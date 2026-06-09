@@ -25,6 +25,10 @@ from .security import PlaceholderVerifier, Principal, TokenVerifier, bearer_sche
 from .services.idempotency import IdempotencyStore, InMemoryIdempotencyStore
 from .services.ratelimit import AllowAllRateLimiter, RateLimiter
 from .services.readiness import ReadinessCheck
+from .wcp.services.dimensi import InMemoryWcpDimensiService, WcpDimensiService
+from .wcp.services.jawaban import InMemoryWcpJawabanService, WcpJawabanService
+from .wcp.services.responden import InMemoryWcpRespondenService, WcpRespondenService
+from .wcp.services.sesi import InMemoryWcpSesiService, WcpSesiService
 
 
 @dataclass
@@ -94,6 +98,49 @@ def _jabatan_singleton() -> InMemoryJabatanService:
 def get_jabatan_service() -> JabatanService:
     """SEAM: kembalikan implementasi `JabatanService`. Ganti di sini saja."""
     return _jabatan_singleton()
+
+
+# --- WCP services ---
+
+
+@lru_cache
+def _wcp_dimensi_singleton() -> InMemoryWcpDimensiService:
+    return InMemoryWcpDimensiService()
+
+
+def get_wcp_dimensi_service() -> WcpDimensiService:
+    """SEAM: kembalikan implementasi `WcpDimensiService`. Ganti di sini saja."""
+    return _wcp_dimensi_singleton()
+
+
+@lru_cache
+def _wcp_sesi_singleton() -> InMemoryWcpSesiService:
+    return InMemoryWcpSesiService()
+
+
+def get_wcp_sesi_service() -> WcpSesiService:
+    """SEAM: kembalikan implementasi `WcpSesiService`. Ganti di sini saja."""
+    return _wcp_sesi_singleton()
+
+
+@lru_cache
+def _wcp_responden_singleton() -> InMemoryWcpRespondenService:
+    return InMemoryWcpRespondenService()
+
+
+def get_wcp_responden_service() -> WcpRespondenService:
+    """SEAM: kembalikan implementasi `WcpRespondenService`. Ganti di sini saja."""
+    return _wcp_responden_singleton()
+
+
+@lru_cache
+def _wcp_jawaban_singleton() -> InMemoryWcpJawabanService:
+    return InMemoryWcpJawabanService()
+
+
+def get_wcp_jawaban_service() -> WcpJawabanService:
+    """SEAM: kembalikan implementasi `WcpJawabanService`. Ganti di sini saja."""
+    return _wcp_jawaban_singleton()
 
 
 # --- Auth ---

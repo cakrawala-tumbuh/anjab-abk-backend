@@ -31,6 +31,27 @@ TAGS_METADATA = [
         "name": "anjab.jabatan",
         "description": "Jabatan — entitas utama Analisis Jabatan (ANJAB).",
     },
+    {
+        "name": "wcp.dimensi",
+        "description": "Master data 12 dimensi WCP dan 72 item pernyataan (read-only).",
+    },
+    {
+        "name": "wcp.sesi",
+        "description": (
+            "Sesi survei WCP per jabatan — CRUD dan transisi status"
+            " (DRAFT→OPEN→CLOSED→ANALYZED)."
+        ),
+    },
+    {
+        "name": "wcp.responden",
+        "description": "Responden dalam sesi WCP dan submit jawaban.",
+    },
+    {
+        "name": "wcp.hasil",
+        "description": (
+            "Analisis WCP: jalankan kalkulasi dan ambil hasil per sesi maupun per responden."
+        ),
+    },
 ]
 
 DESCRIPTION = (

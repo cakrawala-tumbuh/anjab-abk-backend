@@ -4,7 +4,18 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from .v1 import jabatan, jenjang_pendidikan, mata_pelajaran, partisipan, sekolah, system
+from .v1 import (
+    jabatan,
+    jenjang_pendidikan,
+    mata_pelajaran,
+    partisipan,
+    sekolah,
+    system,
+    wcp_dimensi,
+    wcp_hasil,
+    wcp_responden,
+    wcp_sesi,
+)
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(system.router, tags=["system"])
@@ -32,4 +43,24 @@ api_router.include_router(
     jabatan.router,
     prefix="/jabatan",
     tags=["anjab.jabatan"],
+)
+api_router.include_router(
+    wcp_dimensi.router,
+    prefix="/wcp/dimensi",
+    tags=["wcp.dimensi"],
+)
+api_router.include_router(
+    wcp_sesi.router,
+    prefix="/wcp/sesi",
+    tags=["wcp.sesi"],
+)
+api_router.include_router(
+    wcp_responden.router,
+    prefix="/wcp/sesi",
+    tags=["wcp.responden"],
+)
+api_router.include_router(
+    wcp_hasil.router,
+    prefix="/wcp/sesi",
+    tags=["wcp.hasil"],
 )
