@@ -52,6 +52,28 @@ TAGS_METADATA = [
             "Analisis WCP: jalankan kalkulasi dan ambil hasil per sesi maupun per responden."
         ),
     },
+    {
+        "name": "dcs.sub-skala",
+        "description": "Master data 3 sub-skala DCS dan 42 item pernyataan (read-only).",
+    },
+    {
+        "name": "dcs.sesi",
+        "description": (
+            "Sesi survei DCS per jabatan — CRUD dan transisi status"
+            " (DRAFT→OPEN→CLOSED→ANALYZED)."
+        ),
+    },
+    {
+        "name": "dcs.responden",
+        "description": "Responden dalam sesi DCS dan submit jawaban.",
+    },
+    {
+        "name": "dcs.hasil",
+        "description": (
+            "Analisis DCS: jalankan kalkulasi, ambil hasil per sesi/responden,"
+            " serta K-Index terintegrasi dengan WCP."
+        ),
+    },
 ]
 
 DESCRIPTION = (

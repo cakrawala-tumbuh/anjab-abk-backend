@@ -5,6 +5,10 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from .v1 import (
+    dcs_hasil,
+    dcs_responden,
+    dcs_sesi,
+    dcs_subskala,
     jabatan,
     jenjang_pendidikan,
     mata_pelajaran,
@@ -63,4 +67,24 @@ api_router.include_router(
     wcp_hasil.router,
     prefix="/wcp/sesi",
     tags=["wcp.hasil"],
+)
+api_router.include_router(
+    dcs_subskala.router,
+    prefix="/dcs/sub-skala",
+    tags=["dcs.sub-skala"],
+)
+api_router.include_router(
+    dcs_sesi.router,
+    prefix="/dcs/sesi",
+    tags=["dcs.sesi"],
+)
+api_router.include_router(
+    dcs_responden.router,
+    prefix="/dcs/sesi",
+    tags=["dcs.responden"],
+)
+api_router.include_router(
+    dcs_hasil.router,
+    prefix="/dcs/sesi",
+    tags=["dcs.hasil"],
 )

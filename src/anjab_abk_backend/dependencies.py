@@ -20,6 +20,10 @@ from .core.services.jenjang_pendidikan import (
 from .core.services.mata_pelajaran import InMemoryMataPelajaranService, MataPelajaranService
 from .core.services.partisipan import InMemoryPartisipanService, PartisipanService
 from .core.services.sekolah import InMemorySekolahService, SekolahService
+from .dcs.services.jawaban import DcsJawabanService, InMemoryDcsJawabanService
+from .dcs.services.responden import DcsRespondenService, InMemoryDcsRespondenService
+from .dcs.services.sesi import DcsSesiService, InMemoryDcsSesiService
+from .dcs.services.subskala import DcsSubSkalaService, InMemoryDcsSubSkalaService
 from .errors import RateLimitedError, UnauthorizedError
 from .security import PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
 from .services.idempotency import IdempotencyStore, InMemoryIdempotencyStore
@@ -141,6 +145,49 @@ def _wcp_jawaban_singleton() -> InMemoryWcpJawabanService:
 def get_wcp_jawaban_service() -> WcpJawabanService:
     """SEAM: kembalikan implementasi `WcpJawabanService`. Ganti di sini saja."""
     return _wcp_jawaban_singleton()
+
+
+# --- DCS services ---
+
+
+@lru_cache
+def _dcs_subskala_singleton() -> InMemoryDcsSubSkalaService:
+    return InMemoryDcsSubSkalaService()
+
+
+def get_dcs_subskala_service() -> DcsSubSkalaService:
+    """SEAM: kembalikan implementasi `DcsSubSkalaService`. Ganti di sini saja."""
+    return _dcs_subskala_singleton()
+
+
+@lru_cache
+def _dcs_sesi_singleton() -> InMemoryDcsSesiService:
+    return InMemoryDcsSesiService()
+
+
+def get_dcs_sesi_service() -> DcsSesiService:
+    """SEAM: kembalikan implementasi `DcsSesiService`. Ganti di sini saja."""
+    return _dcs_sesi_singleton()
+
+
+@lru_cache
+def _dcs_responden_singleton() -> InMemoryDcsRespondenService:
+    return InMemoryDcsRespondenService()
+
+
+def get_dcs_responden_service() -> DcsRespondenService:
+    """SEAM: kembalikan implementasi `DcsRespondenService`. Ganti di sini saja."""
+    return _dcs_responden_singleton()
+
+
+@lru_cache
+def _dcs_jawaban_singleton() -> InMemoryDcsJawabanService:
+    return InMemoryDcsJawabanService()
+
+
+def get_dcs_jawaban_service() -> DcsJawabanService:
+    """SEAM: kembalikan implementasi `DcsJawabanService`. Ganti di sini saja."""
+    return _dcs_jawaban_singleton()
 
 
 # --- Auth ---
