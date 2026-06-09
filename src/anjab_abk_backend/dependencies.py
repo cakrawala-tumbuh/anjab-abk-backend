@@ -1,0 +1,195 @@
+"""Dependency injection umum: paginasi, service seam, principal auth, idempotency,
+rate limiting, dan readiness check.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from functools import lru_cache
+from typing import Annotated, Any
+
+from fastapi import Depends, Header, Query, Request
+from fastapi.security import HTTPAuthorizationCredentials
+from pydantic import BaseModel
+
+from .anjab.services.jabatan import InMemoryJabatanService, JabatanService
+from .core.services.jenjang_pendidikan import (
+    InMemoryJenjangPendidikanService,
+    JenjangPendidikanService,
+)
+from .core.services.mata_pelajaran import InMemoryMataPelajaranService, MataPelajaranService
+from .core.services.partisipan import InMemoryPartisipanService, PartisipanService
+from .core.services.sekolah import InMemorySekolahService, SekolahService
+from .errors import RateLimitedError, UnauthorizedError
+from .security import PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
+from .services.idempotency import IdempotencyStore, InMemoryIdempotencyStore
+from .services.ratelimit import AllowAllRateLimiter, RateLimiter
+from .services.readiness import ReadinessCheck
+
+
+@dataclass
+class Pagination:
+    limit: int
+    offset: int
+
+
+def pagination_params(
+    limit: Annotated[int, Query(ge=1, le=100, description="Maks item per halaman.")] = 20,
+    offset: Annotated[int, Query(ge=0, description="Jumlah item yang dilewati.")] = 0,
+) -> Pagination:
+    return Pagination(limit=limit, offset=offset)
+
+
+# --- Core services ---
+
+
+@lru_cache
+def _jenjang_singleton() -> InMemoryJenjangPendidikanService:
+    return InMemoryJenjangPendidikanService()
+
+
+def get_jenjang_pendidikan_service() -> JenjangPendidikanService:
+    """SEAM: kembalikan implementasi `JenjangPendidikanService`. Ganti di sini saja."""
+    return _jenjang_singleton()
+
+
+@lru_cache
+def _sekolah_singleton() -> InMemorySekolahService:
+    return InMemorySekolahService()
+
+
+def get_sekolah_service() -> SekolahService:
+    """SEAM: kembalikan implementasi `SekolahService`. Ganti di sini saja."""
+    return _sekolah_singleton()
+
+
+@lru_cache
+def _mata_pelajaran_singleton() -> InMemoryMataPelajaranService:
+    return InMemoryMataPelajaranService()
+
+
+def get_mata_pelajaran_service() -> MataPelajaranService:
+    """SEAM: kembalikan implementasi `MataPelajaranService`. Ganti di sini saja."""
+    return _mata_pelajaran_singleton()
+
+
+@lru_cache
+def _partisipan_singleton() -> InMemoryPartisipanService:
+    return InMemoryPartisipanService()
+
+
+def get_partisipan_service() -> PartisipanService:
+    """SEAM: kembalikan implementasi `PartisipanService`. Ganti di sini saja."""
+    return _partisipan_singleton()
+
+
+# --- ANJAB services ---
+
+
+@lru_cache
+def _jabatan_singleton() -> InMemoryJabatanService:
+    return InMemoryJabatanService()
+
+
+def get_jabatan_service() -> JabatanService:
+    """SEAM: kembalikan implementasi `JabatanService`. Ganti di sini saja."""
+    return _jabatan_singleton()
+
+
+# --- Auth ---
+
+
+@lru_cache
+def _verifier_singleton() -> PlaceholderVerifier:
+    return PlaceholderVerifier()
+
+
+def get_token_verifier() -> TokenVerifier:
+    """SEAM: kembalikan verifier token. Ganti di sini saja (diisi backend-authentik-skill)."""
+    return _verifier_singleton()
+
+
+def get_current_principal(
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    verifier: Annotated[TokenVerifier, Depends(get_token_verifier)],
+) -> Principal:
+    if creds is None:
+        raise UnauthorizedError("Token tidak ada.", headers={"WWW-Authenticate": "Bearer"})
+    return verifier.verify(creds.credentials)
+
+
+# --- Rate limiting ---
+
+
+@lru_cache
+def _rate_limiter_singleton() -> AllowAllRateLimiter:
+    return AllowAllRateLimiter()
+
+
+def get_rate_limiter() -> RateLimiter:
+    return _rate_limiter_singleton()
+
+
+def rate_limit(
+    request: Request,
+    limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
+) -> None:
+    client = request.client.host if request.client else "unknown"
+    key = f"{request.method}:{request.url.path}:{client}"
+    if not limiter.hit(key):
+        raise RateLimitedError(
+            "Terlalu banyak permintaan, coba lagi nanti.",
+            headers={"Retry-After": "1"},
+        )
+
+
+# --- Readiness ---
+
+
+def get_readiness_checks() -> list[ReadinessCheck]:
+    """SEAM: daftar pemeriksaan kesiapan. Default kosong → langsung 'ready'."""
+    return []
+
+
+# --- Idempotency ---
+
+
+@lru_cache
+def _idempotency_store_singleton() -> InMemoryIdempotencyStore:
+    return InMemoryIdempotencyStore()
+
+
+def get_idempotency_store() -> IdempotencyStore:
+    return _idempotency_store_singleton()
+
+
+@dataclass
+class Idempotency:
+    key: str | None
+    store: IdempotencyStore
+
+    def cached(self) -> dict[str, Any] | None:
+        return self.store.get(self.key) if self.key else None
+
+    def reserve(self) -> bool:
+        return self.store.reserve(self.key) if self.key else True
+
+    def release(self) -> None:
+        if self.key:
+            self.store.release(self.key)
+
+    def remember(self, value: BaseModel) -> None:
+        if self.key:
+            self.store.save(self.key, value.model_dump(mode="json"))
+
+
+def idempotency(
+    request: Request,
+    store: Annotated[IdempotencyStore, Depends(get_idempotency_store)],
+    key: Annotated[
+        str | None,
+        Header(alias="Idempotency-Key", description="Kunci idempotency opsional."),
+    ] = None,
+) -> Idempotency:
+    scoped = f"{request.method}:{request.url.path}:{key}" if key else None
+    return Idempotency(key=scoped, store=store)

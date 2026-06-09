@@ -1,0 +1,20 @@
+# CI HANYA menjalankan `make test` — perintah yang persis sama dengan yang
+# dijalankan developer di lokal. Logika lint+unit ada di Makefile + Dockerfile.test,
+# tidak diduplikasi di sini, sehingga lokal dan CI dijamin identik.
+name: Automated Test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Docker sudah tersedia di runner ubuntu-latest.
+      - name: Automated test (lint + unit) di Docker
+        run: make test
