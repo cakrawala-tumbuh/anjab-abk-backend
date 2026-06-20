@@ -14,7 +14,8 @@ DOCKERFILE ?= Dockerfile.test
 DOCKER_RUN  = docker run --rm $(IMAGE_NAME)
 
 .DEFAULT_GOAL := test
-.PHONY: build lint unit test clean shell help
+.PHONY: build lint unit test clean shell help \
+        backup restore backup-list
 
 ## help: tampilkan daftar target
 help:
@@ -42,3 +43,16 @@ clean:
 ## shell: masuk ke shell container test (debugging)
 shell: build
 	docker run --rm -it $(IMAGE_NAME) sh
+
+## backup: dump database ke backups/ (DATABASE_URL wajib di-set di env)
+backup:
+	@./scripts/backup.sh backups
+
+## restore: restore database dari DUMP_FILE=<path> (DATABASE_URL wajib di-set di env)
+restore:
+	@[ -n "$(DUMP_FILE)" ] || { echo "Pakai: make restore DUMP_FILE=<path/ke/file.dump>"; exit 1; }
+	@./scripts/restore.sh "$(DUMP_FILE)"
+
+## backup-list: tampilkan daftar file backup di backups/
+backup-list:
+	@ls -lht backups/*.dump 2>/dev/null || echo "(belum ada file backup di backups/)"
