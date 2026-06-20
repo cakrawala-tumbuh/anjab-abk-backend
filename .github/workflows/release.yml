@@ -1,0 +1,23 @@
+# release.yml — GitHub Release + Docker image ke GHCR.
+# Dipicu saat tag v* di-push (semver dari git-workflow-skill).
+# Dua job independen: Release notes otomatis + image runtime FastAPI.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # untuk GitHub Release
+  packages: write   # untuk push image ke GHCR
+
+jobs:
+  github-release:
+    uses: andhit-r/github-release/.github/workflows/release.yml@v1
+    secrets: inherit
+
+  docker-image:
+    uses: andhit-r/release-docker-image-ghcr/.github/workflows/ghcr.yml@v2
+    with:
+      dockerfile: Dockerfile
+    secrets: inherit
