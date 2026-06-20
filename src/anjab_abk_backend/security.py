@@ -98,11 +98,17 @@ class JwksVerifier:
             )
         except jwt.ExpiredSignatureError:
             from .errors import UnauthorizedError
-            raise UnauthorizedError("Token sudah kedaluwarsa.", headers={"WWW-Authenticate": "Bearer"})
+
+            raise UnauthorizedError(
+                "Token sudah kedaluwarsa.", headers={"WWW-Authenticate": "Bearer"}
+            ) from None
         except jwt.InvalidTokenError as exc:
             logger.debug("Token tidak valid: %s", exc)
             from .errors import UnauthorizedError
-            raise UnauthorizedError("Token tidak valid.", headers={"WWW-Authenticate": "Bearer"})
+
+            raise UnauthorizedError(
+                "Token tidak valid.", headers={"WWW-Authenticate": "Bearer"}
+            ) from exc
 
         return Principal(
             subject=claims["sub"],
