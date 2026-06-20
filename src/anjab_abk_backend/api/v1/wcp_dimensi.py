@@ -1,19 +1,29 @@
-"""Endpoint master data WCP: dimensi dan item (read-only)."""
+"""Endpoint master data WCP: dimensi (read-only) dan item (edit admin-only)."""
 
 from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Body, Depends, Path
 
-from ...dependencies import get_wcp_dimensi_service
+from ...dependencies import get_wcp_dimensi_service, require_admin
 from ...schemas.common import ErrorResponse
-from ...wcp.schemas.dimensi import WcpDimensiRead, WcpDimensiWithItemsRead, WcpItemRead
+from ...wcp.schemas.dimensi import (
+    WcpDimensiRead,
+    WcpDimensiWithItemsRead,
+    WcpItemRead,
+    WcpItemUpdate,
+)
 from ...wcp.services.dimensi import WcpDimensiService
 
 router = APIRouter()
 
 _NOT_FOUND = {404: {"model": ErrorResponse, "description": "Dimensi tidak ditemukan."}}
+_ITEM_NOT_FOUND = {404: {"model": ErrorResponse, "description": "Item tidak ditemukan."}}
+_AUTH = {
+    401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."},
+    403: {"model": ErrorResponse, "description": "Hanya admin yang diizinkan."},
+}
 
 
 @router.get(
@@ -55,3 +65,19 @@ def list_items_by_dimensi(
 ) -> list[WcpItemRead]:
     dim = service.get_dimensi(kode.upper())
     return dim.items
+
+
+@router.patch(
+    "/items/{item_id}",
+    response_model=WcpItemRead,
+    summary="Ubah satu item WCP (admin)",
+    operation_id="wcp_item_update",
+    dependencies=[Depends(require_admin)],
+    responses={**_AUTH, **_ITEM_NOT_FOUND},
+)
+def update_item(
+    item_id: Annotated[str, Path(description="Kode item orisinal, mis. SC1a.")],
+    payload: Annotated[WcpItemUpdate, Body()],
+    service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
+) -> WcpItemRead:
+    return service.update_item(item_id, payload)

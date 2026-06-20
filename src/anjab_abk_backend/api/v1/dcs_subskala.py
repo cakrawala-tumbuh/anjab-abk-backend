@@ -1,19 +1,29 @@
-"""Endpoint master data DCS: sub-skala dan item (read-only)."""
+"""Endpoint master data DCS: sub-skala (read-only) dan item (edit admin-only)."""
 
 from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Body, Depends, Path
 
-from ...dcs.schemas.subskala import DcsItemRead, DcsSubSkalaRead, DcsSubSkalaWithItemsRead
+from ...dcs.schemas.subskala import (
+    DcsItemRead,
+    DcsItemUpdate,
+    DcsSubSkalaRead,
+    DcsSubSkalaWithItemsRead,
+)
 from ...dcs.services.subskala import DcsSubSkalaService
-from ...dependencies import get_dcs_subskala_service
+from ...dependencies import get_dcs_subskala_service, require_admin
 from ...schemas.common import ErrorResponse
 
 router = APIRouter()
 
 _NOT_FOUND = {404: {"model": ErrorResponse, "description": "Sub-skala tidak ditemukan."}}
+_ITEM_NOT_FOUND = {404: {"model": ErrorResponse, "description": "Item tidak ditemukan."}}
+_AUTH = {
+    401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."},
+    403: {"model": ErrorResponse, "description": "Hanya admin yang diizinkan."},
+}
 
 
 @router.get(
@@ -55,3 +65,19 @@ def list_items_by_sub_skala(
 ) -> list[DcsItemRead]:
     sk = service.get_sub_skala(kode.upper())
     return sk.items
+
+
+@router.patch(
+    "/items/{item_id}",
+    response_model=DcsItemRead,
+    summary="Ubah satu item DCS (admin)",
+    operation_id="dcs_item_update",
+    dependencies=[Depends(require_admin)],
+    responses={**_AUTH, **_ITEM_NOT_FOUND},
+)
+def update_item(
+    item_id: Annotated[str, Path(description="Kode item orisinal, mis. D1a.")],
+    payload: Annotated[DcsItemUpdate, Body()],
+    service: Annotated[DcsSubSkalaService, Depends(get_dcs_subskala_service)],
+) -> DcsItemRead:
+    return service.update_item(item_id, payload)

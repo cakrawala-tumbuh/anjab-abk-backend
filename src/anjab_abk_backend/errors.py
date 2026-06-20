@@ -78,6 +78,11 @@ class UnauthorizedError(AppError):
     error_code = "unauthorized"
 
 
+class ForbiddenError(AppError):
+    status_code = status.HTTP_403_FORBIDDEN
+    error_code = "forbidden"
+
+
 class PreconditionRequiredError(AppError):
     status_code = status.HTTP_428_PRECONDITION_REQUIRED
     error_code = "precondition_required"

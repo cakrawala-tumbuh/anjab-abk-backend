@@ -12,6 +12,7 @@ from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     Idempotency,
     Pagination,
+    get_authentik_provisioner,
     get_current_principal,
     get_partisipan_service,
     idempotency,
@@ -22,6 +23,7 @@ from ...errors import ConflictError, PreconditionFailedError, PreconditionRequir
 from ...etag import compute_etag
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ...services.authentik_provisioner import AuthentikProvisioner
 
 router = APIRouter()
 
@@ -125,6 +127,7 @@ def create_partisipan(
                     "summary": "Guru matematika dengan jabatan tambahan",
                     "value": {
                         "nama": "Siti Rahayu, S.Pd.",
+                        "email": "siti.rahayu@sekolah.id",
                         "sekolah_id": "skl_a1b2c3d4",
                         "jabatan_utama_id": "jbt_a1b2c3d4",
                         "jabatan_tambahan_ids": ["jbt_b2c3d4e5"],
@@ -137,6 +140,7 @@ def create_partisipan(
                     "summary": "Staf tata usaha tanpa mata pelajaran",
                     "value": {
                         "nama": "Budi Santoso",
+                        "email": "budi.santoso@sekolah.id",
                         "sekolah_id": "skl_a1b2c3d4",
                         "jabatan_utama_id": "jbt_c3d4e5f6",
                         "jabatan_tambahan_ids": [],
@@ -148,6 +152,7 @@ def create_partisipan(
         ),
     ],
     service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    provisioner: Annotated[AuthentikProvisioner, Depends(get_authentik_provisioner)],
     idem: Annotated[Idempotency, Depends(idempotency)],
     response: Response,
 ) -> PartisipanRead:
@@ -160,7 +165,10 @@ def create_partisipan(
     if not idem.reserve():
         raise ConflictError("Permintaan dengan Idempotency-Key ini sedang diproses.")
     try:
-        item = service.create(payload)
+        authentik_user_id = provisioner.create_partisipan_user(
+            nama=payload.nama, email=payload.email
+        )
+        item = service.create(payload, authentik_user_id=authentik_user_id)
     except Exception:
         idem.release()
         raise

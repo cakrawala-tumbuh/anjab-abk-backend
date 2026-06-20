@@ -1,4 +1,7 @@
-"""Skema Pydantic untuk sub-skala dan item DCS (master data, read-only)."""
+"""Skema Pydantic untuk sub-skala dan item DCS (master data).
+
+Item dapat diubah oleh admin lewat `DcsItemUpdate`; struktur sub-skala tetap.
+"""
 
 from __future__ import annotations
 
@@ -27,6 +30,19 @@ class DcsItemRead(BaseModel):
         examples=["UF"],
     )
     urutan: int = Field(description="Urutan global item (1–42).", examples=[1])
+
+
+class DcsItemUpdate(BaseModel):
+    """Field item DCS yang dapat diubah admin (partial; field kosong diabaikan)."""
+
+    pernyataan: str | None = Field(
+        default=None, min_length=1, max_length=500, description="Teks pernyataan baru."
+    )
+    arah: ArahItem | None = Field(
+        default=None,
+        description="Arah item: F (Favorable) atau UF (Unfavorable, reverse-scored).",
+    )
+    urutan: int | None = Field(default=None, ge=1, le=42, description="Urutan global item (1–42).")
 
 
 class DcsSubSkalaRead(BaseModel):

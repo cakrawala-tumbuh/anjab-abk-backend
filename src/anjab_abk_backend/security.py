@@ -7,10 +7,14 @@ Jangan ubah signature `TokenVerifier.verify` — kontrak ini stabil.
 
 from __future__ import annotations
 
-from typing import Protocol
+import logging
+from typing import Any, Protocol
 
+import jwt
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger("anjab_abk_backend.security")
 
 bearer_scheme = HTTPBearer(
     scheme_name="BearerAuth",
@@ -67,4 +71,42 @@ class PlaceholderVerifier:
     def verify(self, token: str) -> Principal:
         raise NotImplementedError(
             "Pasang verifier token Authentik (gunakan skill backend-authentik-skill)."
+        )
+
+
+class JwksVerifier:
+    """Verifier JWT menggunakan JWKS dari Authentik (RS256).
+
+    Mem-fetch kunci publik dari JWKS endpoint Authentik, mem-verifikasi
+    signature JWT, dan mengekstrak klaim menjadi `Principal`.
+    """
+
+    def __init__(self, jwks_uri: str, issuer: str) -> None:
+        self._issuer = issuer
+        self._jwks_client = jwt.PyJWKClient(jwks_uri, cache_keys=True)
+
+    def verify(self, token: str) -> Principal:
+        try:
+            signing_key = self._jwks_client.get_signing_key_from_jwt(token)
+            claims: dict[str, Any] = jwt.decode(
+                token,
+                signing_key,
+                algorithms=["RS256"],
+                audience=None,
+                options={"verify_aud": False},
+                issuer=self._issuer,
+            )
+        except jwt.ExpiredSignatureError:
+            from .errors import UnauthorizedError
+            raise UnauthorizedError("Token sudah kedaluwarsa.", headers={"WWW-Authenticate": "Bearer"})
+        except jwt.InvalidTokenError as exc:
+            logger.debug("Token tidak valid: %s", exc)
+            from .errors import UnauthorizedError
+            raise UnauthorizedError("Token tidak valid.", headers={"WWW-Authenticate": "Bearer"})
+
+        return Principal(
+            subject=claims["sub"],
+            username=claims.get("preferred_username") or claims.get("email"),
+            groups=claims.get("groups", []),
+            scopes=claims.get("scope", "").split() if isinstance(claims.get("scope"), str) else [],
         )

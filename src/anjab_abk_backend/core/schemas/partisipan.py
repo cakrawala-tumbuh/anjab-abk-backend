@@ -18,6 +18,11 @@ class PartisipanCreate(BaseModel):
         description="Nama lengkap partisipan.",
         examples=["Siti Rahayu, S.Pd."],
     )
+    email: str = Field(
+        pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+        description="Alamat email partisipan — digunakan untuk akun Authentik.",
+        examples=["siti.rahayu@sekolah.id"],
+    )
     sekolah_id: str = Field(
         description="ID sekolah / satuan pendidikan tempat partisipan bertugas.",
         examples=["skl_a1b2c3d4"],
@@ -57,6 +62,11 @@ class PartisipanUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     nama: str | None = Field(default=None, min_length=1, max_length=200, description="Nama baru.")
+    email: str | None = Field(
+        default=None,
+        pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+        description="Alamat email baru.",
+    )
     sekolah_id: str | None = Field(default=None, description="ID sekolah baru.")
     jabatan_utama_id: str | None = Field(default=None, description="ID jabatan utama baru.")
     jabatan_tambahan_ids: list[str] | None = Field(
@@ -79,6 +89,15 @@ class PartisipanRead(BaseModel):
 
     id: str = Field(description="ID unik partisipan.", examples=["par_a1b2c3d4"])
     nama: str = Field(description="Nama lengkap partisipan.", examples=["Siti Rahayu, S.Pd."])
+    email: str = Field(
+        description="Alamat email partisipan.",
+        examples=["siti.rahayu@sekolah.id"],
+    )
+    authentik_user_id: str | None = Field(
+        default=None,
+        description="ID pengguna di Authentik (pk). None bila provisioning belum dikonfigurasi.",
+        examples=["42"],
+    )
     sekolah_id: str = Field(description="ID sekolah tempat bertugas.")
     jabatan_utama_id: str = Field(description="ID jabatan utama.")
     jabatan_tambahan_ids: list[str] = Field(description="Daftar ID jabatan tambahan.")

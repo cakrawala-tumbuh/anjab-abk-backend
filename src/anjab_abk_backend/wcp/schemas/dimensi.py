@@ -1,8 +1,15 @@
-"""Skema Pydantic untuk dimensi dan item WCP (master data, read-only)."""
+"""Skema Pydantic untuk dimensi dan item WCP (master data).
+
+Item dapat diubah oleh admin lewat `WcpItemUpdate`; struktur dimensi tetap.
+"""
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
+
+ReverseType = Literal["NONE", "R", "UF", "R_STAR"]
 
 
 class WcpItemRead(BaseModel):
@@ -26,6 +33,18 @@ class WcpItemRead(BaseModel):
         examples=["R"],
     )
     urutan: int = Field(description="Urutan global item (1–72).", examples=[1])
+
+
+class WcpItemUpdate(BaseModel):
+    """Field item WCP yang dapat diubah admin (partial; field kosong diabaikan)."""
+
+    pernyataan: str | None = Field(
+        default=None, min_length=1, max_length=500, description="Teks pernyataan baru."
+    )
+    reverse_type: ReverseType | None = Field(
+        default=None, description="Tipe scoring: NONE | R | UF | R_STAR."
+    )
+    urutan: int | None = Field(default=None, ge=1, le=72, description="Urutan global item (1–72).")
 
 
 class WcpDimensiRead(BaseModel):

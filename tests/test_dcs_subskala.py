@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from anjab_abk_backend.config import Settings
+from anjab_abk_backend.dependencies import get_token_verifier
+from anjab_abk_backend.main import create_app
+from anjab_abk_backend.security import Principal
+
 BASE = "/api/v1/dcs/sub-skala"
+
+
+class _NonAdminVerifier:
+    def verify(self, token: str) -> Principal:
+        return Principal(subject="u", username="u", groups=["partisipan"])
 
 
 def test_list_sub_skala(anon_client: TestClient) -> None:
@@ -59,3 +69,55 @@ def test_total_items_42(anon_client: TestClient) -> None:
         len(anon_client.get(f"{BASE}/{k}/items").json()) for k in ("DEMAND", "CONTROL", "SUPPORT")
     )
     assert total == 42
+
+
+# --- Update item (admin-only) ---
+
+
+def test_update_item_as_admin(client: TestClient) -> None:
+    r = client.patch(
+        f"{BASE}/items/D1a",
+        json={"pernyataan": "Teks baru D1a.", "arah": "F", "urutan": 2},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["pernyataan"] == "Teks baru D1a."
+    assert data["arah"] == "F"
+    assert data["urutan"] == 2
+
+
+def test_update_item_partial(client: TestClient) -> None:
+    before = client.get(f"{BASE}/CONTROL").json()["items"][0]
+    item_id = before["item_id"]
+    r = client.patch(f"{BASE}/items/{item_id}", json={"pernyataan": "Hanya teks."})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["pernyataan"] == "Hanya teks."
+    assert data["arah"] == before["arah"]
+
+
+def test_update_item_requires_auth(anon_client: TestClient) -> None:
+    r = anon_client.patch(f"{BASE}/items/D1a", json={"pernyataan": "x"})
+    assert r.status_code == 401
+
+
+def test_update_item_forbidden_for_non_admin(settings: Settings) -> None:
+    app = create_app(settings=settings)
+    app.dependency_overrides[get_token_verifier] = lambda: _NonAdminVerifier()
+    with TestClient(app) as c:
+        r = c.patch(
+            f"{BASE}/items/D1a",
+            headers={"Authorization": "Bearer t"},
+            json={"pernyataan": "x"},
+        )
+    assert r.status_code == 403
+
+
+def test_update_item_not_found(client: TestClient) -> None:
+    r = client.patch(f"{BASE}/items/TIDAKADA", json={"pernyataan": "x"})
+    assert r.status_code == 404
+
+
+def test_update_item_rejects_invalid_arah(client: TestClient) -> None:
+    r = client.patch(f"{BASE}/items/D1a", json={"arah": "X"})
+    assert r.status_code == 422

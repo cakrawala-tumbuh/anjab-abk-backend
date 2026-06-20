@@ -1,12 +1,23 @@
-"""SEAM akses data untuk sub-skala dan item DCS (master data, read-only, seeded)."""
+"""SEAM akses data untuk sub-skala dan item DCS (master data, seeded).
+
+Sub-skala bersifat tetap; teks/arah/urutan item dapat diubah admin lewat
+`update_item`. Implementasi in-memory ini placeholder — diganti penyimpanan
+persisten oleh skill `backend-postgresql-skill` tanpa mengubah signature.
+"""
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from typing import Protocol
 
 from ...errors import NotFoundError
-from ..schemas.subskala import DcsItemRead, DcsSubSkalaRead, DcsSubSkalaWithItemsRead
+from ..schemas.subskala import (
+    DcsItemRead,
+    DcsItemUpdate,
+    DcsSubSkalaRead,
+    DcsSubSkalaWithItemsRead,
+)
 from ..seed import ITEM, SUB_SKALA
 
 
@@ -36,6 +47,7 @@ class DcsSubSkalaService(Protocol):
     def get_sub_skala(self, kode: str) -> DcsSubSkalaWithItemsRead: ...
     def list_item(self) -> list[DcsItemRead]: ...
     def get_item_by_item_id(self, item_id: str) -> DcsItemRead: ...
+    def update_item(self, item_id: str, data: DcsItemUpdate) -> DcsItemRead: ...
 
 
 def _to_item_read(rec: _ItemRecord) -> DcsItemRead:
@@ -50,6 +62,7 @@ class InMemoryDcsSubSkalaService:
     """Implementasi seeded in-memory — data identik dengan sheet DCS Screening."""
 
     def __init__(self) -> None:
+        self._lock = threading.Lock()
         self._sub_skala: dict[str, _SubSkalaRecord] = {}
         self._items: dict[str, _ItemRecord] = {}
         self._seed()
@@ -96,3 +109,17 @@ class InMemoryDcsSubSkalaService:
         if rec is None:
             raise NotFoundError(f"Item DCS '{item_id}' tidak ditemukan.")
         return _to_item_read(rec)
+
+    def update_item(self, item_id: str, data: DcsItemUpdate) -> DcsItemRead:
+        with self._lock:
+            rec = self._items.get(item_id)
+            if rec is None:
+                raise NotFoundError(f"Item DCS '{item_id}' tidak ditemukan.")
+            patch = data.model_dump(exclude_unset=True)
+            if "pernyataan" in patch:
+                rec.pernyataan = patch["pernyataan"]
+            if "arah" in patch:
+                rec.arah = patch["arah"]
+            if "urutan" in patch:
+                rec.urutan = patch["urutan"]
+            return _to_item_read(rec)

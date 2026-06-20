@@ -13,6 +13,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
 from .anjab.services.jabatan import InMemoryJabatanService, JabatanService
+from .config import Settings, get_settings
 from .core.services.jenjang_pendidikan import (
     InMemoryJenjangPendidikanService,
     JenjangPendidikanService,
@@ -24,8 +25,13 @@ from .dcs.services.jawaban import DcsJawabanService, InMemoryDcsJawabanService
 from .dcs.services.responden import DcsRespondenService, InMemoryDcsRespondenService
 from .dcs.services.sesi import DcsSesiService, InMemoryDcsSesiService
 from .dcs.services.subskala import DcsSubSkalaService, InMemoryDcsSubSkalaService
-from .errors import RateLimitedError, UnauthorizedError
-from .security import PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
+from .errors import ForbiddenError, RateLimitedError, UnauthorizedError
+from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
+from .services.authentik_provisioner import (
+    AuthentikProvisioner,
+    HttpAuthentikProvisioner,
+    PlaceholderAuthentikProvisioner,
+)
 from .services.idempotency import IdempotencyStore, InMemoryIdempotencyStore
 from .services.ratelimit import AllowAllRateLimiter, RateLimiter
 from .services.readiness import ReadinessCheck
@@ -190,11 +196,39 @@ def get_dcs_jawaban_service() -> DcsJawabanService:
     return _dcs_jawaban_singleton()
 
 
+# --- Authentik Provisioner ---
+
+
+def get_authentik_provisioner(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> AuthentikProvisioner:
+    """SEAM: kembalikan provisioner Authentik.
+
+    Mengembalikan `HttpAuthentikProvisioner` bila env AUTHENTIK_API_URL,
+    AUTHENTIK_API_TOKEN, dan AUTHENTIK_PARTISIPAN_GROUP_ID sudah di-set;
+    sebaliknya `PlaceholderAuthentikProvisioner` yang mengembalikan ID palsu.
+    """
+    if (
+        settings.authentik_api_url
+        and settings.authentik_api_token
+        and settings.authentik_partisipan_group_id
+    ):
+        return HttpAuthentikProvisioner(
+            api_url=settings.authentik_api_url,
+            api_token=settings.authentik_api_token,
+            partisipan_group_id=settings.authentik_partisipan_group_id,
+        )
+    return PlaceholderAuthentikProvisioner()
+
+
 # --- Auth ---
 
 
 @lru_cache
-def _verifier_singleton() -> PlaceholderVerifier:
+def _verifier_singleton() -> TokenVerifier:
+    s = get_settings()
+    if s.authentik_jwks_uri and s.authentik_issuer:
+        return JwksVerifier(jwks_uri=s.authentik_jwks_uri, issuer=s.authentik_issuer)
     return PlaceholderVerifier()
 
 
@@ -210,6 +244,15 @@ def get_current_principal(
     if creds is None:
         raise UnauthorizedError("Token tidak ada.", headers={"WWW-Authenticate": "Bearer"})
     return verifier.verify(creds.credentials)
+
+
+def require_admin(
+    principal: Annotated[Principal, Depends(get_current_principal)],
+) -> Principal:
+    """Guard otorisasi: hanya principal dengan grup `admin` yang diizinkan."""
+    if "admin" not in principal.groups:
+        raise ForbiddenError("Akses ditolak: hanya admin yang dapat mengubah master data.")
+    return principal
 
 
 # --- Rate limiting ---

@@ -22,6 +22,7 @@ SEARCHABLE_FIELDS = frozenset(
     {
         "id",
         "nama",
+        "email",
         "sekolah_id",
         "jabatan_utama_id",
         "masa_kerja_tahun",
@@ -38,7 +39,9 @@ class PartisipanService(Protocol):
 
     def list(self, *, limit: int, offset: int) -> tuple[list[PartisipanRead], int]: ...
     def get(self, partisipan_id: str) -> PartisipanRead: ...
-    def create(self, data: PartisipanCreate) -> PartisipanRead: ...
+    def create(
+        self, data: PartisipanCreate, *, authentik_user_id: str | None = None
+    ) -> PartisipanRead: ...
     def update(self, partisipan_id: str, data: PartisipanUpdate) -> PartisipanRead: ...
     def delete(self, partisipan_id: str) -> None: ...
     def search(
@@ -50,6 +53,7 @@ class PartisipanService(Protocol):
 class _Record:
     id: str
     nama: str
+    email: str
     sekolah_id: str
     jabatan_utama_id: str
     masa_kerja_tahun: int
@@ -58,6 +62,7 @@ class _Record:
     jabatan_tambahan_ids: list[str] = field(default_factory=list)
     masa_kerja_bulan: int = 0
     mata_pelajaran_utama_id: str | None = None
+    authentik_user_id: str | None = None
 
 
 class InMemoryPartisipanService:
@@ -84,11 +89,14 @@ class InMemoryPartisipanService:
             raise NotFoundError(f"Partisipan '{partisipan_id}' tidak ditemukan.")
         return self._to_read(rec)
 
-    def create(self, data: PartisipanCreate) -> PartisipanRead:
+    def create(
+        self, data: PartisipanCreate, *, authentik_user_id: str | None = None
+    ) -> PartisipanRead:
         with self._lock:
             rec = _Record(
                 id=f"par_{uuid.uuid4().hex[:8]}",
                 nama=data.nama,
+                email=data.email,
                 sekolah_id=data.sekolah_id,
                 jabatan_utama_id=data.jabatan_utama_id,
                 jabatan_tambahan_ids=list(data.jabatan_tambahan_ids),
@@ -97,6 +105,7 @@ class InMemoryPartisipanService:
                 mata_pelajaran_utama_id=data.mata_pelajaran_utama_id,
                 aktif=data.aktif,
                 created_at=datetime.now(UTC),
+                authentik_user_id=authentik_user_id,
             )
             self._data[rec.id] = rec
             return self._to_read(rec)

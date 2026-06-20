@@ -8,6 +8,7 @@ BASE = "/api/v1/partisipan"
 
 _PAYLOAD = {
     "nama": "Siti Rahayu, S.Pd.",
+    "email": "siti.rahayu@sekolah.id",
     "sekolah_id": "skl_dummy",
     "jabatan_utama_id": "jbt_dummy",
     "jabatan_tambahan_ids": ["jbt_b1", "jbt_b2"],

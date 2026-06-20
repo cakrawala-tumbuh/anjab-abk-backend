@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from anjab_abk_backend.config import Settings
+from anjab_abk_backend.dependencies import get_token_verifier
+from anjab_abk_backend.main import create_app
+from anjab_abk_backend.security import Principal
+
 BASE = "/api/v1/wcp/dimensi"
+
+
+class _NonAdminVerifier:
+    def verify(self, token: str) -> Principal:
+        return Principal(subject="u", username="u", groups=["partisipan"])
 
 
 def test_list_dimensi_returns_12(anon_client: TestClient) -> None:
@@ -79,3 +89,55 @@ def test_total_items_across_all_dimensi(anon_client: TestClient) -> None:
         r = anon_client.get(f"{BASE}/{d['kode']}/items")
         total += len(r.json())
     assert total == 72
+
+
+# --- Update item (admin-only) ---
+
+
+def test_update_item_as_admin(client: TestClient) -> None:
+    r = client.patch(
+        f"{BASE}/items/TM1a",
+        json={"pernyataan": "Teks baru TM1a.", "reverse_type": "NONE", "urutan": 7},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["pernyataan"] == "Teks baru TM1a."
+    assert data["reverse_type"] == "NONE"
+    assert data["urutan"] == 7
+
+
+def test_update_item_partial(client: TestClient) -> None:
+    before = client.get(f"{BASE}/AS").json()["items"][0]
+    item_id = before["item_id"]
+    r = client.patch(f"{BASE}/items/{item_id}", json={"pernyataan": "Hanya teks."})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["pernyataan"] == "Hanya teks."
+    assert data["reverse_type"] == before["reverse_type"]
+
+
+def test_update_item_requires_auth(anon_client: TestClient) -> None:
+    r = anon_client.patch(f"{BASE}/items/SC1a", json={"pernyataan": "x"})
+    assert r.status_code == 401
+
+
+def test_update_item_forbidden_for_non_admin(settings: Settings) -> None:
+    app = create_app(settings=settings)
+    app.dependency_overrides[get_token_verifier] = lambda: _NonAdminVerifier()
+    with TestClient(app) as c:
+        r = c.patch(
+            f"{BASE}/items/SC1a",
+            headers={"Authorization": "Bearer t"},
+            json={"pernyataan": "x"},
+        )
+    assert r.status_code == 403
+
+
+def test_update_item_not_found(client: TestClient) -> None:
+    r = client.patch(f"{BASE}/items/TIDAKADA", json={"pernyataan": "x"})
+    assert r.status_code == 404
+
+
+def test_update_item_rejects_invalid_reverse_type(client: TestClient) -> None:
+    r = client.patch(f"{BASE}/items/SC1b", json={"reverse_type": "INVALID"})
+    assert r.status_code == 422

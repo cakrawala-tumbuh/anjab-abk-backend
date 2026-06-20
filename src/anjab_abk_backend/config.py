@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     authentik_jwks_uri: str | None = None
     api_audience: str | None = None
 
+    # Authentik Admin API — untuk provisioning akun partisipan.
+    # Diisi agar backend dapat membuat user Authentik saat menambah partisipan.
+    authentik_api_url: str | None = None
+    authentik_api_token: str | None = None
+    authentik_partisipan_group_id: str | None = None
+
     # OAuth2 interaktif Swagger (opsional, doc-only)
     oauth2_authorization_url: str | None = None
     oauth2_token_url: str | None = None
