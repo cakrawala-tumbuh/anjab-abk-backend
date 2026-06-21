@@ -7,7 +7,7 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
-## [0.9.0] - 2026-06-21
+## [0.10.0] - 2026-06-21
 
 ### Ditambahkan
 
