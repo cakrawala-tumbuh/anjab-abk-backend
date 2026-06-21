@@ -55,7 +55,15 @@ def list_responden(
     summary="Daftarkan responden ke sesi WCP",
     operation_id="wcp_responden_create",
     dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND_SESI},
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_NOT_FOUND_SESI,
+        409: {
+            "model": ErrorResponse,
+            "description": "Partisipan sudah terdaftar sebagai responden WCP.",
+        },
+    },
 )
 def create_responden(
     sesi_id: Annotated[str, Path(description="ID sesi WCP.")],

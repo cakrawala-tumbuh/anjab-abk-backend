@@ -7,6 +7,16 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-21
+
+### Ditambahkan
+
+- **Batasan 1 WCP per partisipan**: admin tidak dapat mendaftarkan partisipan yang sama ke lebih
+  dari satu sesi WCP. Endpoint `POST /api/v1/wcp/sesi/{sesi_id}/responden` kini mengembalikan
+  `409 Conflict` apabila `partisipan_id` sudah terdaftar sebagai responden di sesi WCP mana pun.
+- Unit test baru: `test_create_responden_duplicate_partisipan_rejected` (409 pada duplikat
+  partisipan di lintas sesi WCP).
+
 ## [0.6.0] - 2026-06-21
 
 ### Ditambahkan
@@ -79,6 +89,11 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 ### Ditambahkan
 - Rilis pertama: FastAPI backend dengan modul core (sekolah, partisipan, jabatan), WCP, DCS, dan autentikasi Authentik OIDC.
 
-[Unreleased]: https://github.com/cakrawala-tumbuh/anjab-abk-backend/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/cakrawala-tumbuh/anjab-abk-backend/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/cakrawala-tumbuh/anjab-abk-backend/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/cakrawala-tumbuh/anjab-abk-backend/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/cakrawala-tumbuh/anjab-abk-backend/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/cakrawala-tumbuh/anjab-abk-backend/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/cakrawala-tumbuh/anjab-abk-backend/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/cakrawala-tumbuh/anjab-abk-backend/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/cakrawala-tumbuh/anjab-abk-backend/releases/tag/v0.1.0

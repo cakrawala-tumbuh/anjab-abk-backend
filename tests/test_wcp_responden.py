@@ -95,6 +95,25 @@ def test_list_responden_sesi_not_found(anon_client: TestClient) -> None:
     assert r.status_code == 404
 
 
+def test_create_responden_duplicate_partisipan_rejected(
+    client: TestClient, open_sesi: dict
+) -> None:
+    """Partisipan yang sama tidak boleh menjadi responden WCP lebih dari satu kali."""
+    par_id = f"par_{uuid.uuid4().hex[:8]}"
+    r1 = client.post(
+        f"{SESI_BASE}/{open_sesi['id']}/responden",
+        json={"jabatan_label": "Guru A", "partisipan_id": par_id},
+    )
+    assert r1.status_code == 201
+
+    sesi2 = _build_sesi(client)
+    r2 = client.post(
+        f"{SESI_BASE}/{sesi2['id']}/responden",
+        json={"jabatan_label": "Guru B", "partisipan_id": par_id},
+    )
+    assert r2.status_code == 409
+
+
 # --- DELETE /responden/{responden_id} ---
 
 
