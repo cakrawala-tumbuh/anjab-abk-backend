@@ -174,3 +174,60 @@ def test_get_hasil_sesi_not_analyzed(client: TestClient) -> None:
     sesi = _build_sesi(client)
     r = client.get(f"{SESI_BASE}/{sesi['id']}/hasil")
     assert r.status_code in (400, 422)
+
+
+# --- GET /kuesioner/saya (WCP) ---
+
+WCP_KUESIONER_BASE = "/api/v1/wcp/kuesioner"
+
+
+def test_kuesioner_saya_tanpa_partisipan_wcp(client: TestClient) -> None:
+    r = client.get(f"{WCP_KUESIONER_BASE}/saya")
+    assert r.status_code == 200
+
+
+def test_kuesioner_saya_dengan_partisipan_wcp(client: TestClient) -> None:
+    """Enrollment otomatis WCP: sesi untuk jabatan utama partisipan muncul tanpa
+    assign manual; pemanggilan idempoten."""
+    from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
+    from anjab_abk_backend.dependencies import get_partisipan_service
+
+    par_service = get_partisipan_service()
+    par_service._data.clear()  # type: ignore[attr-defined]
+
+    jabatan_id = f"jbt_{uuid.uuid4().hex[:8]}"
+    par_service.create(
+        PartisipanCreate(
+            nama="Partisipan Kuesioner WCP",
+            email=f"ksr_wcp_{uuid.uuid4().hex[:4]}@test.id",
+            sekolah_id="skl_dummy",
+            jabatan_utama_id=jabatan_id,
+            masa_kerja_tahun=2,
+        ),
+        authentik_user_id="test-user",
+    )
+
+    sesi = client.post(
+        SESI_BASE,
+        json={
+            "jabatan_id": jabatan_id,
+            "periode": "2025-10",
+            "min_responden": 2,
+            "max_responden": 4,
+        },
+    ).json()
+    client.post(f"{SESI_BASE}/{sesi['id']}/buka")
+    _build_sesi(client)  # sesi jabatan acak — tidak boleh muncul
+
+    r = client.get(f"{WCP_KUESIONER_BASE}/saya")
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 1
+    item = data[0]
+    assert item["sesi_id"] == sesi["id"]
+    assert item["sesi_status"] == "OPEN"
+    assert item["sesi_jabatan_id"] == jabatan_id
+    assert item["sudah_submit"] is False
+
+    r2 = client.get(f"{WCP_KUESIONER_BASE}/saya")
+    assert [i["id"] for i in r2.json()] == [item["id"]]

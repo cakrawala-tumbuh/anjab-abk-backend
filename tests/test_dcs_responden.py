@@ -273,29 +273,50 @@ def test_kuesioner_saya_tanpa_partisipan(client: TestClient) -> None:
 
 
 def test_kuesioner_saya_dengan_partisipan(client: TestClient) -> None:
+    """Enrollment otomatis: sesi DCS untuk jabatan utama partisipan muncul tanpa
+    perlu assign responden manual; pemanggilan idempoten."""
     from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
     from anjab_abk_backend.dependencies import get_partisipan_service
 
     par_service = get_partisipan_service()
-    par = par_service.create(
+    # Reset store agar get_by_subject("test-user") deterministik (singleton sesi-scope).
+    par_service._data.clear()  # type: ignore[attr-defined]
+
+    jabatan_id = f"jbt_{uuid.uuid4().hex[:8]}"
+    par_service.create(
         PartisipanCreate(
             nama="Partisipan Kuesioner DCS",
             email=f"ksr_dcs_{uuid.uuid4().hex[:4]}@test.id",
             sekolah_id="skl_dummy",
-            jabatan_utama_id="jbt_dummy",
+            jabatan_utama_id=jabatan_id,
             masa_kerja_tahun=2,
         ),
         authentik_user_id="test-user",
     )
 
-    sesi = _build_sesi(client)
-    rsp = _add_responden(client, sesi["id"], partisipan_id=par.id)
+    # Sesi DCS untuk jabatan partisipan (cocok) + sesi lain (jabatan berbeda).
+    sesi = client.post(
+        SESI_BASE,
+        json={
+            "jabatan_id": jabatan_id,
+            "periode": "2025-09",
+            "min_responden": 2,
+            "max_responden": 4,
+        },
+    ).json()
+    client.post(f"{SESI_BASE}/{sesi['id']}/buka")
+    _build_sesi(client)  # sesi jabatan acak — tidak boleh muncul
 
     r = client.get(f"{DCS_KUESIONER_BASE}/saya")
     assert r.status_code == 200
     data = r.json()
-    ids = [item["id"] for item in data]
-    assert rsp["id"] in ids
-    kuesioner = next(item for item in data if item["id"] == rsp["id"])
-    assert kuesioner["sesi_status"] == "OPEN"
-    assert kuesioner["sesi_jabatan_id"] == sesi["jabatan_id"]
+    assert len(data) == 1
+    item = data[0]
+    assert item["sesi_id"] == sesi["id"]
+    assert item["sesi_status"] == "OPEN"
+    assert item["sesi_jabatan_id"] == jabatan_id
+    assert item["sudah_submit"] is False
+
+    # Idempoten: pemanggilan kedua tidak menggandakan responden.
+    r2 = client.get(f"{DCS_KUESIONER_BASE}/saya")
+    assert [i["id"] for i in r2.json()] == [item["id"]]

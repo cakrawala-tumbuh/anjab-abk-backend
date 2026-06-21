@@ -376,3 +376,64 @@ def test_detail_enum_invalid(client: TestClient, field: str) -> None:
     item[field] = "NILAI_SALAH"
     res = client.post(f"{SESI}/responden/{ra['id']}/detail", json={"detail": [item]})
     assert res.status_code == 422
+
+
+# --------------------------------------------------------------------------- #
+# GET /kuesioner/saya (Task Inventory — universal)
+# --------------------------------------------------------------------------- #
+
+KUESIONER = f"{BASE}/kuesioner"
+
+
+def test_kuesioner_saya_tanpa_partisipan_ti(client: TestClient) -> None:
+    r = client.get(f"{KUESIONER}/saya")
+    assert r.status_code == 200
+
+
+def test_kuesioner_saya_universal_ti(client: TestClient) -> None:
+    """Task Inventory bersifat universal: partisipan melihat SEMUA sesi aktif
+    (TAHAP1/TAHAP2), bukan hanya yang cocok jabatannya; pemanggilan idempoten."""
+    import uuid
+
+    from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
+    from anjab_abk_backend.dependencies import (
+        get_partisipan_service,
+        get_ti_responden_service,
+        get_ti_sesi_service,
+    )
+
+    par_service = get_partisipan_service()
+    par_service._data.clear()  # type: ignore[attr-defined]
+    get_ti_responden_service()._data.clear()  # type: ignore[attr-defined]
+    # Bersihkan sesi TI agar query universal hanya melihat sesi test ini.
+    get_ti_sesi_service()._data.clear()  # type: ignore[attr-defined]
+
+    par_service.create(
+        PartisipanCreate(
+            nama="Partisipan Kuesioner TI",
+            email=f"ksr_ti_{uuid.uuid4().hex[:4]}@test.id",
+            sekolah_id="skl_dummy",
+            jabatan_utama_id=f"jbt_{uuid.uuid4().hex[:8]}",
+            masa_kerja_tahun=2,
+        ),
+        authentik_user_id="test-user",
+    )
+
+    # Dua sesi aktif (TAHAP1) + satu sesi DRAFT (tidak boleh muncul).
+    aktif_ids = set()
+    for _ in range(2):
+        sesi = _create_sesi(client)
+        client.post(f"{SESI}/{sesi['id']}/mulai-tahap1")
+        aktif_ids.add(sesi["id"])
+    _create_sesi(client)  # DRAFT
+
+    r = client.get(f"{KUESIONER}/saya")
+    assert r.status_code == 200
+    data = r.json()
+    assert {item["sesi_id"] for item in data} == aktif_ids
+    assert all(item["tahap1_submit"] is False for item in data)
+    assert all(item["sesi_status"] == "TAHAP1" for item in data)
+
+    # Idempoten: jumlah & id responden tetap.
+    r2 = client.get(f"{KUESIONER}/saya")
+    assert {i["id"] for i in r2.json()} == {i["id"] for i in data}

@@ -19,6 +19,7 @@ from .v1 import (
     taskinv_catalog,
     taskinv_detail,
     taskinv_hasil,
+    taskinv_kuesioner,
     taskinv_responden,
     taskinv_seleksi,
     taskinv_sesi,
@@ -105,6 +106,11 @@ api_router.include_router(
     dcs_hasil.router,
     prefix="/dcs/sesi",
     tags=["dcs.hasil"],
+)
+api_router.include_router(
+    taskinv_kuesioner.router,
+    prefix="/task-inventory",
+    tags=["taskinv.kuesioner"],
 )
 api_router.include_router(
     taskinv_catalog.router,

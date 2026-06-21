@@ -36,6 +36,9 @@ class TiRespondenService(Protocol):
     def create(
         self, sesi_id: str, data: TiRespondenCreate, max_responden: int
     ) -> TiRespondenRead: ...
+    def ensure_for_partisipan(
+        self, sesi_id: str, *, partisipan_id: str, nama: str | None
+    ) -> TiRespondenRead: ...
     def mark_tahap1(self, responden_id: str) -> TiRespondenRead: ...
     def mark_tahap2(self, responden_id: str) -> TiRespondenRead: ...
     def delete(self, responden_id: str) -> None: ...
@@ -95,6 +98,31 @@ class InMemoryTiRespondenService:
                 sesi_id=sesi_id,
                 nama=data.nama,
                 partisipan_id=data.partisipan_id,
+                tahap1_submit=False,
+                tahap2_submit=False,
+                created_at=datetime.now(UTC),
+            )
+            self._data[rec.id] = rec
+            return self._to_read(rec)
+
+    def ensure_for_partisipan(
+        self, sesi_id: str, *, partisipan_id: str, nama: str | None
+    ) -> TiRespondenRead:
+        """Idempoten: kembalikan responden untuk (sesi_id, partisipan_id) bila sudah
+        ada, selain itu buat baru.
+
+        Dipakai enrollment otomatis 'Kuesioner Saya' — TIDAK menerapkan batas
+        ``max_responden`` karena setiap partisipan dijamin mengisi alat ukur ini.
+        """
+        with self._lock:
+            for r in self._data.values():
+                if r.sesi_id == sesi_id and r.partisipan_id == partisipan_id:
+                    return self._to_read(r)
+            rec = _Record(
+                id=f"trsp_{uuid.uuid4().hex[:8]}",
+                sesi_id=sesi_id,
+                nama=nama,
+                partisipan_id=partisipan_id,
                 tahap1_submit=False,
                 tahap2_submit=False,
                 created_at=datetime.now(UTC),

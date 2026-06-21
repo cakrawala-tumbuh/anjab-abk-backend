@@ -7,6 +7,21 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-21
+
+### Diubah
+- **Enrollment "Kuesioner Saya" otomatis (computed on-the-fly).** Endpoint
+  `/api/v1/dcs/kuesioner/saya` & `/api/v1/wcp/kuesioner/saya` kini menghitung sesi yang
+  berlaku untuk partisipan (sesi berstatus `OPEN` dengan `jabatan_id == jabatan_utama_id`
+  partisipan) dan membuat record responden secara idempoten — tanpa penugasan manual oleh
+  admin. Selaras model "1 deployment = 1 sesi studi, tiap partisipan mengisi semua alat ukur".
+
+### Ditambahkan
+- Endpoint `/api/v1/task-inventory/kuesioner/saya` — Task Inventory bersifat **universal**:
+  tiap partisipan mengisi SEMUA sesi aktif (`TAHAP1`/`TAHAP2`) tanpa filter jabatan.
+- Metode `ensure_for_partisipan` (idempoten, tidak menerapkan batas `max_responden`) pada
+  service responden DCS, WCP, dan Task Inventory untuk mendukung enrollment otomatis.
+
 ## [0.3.0] - 2026-06-21
 
 ### Ditambahkan
