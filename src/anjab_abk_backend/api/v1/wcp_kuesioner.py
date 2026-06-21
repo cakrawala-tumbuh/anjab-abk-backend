@@ -6,15 +6,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from ...anjab.services.jabatan import JabatanService
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     get_current_principal,
-    get_jabatan_service,
     get_partisipan_service,
     get_wcp_responden_service,
     get_wcp_sesi_service,
 )
+from ...errors import NotFoundError
 from ...schemas.common import ErrorResponse
 from ...security import Principal
 from ...wcp.schemas.kuesioner import WcpKuesionerItemRead
@@ -38,37 +37,25 @@ def kuesioner_saya(
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     sesi_service: Annotated[WcpSesiService, Depends(get_wcp_sesi_service)],
-    jabatan_service: Annotated[JabatanService, Depends(get_jabatan_service)],
 ) -> list[WcpKuesionerItemRead]:
-    """Enrollment otomatis: kembalikan sesi WCP yang berlaku untuk jabatan utama
-    partisipan dan berstatus OPEN, sambil membuat record responden bila belum ada.
+    """Kembalikan sesi WCP yang sudah di-assign ke partisipan dan berstatus OPEN.
 
-    Tiap partisipan mengisi tepat satu WCP sesuai ``jabatan_utama_id``-nya.
+    Partisipan hanya melihat kuesioner WCP yang telah di-assign secara eksplisit
+    oleh admin (record responden sudah dibuat dengan ``partisipan_id`` mereka).
+    Tidak ada enrollment otomatis.
     """
     par = par_service.get_by_subject(principal.subject)
     if par is None:
         return []
 
-    try:
-        jabatan_label = jabatan_service.get(par.jabatan_utama_id).nama
-    except Exception:
-        jabatan_label = par.jabatan_utama_id
-
-    sesi_list, _ = sesi_service.search(
-        domain=[("jabatan_id", "=", par.jabatan_utama_id), ("status", "=", "OPEN")],
-        order=[("created_at", "desc")],
-        limit=100,
-        offset=0,
-    )
-
     result = []
-    for sesi in sesi_list:
-        rsp = rsp_service.ensure_for_partisipan(
-            sesi.id,
-            partisipan_id=par.id,
-            nama=par.nama,
-            jabatan_label=jabatan_label,
-        )
+    for rsp in rsp_service.list_by_partisipan(par.id):
+        try:
+            sesi = sesi_service.get(rsp.sesi_id)
+        except NotFoundError:
+            continue
+        if sesi.status != "OPEN":
+            continue
         result.append(
             WcpKuesionerItemRead(
                 id=rsp.id,

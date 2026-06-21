@@ -15,6 +15,7 @@ from .v1 import (
     mata_pelajaran,
     partisipan,
     sekolah,
+    sme_panel,
     system,
     taskinv_catalog,
     taskinv_detail,
@@ -56,6 +57,11 @@ api_router.include_router(
     jabatan.router,
     prefix="/jabatan",
     tags=["anjab.jabatan"],
+)
+api_router.include_router(
+    sme_panel.router,
+    prefix="/sme-panel",
+    tags=["anjab.sme-panel"],
 )
 api_router.include_router(
     dcs_kuesioner.router,

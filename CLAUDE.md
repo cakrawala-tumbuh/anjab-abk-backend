@@ -40,6 +40,22 @@ tidak boleh lintas domain kecuali lewat `core`.
 - Prefix versi API: `/api/v1/`.
 - Autentikasi via JWT Authentik (RS256, JWKS); backend hanya memvalidasi token, tidak menerbitkan.
 
+## Revisi Desain
+
+### [2026-06-21] DCS & WCP: Enrollment berbasis Assignment
+
+DCS dan WCP beralih dari **enrollment otomatis** ke **sistem assignment**:
+
+- Partisipan **hanya** melihat kuesioner yang sudah di-assign admin secara eksplisit
+  (record `responden` dibuat admin via `POST /api/v1/{dcs|wcp}/sesi/{sesi_id}/responden`
+  dengan field `partisipan_id` diisi).
+- Endpoint `GET /kuesioner/saya` tidak lagi membuat record responden otomatis;
+  ia hanya membaca hasil `list_by_partisipan()`.
+- Method `ensure_for_partisipan()` telah dihapus dari `DcsRespondenService` dan
+  `WcpRespondenService` (Protocol + InMemory impl).
+- Setiap alat ukur (DCS, WCP) dapat di-assign secara mandiri ke partisipan berbeda.
+- Task Inventory tetap menggunakan flow yang sama (assignment manual via `tambah-responden`).
+
 ## Jangan Sentuh
 
 - `alembic/versions/` — migrasi historis yang sudah berjalan; jangan diedit tangan.

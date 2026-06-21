@@ -272,9 +272,9 @@ def test_kuesioner_saya_tanpa_partisipan(client: TestClient) -> None:
     assert r.status_code == 200
 
 
-def test_kuesioner_saya_dengan_partisipan(client: TestClient) -> None:
-    """Enrollment otomatis: sesi DCS untuk jabatan utama partisipan muncul tanpa
-    perlu assign responden manual; pemanggilan idempoten."""
+def test_kuesioner_saya_dengan_assignment(client: TestClient) -> None:
+    """Assignment-based: kuesioner DCS muncul hanya setelah admin assign responden
+    dengan partisipan_id; sesi tanpa assignment tidak muncul."""
     from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
     from anjab_abk_backend.dependencies import get_partisipan_service
 
@@ -283,7 +283,7 @@ def test_kuesioner_saya_dengan_partisipan(client: TestClient) -> None:
     par_service._data.clear()  # type: ignore[attr-defined]
 
     jabatan_id = f"jbt_{uuid.uuid4().hex[:8]}"
-    par_service.create(
+    par = par_service.create(
         PartisipanCreate(
             nama="Partisipan Kuesioner DCS",
             email=f"ksr_dcs_{uuid.uuid4().hex[:4]}@test.id",
@@ -294,7 +294,7 @@ def test_kuesioner_saya_dengan_partisipan(client: TestClient) -> None:
         authentik_user_id="test-user",
     )
 
-    # Sesi DCS untuk jabatan partisipan (cocok) + sesi lain (jabatan berbeda).
+    # Buat sesi DCS dan buka.
     sesi = client.post(
         SESI_BASE,
         json={
@@ -305,11 +305,24 @@ def test_kuesioner_saya_dengan_partisipan(client: TestClient) -> None:
         },
     ).json()
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    _build_sesi(client)  # sesi jabatan acak — tidak boleh muncul
+    _build_sesi(client)  # sesi jabatan acak — tanpa assignment, tidak boleh muncul
 
+    # Sebelum di-assign: kuesioner kosong.
     r = client.get(f"{DCS_KUESIONER_BASE}/saya")
     assert r.status_code == 200
-    data = r.json()
+    assert r.json() == []
+
+    # Admin assign partisipan ke sesi (buat responden dengan partisipan_id).
+    assign_r = client.post(
+        f"{RSP_BASE}/{sesi['id']}/responden",
+        json={"jabatan_label": "Guru DCS", "partisipan_id": par.id},
+    )
+    assert assign_r.status_code == 201
+
+    # Setelah di-assign: kuesioner muncul.
+    r2 = client.get(f"{DCS_KUESIONER_BASE}/saya")
+    assert r2.status_code == 200
+    data = r2.json()
     assert len(data) == 1
     item = data[0]
     assert item["sesi_id"] == sesi["id"]
@@ -317,6 +330,6 @@ def test_kuesioner_saya_dengan_partisipan(client: TestClient) -> None:
     assert item["sesi_jabatan_id"] == jabatan_id
     assert item["sudah_submit"] is False
 
-    # Idempoten: pemanggilan kedua tidak menggandakan responden.
-    r2 = client.get(f"{DCS_KUESIONER_BASE}/saya")
-    assert [i["id"] for i in r2.json()] == [item["id"]]
+    # Idempoten: pemanggilan ulang tidak menggandakan entri.
+    r3 = client.get(f"{DCS_KUESIONER_BASE}/saya")
+    assert [i["id"] for i in r3.json()] == [item["id"]]

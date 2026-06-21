@@ -13,6 +13,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
 from .anjab.services.jabatan import InMemoryJabatanService, JabatanService
+from .anjab.services.sme_panel import InMemorySMEPanelService, SMEPanelService
 from .config import Settings, get_settings
 from .core.services.jenjang_pendidikan import (
     InMemoryJenjangPendidikanService,
@@ -113,6 +114,16 @@ def _jabatan_singleton() -> InMemoryJabatanService:
 def get_jabatan_service() -> JabatanService:
     """SEAM: kembalikan implementasi `JabatanService`. Ganti di sini saja."""
     return _jabatan_singleton()
+
+
+@lru_cache
+def _sme_panel_singleton() -> InMemorySMEPanelService:
+    return InMemorySMEPanelService()
+
+
+def get_sme_panel_service() -> SMEPanelService:
+    """SEAM: kembalikan implementasi `SMEPanelService`. Ganti di sini saja."""
+    return _sme_panel_singleton()
 
 
 # --- WCP services ---

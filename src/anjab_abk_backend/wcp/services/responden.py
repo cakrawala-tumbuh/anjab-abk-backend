@@ -33,9 +33,6 @@ class WcpRespondenService(Protocol):
     def create(
         self, sesi_id: str, data: WcpRespondenCreate, max_responden: int
     ) -> WcpRespondenRead: ...
-    def ensure_for_partisipan(
-        self, sesi_id: str, *, partisipan_id: str, nama: str | None, jabatan_label: str
-    ) -> WcpRespondenRead: ...
     def mark_submitted(self, responden_id: str) -> WcpRespondenRead: ...
     def delete(self, responden_id: str) -> None: ...
 
@@ -93,31 +90,6 @@ class InMemoryWcpRespondenService:
                 nama=data.nama,
                 jabatan_label=data.jabatan_label,
                 partisipan_id=data.partisipan_id,
-                sudah_submit=False,
-                created_at=datetime.now(UTC),
-            )
-            self._data[rec.id] = rec
-            return self._to_read(rec)
-
-    def ensure_for_partisipan(
-        self, sesi_id: str, *, partisipan_id: str, nama: str | None, jabatan_label: str
-    ) -> WcpRespondenRead:
-        """Idempoten: kembalikan responden untuk (sesi_id, partisipan_id) bila sudah
-        ada, selain itu buat baru.
-
-        Dipakai enrollment otomatis 'Kuesioner Saya' — TIDAK menerapkan batas
-        ``max_responden`` karena setiap partisipan dijamin mengisi alat ukur ini.
-        """
-        with self._lock:
-            for r in self._data.values():
-                if r.sesi_id == sesi_id and r.partisipan_id == partisipan_id:
-                    return self._to_read(r)
-            rec = _Record(
-                id=f"wrsp_{uuid.uuid4().hex[:8]}",
-                sesi_id=sesi_id,
-                nama=nama,
-                jabatan_label=jabatan_label,
-                partisipan_id=partisipan_id,
                 sudah_submit=False,
                 created_at=datetime.now(UTC),
             )

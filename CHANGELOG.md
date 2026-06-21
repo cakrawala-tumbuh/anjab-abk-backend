@@ -7,6 +7,22 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-21
+
+### Ditambahkan
+- **SME Panel (Subject-Matter Expert Panel)**: instrumen pengumpulan informasi jabatan via
+  panel pakar. Mencakup skema, service, dan router `/api/v1/sme-panel/`.
+
+### Diubah
+- **DCS & WCP: enrollment berbasis assignment.** Endpoint `GET /kuesioner/saya` untuk DCS
+  dan WCP kini hanya mengembalikan sesi yang sudah di-assign admin secara eksplisit
+  (record responden dibuat dengan `partisipan_id`). Tidak ada lagi enrollment otomatis
+  berdasarkan `jabatan_utama_id`. Setiap alat ukur dapat di-assign secara mandiri.
+
+### Dihapus
+- Method `ensure_for_partisipan()` dihapus dari `DcsRespondenService` dan
+  `WcpRespondenService` (Protocol & implementasi InMemory).
+
 ## [0.4.0] - 2026-06-21
 
 ### Diubah
