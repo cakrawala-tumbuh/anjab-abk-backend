@@ -22,4 +22,3 @@ class WcpKuesionerItemRead(BaseModel):
         description="Status sesi: DRAFT | OPEN | CLOSED | ANALYZED.", examples=["OPEN"]
     )
     sesi_periode: str = Field(description="Periode sesi (YYYY-MM).", examples=["2025-06"])
-    sesi_jabatan_id: str = Field(description="ID jabatan yang dikaji.")

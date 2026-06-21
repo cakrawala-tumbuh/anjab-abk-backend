@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -22,7 +20,6 @@ def _all_jawaban(skor: int = 3) -> list[dict]:
 
 def _build_sesi(client: TestClient) -> dict:
     payload = {
-        "jabatan_id": f"jbt_{uuid.uuid4().hex[:8]}",
         "periode": "2025-07",
         "min_responden": 2,
         "max_responden": 4,

@@ -27,7 +27,6 @@ def _build_sesi(client: TestClient, min_responden: int = 2, max_responden: int =
     sesi = client.post(
         SESI_BASE,
         json={
-            "jabatan_id": f"jbt_{uuid.uuid4().hex[:8]}",
             "periode": "2025-10",
             "min_responden": min_responden,
             "max_responden": max_responden,
@@ -214,13 +213,12 @@ def test_kuesioner_saya_dengan_assignment_wcp(client: TestClient) -> None:
     par_service = get_partisipan_service()
     par_service._data.clear()  # type: ignore[attr-defined]
 
-    jabatan_id = f"jbt_{uuid.uuid4().hex[:8]}"
     par = par_service.create(
         PartisipanCreate(
             nama="Partisipan Kuesioner WCP",
             email=f"ksr_wcp_{uuid.uuid4().hex[:4]}@test.id",
             sekolah_id="skl_dummy",
-            jabatan_utama_id=jabatan_id,
+            jabatan_utama_id=f"jbt_{uuid.uuid4().hex[:8]}",
             masa_kerja_tahun=2,
         ),
         authentik_user_id="test-user",
@@ -229,7 +227,6 @@ def test_kuesioner_saya_dengan_assignment_wcp(client: TestClient) -> None:
     sesi = client.post(
         SESI_BASE,
         json={
-            "jabatan_id": jabatan_id,
             "periode": "2025-10",
             "min_responden": 2,
             "max_responden": 4,
@@ -258,7 +255,6 @@ def test_kuesioner_saya_dengan_assignment_wcp(client: TestClient) -> None:
     item = data[0]
     assert item["sesi_id"] == sesi["id"]
     assert item["sesi_status"] == "OPEN"
-    assert item["sesi_jabatan_id"] == jabatan_id
     assert item["sudah_submit"] is False
 
     # Idempoten: pemanggilan ulang tidak menggandakan entri.

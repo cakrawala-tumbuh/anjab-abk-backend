@@ -66,7 +66,6 @@ def kuesioner_saya(
                 created_at=rsp.created_at,
                 sesi_status=sesi.status,
                 sesi_periode=sesi.periode,
-                sesi_jabatan_id=sesi.jabatan_id,
             )
         )
     return result

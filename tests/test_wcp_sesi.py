@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
 from fastapi.testclient import TestClient
 
 BASE = "/api/v1/wcp/sesi"
 
 
-def _payload(jabatan_id: str | None = None, periode: str | None = None) -> dict:
+def _payload(periode: str | None = None) -> dict:
     return {
-        "jabatan_id": jabatan_id or f"jbt_{uuid.uuid4().hex[:8]}",
         "periode": periode or "2025-06",
         "min_responden": 6,
         "max_responden": 8,
@@ -46,12 +43,9 @@ def test_create_requires_auth(anon_client: TestClient) -> None:
     assert r.status_code == 401
 
 
-def test_duplicate_jabatan_periode_conflict(client: TestClient, created: dict) -> None:
-    r = client.post(
-        BASE,
-        json=_payload(jabatan_id=created["jabatan_id"], periode=created["periode"]),
-    )
-    assert r.status_code == 409
+def test_multiple_sesi_same_periode_allowed(client: TestClient, created: dict) -> None:
+    r = client.post(BASE, json=_payload(periode=created["periode"]))
+    assert r.status_code == 201
 
 
 def test_update_draft(client: TestClient, created: dict) -> None:
@@ -106,10 +100,10 @@ def test_delete_non_draft_rejected(client: TestClient) -> None:
     assert r.status_code in (400, 422)
 
 
-def test_search_by_jabatan(client: TestClient, created: dict) -> None:
+def test_search_by_periode(client: TestClient, created: dict) -> None:
     r = client.post(
         f"{BASE}/search",
-        json={"domain": [["jabatan_id", "=", created["jabatan_id"]]], "limit": 10, "offset": 0},
+        json={"domain": [["periode", "=", created["periode"]]], "limit": 10, "offset": 0},
     )
     assert r.status_code == 200
     assert r.json()["total"] >= 1

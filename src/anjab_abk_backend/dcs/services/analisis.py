@@ -199,7 +199,6 @@ def compute_hasil_sesi(
 
     return DcsHasilSesiRead(
         sesi_id=sesi.id,
-        jabatan_id=sesi.jabatan_id,
         periode=sesi.periode,
         n_responden=n,
         sub_skala=sub_skala_results,

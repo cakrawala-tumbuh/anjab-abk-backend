@@ -8,12 +8,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
-from ...errors import ConflictError, NotFoundError, ValidationAppError
+from ...errors import NotFoundError, ValidationAppError
 from ...schemas.search import Domain, Order
 from ...services.domain import run_search, validate_searchable_fields
 from ..schemas.sesi import StatusSesi, WcpSesiCreate, WcpSesiRead, WcpSesiUpdate
 
-SEARCHABLE_FIELDS = frozenset({"id", "jabatan_id", "periode", "status", "created_at"})
+SEARCHABLE_FIELDS = frozenset({"id", "periode", "status", "created_at"})
 
 _VALID_TRANSITIONS: dict[StatusSesi, StatusSesi] = {
     "DRAFT": "OPEN",
@@ -25,7 +25,6 @@ _VALID_TRANSITIONS: dict[StatusSesi, StatusSesi] = {
 @dataclass
 class _Record:
     id: str
-    jabatan_id: str
     periode: str
     status: str
     min_responden: int
@@ -76,17 +75,8 @@ class InMemoryWcpSesiService:
         if data.min_responden > data.max_responden:
             raise ValidationAppError("min_responden tidak boleh lebih besar dari max_responden.")
         with self._lock:
-            if any(
-                r.jabatan_id == data.jabatan_id and r.periode == data.periode
-                for r in self._data.values()
-            ):
-                raise ConflictError(
-                    f"Sesi WCP untuk jabatan '{data.jabatan_id}'"
-                    f" periode '{data.periode}' sudah ada."
-                )
             rec = _Record(
                 id=f"wses_{uuid.uuid4().hex[:8]}",
-                jabatan_id=data.jabatan_id,
                 periode=data.periode,
                 status="DRAFT",
                 min_responden=data.min_responden,

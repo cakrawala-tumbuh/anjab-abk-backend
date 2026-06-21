@@ -153,7 +153,6 @@ def compute_hasil_sesi(
 
     return WcpHasilSesiRead(
         sesi_id=sesi.id,
-        jabatan_id=sesi.jabatan_id,
         periode=sesi.periode,
         n_responden=n,
         dimensi=dimensi_results,

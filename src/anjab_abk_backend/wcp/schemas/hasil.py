@@ -55,7 +55,6 @@ class WcpHasilSesiRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     sesi_id: str = Field(description="ID sesi.")
-    jabatan_id: str = Field(description="ID jabatan yang dikaji.")
     periode: str = Field(description="Periode survei.")
     n_responden: int = Field(description="Total responden yang submit.")
     dimensi: list[WcpHasilDimensiSesiRead] = Field(description="Hasil per dimensi (12 entri).")

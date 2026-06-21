@@ -7,6 +7,20 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-06-21
+
+### Diubah
+
+- **DCS & WCP: Sesi tidak lagi terikat jabatan** — field `jabatan_id` dihapus dari
+  `DcsSesiCreate`, `DcsSesiRead`, `WcpSesiCreate`, dan `WcpSesiRead`. Partisipan
+  dengan jabatan apapun dapat di-assign ke sesi yang sama.
+- `DcsHasilSesiRead` dan `WcpHasilSesiRead`: field `jabatan_id` dihapus.
+- `DcsKuesionerItemRead` dan `WcpKuesionerItemRead`: field `sesi_jabatan_id` dihapus.
+- Uniqueness constraint `(jabatan_id, periode)` pada sesi DCS/WCP dihapus — admin
+  bebas membuat lebih dari satu sesi per periode.
+- `SEARCHABLE_FIELDS` sesi DCS/WCP tidak lagi mengandung `jabatan_id`.
+- Semua unit test DCS/WCP diperbarui menyesuaikan skema baru.
+
 ## [0.10.0] - 2026-06-21
 
 ### Ditambahkan

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -30,10 +28,9 @@ def _make_jawaban(item_ids: list[str], skor: int = 4) -> dict:
 
 @pytest.fixture
 def open_sesi(client: TestClient) -> dict:
-    jbt = f"jbt_{uuid.uuid4().hex[:8]}"
     sesi = client.post(
         SESI_BASE,
-        json={"jabatan_id": jbt, "periode": "2025-07", "min_responden": 2, "max_responden": 4},
+        json={"periode": "2025-07", "min_responden": 2, "max_responden": 4},
     ).json()
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
     return client.get(f"{SESI_BASE}/{sesi['id']}").json()
@@ -68,10 +65,9 @@ def test_add_responden_to_open_sesi(
 
 
 def test_cannot_add_responden_to_draft(client: TestClient) -> None:
-    jbt = f"jbt_{uuid.uuid4().hex[:8]}"
     sesi = client.post(
         SESI_BASE,
-        json={"jabatan_id": jbt, "periode": "2025-08", "min_responden": 2, "max_responden": 4},
+        json={"periode": "2025-08", "min_responden": 2, "max_responden": 4},
     ).json()
     r = client.post(
         f"{RSP_BASE}/{sesi['id']}/responden",

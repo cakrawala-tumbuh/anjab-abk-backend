@@ -15,10 +15,6 @@ class WcpSesiCreate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    jabatan_id: str = Field(
-        description="ID jabatan yang dikaji.",
-        examples=["jbt_a1b2c3d4"],
-    )
     periode: str = Field(
         min_length=7,
         max_length=7,
@@ -68,7 +64,6 @@ class WcpSesiRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str = Field(description="ID sesi.", examples=["wses_a1b2c3d4"])
-    jabatan_id: str = Field(description="ID jabatan.", examples=["jbt_a1b2c3d4"])
     periode: str = Field(description="Periode survei (YYYY-MM).", examples=["2025-06"])
     status: StatusSesi = Field(description="Status sesi.", examples=["DRAFT"])
     min_responden: int = Field(description="Minimum responden.")

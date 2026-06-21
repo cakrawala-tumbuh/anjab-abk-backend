@@ -24,7 +24,6 @@ def _build_sesi(client: TestClient, min_responden: int = 2, max_responden: int =
     sesi = client.post(
         SESI_BASE,
         json={
-            "jabatan_id": f"jbt_{uuid.uuid4().hex[:8]}",
             "periode": "2025-09",
             "min_responden": min_responden,
             "max_responden": max_responden,
@@ -195,7 +194,6 @@ def test_analisis_dengan_wcp_sesi_k_index(client: TestClient) -> None:
     wcp_sesi = client.post(
         WCP_SESI_BASE,
         json={
-            "jabatan_id": f"jbt_{uuid.uuid4().hex[:8]}",
             "periode": "2025-09",
             "min_responden": 2,
             "max_responden": 4,
@@ -323,13 +321,12 @@ def test_kuesioner_saya_dengan_assignment(client: TestClient) -> None:
     # Reset store agar get_by_subject("test-user") deterministik (singleton sesi-scope).
     par_service._data.clear()  # type: ignore[attr-defined]
 
-    jabatan_id = f"jbt_{uuid.uuid4().hex[:8]}"
     par = par_service.create(
         PartisipanCreate(
             nama="Partisipan Kuesioner DCS",
             email=f"ksr_dcs_{uuid.uuid4().hex[:4]}@test.id",
             sekolah_id="skl_dummy",
-            jabatan_utama_id=jabatan_id,
+            jabatan_utama_id=f"jbt_{uuid.uuid4().hex[:8]}",
             masa_kerja_tahun=2,
         ),
         authentik_user_id="test-user",
@@ -339,7 +336,6 @@ def test_kuesioner_saya_dengan_assignment(client: TestClient) -> None:
     sesi = client.post(
         SESI_BASE,
         json={
-            "jabatan_id": jabatan_id,
             "periode": "2025-09",
             "min_responden": 2,
             "max_responden": 4,
@@ -368,7 +364,6 @@ def test_kuesioner_saya_dengan_assignment(client: TestClient) -> None:
     item = data[0]
     assert item["sesi_id"] == sesi["id"]
     assert item["sesi_status"] == "OPEN"
-    assert item["sesi_jabatan_id"] == jabatan_id
     assert item["sudah_submit"] is False
 
     # Idempoten: pemanggilan ulang tidak menggandakan entri.

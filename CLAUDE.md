@@ -42,6 +42,17 @@ tidak boleh lintas domain kecuali lewat `core`.
 
 ## Revisi Desain
 
+### [2026-06-21] DCS & WCP: Sesi tidak terikat jabatan
+
+Sesi DCS dan WCP tidak lagi memerlukan `jabatan_id`. Partisipan dengan jabatan apapun
+dapat di-assign ke sesi yang sama. Perubahan:
+- `DcsSesiCreate` / `WcpSesiCreate`: field `jabatan_id` dihapus.
+- `DcsSesiRead` / `WcpSesiRead`: field `jabatan_id` dihapus.
+- `DcsHasilSesiRead` / `WcpHasilSesiRead`: field `jabatan_id` dihapus.
+- `DcsKuesionerItemRead` / `WcpKuesionerItemRead`: field `sesi_jabatan_id` dihapus.
+- Uniqueness check `(jabatan_id, periode)` di service dihapus — admin bebas buat sesi sebanyak yang diperlukan per periode.
+- `SEARCHABLE_FIELDS` sesi DCS/WCP tidak lagi mengandung `jabatan_id`.
+
 ### [2026-06-21] DCS & WCP: Enrollment berbasis Assignment
 
 DCS dan WCP beralih dari **enrollment otomatis** ke **sistem assignment**:
