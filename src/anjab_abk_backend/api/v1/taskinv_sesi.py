@@ -1,4 +1,4 @@
-"""Endpoint resource `TiSesi`: CRUD + transisi status 2 tahap."""
+"""Endpoint resource `TiSesi`: CRUD + transisi status 3 tahap."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from ...dependencies import (
     get_ti_responden_service,
     get_ti_seleksi_service,
     get_ti_sesi_service,
+    get_ti_tahap2_service,
     idempotency,
     pagination_params,
     rate_limit,
@@ -26,6 +27,7 @@ from ...taskinv.services.catalog import TiCatalogService
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.seleksi import TiSeleksiService
 from ...taskinv.services.sesi import TiSesiService
+from ...taskinv.services.tahap2 import TiTahap2Service
 
 router = APIRouter()
 
@@ -186,7 +188,7 @@ def mulai_tahap1(
 @router.post(
     "/{sesi_id}/mulai-tahap2",
     response_model=TiSesiRead,
-    summary="Mulai Tahap 2 — Detailing (TAHAP1 → TAHAP2), bekukan task relevan (≥1 partisipan)",
+    summary="Mulai Tahap 2 — Review Koordinator (TAHAP1 → TAHAP2)",
     operation_id="taskinv_sesi_mulai_tahap2",
     dependencies=_WRITE_GUARDS,
     responses={
@@ -195,7 +197,7 @@ def mulai_tahap1(
         **_NOT_FOUND,
         422: {
             "model": ErrorResponse,
-            "description": "Belum semua submit / tidak ada task relevan.",
+            "description": "Belum ada responden yang submit Tahap 1.",
         },
     },
 )
@@ -203,7 +205,6 @@ def mulai_tahap2(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
     service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
-    seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     paksa: Annotated[
         bool,
         Query(description="Paksa lanjut walau belum semua partisipan submit Tahap 1."),
@@ -223,14 +224,69 @@ def mulai_tahap2(
             f"Baru {submitted} dari {total} partisipan submit Tahap 1."
             " Gunakan paksa=true untuk tetap melanjutkan."
         )
-    union = seleksi_service.union_terpilih(sesi_id)
-    return service.freeze_task_terpilih(sesi_id, union)
+    return service.transition(sesi_id, "TAHAP2")
+
+
+@router.post(
+    "/{sesi_id}/mulai-tahap3",
+    response_model=TiSesiRead,
+    summary="Mulai Tahap 3 — Detailing (TAHAP2 → TAHAP3), bekukan task relevan",
+    operation_id="taskinv_sesi_mulai_tahap3",
+    dependencies=_WRITE_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_NOT_FOUND,
+        422: {
+            "model": ErrorResponse,
+            "description": "Belum semua task diputuskan koordinator / tidak ada task relevan.",
+        },
+    },
+)
+def mulai_tahap3(
+    sesi_id: Annotated[str, Path(description="ID sesi.")],
+    service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
+    seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
+    tahap2_service: Annotated[TiTahap2Service, Depends(get_ti_tahap2_service)],
+    paksa: Annotated[
+        bool,
+        Query(
+            description=(
+                "Paksa lanjut walau masih ada task partial" " yang belum diputuskan koordinator."
+            )
+        ),
+    ] = False,
+) -> TiSesiRead:
+    sesi = service.get(sesi_id)
+    if sesi.status != "TAHAP2":
+        raise ValidationAppError(
+            f"Tahap 3 hanya dapat dimulai dari TAHAP2 (saat ini: {sesi.status})."
+        )
+    n_submitted = rsp_service.count_tahap1_submitted(sesi_id)
+    unanimous = seleksi_service.unanimous_terpilih(sesi_id, n_submitted)
+    partial = seleksi_service.partial_terpilih(sesi_id, n_submitted)
+    counts = seleksi_service.count_relevan_per_task(sesi_id)
+
+    if partial:
+        review = tahap2_service.get_review(sesi_id, partial, counts, n_submitted)
+        if review.jumlah_belum_diputuskan > 0 and not paksa:
+            raise ValidationAppError(
+                f"Masih ada {review.jumlah_belum_diputuskan} task"
+                " yang belum diputuskan koordinator."
+                " Gunakan paksa=true untuk tetap melanjutkan"
+                " (task belum diputuskan akan diabaikan)."
+            )
+
+    approved = tahap2_service.get_approved_kodes(sesi_id)
+    final_kodes = sorted(set(unanimous) | set(approved))
+    return service.freeze_task_terpilih(sesi_id, final_kodes)
 
 
 @router.post(
     "/{sesi_id}/tutup",
     response_model=TiSesiRead,
-    summary="Tutup sesi (TAHAP2 → CLOSED)",
+    summary="Tutup sesi (TAHAP3 → CLOSED)",
     operation_id="taskinv_sesi_tutup",
     dependencies=_WRITE_GUARDS,
     responses={**_AUTH, **_RATE, **_NOT_FOUND},

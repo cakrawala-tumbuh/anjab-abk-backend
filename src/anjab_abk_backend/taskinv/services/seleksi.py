@@ -33,6 +33,8 @@ class TiSeleksiService(Protocol):
     ) -> TiSeleksiRead: ...
     def get_by_responden(self, responden_id: str) -> TiSeleksiRead | None: ...
     def union_terpilih(self, sesi_id: str) -> list[str]: ...
+    def unanimous_terpilih(self, sesi_id: str, total_submitted: int) -> list[str]: ...
+    def partial_terpilih(self, sesi_id: str, total_submitted: int) -> list[str]: ...
     def count_relevan_per_task(self, sesi_id: str) -> dict[str, int]: ...
     def delete_by_responden(self, responden_id: str) -> None: ...
 
@@ -86,6 +88,20 @@ class InMemoryTiSeleksiService:
     def union_terpilih(self, sesi_id: str) -> list[str]:
         with self._lock:
             return sorted({r.task_kode for r in self._data.values() if r.sesi_id == sesi_id})
+
+    def unanimous_terpilih(self, sesi_id: str, total_submitted: int) -> list[str]:
+        """Task yang dipilih oleh SEMUA responden yang sudah submit Tahap 1."""
+        counts = self.count_relevan_per_task(sesi_id)
+        if total_submitted == 0:
+            return []
+        return sorted(kode for kode, n in counts.items() if n >= total_submitted)
+
+    def partial_terpilih(self, sesi_id: str, total_submitted: int) -> list[str]:
+        """Task yang dipilih oleh SEBAGIAN (bukan semua) responden — butuh review koordinator."""
+        counts = self.count_relevan_per_task(sesi_id)
+        if total_submitted == 0:
+            return []
+        return sorted(kode for kode, n in counts.items() if 0 < n < total_submitted)
 
     def count_relevan_per_task(self, sesi_id: str) -> dict[str, int]:
         counts: dict[str, int] = {}

@@ -17,12 +17,12 @@ class _Record:
     id: str
     sesi_id: str
     tahap1_submit: bool
-    tahap2_submit: bool
+    tahap3_submit: bool
     created_at: datetime
     nama: str | None = None
     partisipan_id: str | None = None
     tahap1_submitted_at: datetime | None = None
-    tahap2_submitted_at: datetime | None = None
+    tahap3_submitted_at: datetime | None = None
 
 
 class TiRespondenService(Protocol):
@@ -40,7 +40,7 @@ class TiRespondenService(Protocol):
         self, sesi_id: str, *, partisipan_id: str, nama: str | None
     ) -> TiRespondenRead: ...
     def mark_tahap1(self, responden_id: str) -> TiRespondenRead: ...
-    def mark_tahap2(self, responden_id: str) -> TiRespondenRead: ...
+    def mark_tahap3(self, responden_id: str) -> TiRespondenRead: ...
     def delete(self, responden_id: str) -> None: ...
 
 
@@ -99,7 +99,7 @@ class InMemoryTiRespondenService:
                 nama=data.nama,
                 partisipan_id=data.partisipan_id,
                 tahap1_submit=False,
-                tahap2_submit=False,
+                tahap3_submit=False,
                 created_at=datetime.now(UTC),
             )
             self._data[rec.id] = rec
@@ -108,11 +108,8 @@ class InMemoryTiRespondenService:
     def ensure_for_partisipan(
         self, sesi_id: str, *, partisipan_id: str, nama: str | None
     ) -> TiRespondenRead:
-        """Idempoten: kembalikan responden untuk (sesi_id, partisipan_id) bila sudah
-        ada, selain itu buat baru.
-
-        Dipakai enrollment otomatis 'Kuesioner Saya' — TIDAK menerapkan batas
-        ``max_responden`` karena setiap partisipan dijamin mengisi alat ukur ini.
+        """Idempoten: kembalikan responden untuk (sesi_id, partisipan_id) bila sudah ada,
+        selain itu buat baru. Tidak menerapkan batas max_responden.
         """
         with self._lock:
             for r in self._data.values():
@@ -124,7 +121,7 @@ class InMemoryTiRespondenService:
                 nama=nama,
                 partisipan_id=partisipan_id,
                 tahap1_submit=False,
-                tahap2_submit=False,
+                tahap3_submit=False,
                 created_at=datetime.now(UTC),
             )
             self._data[rec.id] = rec
@@ -141,15 +138,15 @@ class InMemoryTiRespondenService:
             rec.tahap1_submitted_at = datetime.now(UTC)
             return self._to_read(rec)
 
-    def mark_tahap2(self, responden_id: str) -> TiRespondenRead:
+    def mark_tahap3(self, responden_id: str) -> TiRespondenRead:
         with self._lock:
             rec = self._data.get(responden_id)
             if rec is None:
                 raise NotFoundError(f"Responden Task Inventory '{responden_id}' tidak ditemukan.")
-            if rec.tahap2_submit:
-                raise ValidationAppError("Responden ini sudah menyelesaikan Tahap 2.")
-            rec.tahap2_submit = True
-            rec.tahap2_submitted_at = datetime.now(UTC)
+            if rec.tahap3_submit:
+                raise ValidationAppError("Responden ini sudah menyelesaikan Tahap 3.")
+            rec.tahap3_submit = True
+            rec.tahap3_submitted_at = datetime.now(UTC)
             return self._to_read(rec)
 
     def delete(self, responden_id: str) -> None:
@@ -157,8 +154,8 @@ class InMemoryTiRespondenService:
             rec = self._data.get(responden_id)
             if rec is None:
                 raise NotFoundError(f"Responden Task Inventory '{responden_id}' tidak ditemukan.")
-            if rec.tahap1_submit or rec.tahap2_submit:
+            if rec.tahap1_submit or rec.tahap3_submit:
                 raise ValidationAppError(
-                    "Responden yang sudah submit (Tahap 1/2) tidak dapat dihapus."
+                    "Responden yang sudah submit (Tahap 1/3) tidak dapat dihapus."
                 )
             del self._data[responden_id]

@@ -1,4 +1,4 @@
-"""Endpoint detailing Tahap 2 (per responden)."""
+"""Endpoint detailing Tahap 3 (per responden)."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan
     "/responden/{responden_id}/detail",
     response_model=list[TiDetailRead],
     status_code=status.HTTP_201_CREATED,
-    summary="Submit detail Tahap 2 untuk satu responden",
+    summary="Submit detail Tahap 3 untuk satu responden",
     operation_id="taskinv_detail_submit",
     dependencies=_WRITE_GUARDS,
     responses={
@@ -52,23 +52,23 @@ def submit_detail(
 ) -> list[TiDetailRead]:
     responden = rsp_service.get(responden_id)
     sesi = sesi_service.get(responden.sesi_id)
-    if sesi.status != "TAHAP2":
+    if sesi.status != "TAHAP3":
         raise ValidationAppError(
-            f"Detail Tahap 2 hanya dapat disubmit saat sesi berstatus TAHAP2"
+            f"Detail Tahap 3 hanya dapat disubmit saat sesi berstatus TAHAP3"
             f" (saat ini: {sesi.status})."
         )
-    if responden.tahap2_submit:
-        raise ValidationAppError("Responden ini sudah menyelesaikan Tahap 2.")
+    if responden.tahap3_submit:
+        raise ValidationAppError("Responden ini sudah menyelesaikan Tahap 3.")
     valid = set(sesi_service.get_task_terpilih(sesi.id))
     result = detail_service.submit(responden_id, sesi.id, payload, valid)
-    rsp_service.mark_tahap2(responden_id)
+    rsp_service.mark_tahap3(responden_id)
     return result
 
 
 @router.get(
     "/responden/{responden_id}/detail",
     response_model=list[TiDetailRead],
-    summary="Lihat detail Tahap 2 satu responden",
+    summary="Lihat detail Tahap 3 satu responden",
     operation_id="taskinv_detail_list",
     responses=_NOT_FOUND_RSP,
 )

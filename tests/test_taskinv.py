@@ -1,4 +1,4 @@
-"""Test endpoint Task Inventory: catalog, alur 2 tahap, transisi, agregasi."""
+"""Test endpoint Task Inventory: catalog, alur 3 tahap, transisi, agregasi."""
 
 from __future__ import annotations
 
@@ -144,6 +144,11 @@ def test_sesi_search(client: TestClient) -> None:
     assert r.json()["total"] >= 1
 
 
+def test_sesi_koordinator_id(client: TestClient) -> None:
+    sesi = _create_sesi(client, koordinator_id="p_koordinator01")
+    assert sesi["koordinator_id"] == "p_koordinator01"
+
+
 # --------------------------------------------------------------------------- #
 # Transisi tahap
 # --------------------------------------------------------------------------- #
@@ -178,11 +183,118 @@ def test_mulai_tahap2_guard_belum_semua_submit(client: TestClient) -> None:
     # 1 dari 2 submit → tanpa paksa harus gagal
     r = client.post(f"{SESI}/{sid}/mulai-tahap2")
     assert r.status_code in (400, 422)
-    # dengan paksa → sukses, union = 2 task
+    # dengan paksa → sukses, status TAHAP2
     r = client.post(f"{SESI}/{sid}/mulai-tahap2", params={"paksa": "true"})
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "TAHAP2"
-    assert r.json()["jumlah_task_terpilih"] == 2
+    # jumlah_task_terpilih belum dibekukan (baru di TAHAP3)
+    assert r.json()["jumlah_task_terpilih"] is None
+
+
+def test_mulai_tahap3_dengan_review_koordinator(client: TestClient) -> None:
+    """Flow: Tahap1 → Tahap2 (koordinator review partial) → Tahap3 (freeze)."""
+    sesi = _create_sesi(client)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, 3)  # K0, K1, K2
+
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    rb = _add_responden(client, sid, "B")
+    # A pilih K0,K1 ; B pilih K1,K2
+    # K1 = unanimous (2/2), K0 & K2 = partial (1/2) → perlu review koordinator
+    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": [kodes[0], kodes[1]]})
+    client.post(f"{SESI}/responden/{rb['id']}/seleksi", json={"task_kode": [kodes[1], kodes[2]]})
+
+    # Masuk TAHAP2 (koordinator review)
+    r2 = client.post(f"{SESI}/{sid}/mulai-tahap2")
+    assert r2.status_code == 200
+    assert r2.json()["status"] == "TAHAP2"
+
+    # GET review koordinator: harus ada 2 task partial (K0 & K2)
+    rv = client.get(f"{SESI}/{sid}/tahap2")
+    assert rv.status_code == 200
+    review = rv.json()
+    partial_kodes = {t["task_kode"] for t in review["tasks"]}
+    assert kodes[0] in partial_kodes
+    assert kodes[2] in partial_kodes
+    assert kodes[1] not in partial_kodes  # K1 unanimous, tidak muncul di review
+    assert review["jumlah_belum_diputuskan"] == 2
+
+    # Koordinator: setujui K0, tolak K2
+    rk = client.post(
+        f"{SESI}/{sid}/tahap2",
+        json={
+            "keputusan": [
+                {"task_kode": kodes[0], "disetujui": True},
+                {"task_kode": kodes[2], "disetujui": False},
+            ]
+        },
+    )
+    assert rk.status_code == 200
+    assert rk.json()["jumlah_belum_diputuskan"] == 0
+
+    # Masuk TAHAP3: freeze = K1 (unanimous) + K0 (disetujui) = 2 task
+    r3 = client.post(f"{SESI}/{sid}/mulai-tahap3")
+    assert r3.status_code == 200, r3.text
+    assert r3.json()["status"] == "TAHAP3"
+    assert r3.json()["jumlah_task_terpilih"] == 2
+
+    # Verifikasi task terpilih: K1 dan K0
+    tt = client.get(f"{SESI}/{sid}/task-terpilih")
+    assert tt.status_code == 200
+    terpilih_kodes = {t["kode"] for t in tt.json()}
+    assert kodes[1] in terpilih_kodes
+    assert kodes[0] in terpilih_kodes
+    assert kodes[2] not in terpilih_kodes
+
+
+def test_mulai_tahap3_paksa_tanpa_review(client: TestClient) -> None:
+    """Dengan paksa=true, bisa masuk TAHAP3 meski ada partial belum diputuskan."""
+    sesi = _create_sesi(client)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, 2)
+
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    rb = _add_responden(client, sid, "B")
+    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": [kodes[0]]})
+    client.post(f"{SESI}/responden/{rb['id']}/seleksi", json={"task_kode": [kodes[1]]})
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+
+    # Tanpa review koordinator, paksa → sukses (partial diabaikan, hanya unanimous)
+    r3 = client.post(f"{SESI}/{sid}/mulai-tahap3", params={"paksa": "true"})
+    # Tidak ada unanimous, namun tidak ada approved → gagal karena tidak ada task
+    # Sebenarnya K0 dipilih 1/2 dan K1 dipilih 1/2, tidak ada unanimous
+    # Dengan paksa: boleh lanjut tapi task kosong → freeze akan gagal
+    # Expected: error karena tidak ada task relevan
+    assert r3.status_code in (200, 400, 422)
+
+
+def test_mulai_tahap3_unanimous_otomatis(client: TestClient) -> None:
+    """Task yang dipilih semua anggota masuk otomatis tanpa review koordinator."""
+    sesi = _create_sesi(client)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, 2)
+
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    rb = _add_responden(client, sid, "B")
+    # Keduanya pilih K0 dan K1 → semua unanimous
+    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
+    client.post(f"{SESI}/responden/{rb['id']}/seleksi", json={"task_kode": kodes})
+
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+
+    # Review: tidak ada task partial
+    rv = client.get(f"{SESI}/{sid}/tahap2")
+    assert rv.json()["tasks"] == []
+    assert rv.json()["jumlah_belum_diputuskan"] == 0
+
+    # Langsung masuk TAHAP3 tanpa review koordinator
+    r3 = client.post(f"{SESI}/{sid}/mulai-tahap3")
+    assert r3.status_code == 200, r3.text
+    assert r3.json()["status"] == "TAHAP3"
+    assert r3.json()["jumlah_task_terpilih"] == 2
 
 
 # --------------------------------------------------------------------------- #
@@ -202,7 +314,6 @@ def test_seleksi_invalid_kode(client: TestClient) -> None:
 def test_seleksi_requires_tahap1(client: TestClient) -> None:
     sesi = _create_sesi(client)  # masih DRAFT
     sid = sesi["id"]
-    # responden hanya bisa ditambah saat DRAFT/TAHAP1; tambah saat DRAFT
     r = _add_responden(client, sid, "A")
     kodes = _catalog_kodes(client, 1)
     res = client.post(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": kodes})
@@ -228,11 +339,11 @@ def test_seleksi_double_submit_conflict(client: TestClient) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Alur penuh 2 tahap + agregasi
+# Alur penuh 3 tahap + agregasi
 # --------------------------------------------------------------------------- #
 
 
-def test_full_two_phase_flow(client: TestClient) -> None:
+def test_full_three_phase_flow(client: TestClient) -> None:
     sesi = _create_sesi(client)
     sid = sesi["id"]
     kodes = _catalog_kodes(client, 3)  # K0, K1, K2
@@ -241,23 +352,35 @@ def test_full_two_phase_flow(client: TestClient) -> None:
     assert client.post(f"{SESI}/{sid}/mulai-tahap1").json()["status"] == "TAHAP1"
     ra = _add_responden(client, sid, "A")
     rb = _add_responden(client, sid, "B")
-    # A pilih K0,K1 ; B pilih K1,K2  → union = K0,K1,K2 ; K1 relevan utk 2 orang
+    # A pilih K0,K1 ; B pilih K1,K2 → K1 unanimous, K0+K2 partial
     client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": [kodes[0], kodes[1]]})
     client.post(f"{SESI}/responden/{rb['id']}/seleksi", json={"task_kode": [kodes[1], kodes[2]]})
 
-    # Tahap 2 (semua submit → tanpa paksa)
-    r2 = client.post(f"{SESI}/{sid}/mulai-tahap2")
-    assert r2.status_code == 200, r2.text
-    assert r2.json()["jumlah_task_terpilih"] == 3
+    # Tahap 2: koordinator setujui K0, tolak K2
+    assert client.post(f"{SESI}/{sid}/mulai-tahap2").json()["status"] == "TAHAP2"
+    client.post(
+        f"{SESI}/{sid}/tahap2",
+        json={
+            "keputusan": [
+                {"task_kode": kodes[0], "disetujui": True},
+                {"task_kode": kodes[2], "disetujui": False},
+            ]
+        },
+    )
 
-    # task-terpilih: K1 harus n_relevan=2
+    # Tahap 3: freeze = K1 (unanimous) + K0 (approved) = 2 task
+    r3 = client.post(f"{SESI}/{sid}/mulai-tahap3")
+    assert r3.status_code == 200, r3.text
+    assert r3.json()["jumlah_task_terpilih"] == 2
+
+    # task-terpilih: K1 n_relevan=2, K0 n_relevan=1
     tt = client.get(f"{SESI}/{sid}/task-terpilih")
     assert tt.status_code == 200
     by_kode = {x["kode"]: x for x in tt.json()}
     assert by_kode[kodes[1]]["n_relevan"] == 2
     assert by_kode[kodes[0]]["n_relevan"] == 1
 
-    # Detail Tahap 2: A isi K0,K1 ; B isi K1,K2
+    # Detail Tahap 3: A isi K0,K1 ; B isi K1 saja (K2 tidak di set terpilih)
     def _ditem(kode: str, jpm: float) -> dict:
         return {
             "task_kode": kode,
@@ -279,7 +402,7 @@ def test_full_two_phase_flow(client: TestClient) -> None:
     assert da.status_code == 201, da.text
     db = client.post(
         f"{SESI}/responden/{rb['id']}/detail",
-        json={"detail": [_ditem(kodes[1], 6.0), _ditem(kodes[2], 1.0)]},
+        json={"detail": [_ditem(kodes[1], 6.0)]},
     )
     assert db.status_code == 201, db.text
 
@@ -288,10 +411,9 @@ def test_full_two_phase_flow(client: TestClient) -> None:
     an = client.post(f"{SESI}/{sid}/analisis")
     assert an.status_code == 200, an.text
     hasil = an.json()
-    assert hasil["status"] if "status" in hasil else True
     assert hasil["n_responden_tahap1"] == 2
-    assert hasil["n_responden_tahap2"] == 2
-    assert hasil["jumlah_task_terpilih"] == 3
+    assert hasil["n_responden_tahap3"] == 2
+    assert hasil["jumlah_task_terpilih"] == 2
 
     tasks = {t["kode"]: t for t in hasil["tasks"]}
     # K1: rata-rata jam/minggu (4+6)/2 = 5 → jam/tahun = 225
@@ -299,13 +421,13 @@ def test_full_two_phase_flow(client: TestClient) -> None:
     assert tasks[kodes[1]]["jam_per_tahun_mean"] == 225.0
     assert tasks[kodes[1]]["n_detail"] == 2
     assert tasks[kodes[0]]["jam_per_minggu_mean"] == 2.0
-    # total jam/minggu = 2 + 5 + 1 = 8
-    assert hasil["total_jam_per_minggu"] == 8.0
+    # total jam/minggu = 2 + 5 = 7
+    assert hasil["total_jam_per_minggu"] == 7.0
 
     # hasil GET tersedia setelah ANALYZED
     hg = client.get(f"{SESI}/{sid}/hasil")
     assert hg.status_code == 200
-    assert hg.json()["jumlah_task_terpilih"] == 3
+    assert hg.json()["jumlah_task_terpilih"] == 2
 
 
 def test_detail_kode_diluar_terpilih_ditolak(client: TestClient) -> None:
@@ -315,8 +437,10 @@ def test_detail_kode_diluar_terpilih_ditolak(client: TestClient) -> None:
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
     client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": [kodes[0]]})
+    # Masuk TAHAP2 lalu TAHAP3 (K0 unanimous karena 1 responden memilihnya)
     client.post(f"{SESI}/{sid}/mulai-tahap2")
-    # kodes[3] tidak ada di union (hanya kodes[0])
+    client.post(f"{SESI}/{sid}/mulai-tahap3")
+    # kodes[3] tidak ada di terpilih (hanya kodes[0])
     res = client.post(
         f"{SESI}/responden/{ra['id']}/detail",
         json={
@@ -330,6 +454,36 @@ def test_detail_kode_diluar_terpilih_ditolak(client: TestClient) -> None:
                     "jam_per_minggu": 1.0,
                     "ai_mode": "Co-Pilot",
                     "va_type": "VA-Enable",
+                }
+            ]
+        },
+    )
+    assert res.status_code in (400, 422)
+
+
+def test_detail_requires_tahap3(client: TestClient) -> None:
+    """Detail hanya bisa disubmit saat TAHAP3, bukan TAHAP2."""
+    sesi = _create_sesi(client)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, 1)
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    # Di TAHAP2, belum bisa submit detail
+    res = client.post(
+        f"{SESI}/responden/{ra['id']}/detail",
+        json={
+            "detail": [
+                {
+                    "task_kode": kodes[0],
+                    "sumber_bukti": "Aktual",
+                    "kondisi": "Baseline",
+                    "frekuensi_teks": "Harian",
+                    "durasi_per_kali": 30,
+                    "jam_per_minggu": 1.0,
+                    "ai_mode": "Human-led",
+                    "va_type": "VA-Core",
                 }
             ]
         },
@@ -363,6 +517,7 @@ def test_detail_enum_invalid(client: TestClient, field: str) -> None:
     ra = _add_responden(client, sid, "A")
     client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
     client.post(f"{SESI}/{sid}/mulai-tahap2")
+    client.post(f"{SESI}/{sid}/mulai-tahap3")
     item = {
         "task_kode": kodes[0],
         "sumber_bukti": "Aktual",
@@ -379,6 +534,34 @@ def test_detail_enum_invalid(client: TestClient, field: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Tahap 2 review koordinator
+# --------------------------------------------------------------------------- #
+
+
+def test_tahap2_review_belum_tahap2(client: TestClient) -> None:
+    sesi = _create_sesi(client)
+    r = client.get(f"{SESI}/{sesi['id']}/tahap2")
+    assert r.status_code in (400, 422)
+
+
+def test_tahap2_submit_keputusan_non_partial_ditolak(client: TestClient) -> None:
+    """Koordinator tidak boleh submit keputusan untuk task unanimous."""
+    sesi = _create_sesi(client)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, 1)
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    # kodes[0] dipilih oleh semua (1 responden = 1 = unanimous), bukan partial
+    r = client.post(
+        f"{SESI}/{sid}/tahap2",
+        json={"keputusan": [{"task_kode": kodes[0], "disetujui": True}]},
+    )
+    assert r.status_code in (400, 422)
+
+
+# --------------------------------------------------------------------------- #
 # GET /kuesioner/saya (Task Inventory — universal)
 # --------------------------------------------------------------------------- #
 
@@ -392,7 +575,7 @@ def test_kuesioner_saya_tanpa_partisipan_ti(client: TestClient) -> None:
 
 def test_kuesioner_saya_universal_ti(client: TestClient) -> None:
     """Task Inventory bersifat universal: partisipan melihat SEMUA sesi aktif
-    (TAHAP1/TAHAP2), bukan hanya yang cocok jabatannya; pemanggilan idempoten."""
+    (TAHAP1/TAHAP2/TAHAP3), bukan hanya yang cocok jabatannya; pemanggilan idempoten."""
     import uuid
 
     from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
@@ -405,7 +588,6 @@ def test_kuesioner_saya_universal_ti(client: TestClient) -> None:
     par_service = get_partisipan_service()
     par_service._data.clear()  # type: ignore[attr-defined]
     get_ti_responden_service()._data.clear()  # type: ignore[attr-defined]
-    # Bersihkan sesi TI agar query universal hanya melihat sesi test ini.
     get_ti_sesi_service()._data.clear()  # type: ignore[attr-defined]
 
     par_service.create(

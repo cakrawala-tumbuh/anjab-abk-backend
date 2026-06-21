@@ -23,6 +23,8 @@ router = APIRouter()
 
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 
+_ACTIVE_STATUSES = ["TAHAP1", "TAHAP2", "TAHAP3"]
+
 
 @router.get(
     "/kuesioner/saya",
@@ -38,15 +40,15 @@ def kuesioner_saya(
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
 ) -> list[TiKuesionerItemRead]:
     """Enrollment otomatis: Task Inventory bersifat universal — tiap partisipan
-    mengisi SEMUA sesi aktif (TAHAP1/TAHAP2) tanpa filter jabatan, sambil membuat
-    record responden bila belum ada.
+    mengisi SEMUA sesi aktif (TAHAP1/TAHAP2/TAHAP3), sambil membuat record
+    responden bila belum ada.
     """
     par = par_service.get_by_subject(principal.subject)
     if par is None:
         return []
 
     sesi_list, _ = sesi_service.search(
-        domain=[("status", "in", ["TAHAP1", "TAHAP2"])],
+        domain=[("status", "in", _ACTIVE_STATUSES)],
         order=[("created_at", "desc")],
         limit=100,
         offset=0,
@@ -65,8 +67,8 @@ def kuesioner_saya(
                 sesi_id=rsp.sesi_id,
                 tahap1_submit=rsp.tahap1_submit,
                 tahap1_submitted_at=rsp.tahap1_submitted_at,
-                tahap2_submit=rsp.tahap2_submit,
-                tahap2_submitted_at=rsp.tahap2_submitted_at,
+                tahap3_submit=rsp.tahap3_submit,
+                tahap3_submitted_at=rsp.tahap3_submitted_at,
                 created_at=rsp.created_at,
                 sesi_status=sesi.status,
                 sesi_unit=sesi.unit,

@@ -53,7 +53,7 @@ def compute_hasil_sesi(
     relevan_counts: dict[str, int],
     n_tahap1: int,
     detail_records: list[TiDetailRead],
-    n_tahap2: int,
+    n_tahap3: int,
 ) -> TiHasilSesiRead:
     """Hitung agregasi lengkap satu sesi Task Inventory."""
     by_kode: dict[str, list[TiDetailRead]] = {}
@@ -110,7 +110,7 @@ def compute_hasil_sesi(
         kategori_jabatan=sesi.kategori_jabatan,
         periode=sesi.periode,
         n_responden_tahap1=n_tahap1,
-        n_responden_tahap2=n_tahap2,
+        n_responden_tahap3=n_tahap3,
         jumlah_task_terpilih=len(kodes),
         total_jam_per_minggu=round(total_jpm, 2),
         total_jam_per_tahun=round(total_jpm * MINGGU_EFEKTIF, 2),

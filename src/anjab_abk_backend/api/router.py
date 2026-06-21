@@ -24,6 +24,7 @@ from .v1 import (
     taskinv_responden,
     taskinv_seleksi,
     taskinv_sesi,
+    taskinv_tahap2,
     wcp_dimensi,
     wcp_hasil,
     wcp_kuesioner,
@@ -142,6 +143,11 @@ api_router.include_router(
     taskinv_detail.router,
     prefix="/task-inventory/sesi",
     tags=["taskinv.detail"],
+)
+api_router.include_router(
+    taskinv_tahap2.router,
+    prefix="/task-inventory/sesi",
+    tags=["taskinv.tahap2"],
 )
 api_router.include_router(
     taskinv_hasil.router,

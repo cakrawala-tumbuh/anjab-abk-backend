@@ -18,7 +18,8 @@ SEARCHABLE_FIELDS = frozenset({"id", "unit", "kategori_jabatan", "periode", "sta
 _VALID_TRANSITIONS: dict[StatusSesi, StatusSesi] = {
     "DRAFT": "TAHAP1",
     "TAHAP1": "TAHAP2",
-    "TAHAP2": "CLOSED",
+    "TAHAP2": "TAHAP3",
+    "TAHAP3": "CLOSED",
     "CLOSED": "ANALYZED",
 }
 
@@ -33,6 +34,7 @@ class _Record:
     min_responden: int
     max_responden: int
     created_at: datetime
+    koordinator_id: str | None = None
     catatan: str | None = None
     task_terpilih: list[str] | None = field(default=None)
 
@@ -68,6 +70,7 @@ class InMemoryTiSesiService:
             kategori_jabatan=rec.kategori_jabatan,
             periode=rec.periode,
             status=rec.status,  # type: ignore[arg-type]
+            koordinator_id=rec.koordinator_id,
             min_responden=rec.min_responden,
             max_responden=rec.max_responden,
             jumlah_task_terpilih=(
@@ -110,6 +113,7 @@ class InMemoryTiSesiService:
                 kategori_jabatan=data.kategori_jabatan,
                 periode=data.periode,
                 status="DRAFT",
+                koordinator_id=data.koordinator_id,
                 min_responden=data.min_responden,
                 max_responden=data.max_responden,
                 catatan=data.catatan,
@@ -160,22 +164,20 @@ class InMemoryTiSesiService:
             return self._to_read(rec)
 
     def freeze_task_terpilih(self, sesi_id: str, kodes: list[str]) -> TiSesiRead:
-        """Bekukan himpunan task terpilih saat transisi TAHAP1 → TAHAP2."""
+        """Bekukan himpunan task terpilih saat transisi TAHAP2 → TAHAP3."""
         with self._lock:
             rec = self._data.get(sesi_id)
             if rec is None:
                 raise NotFoundError(f"Sesi Task Inventory '{sesi_id}' tidak ditemukan.")
-            if rec.status != "TAHAP1":
+            if rec.status != "TAHAP2":
                 raise ValidationAppError(
-                    f"Himpunan task hanya dapat dibekukan dari status TAHAP1"
+                    f"Himpunan task hanya dapat dibekukan dari status TAHAP2"
                     f" (saat ini: {rec.status})."
                 )
             if not kodes:
-                raise ValidationAppError(
-                    "Tidak ada task relevan yang dipilih partisipan; tidak dapat masuk TAHAP2."
-                )
+                raise ValidationAppError("Tidak ada task relevan; tidak dapat masuk TAHAP3.")
             rec.task_terpilih = sorted(set(kodes))
-            rec.status = "TAHAP2"
+            rec.status = "TAHAP3"
             return self._to_read(rec)
 
     def get_task_terpilih(self, sesi_id: str) -> list[str]:

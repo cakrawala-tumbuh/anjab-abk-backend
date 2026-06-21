@@ -16,11 +16,11 @@ class TiKuesionerItemRead(BaseModel):
     sesi_id: str = Field(description="ID sesi Task Inventory.", examples=["tises_a1b2c3d4"])
     tahap1_submit: bool = Field(description="True jika seleksi Tahap 1 sudah disubmit.")
     tahap1_submitted_at: datetime | None = Field(default=None, description="Waktu submit Tahap 1.")
-    tahap2_submit: bool = Field(description="True jika detail Tahap 2 sudah disubmit.")
-    tahap2_submitted_at: datetime | None = Field(default=None, description="Waktu submit Tahap 2.")
+    tahap3_submit: bool = Field(description="True jika detail Tahap 3 sudah disubmit.")
+    tahap3_submitted_at: datetime | None = Field(default=None, description="Waktu submit Tahap 3.")
     created_at: datetime = Field(description="Waktu pendaftaran.")
     sesi_status: str = Field(
-        description="Status sesi: DRAFT | TAHAP1 | TAHAP2 | CLOSED | ANALYZED.",
+        description="Status sesi: DRAFT | TAHAP1 | TAHAP2 | TAHAP3 | CLOSED | ANALYZED.",
         examples=["TAHAP1"],
     )
     sesi_unit: str = Field(description="Unit/jenjang yang dikaji.", examples=["TK"])

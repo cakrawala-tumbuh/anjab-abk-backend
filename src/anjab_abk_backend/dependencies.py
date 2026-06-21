@@ -41,6 +41,7 @@ from .taskinv.services.detail import InMemoryTiDetailService, TiDetailService
 from .taskinv.services.responden import InMemoryTiRespondenService, TiRespondenService
 from .taskinv.services.seleksi import InMemoryTiSeleksiService, TiSeleksiService
 from .taskinv.services.sesi import InMemoryTiSesiService, TiSesiService
+from .taskinv.services.tahap2 import InMemoryTiTahap2Service, TiTahap2Service
 from .wcp.services.dimensi import InMemoryWcpDimensiService, WcpDimensiService
 from .wcp.services.jawaban import InMemoryWcpJawabanService, WcpJawabanService
 from .wcp.services.responden import InMemoryWcpRespondenService, WcpRespondenService
@@ -263,6 +264,16 @@ def _ti_detail_singleton() -> InMemoryTiDetailService:
 def get_ti_detail_service() -> TiDetailService:
     """SEAM: kembalikan implementasi `TiDetailService`. Ganti di sini saja."""
     return _ti_detail_singleton()
+
+
+@lru_cache
+def _ti_tahap2_singleton() -> InMemoryTiTahap2Service:
+    return InMemoryTiTahap2Service()
+
+
+def get_ti_tahap2_service() -> TiTahap2Service:
+    """SEAM: kembalikan implementasi `TiTahap2Service`. Ganti di sini saja."""
+    return _ti_tahap2_singleton()
 
 
 # --- Authentik Provisioner ---

@@ -36,6 +36,6 @@ class TiRespondenRead(BaseModel):
     partisipan_id: str | None = Field(default=None, description="ID partisipan terhubung.")
     tahap1_submit: bool = Field(description="True jika seleksi Tahap 1 sudah disubmit.")
     tahap1_submitted_at: datetime | None = Field(default=None, description="Waktu submit Tahap 1.")
-    tahap2_submit: bool = Field(description="True jika detail Tahap 2 sudah disubmit.")
-    tahap2_submitted_at: datetime | None = Field(default=None, description="Waktu submit Tahap 2.")
+    tahap3_submit: bool = Field(description="True jika detail Tahap 3 sudah disubmit.")
+    tahap3_submitted_at: datetime | None = Field(default=None, description="Waktu submit Tahap 3.")
     created_at: datetime = Field(description="Waktu pendaftaran (UTC, ISO-8601).")

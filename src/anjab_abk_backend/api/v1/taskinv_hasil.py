@@ -59,9 +59,9 @@ def get_task_terpilih(
     catalog: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
 ) -> list[TiTaskTerpilihRead]:
     sesi = sesi_service.get(sesi_id)
-    if sesi.status not in ("TAHAP2", "CLOSED", "ANALYZED"):
+    if sesi.status not in ("TAHAP3", "CLOSED", "ANALYZED"):
         raise ValidationAppError(
-            f"Himpunan task terpilih baru tersedia setelah TAHAP2 (saat ini: {sesi.status})."
+            f"Himpunan task terpilih baru tersedia setelah TAHAP3 (saat ini: {sesi.status})."
         )
     kodes = sesi_service.get_task_terpilih(sesi_id)
     counts = seleksi_service.count_relevan_per_task(sesi_id)
@@ -91,14 +91,16 @@ def run_analisis(
             f"Analisis hanya dapat dijalankan saat sesi berstatus CLOSED atau ANALYZED"
             f" (saat ini: {sesi.status})."
         )
-    n_tahap2 = detail_service.count_responden_submitted(sesi_id)
-    if n_tahap2 < 1:
+    n_tahap3 = detail_service.count_responden_submitted(sesi_id)
+    if n_tahap3 < 1:
         raise ValidationAppError(
-            "Analisis membutuhkan minimal 1 responden yang sudah submit detail Tahap 2."
+            "Analisis membutuhkan minimal 1 responden yang sudah submit detail Tahap 3."
         )
     if sesi.status == "CLOSED":
         sesi = sesi_service.transition(sesi_id, "ANALYZED")
-    return _build_hasil(sesi, sesi_service, seleksi_service, rsp_service, detail_service, catalog)
+    return _build_hasil(
+        sesi, sesi_service, seleksi_service, rsp_service, detail_service, catalog, n_tahap3
+    )
 
 
 @router.get(
@@ -121,7 +123,10 @@ def get_hasil(
         raise ValidationAppError(
             f"Hasil hanya tersedia setelah analisis dijalankan (status saat ini: {sesi.status})."
         )
-    return _build_hasil(sesi, sesi_service, seleksi_service, rsp_service, detail_service, catalog)
+    n_tahap3_g = detail_service.count_responden_submitted(sesi_id)
+    return _build_hasil(
+        sesi, sesi_service, seleksi_service, rsp_service, detail_service, catalog, n_tahap3_g
+    )
 
 
 def _build_hasil(
@@ -131,12 +136,14 @@ def _build_hasil(
     rsp_service: TiRespondenService,
     detail_service: TiDetailService,
     catalog: TiCatalogService,
+    n_tahap3: int | None = None,
 ) -> TiHasilSesiRead:
     kodes = sesi_service.get_task_terpilih(sesi.id)
     counts = seleksi_service.count_relevan_per_task(sesi.id)
     n_tahap1 = rsp_service.count_tahap1_submitted(sesi.id)
     details = detail_service.list_by_sesi(sesi.id)
-    n_tahap2 = detail_service.count_responden_submitted(sesi.id)
+    if n_tahap3 is None:
+        n_tahap3 = detail_service.count_responden_submitted(sesi.id)
     return compute_hasil_sesi(
         sesi,
         kodes,
@@ -144,5 +151,5 @@ def _build_hasil(
         counts,
         n_tahap1,
         details,
-        n_tahap2,
+        n_tahap3,
     )
