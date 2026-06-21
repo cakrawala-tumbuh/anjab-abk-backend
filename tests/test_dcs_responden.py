@@ -264,6 +264,47 @@ def test_create_responden_without_partisipan_id(client: TestClient, open_sesi: d
     assert r.json()["partisipan_id"] is None
 
 
+# --- constraint: 1 partisipan_id maksimal 1 responden DCS ---
+
+
+def test_create_responden_partisipan_id_duplikat_ditolak(client: TestClient) -> None:
+    par_id = f"par_{uuid.uuid4().hex[:8]}"
+    sesi1 = _build_sesi(client)
+    sesi2 = _build_sesi(client)
+
+    # Daftarkan ke sesi pertama — harus berhasil.
+    r1 = client.post(
+        f"{RSP_BASE}/{sesi1['id']}/responden",
+        json={"jabatan_label": "Guru A", "partisipan_id": par_id},
+    )
+    assert r1.status_code == 201
+
+    # Daftarkan ke sesi kedua dengan partisipan_id yang sama — harus ditolak (409).
+    r2 = client.post(
+        f"{RSP_BASE}/{sesi2['id']}/responden",
+        json={"jabatan_label": "Guru B", "partisipan_id": par_id},
+    )
+    assert r2.status_code == 409
+
+
+def test_create_responden_tanpa_partisipan_id_boleh_duplikat(client: TestClient) -> None:
+    """Responden tanpa partisipan_id (anonim) boleh didaftarkan ke beberapa sesi."""
+    sesi1 = _build_sesi(client)
+    sesi2 = _build_sesi(client)
+
+    r1 = client.post(
+        f"{RSP_BASE}/{sesi1['id']}/responden",
+        json={"jabatan_label": "Anonim A"},
+    )
+    assert r1.status_code == 201
+
+    r2 = client.post(
+        f"{RSP_BASE}/{sesi2['id']}/responden",
+        json={"jabatan_label": "Anonim B"},
+    )
+    assert r2.status_code == 201
+
+
 # --- GET /kuesioner/saya (DCS) ---
 
 

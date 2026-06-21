@@ -55,7 +55,15 @@ def list_responden(
     summary="Daftarkan responden ke sesi DCS",
     operation_id="dcs_responden_create",
     dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND_SESI},
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_NOT_FOUND_SESI,
+        409: {
+            "model": ErrorResponse,
+            "description": "Partisipan sudah terdaftar sebagai responden DCS.",
+        },
+    },
 )
 def create_responden(
     sesi_id: Annotated[str, Path(description="ID sesi DCS.")],

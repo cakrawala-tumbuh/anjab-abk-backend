@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
-from ...errors import NotFoundError, ValidationAppError
+from ...errors import ConflictError, NotFoundError, ValidationAppError
 from ..schemas.responden import DcsRespondenCreate, DcsRespondenRead
 
 
@@ -84,6 +84,12 @@ class InMemoryDcsRespondenService:
                 raise ValidationAppError(
                     f"Sesi sudah mencapai batas maksimum {max_responden} responden."
                 )
+            if data.partisipan_id is not None:
+                already = any(r.partisipan_id == data.partisipan_id for r in self._data.values())
+                if already:
+                    raise ConflictError(
+                        f"Partisipan '{data.partisipan_id}' sudah terdaftar sebagai responden DCS."
+                    )
             rec = _Record(
                 id=f"drsp_{uuid.uuid4().hex[:8]}",
                 sesi_id=sesi_id,

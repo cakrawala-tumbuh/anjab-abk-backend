@@ -7,6 +7,17 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-21
+
+### Ditambahkan
+
+- **Batasan 1 DCS per partisipan**: admin tidak dapat mendaftarkan partisipan yang sama ke lebih
+  dari satu sesi DCS. Endpoint `POST /api/v1/dcs/sesi/{sesi_id}/responden` kini mengembalikan
+  `409 Conflict` apabila `partisipan_id` sudah terdaftar sebagai responden di sesi DCS mana pun.
+- Dua unit test baru: `test_create_responden_partisipan_id_duplikat_ditolak` (409 pada duplikat)
+  dan `test_create_responden_tanpa_partisipan_id_boleh_duplikat` (responden anonim tidak
+  terkena batasan).
+
 ## [0.5.0] - 2026-06-21
 
 ### Ditambahkan
