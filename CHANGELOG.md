@@ -7,6 +7,17 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-21
+
+### Ditambahkan
+
+- **Koordinator SME Panel**: field `koordinator_id` pada resource `SMEPanel` untuk menyimpan
+  ID partisipan yang berperan sebagai koordinator panel. Koordinator wajib merupakan anggota
+  panel; mengirim `null` pada PATCH menghapus koordinator. Menghapus anggota yang saat ini
+  menjadi koordinator juga otomatis menghapus koordinator.
+- Empat unit test baru: `test_set_koordinator`, `test_set_koordinator_bukan_anggota`,
+  `test_hapus_koordinator`, `test_remove_anggota_clears_koordinator`.
+
 ## [0.7.0] - 2026-06-21
 
 ### Ditambahkan

@@ -52,6 +52,7 @@ def test_create_and_get(client: TestClient, panel: dict) -> None:
     assert panel["id"].startswith("sme_")
     assert "jabatan_id" in panel
     assert panel["partisipan_ids"] == []
+    assert panel["koordinator_id"] is None
     assert panel["aktif"] is True
     r = client.get(f"{BASE}/{panel['id']}")
     assert r.status_code == 200
@@ -161,3 +162,39 @@ def test_add_anggota_requires_auth(anon_client: TestClient, client: TestClient) 
     panel_id = r_panel.json()["id"]
     r = anon_client.post(f"{BASE}/{panel_id}/anggota", json={"partisipan_id": "par_x"})
     assert r.status_code == 401
+
+
+def test_set_koordinator(client: TestClient, panel: dict) -> None:
+    jbt_id = panel["jabatan_id"]
+    par_id = _buat_partisipan(client, jbt_id, [], f"koord_{uuid.uuid4().hex[:6]}")
+    client.post(f"{BASE}/{panel['id']}/anggota", json={"partisipan_id": par_id})
+    r = client.patch(f"{BASE}/{panel['id']}", json={"koordinator_id": par_id})
+    assert r.status_code == 200
+    assert r.json()["koordinator_id"] == par_id
+
+
+def test_set_koordinator_bukan_anggota(client: TestClient, panel: dict) -> None:
+    jbt_id = panel["jabatan_id"]
+    par_id = _buat_partisipan(client, jbt_id, [], f"nonmember_{uuid.uuid4().hex[:6]}")
+    r = client.patch(f"{BASE}/{panel['id']}", json={"koordinator_id": par_id})
+    assert r.status_code == 422
+
+
+def test_hapus_koordinator(client: TestClient, panel: dict) -> None:
+    jbt_id = panel["jabatan_id"]
+    par_id = _buat_partisipan(client, jbt_id, [], f"hapuskoord_{uuid.uuid4().hex[:6]}")
+    client.post(f"{BASE}/{panel['id']}/anggota", json={"partisipan_id": par_id})
+    client.patch(f"{BASE}/{panel['id']}", json={"koordinator_id": par_id})
+    r = client.patch(f"{BASE}/{panel['id']}", json={"koordinator_id": None})
+    assert r.status_code == 200
+    assert r.json()["koordinator_id"] is None
+
+
+def test_remove_anggota_clears_koordinator(client: TestClient, panel: dict) -> None:
+    jbt_id = panel["jabatan_id"]
+    par_id = _buat_partisipan(client, jbt_id, [], f"clrkoord_{uuid.uuid4().hex[:6]}")
+    client.post(f"{BASE}/{panel['id']}/anggota", json={"partisipan_id": par_id})
+    client.patch(f"{BASE}/{panel['id']}", json={"koordinator_id": par_id})
+    r_remove = client.delete(f"{BASE}/{panel['id']}/anggota/{par_id}")
+    assert r_remove.status_code == 200
+    assert r_remove.json()["koordinator_id"] is None

@@ -44,6 +44,7 @@ class _Record:
     aktif: bool
     created_at: datetime
     partisipan_ids: list[str] = field(default_factory=list)
+    koordinator_id: str | None = None
 
 
 class InMemorySMEPanelService:
@@ -59,6 +60,7 @@ class InMemorySMEPanelService:
             id=rec.id,
             jabatan_id=rec.jabatan_id,
             partisipan_ids=list(rec.partisipan_ids),
+            koordinator_id=rec.koordinator_id,
             aktif=rec.aktif,
             created_at=rec.created_at,
         )
@@ -134,4 +136,6 @@ class InMemorySMEPanelService:
             if partisipan_id not in rec.partisipan_ids:
                 raise NotFoundError(f"Partisipan '{partisipan_id}' bukan anggota panel ini.")
             rec.partisipan_ids.remove(partisipan_id)
+            if rec.koordinator_id == partisipan_id:
+                rec.koordinator_id = None
             return self._to_read(rec)

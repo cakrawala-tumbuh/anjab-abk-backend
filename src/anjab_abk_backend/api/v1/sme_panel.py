@@ -213,7 +213,16 @@ def get_sme_panel(
     summary="Perbarui SME panel",
     operation_id="sme_panel_update",
     dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND, **_PRECONDITION},
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_NOT_FOUND,
+        **_PRECONDITION,
+        422: {
+            "model": ErrorResponse,
+            "description": "Koordinator bukan anggota panel.",
+        },
+    },
 )
 def update_sme_panel(
     panel_id: Annotated[str, Path(description="ID SME panel.")],
@@ -225,6 +234,9 @@ def update_sme_panel(
 ) -> SMEPanelRead:
     current = service.get(panel_id)
     _check_precondition(current, if_match, settings.require_if_match)
+    if "koordinator_id" in payload.model_fields_set and payload.koordinator_id is not None:
+        if payload.koordinator_id not in current.partisipan_ids:
+            raise ValidationAppError("Koordinator harus merupakan anggota panel SME ini.")
     updated = service.update(panel_id, payload)
     response.headers["ETag"] = compute_etag(updated)
     return updated

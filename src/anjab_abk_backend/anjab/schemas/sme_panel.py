@@ -25,6 +25,13 @@ class SMEPanelUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     aktif: bool | None = Field(default=None, description="Status aktif baru.")
+    koordinator_id: str | None = Field(
+        default=None,
+        description=(
+            "ID partisipan yang menjadi koordinator panel. "
+            "Harus anggota panel. Kirim null untuk menghapus koordinator."
+        ),
+    )
 
 
 class SMEPanelRead(BaseModel):
@@ -37,6 +44,10 @@ class SMEPanelRead(BaseModel):
     partisipan_ids: list[str] = Field(
         default_factory=list,
         description="Daftar ID partisipan anggota panel.",
+    )
+    koordinator_id: str | None = Field(
+        default=None,
+        description="ID partisipan yang menjadi koordinator panel. Harus merupakan anggota panel.",
     )
     aktif: bool = Field(description="Status aktif.")
     created_at: datetime = Field(description="Waktu pembuatan (UTC, ISO-8601).")
