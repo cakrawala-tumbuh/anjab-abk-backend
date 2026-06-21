@@ -39,6 +39,7 @@ class PartisipanService(Protocol):
 
     def list(self, *, limit: int, offset: int) -> tuple[list[PartisipanRead], int]: ...
     def get(self, partisipan_id: str) -> PartisipanRead: ...
+    def get_by_subject(self, subject: str) -> PartisipanRead | None: ...
     def create(
         self, data: PartisipanCreate, *, authentik_user_id: str | None = None
     ) -> PartisipanRead: ...
@@ -88,6 +89,16 @@ class InMemoryPartisipanService:
         if rec is None:
             raise NotFoundError(f"Partisipan '{partisipan_id}' tidak ditemukan.")
         return self._to_read(rec)
+
+    def get_by_subject(self, subject: str) -> PartisipanRead | None:
+        with self._lock:
+            for rec in self._data.values():
+                if rec.authentik_user_id == subject:
+                    return self._to_read(rec)
+            for rec in self._data.values():
+                if rec.email == subject:
+                    return self._to_read(rec)
+        return None
 
     def create(
         self, data: PartisipanCreate, *, authentik_user_id: str | None = None

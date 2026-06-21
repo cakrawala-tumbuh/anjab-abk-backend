@@ -24,6 +24,11 @@ class WcpRespondenCreate(BaseModel):
         description="Label jabatan responden (teks bebas).",
         examples=["Guru Matematika"],
     )
+    partisipan_id: str | None = Field(
+        default=None,
+        description="ID partisipan yang terhubung (opsional, untuk fitur 'Kuesioner Saya').",
+        examples=["par_a1b2c3d4"],
+    )
 
 
 class WcpRespondenRead(BaseModel):
@@ -35,6 +40,9 @@ class WcpRespondenRead(BaseModel):
     sesi_id: str = Field(description="ID sesi induk.", examples=["wses_a1b2c3d4"])
     nama: str | None = Field(default=None, description="Nama responden.")
     jabatan_label: str = Field(description="Label jabatan responden.")
+    partisipan_id: str | None = Field(
+        default=None, description="ID partisipan yang terhubung, bila ada."
+    )
     sudah_submit: bool = Field(description="True jika jawaban sudah disubmit.")
     submitted_at: datetime | None = Field(default=None, description="Waktu submit jawaban.")
     created_at: datetime = Field(description="Waktu pendaftaran (UTC, ISO-8601).")

@@ -34,11 +34,11 @@ def _build_sesi(client: TestClient, min_responden: int = 2, max_responden: int =
     return client.get(f"{SESI_BASE}/{sesi['id']}").json()
 
 
-def _add_responden(client: TestClient, sesi_id: str) -> dict:
-    return client.post(
-        f"{RSP_BASE}/{sesi_id}/responden",
-        json={"jabatan_label": "Guru Test"},
-    ).json()
+def _add_responden(client: TestClient, sesi_id: str, partisipan_id: str | None = None) -> dict:
+    body: dict = {"jabatan_label": "Guru Test"}
+    if partisipan_id:
+        body["partisipan_id"] = partisipan_id
+    return client.post(f"{RSP_BASE}/{sesi_id}/responden", json=body).json()
 
 
 def _submit(client: TestClient, responden_id: str, skor: int = 3) -> None:
@@ -64,6 +64,9 @@ def analyzed_sesi(client: TestClient) -> dict:
     client.post(f"{SESI_BASE}/{sesi_id}/tutup")
     client.post(f"{SESI_BASE}/{sesi_id}/analisis")
     return client.get(f"{SESI_BASE}/{sesi_id}").json()
+
+
+DCS_KUESIONER_BASE = "/api/v1/dcs/kuesioner"
 
 
 # --- GET /{sesi_id}/responden ---
@@ -236,3 +239,63 @@ def test_analisis_dengan_wcp_sesi_k_index(client: TestClient) -> None:
     assert data["sesi_id"] == dcs_sesi_id
     assert data["k_index"] is not None
     assert 0.0 <= data["k_index"] <= 1.0
+
+
+# --- partisipan_id pada responden ---
+
+
+def test_create_responden_with_partisipan_id(client: TestClient, open_sesi: dict) -> None:
+    par_id = f"par_{uuid.uuid4().hex[:8]}"
+    r = client.post(
+        f"{RSP_BASE}/{open_sesi['id']}/responden",
+        json={"jabatan_label": "Guru Sains", "partisipan_id": par_id},
+    )
+    assert r.status_code == 201
+    data = r.json()
+    assert data["partisipan_id"] == par_id
+
+
+def test_create_responden_without_partisipan_id(client: TestClient, open_sesi: dict) -> None:
+    r = client.post(
+        f"{RSP_BASE}/{open_sesi['id']}/responden",
+        json={"jabatan_label": "Guru Seni"},
+    )
+    assert r.status_code == 201
+    assert r.json()["partisipan_id"] is None
+
+
+# --- GET /kuesioner/saya (DCS) ---
+
+
+def test_kuesioner_saya_tanpa_partisipan(client: TestClient) -> None:
+    r = client.get(f"{DCS_KUESIONER_BASE}/saya")
+    assert r.status_code == 200
+
+
+def test_kuesioner_saya_dengan_partisipan(client: TestClient) -> None:
+    from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
+    from anjab_abk_backend.dependencies import get_partisipan_service
+
+    par_service = get_partisipan_service()
+    par = par_service.create(
+        PartisipanCreate(
+            nama="Partisipan Kuesioner DCS",
+            email=f"ksr_dcs_{uuid.uuid4().hex[:4]}@test.id",
+            sekolah_id="skl_dummy",
+            jabatan_utama_id="jbt_dummy",
+            masa_kerja_tahun=2,
+        ),
+        authentik_user_id="test-user",
+    )
+
+    sesi = _build_sesi(client)
+    rsp = _add_responden(client, sesi["id"], partisipan_id=par.id)
+
+    r = client.get(f"{DCS_KUESIONER_BASE}/saya")
+    assert r.status_code == 200
+    data = r.json()
+    ids = [item["id"] for item in data]
+    assert rsp["id"] in ids
+    kuesioner = next(item for item in data if item["id"] == rsp["id"])
+    assert kuesioner["sesi_status"] == "OPEN"
+    assert kuesioner["sesi_jabatan_id"] == sesi["jabatan_id"]

@@ -7,6 +7,21 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-21
+
+### Ditambahkan
+- Instrumen **Task Inventory** (Inventori Tugas, standar CalHR 5-komponen) dengan alur 2 tahap:
+  Tahap 1 seleksi relevansi task per partisipan, lalu Tahap 2 detailing field CalHR per task
+  relevan (dipilih ≥1 partisipan). Status sesi: `DRAFT → TAHAP1 → TAHAP2 → CLOSED → ANALYZED`.
+- Catalog master 2.738 task (di-seed dari hasil FGD) per kombinasi Unit × Kategori Jabatan.
+- Endpoint `/api/v1/task-inventory/*`: catalog, sesi (CRUD + transisi), responden, seleksi
+  Tahap 1, detail Tahap 2, himpunan task terpilih, serta analisis/hasil agregasi (masukan ABK).
+- Unittest endpoint Task Inventory: catalog, alur 2 tahap, transisi & guard, agregasi hasil.
+- Fitur **Kuesioner Saya**: endpoint `/api/v1/dcs/kuesioner/saya` & `/api/v1/wcp/kuesioner/saya`
+  untuk responden melihat kuesioner DCS/WCP yang ditugaskan kepadanya.
+- Penautan partisipan pada responden DCS/WCP (`partisipan_id`, `list_by_partisipan`) dan
+  pencarian partisipan berdasarkan subject (`get_by_subject`).
+
 ## [0.2.0] - 2026-06-20
 
 ### Ditambahkan

@@ -20,6 +20,7 @@ class _Record:
     sudah_submit: bool
     created_at: datetime
     nama: str | None = None
+    partisipan_id: str | None = None
     submitted_at: datetime | None = None
 
 
@@ -27,6 +28,7 @@ class DcsRespondenService(Protocol):
     """Kontrak operasi terhadap DcsResponden."""
 
     def list_by_sesi(self, sesi_id: str) -> list[DcsRespondenRead]: ...
+    def list_by_partisipan(self, partisipan_id: str) -> list[DcsRespondenRead]: ...
     def get(self, responden_id: str) -> DcsRespondenRead: ...
     def create(
         self, sesi_id: str, data: DcsRespondenCreate, max_responden: int
@@ -50,6 +52,14 @@ class InMemoryDcsRespondenService:
         with self._lock:
             ordered = sorted(
                 (r for r in self._data.values() if r.sesi_id == sesi_id),
+                key=lambda r: r.created_at,
+            )
+        return [self._to_read(r) for r in ordered]
+
+    def list_by_partisipan(self, partisipan_id: str) -> list[DcsRespondenRead]:
+        with self._lock:
+            ordered = sorted(
+                (r for r in self._data.values() if r.partisipan_id == partisipan_id),
                 key=lambda r: r.created_at,
             )
         return [self._to_read(r) for r in ordered]
@@ -79,6 +89,7 @@ class InMemoryDcsRespondenService:
                 sesi_id=sesi_id,
                 nama=data.nama,
                 jabatan_label=data.jabatan_label,
+                partisipan_id=data.partisipan_id,
                 sudah_submit=False,
                 created_at=datetime.now(UTC),
             )

@@ -35,6 +35,11 @@ from .services.authentik_provisioner import (
 from .services.idempotency import IdempotencyStore, InMemoryIdempotencyStore
 from .services.ratelimit import AllowAllRateLimiter, RateLimiter
 from .services.readiness import ReadinessCheck
+from .taskinv.services.catalog import InMemoryTiCatalogService, TiCatalogService
+from .taskinv.services.detail import InMemoryTiDetailService, TiDetailService
+from .taskinv.services.responden import InMemoryTiRespondenService, TiRespondenService
+from .taskinv.services.seleksi import InMemoryTiSeleksiService, TiSeleksiService
+from .taskinv.services.sesi import InMemoryTiSesiService, TiSesiService
 from .wcp.services.dimensi import InMemoryWcpDimensiService, WcpDimensiService
 from .wcp.services.jawaban import InMemoryWcpJawabanService, WcpJawabanService
 from .wcp.services.responden import InMemoryWcpRespondenService, WcpRespondenService
@@ -194,6 +199,59 @@ def _dcs_jawaban_singleton() -> InMemoryDcsJawabanService:
 def get_dcs_jawaban_service() -> DcsJawabanService:
     """SEAM: kembalikan implementasi `DcsJawabanService`. Ganti di sini saja."""
     return _dcs_jawaban_singleton()
+
+
+# --- Task Inventory services ---
+
+
+@lru_cache
+def _ti_catalog_singleton() -> InMemoryTiCatalogService:
+    return InMemoryTiCatalogService()
+
+
+def get_ti_catalog_service() -> TiCatalogService:
+    """SEAM: kembalikan implementasi `TiCatalogService`. Ganti di sini saja."""
+    return _ti_catalog_singleton()
+
+
+@lru_cache
+def _ti_sesi_singleton() -> InMemoryTiSesiService:
+    return InMemoryTiSesiService()
+
+
+def get_ti_sesi_service() -> TiSesiService:
+    """SEAM: kembalikan implementasi `TiSesiService`. Ganti di sini saja."""
+    return _ti_sesi_singleton()
+
+
+@lru_cache
+def _ti_responden_singleton() -> InMemoryTiRespondenService:
+    return InMemoryTiRespondenService()
+
+
+def get_ti_responden_service() -> TiRespondenService:
+    """SEAM: kembalikan implementasi `TiRespondenService`. Ganti di sini saja."""
+    return _ti_responden_singleton()
+
+
+@lru_cache
+def _ti_seleksi_singleton() -> InMemoryTiSeleksiService:
+    return InMemoryTiSeleksiService()
+
+
+def get_ti_seleksi_service() -> TiSeleksiService:
+    """SEAM: kembalikan implementasi `TiSeleksiService`. Ganti di sini saja."""
+    return _ti_seleksi_singleton()
+
+
+@lru_cache
+def _ti_detail_singleton() -> InMemoryTiDetailService:
+    return InMemoryTiDetailService()
+
+
+def get_ti_detail_service() -> TiDetailService:
+    """SEAM: kembalikan implementasi `TiDetailService`. Ganti di sini saja."""
+    return _ti_detail_singleton()
 
 
 # --- Authentik Provisioner ---

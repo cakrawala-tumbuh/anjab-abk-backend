@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from .v1 import (
     dcs_hasil,
+    dcs_kuesioner,
     dcs_responden,
     dcs_sesi,
     dcs_subskala,
@@ -15,8 +16,15 @@ from .v1 import (
     partisipan,
     sekolah,
     system,
+    taskinv_catalog,
+    taskinv_detail,
+    taskinv_hasil,
+    taskinv_responden,
+    taskinv_seleksi,
+    taskinv_sesi,
     wcp_dimensi,
     wcp_hasil,
+    wcp_kuesioner,
     wcp_responden,
     wcp_sesi,
 )
@@ -47,6 +55,16 @@ api_router.include_router(
     jabatan.router,
     prefix="/jabatan",
     tags=["anjab.jabatan"],
+)
+api_router.include_router(
+    dcs_kuesioner.router,
+    prefix="/dcs",
+    tags=["dcs.kuesioner"],
+)
+api_router.include_router(
+    wcp_kuesioner.router,
+    prefix="/wcp",
+    tags=["wcp.kuesioner"],
 )
 api_router.include_router(
     wcp_dimensi.router,
@@ -87,4 +105,34 @@ api_router.include_router(
     dcs_hasil.router,
     prefix="/dcs/sesi",
     tags=["dcs.hasil"],
+)
+api_router.include_router(
+    taskinv_catalog.router,
+    prefix="/task-inventory/catalog",
+    tags=["taskinv.catalog"],
+)
+api_router.include_router(
+    taskinv_sesi.router,
+    prefix="/task-inventory/sesi",
+    tags=["taskinv.sesi"],
+)
+api_router.include_router(
+    taskinv_responden.router,
+    prefix="/task-inventory/sesi",
+    tags=["taskinv.responden"],
+)
+api_router.include_router(
+    taskinv_seleksi.router,
+    prefix="/task-inventory/sesi",
+    tags=["taskinv.seleksi"],
+)
+api_router.include_router(
+    taskinv_detail.router,
+    prefix="/task-inventory/sesi",
+    tags=["taskinv.detail"],
+)
+api_router.include_router(
+    taskinv_hasil.router,
+    prefix="/task-inventory/sesi",
+    tags=["taskinv.hasil"],
 )
