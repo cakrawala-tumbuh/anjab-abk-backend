@@ -25,6 +25,10 @@ from .v1 import (
     taskinv_seleksi,
     taskinv_sesi,
     taskinv_tahap2,
+    ts_kuesioner,
+    ts_log,
+    ts_responden,
+    ts_sesi,
     wcp_dimensi,
     wcp_hasil,
     wcp_kuesioner,
@@ -153,4 +157,24 @@ api_router.include_router(
     taskinv_hasil.router,
     prefix="/task-inventory/sesi",
     tags=["taskinv.hasil"],
+)
+api_router.include_router(
+    ts_kuesioner.router,
+    prefix="/time-study",
+    tags=["ts.kuesioner"],
+)
+api_router.include_router(
+    ts_sesi.router,
+    prefix="/time-study/sesi",
+    tags=["ts.sesi"],
+)
+api_router.include_router(
+    ts_responden.router,
+    prefix="/time-study/sesi",
+    tags=["ts.responden"],
+)
+api_router.include_router(
+    ts_log.router,
+    prefix="/time-study/responden",
+    tags=["ts.log"],
 )

@@ -7,6 +7,24 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-06-21
+
+### Ditambahkan
+
+- **Time Study (Studi Waktu)**: alat ukur baru berupa log harian alokasi waktu kerja per jabatan.
+  - Resource `TsSesi` — admin membuat dan mengelola sesi studi waktu per jabatan dan periode.
+    Transisi status: `DRAFT → OPEN → CLOSED → ANALYZED`.
+  - Resource `TsResponden` — admin men-assign partisipan ke sesi; partisipan wajib di-assign
+    sebelum dapat menginput log.
+  - Resource `TsLog` — partisipan menginput log harian: waktu masuk, waktu keluar, warna hari
+    (GREEN/YELLOW/RED), dan pembagian menit kerja per 6 kategori: Core, Character, Improve,
+    Strategic, Admin, Recovery. Kategori CoPilot (AI) dihapus dari instrumen.
+  - Validasi: satu log per (responden, tanggal); total menit kategori ≤ durasi kerja + toleransi
+    30 menit; `waktu_masuk` harus lebih awal dari `waktu_keluar`.
+  - Endpoint `GET /api/v1/time-study/kuesioner/saya` untuk partisipan melihat sesi yang aktif
+    beserta jumlah log yang telah diinput.
+  - 28 unit test baru pada `test_ts_sesi.py`, `test_ts_responden.py`, `test_ts_log.py`.
+
 ## [0.8.0] - 2026-06-21
 
 ### Ditambahkan

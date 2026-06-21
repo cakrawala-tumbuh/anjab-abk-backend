@@ -42,6 +42,9 @@ from .taskinv.services.responden import InMemoryTiRespondenService, TiRespondenS
 from .taskinv.services.seleksi import InMemoryTiSeleksiService, TiSeleksiService
 from .taskinv.services.sesi import InMemoryTiSesiService, TiSesiService
 from .taskinv.services.tahap2 import InMemoryTiTahap2Service, TiTahap2Service
+from .ts.services.log import InMemoryTsLogService, TsLogService
+from .ts.services.responden import InMemoryTsRespondenService, TsRespondenService
+from .ts.services.sesi import InMemoryTsSesiService, TsSesiService
 from .wcp.services.dimensi import InMemoryWcpDimensiService, WcpDimensiService
 from .wcp.services.jawaban import InMemoryWcpJawabanService, WcpJawabanService
 from .wcp.services.responden import InMemoryWcpRespondenService, WcpRespondenService
@@ -274,6 +277,39 @@ def _ti_tahap2_singleton() -> InMemoryTiTahap2Service:
 def get_ti_tahap2_service() -> TiTahap2Service:
     """SEAM: kembalikan implementasi `TiTahap2Service`. Ganti di sini saja."""
     return _ti_tahap2_singleton()
+
+
+# --- TS services ---
+
+
+@lru_cache
+def _ts_sesi_singleton() -> InMemoryTsSesiService:
+    return InMemoryTsSesiService()
+
+
+def get_ts_sesi_service() -> TsSesiService:
+    """SEAM: kembalikan implementasi `TsSesiService`. Ganti di sini saja."""
+    return _ts_sesi_singleton()
+
+
+@lru_cache
+def _ts_responden_singleton() -> InMemoryTsRespondenService:
+    return InMemoryTsRespondenService()
+
+
+def get_ts_responden_service() -> TsRespondenService:
+    """SEAM: kembalikan implementasi `TsRespondenService`. Ganti di sini saja."""
+    return _ts_responden_singleton()
+
+
+@lru_cache
+def _ts_log_singleton() -> InMemoryTsLogService:
+    return InMemoryTsLogService()
+
+
+def get_ts_log_service() -> TsLogService:
+    """SEAM: kembalikan implementasi `TsLogService`. Ganti di sini saja."""
+    return _ts_log_singleton()
 
 
 # --- Authentik Provisioner ---
