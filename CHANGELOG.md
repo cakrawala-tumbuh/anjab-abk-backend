@@ -7,6 +7,22 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-06-22
+
+### Ditambahkan
+
+- **Batas paginasi dinaikkan** — `pagination_params` kini menerima `limit` hingga 500
+  (sebelumnya 100), mendukung halaman admin master data dengan jumlah data besar.
+- 4 unit test tambahan: `limit > 100`, dan catalog untuk kombinasi dengan `detil_tugas` kosong.
+
+### Diperbaiki
+
+- `UraianTugasBackedCatalogService._to_catalog()` gagal saat `detil_tugas_id=None`
+  (melempar `NotFoundError` karena `self._dt.get(None)`). Kini menghasilkan
+  `detil_tugas=None` di `TiCatalogRead` tanpa error.
+- `TiCatalogRead.detil_tugas` diubah menjadi `str | None` (sebelumnya `str` wajib).
+- Baris deskripsi panjang di `taskinv_catalog.py` dipecah agar lolos ruff E501.
+
 ## [0.13.0] - 2026-06-22
 
 ### Ditambahkan
@@ -20,16 +36,6 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 - **SME panel bebas jabatan** — validasi jabatan dihapus dari `add_anggota`; partisipan
   manapun dapat ditambahkan ke panel SME. Cek keanggotaan panel dijalankan saat responden
   didaftarkan ke sesi TI.
-- **Batas paginasi dinaikkan** — `pagination_params` kini menerima `limit` hingga 500
-  (sebelumnya 100), mendukung halaman admin master data dengan data besar.
-- 4 unit test tambahan: limit > 100, dan catalog untuk kombinasi dengan `detil_tugas` kosong.
-
-### Diperbaiki
-
-- `UraianTugasBackedCatalogService._to_catalog()` gagal saat `detil_tugas_id=None`
-  (melempar `NotFoundError` karena `dt.get(None)`). Kini `detil_tugas_id=None` menghasilkan
-  `detil_tugas=None` di `TiCatalogRead` tanpa error.
-- `TiCatalogRead.detil_tugas` diubah menjadi `str | None` (sebelumnya `str` wajib).
 
 ## [0.12.0] - 2026-06-22
 
