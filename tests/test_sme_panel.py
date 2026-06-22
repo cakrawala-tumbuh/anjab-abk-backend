@@ -128,11 +128,12 @@ def test_add_anggota_via_jabatan_tambahan(client: TestClient, panel: dict) -> No
     assert par_id in r.json()["partisipan_ids"]
 
 
-def test_add_anggota_jabatan_tidak_sesuai(client: TestClient, panel: dict) -> None:
+def test_add_anggota_berbeda_jabatan_tetap_berhasil(client: TestClient, panel: dict) -> None:
     jbt_beda = _jabatan_id()
     par_id = _buat_partisipan(client, jbt_beda, [], f"beda_{uuid.uuid4().hex[:6]}")
     r = client.post(f"{BASE}/{panel['id']}/anggota", json={"partisipan_id": par_id})
-    assert r.status_code == 422
+    assert r.status_code == 200
+    assert par_id in r.json()["partisipan_ids"]
 
 
 def test_add_anggota_duplikat(client: TestClient, panel: dict) -> None:

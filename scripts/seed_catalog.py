@@ -24,7 +24,14 @@ BASE_URL = os.getenv("BASE_URL", "http://localhost:8000/api/v1")
 TOKEN = os.getenv("TOKEN", "")
 DRY_RUN = os.getenv("DRY_RUN", "0") == "1"
 
-DATA_FILE = Path(__file__).parent.parent / "src" / "anjab_abk_backend" / "taskinv" / "data" / "task_catalog.json"
+DATA_FILE = (
+    Path(__file__).parent.parent
+    / "src"
+    / "anjab_abk_backend"
+    / "taskinv"
+    / "data"
+    / "task_catalog.json"
+)
 
 if not TOKEN and not DRY_RUN:
     print("ERROR: TOKEN wajib diisi untuk operasi tulis.", file=sys.stderr)
@@ -117,7 +124,10 @@ def main() -> None:
             dt_by_key[key] = result["id"]
             dt_created += 1
         else:
-            rows = _search("/task-inventory/detil-tugas", [["nama", "=", dt_nama], ["tugas_pokok_id", "=", tp_id]])
+            rows = _search(
+                "/task-inventory/detil-tugas",
+                [["nama", "=", dt_nama], ["tugas_pokok_id", "=", tp_id]],
+            )
             if rows:
                 dt_by_key[key] = rows[0]["id"]
             dt_skipped += 1

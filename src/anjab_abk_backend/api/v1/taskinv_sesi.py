@@ -87,11 +87,17 @@ def create_sesi(
     idem: Annotated[Idempotency, Depends(idempotency)],
     response: Response,
 ) -> TiSesiRead:
-    if not catalog.valid_kodes(payload.unit, payload.kategori_jabatan):
-        raise ValidationAppError(
-            f"Tidak ada task catalog untuk kombinasi unit '{payload.unit}'"
-            f" dan kategori jabatan '{payload.kategori_jabatan}'."
-        )
+    if payload.unit is not None:
+        if not catalog.valid_kodes(payload.unit, payload.kategori_jabatan):
+            raise ValidationAppError(
+                f"Tidak ada task catalog untuk kombinasi unit '{payload.unit}'"
+                f" dan kategori jabatan '{payload.kategori_jabatan}'."
+            )
+    else:
+        if not catalog.valid_kodes_for_kategori(payload.kategori_jabatan):
+            raise ValidationAppError(
+                f"Tidak ada task catalog untuk kategori jabatan '{payload.kategori_jabatan}'."
+            )
     cached = idem.cached()
     if cached is not None:
         response.status_code = status.HTTP_200_OK

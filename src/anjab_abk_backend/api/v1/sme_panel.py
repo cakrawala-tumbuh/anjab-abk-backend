@@ -14,12 +14,10 @@ from ...anjab.schemas.sme_panel import (
 )
 from ...anjab.services.sme_panel import SMEPanelService
 from ...config import Settings, get_settings
-from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     Idempotency,
     Pagination,
     get_current_principal,
-    get_partisipan_service,
     get_sme_panel_service,
     idempotency,
     pagination_params,
@@ -269,26 +267,14 @@ def delete_sme_panel(
         **_RATE,
         **_NOT_FOUND,
         409: {"model": ErrorResponse, "description": "Partisipan sudah anggota panel ini."},
-        422: {
-            "model": ErrorResponse,
-            "description": "Jabatan partisipan tidak sesuai dengan panel ini.",
-        },
     },
 )
 def add_anggota(
     panel_id: Annotated[str, Path(description="ID SME panel.")],
     payload: SMEPanelAnggotaAdd,
     service: Annotated[SMEPanelService, Depends(get_sme_panel_service)],
-    partisipan_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
     response: Response,
 ) -> SMEPanelRead:
-    panel = service.get(panel_id)
-    partisipan = partisipan_service.get(payload.partisipan_id)
-    jabatan_ids_partisipan = {partisipan.jabatan_utama_id} | set(partisipan.jabatan_tambahan_ids)
-    if panel.jabatan_id not in jabatan_ids_partisipan:
-        raise ValidationAppError(
-            "Partisipan tidak dapat ditambahkan: jabatan tidak sesuai dengan panel SME ini."
-        )
     updated = service.add_anggota(panel_id, payload.partisipan_id)
     response.headers["ETag"] = compute_etag(updated)
     return updated

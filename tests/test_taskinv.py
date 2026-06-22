@@ -22,12 +22,13 @@ def _uniq_periode() -> str:
 
 def _sesi_payload(periode: str | None = None, **over) -> dict:
     payload = {
-        "unit": UNIT,
         "kategori_jabatan": KATEGORI,
         "periode": periode or _uniq_periode(),
         "min_responden": 1,
         "max_responden": 10,
     }
+    if "unit" not in over:
+        payload["unit"] = UNIT  # default to UNIT for existing tests
     payload.update(over)
     return payload
 
@@ -619,3 +620,106 @@ def test_kuesioner_saya_universal_ti(client: TestClient) -> None:
     # Idempoten: jumlah & id responden tetap.
     r2 = client.get(f"{KUESIONER}/saya")
     assert {i["id"] for i in r2.json()} == {i["id"] for i in data}
+
+
+# --------------------------------------------------------------------------- #
+# Sesi tanpa unit + SME panel check
+# --------------------------------------------------------------------------- #
+
+
+def test_sesi_create_tanpa_unit(client: TestClient) -> None:
+    """Session tanpa unit dapat dibuat."""
+    r = client.post(
+        SESI,
+        json={
+            "kategori_jabatan": KATEGORI,
+            "periode": _uniq_periode(),
+            "min_responden": 1,
+            "max_responden": 10,
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["unit"] is None
+
+
+def test_sesi_create_tanpa_unit_kategori_invalid(client: TestClient) -> None:
+    """Session tanpa unit dengan kategori tidak valid ditolak."""
+    r = client.post(
+        SESI,
+        json={
+            "kategori_jabatan": "Jabatan Tidak Ada Di Catalog",
+            "periode": _uniq_periode(),
+        },
+    )
+    assert r.status_code in (400, 422)
+
+
+def test_responden_sme_panel_check(client: TestClient) -> None:
+    """Partisipan hanya bisa jadi responden TI jika anggota SME panel jabatan sesi."""
+    import uuid
+
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
+    from anjab_abk_backend.dependencies import (
+        get_partisipan_service,
+        get_sme_panel_service,
+    )
+
+    jabatan_id = f"jbt_{uuid.uuid4().hex[:8]}"
+
+    # Buat SME panel untuk jabatan ini
+    sme_svc = get_sme_panel_service()
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id))
+
+    # Buat partisipan A (akan menjadi anggota panel)
+    par_svc = get_partisipan_service()
+    par_a = par_svc.create(
+        PartisipanCreate(
+            nama="Par A",
+            email=f"par.a.{uuid.uuid4().hex[:4]}@test.id",
+            sekolah_id="skl_test",
+            jabatan_utama_id=jabatan_id,
+            masa_kerja_tahun=2,
+        ),
+        authentik_user_id=f"uid_a_{uuid.uuid4().hex[:4]}",
+    )
+    sme_svc.add_anggota(panel.id, par_a.id)
+
+    # Buat partisipan B (tidak di panel)
+    par_b = par_svc.create(
+        PartisipanCreate(
+            nama="Par B",
+            email=f"par.b.{uuid.uuid4().hex[:4]}@test.id",
+            sekolah_id="skl_test",
+            jabatan_utama_id=f"jbt_{uuid.uuid4().hex[:8]}",
+            masa_kerja_tahun=2,
+        ),
+        authentik_user_id=f"uid_b_{uuid.uuid4().hex[:4]}",
+    )
+
+    # Buat sesi TI dengan jabatan_id
+    sesi = _create_sesi(client, jabatan_id=jabatan_id)
+    sid = sesi["id"]
+    assert sesi["jabatan_id"] == jabatan_id
+
+    # Par A (anggota panel) → berhasil
+    r_a = client.post(
+        f"{SESI}/{sid}/responden",
+        json={"partisipan_id": par_a.id, "nama": "Par A"},
+    )
+    assert r_a.status_code == 201, r_a.text
+
+    # Par B (bukan anggota panel) → ditolak
+    r_b = client.post(
+        f"{SESI}/{sid}/responden",
+        json={"partisipan_id": par_b.id, "nama": "Par B"},
+    )
+    assert r_b.status_code in (400, 422), r_b.text
+
+
+def test_responden_tanpa_jabatan_id_bebas(client: TestClient) -> None:
+    """Sesi tanpa jabatan_id: semua partisipan bisa didaftarkan."""
+    sesi = _create_sesi(client)  # tanpa jabatan_id
+    assert sesi.get("jabatan_id") is None
+    r = _add_responden(client, sesi["id"], "Partisipan Bebas")
+    assert r["id"].startswith("trsp_")

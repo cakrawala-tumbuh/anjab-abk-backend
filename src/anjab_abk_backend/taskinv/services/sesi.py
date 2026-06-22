@@ -27,7 +27,7 @@ _VALID_TRANSITIONS: dict[StatusSesi, StatusSesi] = {
 @dataclass
 class _Record:
     id: str
-    unit: str
+    unit: str | None
     kategori_jabatan: str
     periode: str
     status: str
@@ -35,6 +35,7 @@ class _Record:
     max_responden: int
     created_at: datetime
     koordinator_id: str | None = None
+    jabatan_id: str | None = None
     catatan: str | None = None
     task_terpilih: list[str] | None = field(default=None)
 
@@ -71,6 +72,7 @@ class InMemoryTiSesiService:
             periode=rec.periode,
             status=rec.status,  # type: ignore[arg-type]
             koordinator_id=rec.koordinator_id,
+            jabatan_id=rec.jabatan_id,
             min_responden=rec.min_responden,
             max_responden=rec.max_responden,
             jumlah_task_terpilih=(
@@ -97,16 +99,30 @@ class InMemoryTiSesiService:
         if data.min_responden > data.max_responden:
             raise ValidationAppError("min_responden tidak boleh lebih besar dari max_responden.")
         with self._lock:
-            if any(
-                r.unit == data.unit
-                and r.kategori_jabatan == data.kategori_jabatan
-                and r.periode == data.periode
-                for r in self._data.values()
-            ):
-                raise ConflictError(
-                    f"Sesi untuk unit '{data.unit}' jabatan '{data.kategori_jabatan}'"
-                    f" periode '{data.periode}' sudah ada."
-                )
+            if data.unit is not None:
+                # unit provided: unique on (unit, kategori_jabatan, periode)
+                if any(
+                    r.unit == data.unit
+                    and r.kategori_jabatan == data.kategori_jabatan
+                    and r.periode == data.periode
+                    for r in self._data.values()
+                ):
+                    raise ConflictError(
+                        f"Sesi untuk unit '{data.unit}' jabatan '{data.kategori_jabatan}'"
+                        f" periode '{data.periode}' sudah ada."
+                    )
+            else:
+                # unit not provided: unique on (kategori_jabatan, periode)
+                if any(
+                    r.unit is None
+                    and r.kategori_jabatan == data.kategori_jabatan
+                    and r.periode == data.periode
+                    for r in self._data.values()
+                ):
+                    raise ConflictError(
+                        f"Sesi tanpa unit untuk jabatan '{data.kategori_jabatan}'"
+                        f" periode '{data.periode}' sudah ada."
+                    )
             rec = _Record(
                 id=f"tises_{uuid.uuid4().hex[:8]}",
                 unit=data.unit,
@@ -114,6 +130,7 @@ class InMemoryTiSesiService:
                 periode=data.periode,
                 status="DRAFT",
                 koordinator_id=data.koordinator_id,
+                jabatan_id=data.jabatan_id,
                 min_responden=data.min_responden,
                 max_responden=data.max_responden,
                 catatan=data.catatan,

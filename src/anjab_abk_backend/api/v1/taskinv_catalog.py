@@ -28,12 +28,17 @@ def list_kombinasi(
 @router.get(
     "",
     response_model=list[TiCatalogRead],
-    summary="Daftar task catalog untuk satu kombinasi unit × kategori jabatan",
+    summary="Daftar task catalog untuk kombinasi unit × kategori jabatan",
     operation_id="taskinv_catalog_list",
 )
 def list_catalog(
     service: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
-    unit: Annotated[str, Query(description="Unit/jenjang (TK/SD/SMP/SMA).")],
     kategori_jabatan: Annotated[str, Query(description="Kategori jabatan.")],
+    unit: Annotated[
+        str | None,
+        Query(description="Unit/jenjang (TK/SD/SMP/SMA). Opsional; bila tidak diisi, kembalikan semua task untuk kategori jabatan ini lintas unit."),
+    ] = None,
 ) -> list[TiCatalogRead]:
-    return service.list_by_kombinasi(unit, kategori_jabatan)
+    if unit is not None:
+        return service.list_by_kombinasi(unit, kategori_jabatan)
+    return service.list_by_kategori(kategori_jabatan)

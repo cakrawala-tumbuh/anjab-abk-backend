@@ -27,8 +27,10 @@ class TiCatalogService(Protocol):
 
     def list_kombinasi(self) -> list[TiKombinasiRead]: ...
     def list_by_kombinasi(self, unit: str, kategori_jabatan: str) -> list[TiCatalogRead]: ...
+    def list_by_kategori(self, kategori_jabatan: str) -> list[TiCatalogRead]: ...
     def get(self, kode: str) -> TiCatalogRead: ...
     def valid_kodes(self, unit: str, kategori_jabatan: str) -> set[str]: ...
+    def valid_kodes_for_kategori(self, kategori_jabatan: str) -> set[str]: ...
 
 
 class InMemoryTiCatalogService:
@@ -70,10 +72,28 @@ class InMemoryTiCatalogService:
             raise NotFoundError(f"Task catalog '{kode}' tidak ditemukan.")
         return TiCatalogRead.model_validate(item)
 
+    def list_by_kategori(self, kategori_jabatan: str) -> list[TiCatalogRead]:
+        with self._lock:
+            items = [
+                it
+                for (_unit, kj), its in self._by_kombinasi.items()
+                if kj == kategori_jabatan
+                for it in its
+            ]
+        return [TiCatalogRead.model_validate(it) for it in items]
+
     def valid_kodes(self, unit: str, kategori_jabatan: str) -> set[str]:
         with self._lock:
             items = self._by_kombinasi.get((unit, kategori_jabatan), [])
             return {it["kode"] for it in items}
+
+    def valid_kodes_for_kategori(self, kategori_jabatan: str) -> set[str]:
+        with self._lock:
+            result: set[str] = set()
+            for (_unit, kj), items in self._by_kombinasi.items():
+                if kj == kategori_jabatan:
+                    result.update(it["kode"] for it in items)
+            return result
 
 
 class UraianTugasBackedCatalogService:
@@ -124,9 +144,25 @@ class UraianTugasBackedCatalogService:
         items = self._ut.list_by_unit_kategori(unit, kategori_jabatan)
         return [self._to_catalog(ut) for ut in items]
 
+    def list_by_kategori(self, kategori_jabatan: str) -> list[TiCatalogRead]:
+        kombinasi = self.list_kombinasi()
+        result: list[TiCatalogRead] = []
+        for row in kombinasi:
+            if row.kategori_jabatan == kategori_jabatan:
+                result.extend(self.list_by_kombinasi(row.unit, row.kategori_jabatan))
+        return result
+
     def get(self, kode: str) -> TiCatalogRead:
         ut = self._ut.get_by_kode(kode)
         return self._to_catalog(ut)
 
     def valid_kodes(self, unit: str, kategori_jabatan: str) -> set[str]:
         return self._ut.valid_kodes(unit, kategori_jabatan)
+
+    def valid_kodes_for_kategori(self, kategori_jabatan: str) -> set[str]:
+        kombinasi = self.list_kombinasi()
+        result: set[str] = set()
+        for row in kombinasi:
+            if row.kategori_jabatan == kategori_jabatan:
+                result.update(self.valid_kodes(row.unit, row.kategori_jabatan))
+        return result

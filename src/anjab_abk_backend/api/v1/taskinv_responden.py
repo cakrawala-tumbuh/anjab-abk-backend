@@ -6,8 +6,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Response, status
 
+from ...anjab.services.sme_panel import SMEPanelService
 from ...dependencies import (
     get_current_principal,
+    get_sme_panel_service,
     get_ti_responden_service,
     get_ti_sesi_service,
     rate_limit,
@@ -50,13 +52,22 @@ def list_responden(
     summary="Daftarkan responden ke sesi (saat DRAFT/TAHAP1)",
     operation_id="taskinv_responden_create",
     dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND_SESI},
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_NOT_FOUND_SESI,
+        422: {
+            "model": ErrorResponse,
+            "description": "Partisipan bukan anggota SME panel jabatan sesi ini.",
+        },
+    },
 )
 def create_responden(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
     payload: TiRespondenCreate,
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
+    sme_panel_service: Annotated[SMEPanelService, Depends(get_sme_panel_service)],
 ) -> TiRespondenRead:
     sesi = sesi_service.get(sesi_id)
     if sesi.status not in ("DRAFT", "TAHAP1"):
@@ -64,6 +75,20 @@ def create_responden(
             "Responden hanya dapat ditambahkan saat sesi berstatus DRAFT atau TAHAP1"
             f" (saat ini: {sesi.status})."
         )
+    if sesi.jabatan_id and payload.partisipan_id:
+        panels, _ = sme_panel_service.search(
+            domain=[["jabatan_id", "=", sesi.jabatan_id]],
+            order=[],
+            limit=1,
+            offset=0,
+        )
+        if not panels:
+            raise ValidationAppError("SME panel untuk jabatan sesi ini belum dibuat.")
+        if payload.partisipan_id not in panels[0].partisipan_ids:
+            raise ValidationAppError(
+                "Partisipan tidak dapat ditambahkan:"
+                " belum tergabung dalam SME panel jabatan ini."
+            )
     return rsp_service.create(sesi_id, payload, sesi.max_responden)
 
 
