@@ -36,7 +36,12 @@ def list_catalog(
     kategori_jabatan: Annotated[str, Query(description="Kategori jabatan.")],
     unit: Annotated[
         str | None,
-        Query(description="Unit/jenjang (TK/SD/SMP/SMA). Opsional; bila tidak diisi, kembalikan semua task untuk kategori jabatan ini lintas unit."),
+        Query(
+            description=(
+                "Unit/jenjang (TK/SD/SMP/SMA). Opsional; bila tidak diisi, "
+                "kembalikan semua task untuk kategori jabatan ini lintas unit."
+            )
+        ),
     ] = None,
 ) -> list[TiCatalogRead]:
     if unit is not None:

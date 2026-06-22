@@ -14,8 +14,10 @@ class TiCatalogRead(BaseModel):
     unit: str = Field(description="Unit/jenjang (TK/SD/SMP/SMA).", examples=["TK"])
     kategori_jabatan: str = Field(description="Kategori jabatan.", examples=["Kepala Sekolah"])
     tugas_pokok: str = Field(description="Tugas pokok (klaster).", examples=["Pengelolaan SDM"])
-    detil_tugas: str = Field(
-        description="Detil tugas (kelompok).", examples=["Mengevaluasi Kinerja Karyawan"]
+    detil_tugas: str | None = Field(
+        default=None,
+        description="Detil tugas (kelompok); null bila task langsung di bawah tugas pokok.",
+        examples=["Mengevaluasi Kinerja Karyawan"],
     )
     uraian_tugas: str = Field(
         description="Uraian tugas (task statement).",

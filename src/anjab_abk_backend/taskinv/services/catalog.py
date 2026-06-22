@@ -114,14 +114,14 @@ class UraianTugasBackedCatalogService:
         self._tp = tp_svc
 
     def _to_catalog(self, ut) -> TiCatalogRead:  # type: ignore[no-untyped-def]
-        dt = self._dt.get(ut.detil_tugas_id)
+        dt = self._dt.get(ut.detil_tugas_id) if ut.detil_tugas_id else None
         tp = self._tp.get(ut.tugas_pokok_id)
         return TiCatalogRead(
             kode=ut.kode,
             unit=ut.unit,
             kategori_jabatan=ut.kategori_jabatan,
             tugas_pokok=tp.nama,
-            detil_tugas=dt.nama,
+            detil_tugas=dt.nama if dt else None,
             uraian_tugas=ut.uraian,
             urutan=ut.urutan,
         )

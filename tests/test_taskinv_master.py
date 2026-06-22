@@ -333,3 +333,32 @@ def test_ut_seeded_data_via_catalog_endpoint(anon_client: TestClient) -> None:
     items = r.json()
     assert len(items) > 0
     assert all(it["unit"] == "TK" for it in items)
+
+
+def test_catalog_with_null_detil_tugas(anon_client: TestClient) -> None:
+    """Catalog untuk kombinasi yang punya task tanpa detil_tugas (detil_tugas_id=None) harus 200."""
+    r = anon_client.get(
+        "/api/v1/task-inventory/catalog",
+        params={"unit": "SMA", "kategori_jabatan": "Wakil Kepala Sekolah Bidang Kurikulum"},
+    )
+    assert r.status_code == 200
+    items = r.json()
+    assert len(items) > 0
+    # Beberapa item di kombinasi ini tidak punya detil_tugas
+    assert any(it["detil_tugas"] is None for it in items)
+
+
+def test_tp_list_large_limit(anon_client: TestClient) -> None:
+    """Limit hingga 500 harus diterima (le=500 di pagination_params)."""
+    r = anon_client.get(TP_BASE, params={"limit": 200})
+    assert r.status_code == 200
+    body = r.json()
+    assert "items" in body
+
+
+def test_ut_list_large_limit(anon_client: TestClient) -> None:
+    """Limit 500 harus diterima untuk uraian-tugas."""
+    r = anon_client.get(UT_BASE, params={"limit": 500})
+    assert r.status_code == 200
+    body = r.json()
+    assert "items" in body

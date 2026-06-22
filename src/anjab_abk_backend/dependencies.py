@@ -64,7 +64,7 @@ class Pagination:
 
 
 def pagination_params(
-    limit: Annotated[int, Query(ge=1, le=100, description="Maks item per halaman.")] = 20,
+    limit: Annotated[int, Query(ge=1, le=500, description="Maks item per halaman.")] = 20,
     offset: Annotated[int, Query(ge=0, description="Jumlah item yang dilewati.")] = 0,
 ) -> Pagination:
     return Pagination(limit=limit, offset=offset)
