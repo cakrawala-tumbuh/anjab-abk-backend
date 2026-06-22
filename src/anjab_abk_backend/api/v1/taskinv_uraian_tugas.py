@@ -131,7 +131,6 @@ def create_uraian_tugas(
                         "kode": "TIf0b59714",
                         "uraian": "Menyusun evaluasi karyawan",
                         "unit": "TK",
-                        "kategori_jabatan": "Kepala Sekolah",
                         "urutan": 1,
                         "detil_tugas_id": "dt_a1b2c3d4",
                         "tugas_pokok_id": "tp_a1b2c3d4",

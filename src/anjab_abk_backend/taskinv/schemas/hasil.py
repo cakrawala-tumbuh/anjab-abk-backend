@@ -45,8 +45,8 @@ class TiHasilSesiRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     sesi_id: str = Field(description="ID sesi.")
-    unit: str = Field(description="Unit/jenjang.")
-    kategori_jabatan: str = Field(description="Kategori jabatan.")
+    jabatan_id: str = Field(description="ID jabatan yang dikaji.")
+    unit: str | None = Field(default=None, description="Unit/jenjang.")
     periode: str = Field(description="Periode.")
     n_responden_tahap1: int = Field(description="Jumlah responden yang submit Tahap 1.")
     n_responden_tahap3: int = Field(description="Jumlah responden yang submit Tahap 3 (detail).")

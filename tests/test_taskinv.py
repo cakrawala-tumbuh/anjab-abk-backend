@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 BASE = "/api/v1/task-inventory"
 SESI = f"{BASE}/sesi"
 UNIT = "TK"
-KATEGORI = "Kepala Sekolah"
 
 _year_counter = itertools.count(2000)
 
@@ -20,9 +19,18 @@ def _uniq_periode() -> str:
     return f"{next(_year_counter)}-01"
 
 
-def _sesi_payload(periode: str | None = None, **over) -> dict:
+@pytest.fixture(scope="module")
+def jabatan_id_tk(anon_client: TestClient) -> str:
+    """Jabatan_id dari catalog kombinasi yang cocok dengan unit TK."""
+    kombis = anon_client.get(BASE + "/catalog/kombinasi").json()
+    match = next((x for x in kombis if x["unit"] == UNIT), None)
+    assert match is not None, f"Tidak ada kombinasi untuk unit '{UNIT}' dalam catalog"
+    return match["jabatan_id"]
+
+
+def _sesi_payload(jabatan_id: str, periode: str | None = None, **over) -> dict:
     payload = {
-        "kategori_jabatan": KATEGORI,
+        "jabatan_id": jabatan_id,
         "periode": periode or _uniq_periode(),
         "min_responden": 1,
         "max_responden": 10,
@@ -33,16 +41,16 @@ def _sesi_payload(periode: str | None = None, **over) -> dict:
     return payload
 
 
-def _catalog_kodes(client: TestClient, n: int) -> list[str]:
-    r = client.get(BASE + "/catalog", params={"unit": UNIT, "kategori_jabatan": KATEGORI})
+def _catalog_kodes(client: TestClient, jabatan_id: str, n: int) -> list[str]:
+    r = client.get(BASE + "/catalog", params={"unit": UNIT, "jabatan_id": jabatan_id})
     assert r.status_code == 200
     items = r.json()
     assert len(items) >= n
     return [it["kode"] for it in items[:n]]
 
 
-def _create_sesi(client: TestClient, **over) -> dict:
-    r = client.post(SESI, json=_sesi_payload(**over))
+def _create_sesi(client: TestClient, jabatan_id: str, **over) -> dict:
+    r = client.post(SESI, json=_sesi_payload(jabatan_id, **over))
     assert r.status_code == 201, r.text
     return r.json()
 
@@ -63,21 +71,23 @@ def test_catalog_kombinasi(anon_client: TestClient) -> None:
     assert r.status_code == 200
     rows = r.json()
     assert len(rows) == 51
-    target = next(x for x in rows if x["unit"] == UNIT and x["kategori_jabatan"] == KATEGORI)
+    # Tiap baris punya jabatan_id (bukan kategori_jabatan)
+    assert all("jabatan_id" in x for x in rows)
+    target = next(x for x in rows if x["unit"] == UNIT)
     assert target["jumlah_task"] > 0
 
 
-def test_catalog_list_by_kombinasi(anon_client: TestClient) -> None:
-    r = anon_client.get(BASE + "/catalog", params={"unit": UNIT, "kategori_jabatan": KATEGORI})
+def test_catalog_list_by_kombinasi(anon_client: TestClient, jabatan_id_tk: str) -> None:
+    r = anon_client.get(BASE + "/catalog", params={"unit": UNIT, "jabatan_id": jabatan_id_tk})
     assert r.status_code == 200
     items = r.json()
     assert len(items) > 0
-    assert all(it["unit"] == UNIT and it["kategori_jabatan"] == KATEGORI for it in items)
+    assert all(it["unit"] == UNIT and it["jabatan_id"] == jabatan_id_tk for it in items)
     assert items[0]["kode"].startswith("TI")
 
 
 def test_catalog_unknown_kombinasi_empty(anon_client: TestClient) -> None:
-    r = anon_client.get(BASE + "/catalog", params={"unit": "ZZ", "kategori_jabatan": "X"})
+    r = anon_client.get(BASE + "/catalog", params={"unit": "ZZ", "jabatan_id": "jbt_tidakada"})
     assert r.status_code == 200
     assert r.json() == []
 
@@ -87,46 +97,47 @@ def test_catalog_unknown_kombinasi_empty(anon_client: TestClient) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_sesi_create_and_get(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_sesi_create_and_get(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     assert sesi["id"].startswith("tises_")
     assert sesi["status"] == "DRAFT"
     assert sesi["jumlah_task_terpilih"] is None
+    assert sesi["jabatan_id"] == jabatan_id_tk
     r = client.get(f"{SESI}/{sesi['id']}")
     assert r.status_code == 200
     assert r.json()["id"] == sesi["id"]
 
 
-def test_sesi_create_requires_auth(anon_client: TestClient) -> None:
-    r = anon_client.post(SESI, json=_sesi_payload())
+def test_sesi_create_requires_auth(anon_client: TestClient, jabatan_id_tk: str) -> None:
+    r = anon_client.post(SESI, json=_sesi_payload(jabatan_id_tk))
     assert r.status_code == 401
 
 
 def test_sesi_create_invalid_kombinasi(client: TestClient) -> None:
-    r = client.post(SESI, json=_sesi_payload(unit="ZZ", kategori_jabatan="X"))
+    r = client.post(SESI, json=_sesi_payload("jbt_tidakada", unit="ZZ"))
     assert r.status_code in (400, 422)
 
 
-def test_sesi_duplicate_conflict(client: TestClient) -> None:
-    sesi = _create_sesi(client)
-    r = client.post(SESI, json=_sesi_payload(periode=sesi["periode"]))
+def test_sesi_duplicate_conflict(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    r = client.post(SESI, json=_sesi_payload(jabatan_id_tk, periode=sesi["periode"]))
     assert r.status_code == 409
 
 
-def test_sesi_min_gt_max_rejected(client: TestClient) -> None:
-    r = client.post(SESI, json=_sesi_payload(min_responden=5, max_responden=2))
+def test_sesi_min_gt_max_rejected(client: TestClient, jabatan_id_tk: str) -> None:
+    r = client.post(SESI, json=_sesi_payload(jabatan_id_tk, min_responden=5, max_responden=2))
     assert r.status_code in (400, 422)
 
 
-def test_sesi_update_draft(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_sesi_update_draft(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     r = client.patch(f"{SESI}/{sesi['id']}", json={"catatan": "halo"})
     assert r.status_code == 200
     assert r.json()["catatan"] == "halo"
 
 
-def test_sesi_delete_draft(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_sesi_delete_draft(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     r = client.delete(f"{SESI}/{sesi['id']}")
     assert r.status_code == 204
     assert client.get(f"{SESI}/{sesi['id']}").status_code == 404
@@ -136,8 +147,8 @@ def test_sesi_not_found(anon_client: TestClient) -> None:
     assert anon_client.get(f"{SESI}/tises_xxx").status_code == 404
 
 
-def test_sesi_search(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_sesi_search(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     r = client.post(
         f"{SESI}/search", json={"domain": [["id", "=", sesi["id"]]], "limit": 10, "offset": 0}
     )
@@ -145,8 +156,8 @@ def test_sesi_search(client: TestClient) -> None:
     assert r.json()["total"] >= 1
 
 
-def test_sesi_koordinator_id(client: TestClient) -> None:
-    sesi = _create_sesi(client, koordinator_id="p_koordinator01")
+def test_sesi_koordinator_id(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk, koordinator_id="p_koordinator01")
     assert sesi["koordinator_id"] == "p_koordinator01"
 
 
@@ -155,26 +166,26 @@ def test_sesi_koordinator_id(client: TestClient) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_mulai_tahap1(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_mulai_tahap1(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     r = client.post(f"{SESI}/{sesi['id']}/mulai-tahap1")
     assert r.status_code == 200
     assert r.json()["status"] == "TAHAP1"
 
 
-def test_mulai_tahap2_invalid_from_draft(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_mulai_tahap2_invalid_from_draft(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     r = client.post(f"{SESI}/{sesi['id']}/mulai-tahap2")
     assert r.status_code in (400, 422)
 
 
-def test_mulai_tahap2_guard_belum_semua_submit(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_mulai_tahap2_guard_belum_semua_submit(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     r1 = _add_responden(client, sid, "A")
     _add_responden(client, sid, "B")  # tidak submit
-    kodes = _catalog_kodes(client, 3)
+    kodes = _catalog_kodes(client, jabatan_id_tk, 3)
     assert (
         client.post(
             f"{SESI}/responden/{r1['id']}/seleksi", json={"task_kode": kodes[:2]}
@@ -192,11 +203,11 @@ def test_mulai_tahap2_guard_belum_semua_submit(client: TestClient) -> None:
     assert r.json()["jumlah_task_terpilih"] is None
 
 
-def test_mulai_tahap3_dengan_review_koordinator(client: TestClient) -> None:
+def test_mulai_tahap3_dengan_review_koordinator(client: TestClient, jabatan_id_tk: str) -> None:
     """Flow: Tahap1 → Tahap2 (koordinator review partial) → Tahap3 (freeze)."""
-    sesi = _create_sesi(client)
+    sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
-    kodes = _catalog_kodes(client, 3)  # K0, K1, K2
+    kodes = _catalog_kodes(client, jabatan_id_tk, 3)  # K0, K1, K2
 
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
@@ -249,11 +260,11 @@ def test_mulai_tahap3_dengan_review_koordinator(client: TestClient) -> None:
     assert kodes[2] not in terpilih_kodes
 
 
-def test_mulai_tahap3_paksa_tanpa_review(client: TestClient) -> None:
+def test_mulai_tahap3_paksa_tanpa_review(client: TestClient, jabatan_id_tk: str) -> None:
     """Dengan paksa=true, bisa masuk TAHAP3 meski ada partial belum diputuskan."""
-    sesi = _create_sesi(client)
+    sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
-    kodes = _catalog_kodes(client, 2)
+    kodes = _catalog_kodes(client, jabatan_id_tk, 2)
 
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
@@ -271,11 +282,11 @@ def test_mulai_tahap3_paksa_tanpa_review(client: TestClient) -> None:
     assert r3.status_code in (200, 400, 422)
 
 
-def test_mulai_tahap3_unanimous_otomatis(client: TestClient) -> None:
+def test_mulai_tahap3_unanimous_otomatis(client: TestClient, jabatan_id_tk: str) -> None:
     """Task yang dipilih semua anggota masuk otomatis tanpa review koordinator."""
-    sesi = _create_sesi(client)
+    sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
-    kodes = _catalog_kodes(client, 2)
+    kodes = _catalog_kodes(client, jabatan_id_tk, 2)
 
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
@@ -303,8 +314,8 @@ def test_mulai_tahap3_unanimous_otomatis(client: TestClient) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_seleksi_invalid_kode(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_seleksi_invalid_kode(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     r = _add_responden(client, sid, "A")
@@ -312,21 +323,21 @@ def test_seleksi_invalid_kode(client: TestClient) -> None:
     assert res.status_code in (400, 422)
 
 
-def test_seleksi_requires_tahap1(client: TestClient) -> None:
-    sesi = _create_sesi(client)  # masih DRAFT
+def test_seleksi_requires_tahap1(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)  # masih DRAFT
     sid = sesi["id"]
     r = _add_responden(client, sid, "A")
-    kodes = _catalog_kodes(client, 1)
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
     res = client.post(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": kodes})
     assert res.status_code in (400, 422)
 
 
-def test_seleksi_double_submit_conflict(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_seleksi_double_submit_conflict(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     r = _add_responden(client, sid, "A")
-    kodes = _catalog_kodes(client, 2)
+    kodes = _catalog_kodes(client, jabatan_id_tk, 2)
     assert (
         client.post(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": kodes}).status_code
         == 201
@@ -344,10 +355,10 @@ def test_seleksi_double_submit_conflict(client: TestClient) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_full_three_phase_flow(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_full_three_phase_flow(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
-    kodes = _catalog_kodes(client, 3)  # K0, K1, K2
+    kodes = _catalog_kodes(client, jabatan_id_tk, 3)  # K0, K1, K2
 
     # Tahap 1
     assert client.post(f"{SESI}/{sid}/mulai-tahap1").json()["status"] == "TAHAP1"
@@ -415,6 +426,7 @@ def test_full_three_phase_flow(client: TestClient) -> None:
     assert hasil["n_responden_tahap1"] == 2
     assert hasil["n_responden_tahap3"] == 2
     assert hasil["jumlah_task_terpilih"] == 2
+    assert "jabatan_id" in hasil  # bukan kategori_jabatan
 
     tasks = {t["kode"]: t for t in hasil["tasks"]}
     # K1: rata-rata jam/minggu (4+6)/2 = 5 → jam/tahun = 225
@@ -431,10 +443,10 @@ def test_full_three_phase_flow(client: TestClient) -> None:
     assert hg.json()["jumlah_task_terpilih"] == 2
 
 
-def test_detail_kode_diluar_terpilih_ditolak(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_detail_kode_diluar_terpilih_ditolak(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
-    kodes = _catalog_kodes(client, 4)
+    kodes = _catalog_kodes(client, jabatan_id_tk, 4)
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
     client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": [kodes[0]]})
@@ -462,11 +474,11 @@ def test_detail_kode_diluar_terpilih_ditolak(client: TestClient) -> None:
     assert res.status_code in (400, 422)
 
 
-def test_detail_requires_tahap3(client: TestClient) -> None:
+def test_detail_requires_tahap3(client: TestClient, jabatan_id_tk: str) -> None:
     """Detail hanya bisa disubmit saat TAHAP3, bukan TAHAP2."""
-    sesi = _create_sesi(client)
+    sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
-    kodes = _catalog_kodes(client, 1)
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
     client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
@@ -492,28 +504,28 @@ def test_detail_requires_tahap3(client: TestClient) -> None:
     assert res.status_code in (400, 422)
 
 
-def test_hasil_belum_analyzed(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_hasil_belum_analyzed(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     r = client.get(f"{SESI}/{sesi['id']}/hasil")
     assert r.status_code in (400, 422)
 
 
-def test_responden_delete_setelah_submit_ditolak(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_responden_delete_setelah_submit_ditolak(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
-    kodes = _catalog_kodes(client, 1)
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
     client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
     r = client.delete(f"{SESI}/responden/{ra['id']}")
     assert r.status_code in (400, 422)
 
 
 @pytest.mark.parametrize("field", ["sumber_bukti", "ai_mode", "va_type"])
-def test_detail_enum_invalid(client: TestClient, field: str) -> None:
-    sesi = _create_sesi(client)
+def test_detail_enum_invalid(client: TestClient, jabatan_id_tk: str, field: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
-    kodes = _catalog_kodes(client, 1)
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
     client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
@@ -539,17 +551,19 @@ def test_detail_enum_invalid(client: TestClient, field: str) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_tahap2_review_belum_tahap2(client: TestClient) -> None:
-    sesi = _create_sesi(client)
+def test_tahap2_review_belum_tahap2(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
     r = client.get(f"{SESI}/{sesi['id']}/tahap2")
     assert r.status_code in (400, 422)
 
 
-def test_tahap2_submit_keputusan_non_partial_ditolak(client: TestClient) -> None:
+def test_tahap2_submit_keputusan_non_partial_ditolak(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
     """Koordinator tidak boleh submit keputusan untuk task unanimous."""
-    sesi = _create_sesi(client)
+    sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
-    kodes = _catalog_kodes(client, 1)
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
     client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
@@ -574,7 +588,7 @@ def test_kuesioner_saya_tanpa_partisipan_ti(client: TestClient) -> None:
     assert r.status_code == 200
 
 
-def test_kuesioner_saya_universal_ti(client: TestClient) -> None:
+def test_kuesioner_saya_universal_ti(client: TestClient, jabatan_id_tk: str) -> None:
     """Task Inventory bersifat universal: partisipan melihat SEMUA sesi aktif
     (TAHAP1/TAHAP2/TAHAP3), bukan hanya yang cocok jabatannya; pemanggilan idempoten."""
     import uuid
@@ -605,10 +619,10 @@ def test_kuesioner_saya_universal_ti(client: TestClient) -> None:
     # Dua sesi aktif (TAHAP1) + satu sesi DRAFT (tidak boleh muncul).
     aktif_ids = set()
     for _ in range(2):
-        sesi = _create_sesi(client)
+        sesi = _create_sesi(client, jabatan_id_tk)
         client.post(f"{SESI}/{sesi['id']}/mulai-tahap1")
         aktif_ids.add(sesi["id"])
-    _create_sesi(client)  # DRAFT
+    _create_sesi(client, jabatan_id_tk)  # DRAFT
 
     r = client.get(f"{KUESIONER}/saya")
     assert r.status_code == 200
@@ -616,6 +630,8 @@ def test_kuesioner_saya_universal_ti(client: TestClient) -> None:
     assert {item["sesi_id"] for item in data} == aktif_ids
     assert all(item["tahap1_submit"] is False for item in data)
     assert all(item["sesi_status"] == "TAHAP1" for item in data)
+    # Response menggunakan sesi_jabatan_id (bukan sesi_kategori_jabatan)
+    assert all("sesi_jabatan_id" in item for item in data)
 
     # Idempoten: jumlah & id responden tetap.
     r2 = client.get(f"{KUESIONER}/saya")
@@ -627,12 +643,12 @@ def test_kuesioner_saya_universal_ti(client: TestClient) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_sesi_create_tanpa_unit(client: TestClient) -> None:
+def test_sesi_create_tanpa_unit(client: TestClient, jabatan_id_tk: str) -> None:
     """Session tanpa unit dapat dibuat."""
     r = client.post(
         SESI,
         json={
-            "kategori_jabatan": KATEGORI,
+            "jabatan_id": jabatan_id_tk,
             "periode": _uniq_periode(),
             "min_responden": 1,
             "max_responden": 10,
@@ -642,12 +658,12 @@ def test_sesi_create_tanpa_unit(client: TestClient) -> None:
     assert r.json()["unit"] is None
 
 
-def test_sesi_create_tanpa_unit_kategori_invalid(client: TestClient) -> None:
-    """Session tanpa unit dengan kategori tidak valid ditolak."""
+def test_sesi_create_tanpa_unit_jabatan_invalid(client: TestClient) -> None:
+    """Session tanpa unit dengan jabatan tidak valid ditolak."""
     r = client.post(
         SESI,
         json={
-            "kategori_jabatan": "Jabatan Tidak Ada Di Catalog",
+            "jabatan_id": "jbt_tidakada_samasekali",
             "periode": _uniq_periode(),
         },
     )
@@ -697,10 +713,25 @@ def test_responden_sme_panel_check(client: TestClient) -> None:
         authentik_user_id=f"uid_b_{uuid.uuid4().hex[:4]}",
     )
 
-    # Buat sesi TI dengan jabatan_id
-    sesi = _create_sesi(client, jabatan_id=jabatan_id)
-    sid = sesi["id"]
-    assert sesi["jabatan_id"] == jabatan_id
+    # Buat sesi TI dengan jabatan_id (tanpa unit → tidak perlu catalog valid)
+    # Gunakan jabatan_id yang memang ada di SME panel
+    # Namun: jabatan ini tidak ada di catalog → cek validation
+    # Untuk tes ini, buat sesi langsung via service (bypass catalog check)
+    from anjab_abk_backend.dependencies import get_ti_sesi_service
+    from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
+
+    sesi_svc = get_ti_sesi_service()
+    sesi_obj = sesi_svc.create(
+        TiSesiCreate(
+            jabatan_id=jabatan_id,
+            unit=None,
+            periode=_uniq_periode(),
+            min_responden=1,
+            max_responden=10,
+        )
+    )
+    sid = sesi_obj.id
+    assert sesi_obj.jabatan_id == jabatan_id
 
     # Par A (anggota panel) → berhasil
     r_a = client.post(
@@ -717,9 +748,25 @@ def test_responden_sme_panel_check(client: TestClient) -> None:
     assert r_b.status_code in (400, 422), r_b.text
 
 
-def test_responden_tanpa_jabatan_id_bebas(client: TestClient) -> None:
-    """Sesi tanpa jabatan_id: semua partisipan bisa didaftarkan."""
-    sesi = _create_sesi(client)  # tanpa jabatan_id
-    assert sesi.get("jabatan_id") is None
-    r = _add_responden(client, sesi["id"], "Partisipan Bebas")
+def test_responden_tanpa_jabatan_id_bebas(client: TestClient, jabatan_id_tk: str) -> None:
+    """Sesi dengan jabatan yang tidak punya SME panel: semua partisipan bisa didaftarkan."""
+    import uuid
+
+    # Buat jabatan baru tanpa SME panel
+    from anjab_abk_backend.dependencies import get_ti_sesi_service
+    from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
+
+    jabatan_baru_id = f"jbt_{uuid.uuid4().hex[:8]}"
+    sesi_svc = get_ti_sesi_service()
+    sesi_obj = sesi_svc.create(
+        TiSesiCreate(
+            jabatan_id=jabatan_baru_id,
+            unit=None,
+            periode=_uniq_periode(),
+            min_responden=1,
+            max_responden=10,
+        )
+    )
+    assert sesi_obj.jabatan_id == jabatan_baru_id
+    r = _add_responden(client, sesi_obj.id, "Partisipan Bebas")
     assert r["id"].startswith("trsp_")

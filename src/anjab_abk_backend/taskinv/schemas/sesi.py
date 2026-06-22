@@ -15,6 +15,11 @@ class TiSesiCreate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    jabatan_id: str = Field(
+        min_length=1,
+        description="ID jabatan yang dikaji (FK ke Jabatan).",
+        examples=["jbt_a1b2c3d4"],
+    )
     unit: str | None = Field(
         default=None,
         max_length=50,
@@ -23,12 +28,6 @@ class TiSesiCreate(BaseModel):
             " bila tidak diisi, sesi berlaku lintas unit."
         ),
         examples=["TK"],
-    )
-    kategori_jabatan: str = Field(
-        min_length=1,
-        max_length=200,
-        description="Kategori jabatan yang dikaji.",
-        examples=["Kepala Sekolah"],
     )
     periode: str = Field(
         min_length=7,
@@ -48,14 +47,6 @@ class TiSesiCreate(BaseModel):
         description="ID partisipan yang menjadi koordinator SME panel (Tahap 2).",
         examples=["p_a1b2c3d4"],
     )
-    jabatan_id: str | None = Field(
-        default=None,
-        description=(
-            "ID jabatan (opsional); bila diisi, hanya partisipan anggota SME panel"
-            " jabatan ini yang dapat didaftarkan sebagai responden."
-        ),
-        examples=["jbt_a1b2c3d4"],
-    )
     catatan: str | None = Field(
         default=None, max_length=500, description="Catatan opsional untuk sesi ini."
     )
@@ -68,7 +59,6 @@ class TiSesiUpdate(BaseModel):
 
     periode: str | None = Field(default=None, min_length=7, max_length=7, pattern=r"^\d{4}-\d{2}$")
     koordinator_id: str | None = Field(default=None, description="ID koordinator SME panel.")
-    jabatan_id: str | None = Field(default=None, description="ID jabatan.")
     min_responden: int | None = Field(default=None, ge=1)
     max_responden: int | None = Field(default=None, ge=1)
     catatan: str | None = Field(default=None, max_length=500)
@@ -80,13 +70,12 @@ class TiSesiRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str = Field(description="ID sesi.", examples=["tises_a1b2c3d4"])
+    jabatan_id: str = Field(description="ID jabatan yang dikaji.", examples=["jbt_a1b2c3d4"])
     unit: str | None = Field(default=None, description="Unit/jenjang.", examples=["TK"])
-    kategori_jabatan: str = Field(description="Kategori jabatan.", examples=["Kepala Sekolah"])
     periode: str = Field(description="Periode kajian (YYYY-MM).", examples=["2026-06"])
     status: StatusSesi = Field(description="Status sesi.", examples=["DRAFT"])
     min_responden: int = Field(description="Minimum responden.")
     max_responden: int = Field(description="Maksimum responden.")
-    jabatan_id: str | None = Field(default=None, description="ID jabatan (opsional).")
     koordinator_id: str | None = Field(
         default=None, description="ID koordinator SME panel yang bertanggung jawab Tahap 2."
     )

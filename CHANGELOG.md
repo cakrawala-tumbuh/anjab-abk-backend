@@ -7,6 +7,22 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-06-22
+
+### Diubah (Breaking)
+
+- **Jabatan melekat pada TugasPokok, bukan TiSesi** — `jabatan_id` dipindahkan dari
+  `TiSesiCreate/Read/Update` ke `TugasPokokCreate/Read`. `TiSesiCreate` tidak lagi memiliki
+  field `jabatan_id` maupun `kategori_jabatan`; `TugasPokokCreate` kini memerlukan `jabatan_id`
+  (wajib). `UraianTugas` mewarisi `jabatan_id` secara otomatis dari `TugasPokok` induknya
+  (denormalisasi ke `_Record` internal).
+- `TiCatalogRead` dan `TiKombinasiRead` dikelompokkan berdasarkan `jabatan_id`
+  (menggantikan `kategori_jabatan`).
+- `TiKuesionerItemRead.sesi_jabatan_id` menggantikan field `sesi_kategori_jabatan`.
+- Uniqueness `TugasPokok` berubah dari `(nama)` menjadi `(nama, jabatan_id)` —
+  nama yang sama diperbolehkan untuk jabatan berbeda.
+- Seed `TugasPokok` dan `UraianTugas` diperbarui konsisten dengan struktur jabatan baru.
+
 ## [0.13.1] - 2026-06-22
 
 ### Ditambahkan

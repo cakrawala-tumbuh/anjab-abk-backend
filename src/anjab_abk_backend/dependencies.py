@@ -234,13 +234,14 @@ def _create_ti_master_services() -> (
         UraianTugasBackedCatalogService,
     ]
 ):
-    """Factory: buat dan seed TugasPokok, DetilTugas, UraianTugas, lalu buat CatalogService."""
+    """Factory: buat dan seed Jabatan, TugasPokok, DetilTugas, UraianTugas lalu CatalogService."""
     from .taskinv.seed import seed_catalog_models
 
+    jabatan_svc = _jabatan_singleton()
     tp_svc = InMemoryTugasPokokService()
     dt_svc = InMemoryDetilTugasService()
-    ut_svc = InMemoryUraianTugasService()
-    seed_catalog_models(tp_svc, dt_svc, ut_svc)
+    ut_svc = InMemoryUraianTugasService(tp_svc)
+    seed_catalog_models(tp_svc, dt_svc, ut_svc, jabatan_svc)
     catalog_svc = UraianTugasBackedCatalogService(ut_svc=ut_svc, dt_svc=dt_svc, tp_svc=tp_svc)
     return tp_svc, dt_svc, ut_svc, catalog_svc
 

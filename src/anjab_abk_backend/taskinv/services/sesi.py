@@ -13,7 +13,7 @@ from ...schemas.search import Domain, Order
 from ...services.domain import run_search, validate_searchable_fields
 from ..schemas.sesi import StatusSesi, TiSesiCreate, TiSesiRead, TiSesiUpdate
 
-SEARCHABLE_FIELDS = frozenset({"id", "unit", "kategori_jabatan", "periode", "status", "created_at"})
+SEARCHABLE_FIELDS = frozenset({"id", "jabatan_id", "unit", "periode", "status", "created_at"})
 
 _VALID_TRANSITIONS: dict[StatusSesi, StatusSesi] = {
     "DRAFT": "TAHAP1",
@@ -27,15 +27,14 @@ _VALID_TRANSITIONS: dict[StatusSesi, StatusSesi] = {
 @dataclass
 class _Record:
     id: str
-    unit: str | None
-    kategori_jabatan: str
+    jabatan_id: str
     periode: str
     status: str
     min_responden: int
     max_responden: int
     created_at: datetime
+    unit: str | None = None
     koordinator_id: str | None = None
-    jabatan_id: str | None = None
     catatan: str | None = None
     task_terpilih: list[str] | None = field(default=None)
 
@@ -67,12 +66,11 @@ class InMemoryTiSesiService:
     def _to_read(rec: _Record) -> TiSesiRead:
         return TiSesiRead(
             id=rec.id,
+            jabatan_id=rec.jabatan_id,
             unit=rec.unit,
-            kategori_jabatan=rec.kategori_jabatan,
             periode=rec.periode,
             status=rec.status,  # type: ignore[arg-type]
             koordinator_id=rec.koordinator_id,
-            jabatan_id=rec.jabatan_id,
             min_responden=rec.min_responden,
             max_responden=rec.max_responden,
             jumlah_task_terpilih=(
@@ -100,37 +98,34 @@ class InMemoryTiSesiService:
             raise ValidationAppError("min_responden tidak boleh lebih besar dari max_responden.")
         with self._lock:
             if data.unit is not None:
-                # unit provided: unique on (unit, kategori_jabatan, periode)
+                # unit provided: unique on (unit, jabatan_id, periode)
                 if any(
                     r.unit == data.unit
-                    and r.kategori_jabatan == data.kategori_jabatan
+                    and r.jabatan_id == data.jabatan_id
                     and r.periode == data.periode
                     for r in self._data.values()
                 ):
                     raise ConflictError(
-                        f"Sesi untuk unit '{data.unit}' jabatan '{data.kategori_jabatan}'"
+                        f"Sesi untuk unit '{data.unit}' jabatan '{data.jabatan_id}'"
                         f" periode '{data.periode}' sudah ada."
                     )
             else:
-                # unit not provided: unique on (kategori_jabatan, periode)
+                # unit not provided: unique on (jabatan_id, periode)
                 if any(
-                    r.unit is None
-                    and r.kategori_jabatan == data.kategori_jabatan
-                    and r.periode == data.periode
+                    r.unit is None and r.jabatan_id == data.jabatan_id and r.periode == data.periode
                     for r in self._data.values()
                 ):
                     raise ConflictError(
-                        f"Sesi tanpa unit untuk jabatan '{data.kategori_jabatan}'"
+                        f"Sesi tanpa unit untuk jabatan '{data.jabatan_id}'"
                         f" periode '{data.periode}' sudah ada."
                     )
             rec = _Record(
                 id=f"tises_{uuid.uuid4().hex[:8]}",
+                jabatan_id=data.jabatan_id,
                 unit=data.unit,
-                kategori_jabatan=data.kategori_jabatan,
                 periode=data.periode,
                 status="DRAFT",
                 koordinator_id=data.koordinator_id,
-                jabatan_id=data.jabatan_id,
                 min_responden=data.min_responden,
                 max_responden=data.max_responden,
                 catatan=data.catatan,
@@ -212,8 +207,8 @@ class InMemoryTiSesiService:
             records = [
                 {
                     "id": r.id,
+                    "jabatan_id": r.jabatan_id,
                     "unit": r.unit,
-                    "kategori_jabatan": r.kategori_jabatan,
                     "periode": r.periode,
                     "status": r.status,
                     "created_at": r.created_at,

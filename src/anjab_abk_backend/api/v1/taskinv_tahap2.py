@@ -95,5 +95,8 @@ def submit_tahap2_keputusan(
             f"Task berikut bukan task partial (sudah dipilih semua atau tidak ada di seleksi): "
             f"{', '.join(sorted(non_partial)[:5])}"
         )
-    valid_kodes = catalog.valid_kodes(sesi.unit, sesi.kategori_jabatan)
+    if sesi.unit is not None:
+        valid_kodes = catalog.valid_kodes(sesi.unit, sesi.jabatan_id)
+    else:
+        valid_kodes = catalog.valid_kodes_for_jabatan(sesi.jabatan_id)
     return tahap2_service.submit_keputusan(sesi_id, payload.keputusan, valid_kodes)

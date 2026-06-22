@@ -63,9 +63,9 @@ def submit_seleksi(
     if responden.tahap1_submit:
         raise ValidationAppError("Responden ini sudah menyelesaikan Tahap 1.")
     if sesi.unit is not None:
-        valid = catalog.valid_kodes(sesi.unit, sesi.kategori_jabatan)
+        valid = catalog.valid_kodes(sesi.unit, sesi.jabatan_id)
     else:
-        valid = catalog.valid_kodes_for_kategori(sesi.kategori_jabatan)
+        valid = catalog.valid_kodes_for_jabatan(sesi.jabatan_id)
     result = seleksi_service.submit(responden_id, sesi.id, payload.task_kode, valid)
     rsp_service.mark_tahap1(responden_id)
     return result

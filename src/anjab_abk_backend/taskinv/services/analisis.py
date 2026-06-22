@@ -107,7 +107,7 @@ def compute_hasil_sesi(
     return TiHasilSesiRead(
         sesi_id=sesi.id,
         unit=sesi.unit,
-        kategori_jabatan=sesi.kategori_jabatan,
+        jabatan_id=sesi.jabatan_id,
         periode=sesi.periode,
         n_responden_tahap1=n_tahap1,
         n_responden_tahap3=n_tahap3,

@@ -72,7 +72,7 @@ def kuesioner_saya(
                 created_at=rsp.created_at,
                 sesi_status=sesi.status,
                 sesi_unit=sesi.unit,
-                sesi_kategori_jabatan=sesi.kategori_jabatan,
+                sesi_jabatan_id=sesi.jabatan_id,
                 sesi_periode=sesi.periode,
             )
         )

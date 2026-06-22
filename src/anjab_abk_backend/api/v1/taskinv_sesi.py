@@ -73,7 +73,7 @@ def create_sesi(
                     "summary": "Sesi TI Kepala Sekolah TK",
                     "value": {
                         "unit": "TK",
-                        "kategori_jabatan": "Kepala Sekolah",
+                        "jabatan_id": "jbt_a1b2c3d4",
                         "periode": "2026-06",
                         "min_responden": 3,
                         "max_responden": 10,
@@ -88,15 +88,15 @@ def create_sesi(
     response: Response,
 ) -> TiSesiRead:
     if payload.unit is not None:
-        if not catalog.valid_kodes(payload.unit, payload.kategori_jabatan):
+        if not catalog.valid_kodes(payload.unit, payload.jabatan_id):
             raise ValidationAppError(
                 f"Tidak ada task catalog untuk kombinasi unit '{payload.unit}'"
-                f" dan kategori jabatan '{payload.kategori_jabatan}'."
+                f" dan jabatan '{payload.jabatan_id}'."
             )
     else:
-        if not catalog.valid_kodes_for_kategori(payload.kategori_jabatan):
+        if not catalog.valid_kodes_for_jabatan(payload.jabatan_id):
             raise ValidationAppError(
-                f"Tidak ada task catalog untuk kategori jabatan '{payload.kategori_jabatan}'."
+                f"Tidak ada task catalog untuk jabatan '{payload.jabatan_id}'."
             )
     cached = idem.cached()
     if cached is not None:
