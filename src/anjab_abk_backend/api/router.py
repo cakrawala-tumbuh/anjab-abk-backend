@@ -19,12 +19,15 @@ from .v1 import (
     system,
     taskinv_catalog,
     taskinv_detail,
+    taskinv_detil_tugas,
     taskinv_hasil,
     taskinv_kuesioner,
     taskinv_responden,
     taskinv_seleksi,
     taskinv_sesi,
     taskinv_tahap2,
+    taskinv_tugas_pokok,
+    taskinv_uraian_tugas,
     ts_kuesioner,
     ts_log,
     ts_responden,
@@ -177,4 +180,19 @@ api_router.include_router(
     ts_log.router,
     prefix="/time-study/responden",
     tags=["ts.log"],
+)
+api_router.include_router(
+    taskinv_tugas_pokok.router,
+    prefix="/task-inventory/tugas-pokok",
+    tags=["taskinv.tugas-pokok"],
+)
+api_router.include_router(
+    taskinv_detil_tugas.router,
+    prefix="/task-inventory/detil-tugas",
+    tags=["taskinv.detil-tugas"],
+)
+api_router.include_router(
+    taskinv_uraian_tugas.router,
+    prefix="/task-inventory/uraian-tugas",
+    tags=["taskinv.uraian-tugas"],
 )

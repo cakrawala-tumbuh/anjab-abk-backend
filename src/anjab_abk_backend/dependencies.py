@@ -36,12 +36,18 @@ from .services.authentik_provisioner import (
 from .services.idempotency import IdempotencyStore, InMemoryIdempotencyStore
 from .services.ratelimit import AllowAllRateLimiter, RateLimiter
 from .services.readiness import ReadinessCheck
-from .taskinv.services.catalog import InMemoryTiCatalogService, TiCatalogService
+from .taskinv.services.catalog import (
+    TiCatalogService,
+    UraianTugasBackedCatalogService,
+)
 from .taskinv.services.detail import InMemoryTiDetailService, TiDetailService
+from .taskinv.services.detil_tugas import DetilTugasService, InMemoryDetilTugasService
 from .taskinv.services.responden import InMemoryTiRespondenService, TiRespondenService
 from .taskinv.services.seleksi import InMemoryTiSeleksiService, TiSeleksiService
 from .taskinv.services.sesi import InMemoryTiSesiService, TiSesiService
 from .taskinv.services.tahap2 import InMemoryTiTahap2Service, TiTahap2Service
+from .taskinv.services.tugas_pokok import InMemoryTugasPokokService, TugasPokokService
+from .taskinv.services.uraian_tugas import InMemoryUraianTugasService, UraianTugasService
 from .ts.services.log import InMemoryTsLogService, TsLogService
 from .ts.services.responden import InMemoryTsRespondenService, TsRespondenService
 from .ts.services.sesi import InMemoryTsSesiService, TsSesiService
@@ -216,17 +222,54 @@ def get_dcs_jawaban_service() -> DcsJawabanService:
     return _dcs_jawaban_singleton()
 
 
-# --- Task Inventory services ---
+# --- Task Inventory master data services (TugasPokok / DetilTugas / UraianTugas) ---
 
 
 @lru_cache
-def _ti_catalog_singleton() -> InMemoryTiCatalogService:
-    return InMemoryTiCatalogService()
+def _create_ti_master_services() -> (
+    tuple[
+        InMemoryTugasPokokService,
+        InMemoryDetilTugasService,
+        InMemoryUraianTugasService,
+        UraianTugasBackedCatalogService,
+    ]
+):
+    """Factory: buat dan seed TugasPokok, DetilTugas, UraianTugas, lalu buat CatalogService."""
+    from .taskinv.seed import seed_catalog_models
+
+    tp_svc = InMemoryTugasPokokService()
+    dt_svc = InMemoryDetilTugasService()
+    ut_svc = InMemoryUraianTugasService()
+    seed_catalog_models(tp_svc, dt_svc, ut_svc)
+    catalog_svc = UraianTugasBackedCatalogService(ut_svc=ut_svc, dt_svc=dt_svc, tp_svc=tp_svc)
+    return tp_svc, dt_svc, ut_svc, catalog_svc
+
+
+def get_tugas_pokok_service() -> TugasPokokService:
+    """SEAM: kembalikan implementasi `TugasPokokService`. Ganti di sini saja."""
+    tp_svc, _, _, _ = _create_ti_master_services()
+    return tp_svc
+
+
+def get_detil_tugas_service() -> DetilTugasService:
+    """SEAM: kembalikan implementasi `DetilTugasService`. Ganti di sini saja."""
+    _, dt_svc, _, _ = _create_ti_master_services()
+    return dt_svc
+
+
+def get_uraian_tugas_service() -> UraianTugasService:
+    """SEAM: kembalikan implementasi `UraianTugasService`. Ganti di sini saja."""
+    _, _, ut_svc, _ = _create_ti_master_services()
+    return ut_svc
+
+
+# --- Task Inventory services ---
 
 
 def get_ti_catalog_service() -> TiCatalogService:
     """SEAM: kembalikan implementasi `TiCatalogService`. Ganti di sini saja."""
-    return _ti_catalog_singleton()
+    _, _, _, catalog_svc = _create_ti_master_services()
+    return catalog_svc
 
 
 @lru_cache

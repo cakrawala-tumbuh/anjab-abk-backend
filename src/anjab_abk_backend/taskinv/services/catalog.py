@@ -1,17 +1,25 @@
 """SEAM akses data catalog Task Inventory (master data, seeded read-only).
 
-Data di-seed dari `taskinv.seed.load_catalog()`. Implementasi in-memory ini placeholder —
-diganti penyimpanan persisten oleh `backend-postgresql-skill` tanpa mengubah signature.
+`TiCatalogService` adalah kontrak (Protocol). Dua implementasi tersedia:
+- `InMemoryTiCatalogService`: seeded langsung dari JSON (fallback/legacy).
+- `UraianTugasBackedCatalogService`: baca dari UraianTugasService + DetilTugasService +
+  TugasPokokService — sumber tunggal data setelah model catalog dinormalisasi.
+  Perubahan via CRUD uraian/detil/tugas-pokok langsung tercermin di catalog.
 """
 
 from __future__ import annotations
 
 import threading
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from ...errors import NotFoundError
 from ..schemas.catalog import TiCatalogRead, TiKombinasiRead
 from ..seed import CatalogItem, load_catalog
+
+if TYPE_CHECKING:
+    from .detil_tugas import DetilTugasService
+    from .tugas_pokok import TugasPokokService
+    from .uraian_tugas import UraianTugasService
 
 
 class TiCatalogService(Protocol):
@@ -24,7 +32,11 @@ class TiCatalogService(Protocol):
 
 
 class InMemoryTiCatalogService:
-    """Implementasi seeded in-memory — data identik dengan CSV FGD (dedup)."""
+    """Implementasi seeded in-memory — data identik dengan CSV FGD (dedup).
+
+    Digunakan sebagai fallback. Untuk production gunakan `UraianTugasBackedCatalogService`
+    agar perubahan CRUD tercermin di catalog.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -62,3 +74,59 @@ class InMemoryTiCatalogService:
         with self._lock:
             items = self._by_kombinasi.get((unit, kategori_jabatan), [])
             return {it["kode"] for it in items}
+
+
+class UraianTugasBackedCatalogService:
+    """Catalog yang membaca dari UraianTugasService, DetilTugasService, TugasPokokService.
+
+    Sumber tunggal data setelah model catalog dinormalisasi ke tiga tabel terpisah.
+    Perubahan via CRUD langsung tercermin di catalog tanpa sinkronisasi tambahan.
+    """
+
+    def __init__(
+        self,
+        ut_svc: UraianTugasService,
+        dt_svc: DetilTugasService,
+        tp_svc: TugasPokokService,
+    ) -> None:
+        self._ut = ut_svc
+        self._dt = dt_svc
+        self._tp = tp_svc
+
+    def _to_catalog(self, ut) -> TiCatalogRead:  # type: ignore[no-untyped-def]
+        dt = self._dt.get(ut.detil_tugas_id)
+        tp = self._tp.get(ut.tugas_pokok_id)
+        return TiCatalogRead(
+            kode=ut.kode,
+            unit=ut.unit,
+            kategori_jabatan=ut.kategori_jabatan,
+            tugas_pokok=tp.nama,
+            detil_tugas=dt.nama,
+            uraian_tugas=ut.uraian,
+            urutan=ut.urutan,
+        )
+
+    def list_kombinasi(self) -> list[TiKombinasiRead]:
+        # Ambil semua uraian_tugas, kumpulkan kombinasi unik
+        all_ut, total = self._ut.list(limit=10_000, offset=0)
+        counts: dict[tuple[str, str], int] = {}
+        for ut in all_ut:
+            key = (ut.unit, ut.kategori_jabatan)
+            counts[key] = counts.get(key, 0) + 1
+        rows = [
+            TiKombinasiRead(unit=unit, kategori_jabatan=kj, jumlah_task=cnt)
+            for (unit, kj), cnt in counts.items()
+        ]
+        rows.sort(key=lambda r: (r.unit, r.kategori_jabatan))
+        return rows
+
+    def list_by_kombinasi(self, unit: str, kategori_jabatan: str) -> list[TiCatalogRead]:
+        items = self._ut.list_by_unit_kategori(unit, kategori_jabatan)
+        return [self._to_catalog(ut) for ut in items]
+
+    def get(self, kode: str) -> TiCatalogRead:
+        ut = self._ut.get_by_kode(kode)
+        return self._to_catalog(ut)
+
+    def valid_kodes(self, unit: str, kategori_jabatan: str) -> set[str]:
+        return self._ut.valid_kodes(unit, kategori_jabatan)

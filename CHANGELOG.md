@@ -7,6 +7,26 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-06-22
+
+### Ditambahkan
+
+- **Master data catalog Task Inventory** — tiga model baru dengan CRUD + search lengkap:
+  - `TugasPokok` (klaster tugas) — endpoint `GET/POST /api/v1/task-inventory/tugas-pokok`,
+    `POST .../search`, `GET/PATCH/DELETE .../tugas-pokok/{tp_id}`.
+  - `DetilTugas` (kelompok tugas, M2O ke TugasPokok) — endpoint di `/task-inventory/detil-tugas`.
+  - `UraianTugas` (pernyataan tugas, M2O ke TugasPokok **dan** DetilTugas) — endpoint
+    di `/task-inventory/uraian-tugas`. Field `detil_tugas_id` bersifat opsional (null) untuk
+    task yang tidak masuk detil tugas.
+- `seed_catalog_models()` di `taskinv/seed.py` — fungsi idempoten yang meng-seed 77 TugasPokok,
+  261 DetilTugas, dan 2738 UraianTugas dari `task_catalog.json` saat startup.
+- `UraianTugasBackedCatalogService` di `taskinv/services/catalog.py` — implementasi catalog
+  yang baca dari model terpisah (bukan langsung JSON), sehingga perubahan CRUD tercermin.
+- Script migrasi `scripts/seed_catalog.py` — panggil REST API untuk mengisi data catalog
+  di production. Gunakan: `BASE_URL=... TOKEN=... python scripts/seed_catalog.py`.
+- 29 unit test baru di `tests/test_taskinv_master.py` mencakup CRUD + search untuk
+  TugasPokok, DetilTugas, dan UraianTugas.
+
 ## [0.11.0] - 2026-06-21
 
 ### Diubah
