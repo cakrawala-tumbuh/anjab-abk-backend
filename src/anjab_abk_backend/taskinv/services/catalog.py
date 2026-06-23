@@ -12,6 +12,7 @@ diambil langsung dari UraianTugas (M2O, bukan diwarisi dari TugasPokok).
 
 from __future__ import annotations
 
+import hashlib
 import threading
 from typing import TYPE_CHECKING, Protocol
 
@@ -23,6 +24,12 @@ if TYPE_CHECKING:
     from .detil_tugas import DetilTugasService
     from .tugas_pokok import TugasPokokService
     from .uraian_tugas import UraianTugasService
+
+
+def _synth_id(prefix: str, nama: str) -> str:
+    """Sintesiskan id deterministik dari nama (hanya untuk fallback in-memory legacy)."""
+    digest = hashlib.sha1(nama.encode("utf-8")).hexdigest()[:8]  # noqa: S324
+    return f"{prefix}_{digest}"
 
 
 class TiCatalogService(Protocol):
@@ -53,12 +60,17 @@ class InMemoryTiCatalogService:
         self._by_kombinasi: dict[tuple[str, str], list[TiCatalogRead]] = {}
         for item in load_catalog():
             jabatan_id = jabatan_id_by_nama.get(item["kategori_jabatan"], item["kategori_jabatan"])
+            detil_nama = item["detil_tugas"] or None
             read = TiCatalogRead(
                 kode=item["kode"],
                 unit=item["unit"],
                 jabatan_id=jabatan_id,
+                # Legacy in-memory: JSON tak menyimpan id, sintesiskan id stabil dari nama
+                # agar kontrak schema terpenuhi & cascade Tahap 1 tetap berfungsi.
+                tugas_pokok_id=_synth_id("titp", item["tugas_pokok"]),
                 tugas_pokok=item["tugas_pokok"],
-                detil_tugas=item["detil_tugas"] or None,
+                detil_tugas_id=_synth_id("tidt", detil_nama) if detil_nama else None,
+                detil_tugas=detil_nama,
                 uraian_tugas=item["uraian_tugas"],
                 urutan=item["urutan"],
             )
@@ -136,7 +148,9 @@ class UraianTugasBackedCatalogService:
             kode=ut.kode,
             unit=ut.unit,
             jabatan_id=ut.jabatan_id,
+            tugas_pokok_id=ut.tugas_pokok_id,
             tugas_pokok=tp.nama,
+            detil_tugas_id=ut.detil_tugas_id,
             detil_tugas=dt.nama if dt else None,
             uraian_tugas=ut.uraian,
             urutan=ut.urutan,

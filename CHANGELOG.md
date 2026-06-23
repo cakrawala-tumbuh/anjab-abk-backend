@@ -7,6 +7,19 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-06-23
+
+### Ditambahkan
+
+- **Catalog Task Inventory diperkaya id hirarki** — `TiCatalogRead` kini menyertakan
+  `tugas_pokok_id` dan `detil_tugas_id` (kunci stabil) di samping nama tugas pokok &
+  detil tugas yang sudah ada. Diambil langsung dari `UraianTugas` (M2O) sehingga
+  konsisten dengan master data. Mendukung seleksi relevansi Tahap 1 bertingkat
+  (cascade Tugas Pokok → Detil Tugas → Uraian Tugas) di frontend tanpa mengandalkan
+  pencocokan nama. `detil_tugas_id` bernilai null bila task langsung di bawah tugas
+  pokok (konsisten dengan `detil_tugas`). Kontrak submit seleksi (`task_kode`) tidak
+  berubah.
+
 ## [0.17.0] - 2026-06-23
 
 ### Ditambahkan

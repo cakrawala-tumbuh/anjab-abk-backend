@@ -84,6 +84,11 @@ def test_catalog_list_by_kombinasi(anon_client: TestClient, jabatan_id_tk: str) 
     assert len(items) > 0
     assert all(it["unit"] == UNIT and it["jabatan_id"] == jabatan_id_tk for it in items)
     assert items[0]["kode"].startswith("TI")
+    # Cascade Tahap 1 mengandalkan id stabil tugas pokok & detil tugas (level 1 & 2).
+    assert all(it.get("tugas_pokok_id") for it in items)
+    assert all("detil_tugas_id" in it for it in items)
+    # detil_tugas_id konsisten dengan ada/tidaknya nama detil tugas.
+    assert all((it["detil_tugas_id"] is None) == (it["detil_tugas"] is None) for it in items)
 
 
 def test_catalog_unknown_kombinasi_empty(anon_client: TestClient) -> None:

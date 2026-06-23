@@ -13,7 +13,19 @@ class TiCatalogRead(BaseModel):
     kode: str = Field(description="Kode task deterministik.", examples=["TIf0b59714"])
     unit: str = Field(description="Unit/jenjang (TK/SD/SMP/SMA).", examples=["TK"])
     jabatan_id: str = Field(description="ID jabatan.", examples=["jbt_a1b2c3d4"])
+    tugas_pokok_id: str = Field(
+        description="ID tugas pokok — kunci stabil untuk cascade Tahap 1 (level 1).",
+        examples=["titp_a1b2c3d4"],
+    )
     tugas_pokok: str = Field(description="Tugas pokok (klaster).", examples=["Pengelolaan SDM"])
+    detil_tugas_id: str | None = Field(
+        default=None,
+        description=(
+            "ID detil tugas — kunci stabil untuk cascade Tahap 1 (level 2); "
+            "null bila task langsung di bawah tugas pokok."
+        ),
+        examples=["tidt_a1b2c3d4"],
+    )
     detil_tugas: str | None = Field(
         default=None,
         description="Detil tugas (kelompok); null bila task langsung di bawah tugas pokok.",
