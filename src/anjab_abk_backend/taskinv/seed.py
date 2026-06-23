@@ -9,7 +9,9 @@ Fungsi `seed_catalog_models` memigrasikan data JSON ke tiga model terpisah:
 TugasPokok, DetilTugas, dan UraianTugas — yang menjadi sumber tunggal data catalog.
 
 Jabatan di-auto-create dari string `kategori_jabatan` pada catalog JSON bila belum ada.
-TugasPokok kini melekat pada jabatan_id (FK ke Jabatan), bukan hanya pada nama.
+TugasPokok memiliki M2M ke Jabatan (jabatan_ids). DetilTugas juga M2M ke Jabatan
+(jabatan_ids, subset dari parent TugasPokok). UraianTugas memiliki M2O ke Jabatan
+(jabatan_id, langsung tersimpan).
 """
 
 from __future__ import annotations
@@ -71,14 +73,14 @@ def seed_catalog_models(
 
     Alur:
     1. Auto-create Jabatan dari string `kategori_jabatan` (bila belum ada).
-    2. Seed TugasPokok dengan jabatan_id (dedup by nama + jabatan_id).
-    3. Seed DetilTugas (dedup by nama + tugas_pokok_id).
-    4. Seed UraianTugas (unik by kode).
+    2. Akumulasi jabatan_ids per nama TugasPokok, lalu seed TugasPokok (unik by nama).
+    3. Akumulasi jabatan_ids per (tp_id, dt_nama), lalu seed DetilTugas.
+    4. Seed UraianTugas dengan jabatan_id eksplisit (M2O langsung).
     """
     from ..anjab.schemas.jabatan import JabatanCreate
     from ..errors import ConflictError
     from .schemas.detil_tugas import DetilTugasCreate
-    from .schemas.tugas_pokok import TugasPokokCreate
+    from .schemas.tugas_pokok import TugasPokokCreate, TugasPokokUpdate
     from .schemas.uraian_tugas import UraianTugasCreate
 
     catalog = load_catalog()
@@ -91,13 +93,11 @@ def seed_catalog_models(
         if nama in seen_jbt:
             continue
         seen_jbt.add(nama)
-        # Cari dulu via search
         rows, _ = jabatan_svc.search(domain=[["nama", "=", nama]], order=[], limit=1, offset=0)
         if rows:
             jabatan_id_by_nama[nama] = rows[0].id
         else:
             kode = _slug_kode(nama)
-            # Pastikan kode unik
             suffix = 0
             kode_try = kode
             while True:
@@ -125,53 +125,57 @@ def seed_catalog_models(
                 if rows2:
                     jabatan_id_by_nama[nama] = rows2[0].id
 
-    # Langkah 2: seed TugasPokok (dedup by nama + jabatan_id)
-    tp_by_key: dict[tuple[str, str], str] = {}  # (nama, jabatan_id) → tp_id
-    seen_tp: set[tuple[str, str]] = set()
+    # Langkah 2: akumulasi jabatan_ids per nama TugasPokok, lalu seed
+    tp_jabatan_ids: dict[str, list[str]] = {}  # nama → [jabatan_id, ...]
     for item in catalog:
         jabatan_id = jabatan_id_by_nama.get(item["kategori_jabatan"], "")
-        key = (item["tugas_pokok"], jabatan_id)
-        if key in seen_tp:
+        nama = item["tugas_pokok"]
+        if nama not in tp_jabatan_ids:
+            tp_jabatan_ids[nama] = []
+        if jabatan_id and jabatan_id not in tp_jabatan_ids[nama]:
+            tp_jabatan_ids[nama].append(jabatan_id)
+
+    tp_by_nama: dict[str, str] = {}  # nama → tp_id
+    for nama, jabatan_ids in tp_jabatan_ids.items():
+        if not jabatan_ids:
             continue
-        seen_tp.add(key)
-        rows, _ = tp_svc.search(
-            domain=[["nama", "=", item["tugas_pokok"]], ["jabatan_id", "=", jabatan_id]],
-            order=[],
-            limit=1,
-            offset=0,
-        )
+        rows, _ = tp_svc.search(domain=[["nama", "=", nama]], order=[], limit=1, offset=0)
         if rows:
-            tp_by_key[key] = rows[0].id
+            tp_by_nama[nama] = rows[0].id
+            # Tambahkan jabatan_ids baru yang belum ada
+            current_ids = set(rows[0].jabatan_ids)
+            new_ids = set(jabatan_ids)
+            if not new_ids.issubset(current_ids):
+                tp_svc.update(rows[0].id, TugasPokokUpdate(jabatan_ids=list(current_ids | new_ids)))
         else:
             try:
-                r = tp_svc.create(TugasPokokCreate(jabatan_id=jabatan_id, nama=item["tugas_pokok"]))
-                tp_by_key[key] = r.id
+                r = tp_svc.create(TugasPokokCreate(jabatan_ids=jabatan_ids, nama=nama))
+                tp_by_nama[nama] = r.id
             except ConflictError:
-                rows2, _ = tp_svc.search(
-                    domain=[
-                        ["nama", "=", item["tugas_pokok"]],
-                        ["jabatan_id", "=", jabatan_id],
-                    ],
-                    order=[],
-                    limit=1,
-                    offset=0,
-                )
+                rows2, _ = tp_svc.search(domain=[["nama", "=", nama]], order=[], limit=1, offset=0)
                 if rows2:
-                    tp_by_key[key] = rows2[0].id
+                    tp_by_nama[nama] = rows2[0].id
 
-    # Langkah 3: seed DetilTugas (dedup by nama + tugas_pokok_id; skip jika nama kosong)
-    dt_by_key: dict[tuple[str, str], str] = {}  # (tp_id, dt_nama) → dt_id
-    seen_dt: set[tuple[str, str]] = set()
+    # Langkah 3: akumulasi jabatan_ids per (tp_id, dt_nama), lalu seed DetilTugas
+    dt_jabatan_ids: dict[tuple[str, str], list[str]] = {}  # (tp_id, dt_nama) → [jabatan_id, ...]
     for item in catalog:
         dt_nama = item["detil_tugas"].strip()
         if not dt_nama:
             continue
         jabatan_id = jabatan_id_by_nama.get(item["kategori_jabatan"], "")
-        tp_id = tp_by_key.get((item["tugas_pokok"], jabatan_id), "")
-        key = (tp_id, dt_nama)
-        if key in seen_dt:
+        tp_id = tp_by_nama.get(item["tugas_pokok"], "")
+        if not tp_id:
             continue
-        seen_dt.add(key)
+        key = (tp_id, dt_nama)
+        if key not in dt_jabatan_ids:
+            dt_jabatan_ids[key] = []
+        if jabatan_id and jabatan_id not in dt_jabatan_ids[key]:
+            dt_jabatan_ids[key].append(jabatan_id)
+
+    dt_by_key: dict[tuple[str, str], str] = {}  # (tp_id, dt_nama) → dt_id
+    for (tp_id, dt_nama), jabatan_ids in dt_jabatan_ids.items():
+        if not jabatan_ids:
+            continue
         rows, _ = dt_svc.search(
             domain=[["nama", "=", dt_nama], ["tugas_pokok_id", "=", tp_id]],
             order=[],
@@ -179,11 +183,22 @@ def seed_catalog_models(
             offset=0,
         )
         if rows:
-            dt_by_key[key] = rows[0].id
+            dt_by_key[(tp_id, dt_nama)] = rows[0].id
+            current_ids = set(rows[0].jabatan_ids)
+            new_ids = set(jabatan_ids)
+            if not new_ids.issubset(current_ids):
+                from .schemas.detil_tugas import DetilTugasUpdate
+
+                dt_svc.update(
+                    rows[0].id,
+                    DetilTugasUpdate(jabatan_ids=list(current_ids | new_ids)),
+                )
         else:
             try:
-                r = dt_svc.create(DetilTugasCreate(nama=dt_nama, tugas_pokok_id=tp_id))
-                dt_by_key[key] = r.id
+                r = dt_svc.create(
+                    DetilTugasCreate(nama=dt_nama, tugas_pokok_id=tp_id, jabatan_ids=jabatan_ids)
+                )
+                dt_by_key[(tp_id, dt_nama)] = r.id
             except ConflictError:
                 rows2, _ = dt_svc.search(
                     domain=[["nama", "=", dt_nama], ["tugas_pokok_id", "=", tp_id]],
@@ -192,14 +207,16 @@ def seed_catalog_models(
                     offset=0,
                 )
                 if rows2:
-                    dt_by_key[key] = rows2[0].id
+                    dt_by_key[(tp_id, dt_nama)] = rows2[0].id
 
-    # Langkah 4: seed UraianTugas (unik by kode)
+    # Langkah 4: seed UraianTugas dengan jabatan_id eksplisit
     for item in catalog:
         jabatan_id = jabatan_id_by_nama.get(item["kategori_jabatan"], "")
-        tp_id = tp_by_key.get((item["tugas_pokok"], jabatan_id), "")
+        tp_id = tp_by_nama.get(item["tugas_pokok"], "")
         dt_nama = item["detil_tugas"].strip()
         dt_id = dt_by_key.get((tp_id, dt_nama)) if dt_nama else None
+        if not jabatan_id or not tp_id:
+            continue
         try:
             ut_svc.create(
                 UraianTugasCreate(
@@ -207,6 +224,7 @@ def seed_catalog_models(
                     uraian=item["uraian_tugas"],
                     unit=item["unit"],
                     urutan=item["urutan"],
+                    jabatan_id=jabatan_id,
                     detil_tugas_id=dt_id or None,
                     tugas_pokok_id=tp_id,
                 )
@@ -217,7 +235,7 @@ def seed_catalog_models(
     _logger.info(
         "seed_catalog_models: %d jabatan, %d TP, %d DT, %d UT di-seed dari task_catalog.json",
         len(jabatan_id_by_nama),
-        len(tp_by_key),
+        len(tp_by_nama),
         len(dt_by_key),
         len(catalog),
     )

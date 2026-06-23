@@ -7,6 +7,22 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-06-23
+
+### Diubah (Breaking)
+
+- **TugasPokok M2M ke Jabatan** — `jabatan_id: str` diganti `jabatan_ids: list[str]`
+  (wajib, minimal satu). Satu TugasPokok kini dapat terhubung ke beberapa Jabatan.
+- **DetilTugas M2M ke Jabatan** — `jabatan_ids: list[str]` ditambahkan (wajib, minimal satu,
+  harus subset dari `jabatan_ids` TugasPokok induknya). Validasi subset dijalankan saat buat/perbarui.
+- **UraianTugas M2O ke Jabatan eksplisit** — `jabatan_id: str` kini wajib diisi saat membuat
+  UraianTugas; nilai harus ada dalam `jabatan_ids` DetilTugas induknya.
+- `TugasPokokCreate.jabatan_id` → `TugasPokokCreate.jabatan_ids` (list); `TugasPokokRead` mengembalikan
+  `jabatan_ids` (list lengkap) dan `jabatan_kodes` (list kode) sebagai tambahan `jabatan_id` pertama.
+- `DetilTugasCreate` dan `DetilTugasRead` kini mengandung `jabatan_ids`.
+- `UraianTugasCreate` kini memerlukan `jabatan_id` eksplisit (sebelumnya diwarisi otomatis dari TP).
+- Seed data `TugasPokok` dan `UraianTugas` diperbarui konsisten dengan struktur M2M baru.
+
 ## [0.14.0] - 2026-06-22
 
 ### Diubah (Breaking)

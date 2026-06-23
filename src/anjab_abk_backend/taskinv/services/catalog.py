@@ -7,7 +7,7 @@
   Perubahan via CRUD uraian/detil/tugas-pokok langsung tercermin di catalog.
 
 Catalog dikelompokkan berdasarkan kombinasi (unit × jabatan_id). jabatan_id
-diwarisi dari TugasPokok (bukan disimpan di UraianTugas secara langsung).
+diambil langsung dari UraianTugas (M2O, bukan diwarisi dari TugasPokok).
 """
 
 from __future__ import annotations
@@ -116,7 +116,7 @@ class UraianTugasBackedCatalogService:
 
     Sumber tunggal data setelah model catalog dinormalisasi ke tiga tabel terpisah.
     Perubahan via CRUD langsung tercermin di catalog tanpa sinkronisasi tambahan.
-    jabatan_id diambil dari TugasPokok induk melalui ut.tugas_pokok_id.
+    jabatan_id diambil langsung dari UraianTugas (M2O, disimpan eksplisit).
     """
 
     def __init__(
@@ -135,7 +135,7 @@ class UraianTugasBackedCatalogService:
         return TiCatalogRead(
             kode=ut.kode,
             unit=ut.unit,
-            jabatan_id=tp.jabatan_id,
+            jabatan_id=ut.jabatan_id,
             tugas_pokok=tp.nama,
             detil_tugas=dt.nama if dt else None,
             uraian_tugas=ut.uraian,

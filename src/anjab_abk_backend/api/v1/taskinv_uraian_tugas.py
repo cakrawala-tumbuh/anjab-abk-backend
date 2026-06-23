@@ -132,6 +132,7 @@ def create_uraian_tugas(
                         "uraian": "Menyusun evaluasi karyawan",
                         "unit": "TK",
                         "urutan": 1,
+                        "jabatan_id": "jbt_a1b2c3d4",
                         "detil_tugas_id": "dt_a1b2c3d4",
                         "tugas_pokok_id": "tp_a1b2c3d4",
                     },

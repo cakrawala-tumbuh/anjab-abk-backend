@@ -4,9 +4,9 @@
 PLACEHOLDER in-memory yang di-seed dari task_catalog.json.
 Ganti dengan implementasi PostgreSQL lewat skill `backend-postgresql-skill` — kontrak tidak berubah.
 
-UraianTugas punya relasi M2O ke TugasPokok (tugas_pokok_id) dan DetilTugas (detil_tugas_id).
-jabatan_id DIWARISKAN dari TugasPokok dan di-denormalisasi ke internal record untuk
-efisiensi query filter (diganti JOIN di PostgreSQL).
+UraianTugas punya relasi M2O ke TugasPokok (tugas_pokok_id), M2O ke DetilTugas
+(detil_tugas_id, opsional), dan M2O ke Jabatan (jabatan_id, langsung tersimpan).
+Jabatan yang dipilih harus ada dalam jabatan_ids DetilTugas induk (bila detil_tugas_id diisi).
 """
 
 from __future__ import annotations
@@ -17,13 +17,13 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol
 
-from ...errors import ConflictError, NotFoundError
+from ...errors import ConflictError, NotFoundError, ValidationAppError
 from ...schemas.search import Domain, Order
 from ...services.domain import run_search, validate_searchable_fields
 from ..schemas.uraian_tugas import UraianTugasCreate, UraianTugasRead, UraianTugasUpdate
 
 if TYPE_CHECKING:
-    from .tugas_pokok import InMemoryTugasPokokService
+    from .detil_tugas import InMemoryDetilTugasService
 
 SEARCHABLE_FIELDS = frozenset(
     {
@@ -66,7 +66,7 @@ class _Record:
     kode: str
     uraian: str
     unit: str
-    jabatan_id: str  # denormalisasi dari TugasPokok untuk efisiensi filter
+    jabatan_id: str
     urutan: int
     tugas_pokok_id: str
     created_at: datetime
@@ -74,22 +74,25 @@ class _Record:
 
 
 class InMemoryUraianTugasService:
-    """Placeholder in-memory thread-safe — BUKAN sumber data nyata.
+    """Placeholder in-memory thread-safe — BUKAN sumber data nyata."""
 
-    Menerima `tp_svc` untuk resolve jabatan_id saat create (denormalisasi).
-    """
-
-    def __init__(self, tp_svc: InMemoryTugasPokokService) -> None:
-        self._tp = tp_svc
+    def __init__(self, dt_svc: InMemoryDetilTugasService | None = None) -> None:
+        self._dt = dt_svc
         self._lock = threading.Lock()
         self._data: dict[str, _Record] = {}
 
-    def _resolve_jabatan_id(self, tugas_pokok_id: str) -> str:
+    def _validate_jabatan_in_dt(self, jabatan_id: str, detil_tugas_id: str) -> None:
+        if self._dt is None:
+            return
         try:
-            tp = self._tp.get(tugas_pokok_id)
-            return tp.jabatan_id
+            dt = self._dt.get(detil_tugas_id)
         except NotFoundError:
-            return ""
+            raise NotFoundError(f"DetilTugas '{detil_tugas_id}' tidak ditemukan.") from None
+        if jabatan_id not in dt.jabatan_ids:
+            raise ValidationAppError(
+                f"Jabatan '{jabatan_id}' bukan bagian dari jabatan_ids"
+                f" DetilTugas '{detil_tugas_id}'."
+            )
 
     def _to_read(self, rec: _Record) -> UraianTugasRead:
         return UraianTugasRead.model_validate(rec)
@@ -115,7 +118,8 @@ class InMemoryUraianTugasService:
         raise NotFoundError(f"UraianTugas dengan kode '{kode}' tidak ditemukan.")
 
     def create(self, data: UraianTugasCreate) -> UraianTugasRead:
-        jabatan_id = self._resolve_jabatan_id(data.tugas_pokok_id)
+        if data.detil_tugas_id:
+            self._validate_jabatan_in_dt(data.jabatan_id, data.detil_tugas_id)
         with self._lock:
             if any(r.kode == data.kode for r in self._data.values()):
                 raise ConflictError(f"UraianTugas dengan kode '{data.kode}' sudah ada.")
@@ -124,7 +128,7 @@ class InMemoryUraianTugasService:
                 kode=data.kode,
                 uraian=data.uraian,
                 unit=data.unit,
-                jabatan_id=jabatan_id,
+                jabatan_id=data.jabatan_id,
                 urutan=data.urutan,
                 detil_tugas_id=data.detil_tugas_id,
                 tugas_pokok_id=data.tugas_pokok_id,
@@ -142,11 +146,17 @@ class InMemoryUraianTugasService:
             if "kode" in changes:
                 if any(r.kode == changes["kode"] and r.id != ut_id for r in self._data.values()):
                     raise ConflictError(f"UraianTugas dengan kode '{changes['kode']}' sudah ada.")
+            new_jabatan_id = changes.get("jabatan_id", rec.jabatan_id)
+            new_detil_id = changes.get("detil_tugas_id", rec.detil_tugas_id)
+        # Validasi jabatan di luar lock
+        if new_detil_id and ("jabatan_id" in changes or "detil_tugas_id" in changes):
+            self._validate_jabatan_in_dt(new_jabatan_id, new_detil_id)
+        with self._lock:
+            rec = self._data.get(ut_id)
+            if rec is None:
+                raise NotFoundError(f"UraianTugas '{ut_id}' tidak ditemukan.")
             for key, value in changes.items():
                 setattr(rec, key, value)
-            # Re-resolve jabatan_id bila tugas_pokok_id berubah
-            if "tugas_pokok_id" in changes:
-                rec.jabatan_id = self._resolve_jabatan_id(rec.tugas_pokok_id)
             return self._to_read(rec)
 
     def delete(self, ut_id: str) -> None:

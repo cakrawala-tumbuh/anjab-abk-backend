@@ -1,8 +1,8 @@
 """Skema Pydantic untuk resource `TugasPokok` (master data catalog TI).
 
-TugasPokok adalah klaster tugas tingkat pertama. Setiap TugasPokok melekat pada
-satu Jabatan (via jabatan_id) sehingga jabatan diwariskan ke DetilTugas dan
-UraianTugas melalui relasi M2O.
+TugasPokok adalah klaster tugas tingkat pertama. Setiap TugasPokok memiliki
+relasi M2M ke Jabatan (via jabatan_ids). DetilTugas hanya dapat dipilihkan
+jabatan yang merupakan subset dari jabatan_ids TugasPokok induknya.
 """
 
 from __future__ import annotations
@@ -17,10 +17,10 @@ class TugasPokokCreate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    jabatan_id: str = Field(
+    jabatan_ids: list[str] = Field(
         min_length=1,
-        description="ID jabatan yang menjadi induk tugas pokok ini.",
-        examples=["jbt_a1b2c3d4"],
+        description="Daftar ID jabatan yang terkait dengan tugas pokok ini (M2M, minimal 1).",
+        examples=[["jbt_a1b2c3d4", "jbt_b2c3d4e5"]],
     )
     nama: str = Field(
         min_length=1,
@@ -35,10 +35,10 @@ class TugasPokokUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    jabatan_id: str | None = Field(
+    jabatan_ids: list[str] | None = Field(
         default=None,
         min_length=1,
-        description="ID jabatan baru.",
+        description="Daftar ID jabatan baru (M2M, minimal 1 item bila diisi).",
     )
     nama: str | None = Field(
         default=None,
@@ -54,6 +54,9 @@ class TugasPokokRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str = Field(description="ID unik tugas pokok.", examples=["tp_a1b2c3d4"])
-    jabatan_id: str = Field(description="ID jabatan induk.", examples=["jbt_a1b2c3d4"])
+    jabatan_ids: list[str] = Field(
+        description="Daftar ID jabatan terkait (M2M).",
+        examples=[["jbt_a1b2c3d4"]],
+    )
     nama: str = Field(description="Nama tugas pokok.", examples=["Pengelolaan SDM"])
     created_at: datetime = Field(description="Waktu pembuatan (UTC, ISO-8601).")

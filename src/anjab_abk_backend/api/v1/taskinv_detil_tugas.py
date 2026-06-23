@@ -130,6 +130,7 @@ def create_detil_tugas(
                     "value": {
                         "nama": "Mengevaluasi Kinerja Karyawan",
                         "tugas_pokok_id": "tp_a1b2c3d4",
+                        "jabatan_ids": ["jbt_a1b2c3d4"],
                     },
                 },
             }

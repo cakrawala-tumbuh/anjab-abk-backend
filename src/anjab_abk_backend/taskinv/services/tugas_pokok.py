@@ -4,8 +4,8 @@
 PLACEHOLDER in-memory yang di-seed dari task_catalog.json.
 Ganti dengan implementasi PostgreSQL lewat skill `backend-postgresql-skill` — kontrak tidak berubah.
 
-Setiap TugasPokok melekat pada satu Jabatan via jabatan_id. Jabatan diwariskan
-ke DetilTugas dan UraianTugas melalui relasi M2O.
+Setiap TugasPokok memiliki relasi M2M ke Jabatan via jabatan_ids.
+Nama TugasPokok bersifat unik secara global.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from ...schemas.search import Domain, Order
 from ...services.domain import run_search, validate_searchable_fields
 from ..schemas.tugas_pokok import TugasPokokCreate, TugasPokokRead, TugasPokokUpdate
 
-SEARCHABLE_FIELDS = frozenset({"id", "jabatan_id", "nama", "created_at"})
+SEARCHABLE_FIELDS = frozenset({"id", "nama", "created_at"})
 
 
 class TugasPokokService(Protocol):
@@ -40,9 +40,13 @@ class TugasPokokService(Protocol):
 @dataclass
 class _Record:
     id: str
-    jabatan_id: str
+    jabatan_ids: list[str]
     nama: str
     created_at: datetime
+
+    def __post_init__(self) -> None:
+        # Pastikan jabatan_ids tidak di-share antar instance
+        self.jabatan_ids = list(self.jabatan_ids)
 
 
 class InMemoryTugasPokokService:
@@ -54,11 +58,11 @@ class InMemoryTugasPokokService:
 
     @staticmethod
     def _to_read(rec: _Record) -> TugasPokokRead:
-        return TugasPokokRead.model_validate(rec)
+        return TugasPokokRead.model_validate(asdict(rec))
 
     def list(self, *, limit: int, offset: int) -> tuple[list[TugasPokokRead], int]:
         with self._lock:
-            ordered = sorted(self._data.values(), key=lambda r: (r.jabatan_id, r.nama))
+            ordered = sorted(self._data.values(), key=lambda r: r.nama)
         page = ordered[offset : offset + limit]
         return [self._to_read(r) for r in page], len(ordered)
 
@@ -71,16 +75,11 @@ class InMemoryTugasPokokService:
 
     def create(self, data: TugasPokokCreate) -> TugasPokokRead:
         with self._lock:
-            if any(
-                r.nama == data.nama and r.jabatan_id == data.jabatan_id for r in self._data.values()
-            ):
-                raise ConflictError(
-                    f"TugasPokok dengan nama '{data.nama}'"
-                    f" untuk jabatan '{data.jabatan_id}' sudah ada."
-                )
+            if any(r.nama == data.nama for r in self._data.values()):
+                raise ConflictError(f"TugasPokok dengan nama '{data.nama}' sudah ada.")
             rec = _Record(
                 id=f"tp_{uuid.uuid4().hex[:8]}",
-                jabatan_id=data.jabatan_id,
+                jabatan_ids=list(data.jabatan_ids),
                 nama=data.nama,
                 created_at=datetime.now(UTC),
             )
@@ -94,17 +93,15 @@ class InMemoryTugasPokokService:
             if rec is None:
                 raise NotFoundError(f"TugasPokok '{tp_id}' tidak ditemukan.")
             new_nama = changes.get("nama", rec.nama)
-            new_jabatan_id = changes.get("jabatan_id", rec.jabatan_id)
-            if any(
-                r.nama == new_nama and r.jabatan_id == new_jabatan_id and r.id != tp_id
-                for r in self._data.values()
+            if new_nama != rec.nama and any(
+                r.nama == new_nama and r.id != tp_id for r in self._data.values()
             ):
-                raise ConflictError(
-                    f"TugasPokok dengan nama '{new_nama}'"
-                    f" untuk jabatan '{new_jabatan_id}' sudah ada."
-                )
+                raise ConflictError(f"TugasPokok dengan nama '{new_nama}' sudah ada.")
             for key, value in changes.items():
-                setattr(rec, key, value)
+                if key == "jabatan_ids":
+                    rec.jabatan_ids = list(value)
+                else:
+                    setattr(rec, key, value)
             return self._to_read(rec)
 
     def delete(self, tp_id: str) -> None:

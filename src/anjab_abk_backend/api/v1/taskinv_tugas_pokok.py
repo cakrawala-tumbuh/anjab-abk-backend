@@ -127,7 +127,10 @@ def create_tugas_pokok(
             openapi_examples={
                 "pengelolaan_sdm": {
                     "summary": "Pengelolaan SDM",
-                    "value": {"jabatan_id": "jbt_a1b2c3d4", "nama": "Pengelolaan SDM"},
+                    "value": {
+                        "jabatan_ids": ["jbt_a1b2c3d4", "jbt_b2c3d4e5"],
+                        "nama": "Pengelolaan SDM",
+                    },
                 },
             }
         ),

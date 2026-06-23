@@ -1,11 +1,12 @@
 """Skema Pydantic untuk resource `UraianTugas` (master data catalog TI).
 
 UraianTugas adalah pernyataan tugas spesifik (task statement) level terbawah.
-Relasi M2O: UraianTugas → TugasPokok (via tugas_pokok_id) dan
-           UraianTugas → DetilTugas (via detil_tugas_id).
+Relasi M2O: UraianTugas → TugasPokok (via tugas_pokok_id),
+            UraianTugas → DetilTugas (via detil_tugas_id, opsional),
+            UraianTugas → Jabatan (via jabatan_id, M2O langsung).
 
-Jabatan DIWARISKAN dari TugasPokok (jabatan_id), bukan disimpan langsung di sini.
-Field jabatan_id pada UraianTugasRead adalah nilai turunan dari TugasPokok induk.
+Jabatan yang dapat dipilih untuk UraianTugas adalah jabatan yang tergabung
+dalam jabatan_ids DetilTugas induknya (bila detil_tugas_id diisi).
 """
 
 from __future__ import annotations
@@ -43,13 +44,21 @@ class UraianTugasCreate(BaseModel):
         description="Urutan dalam kombinasi unit × jabatan.",
         examples=[1],
     )
+    jabatan_id: str = Field(
+        min_length=1,
+        description=(
+            "ID jabatan untuk uraian tugas ini (M2O). "
+            "Bila detil_tugas_id diisi, jabatan harus ada dalam jabatan_ids DetilTugas tersebut."
+        ),
+        examples=["jbt_a1b2c3d4"],
+    )
     detil_tugas_id: str | None = Field(
         default=None,
         description="ID detil tugas induk (M2O). Null jika task tidak masuk detil tugas.",
         examples=["dt_a1b2c3d4"],
     )
     tugas_pokok_id: str = Field(
-        description="ID tugas pokok induk (M2O). Jabatan diwarisi dari TugasPokok ini.",
+        description="ID tugas pokok induk (M2O).",
         examples=["tp_a1b2c3d4"],
     )
 
@@ -65,15 +74,13 @@ class UraianTugasUpdate(BaseModel):
     )
     unit: str | None = Field(default=None, min_length=1, max_length=20, description="Unit baru.")
     urutan: int | None = Field(default=None, ge=1, description="Urutan baru.")
+    jabatan_id: str | None = Field(default=None, min_length=1, description="ID jabatan baru.")
     detil_tugas_id: str | None = Field(default=None, description="ID detil tugas induk baru.")
     tugas_pokok_id: str | None = Field(default=None, description="ID tugas pokok induk baru.")
 
 
 class UraianTugasRead(BaseModel):
-    """Representasi uraian tugas yang dikembalikan API.
-
-    jabatan_id adalah nilai turunan (inherited) dari TugasPokok induk.
-    """
+    """Representasi uraian tugas yang dikembalikan API."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -84,7 +91,8 @@ class UraianTugasRead(BaseModel):
     )
     unit: str = Field(description="Unit/jenjang.", examples=["TK"])
     jabatan_id: str = Field(
-        description="ID jabatan (diwarisi dari TugasPokok).", examples=["jbt_a1b2c3d4"]
+        description="ID jabatan untuk uraian tugas ini (M2O langsung).",
+        examples=["jbt_a1b2c3d4"],
     )
     urutan: int = Field(description="Urutan dalam kombinasi unit × jabatan.", examples=[1])
     detil_tugas_id: str | None = Field(

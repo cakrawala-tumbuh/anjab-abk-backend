@@ -23,23 +23,6 @@ def _uniq(prefix: str = "") -> str:
     return f"{prefix}{uuid.uuid4().hex[:8]}"
 
 
-def _get_seeded_jabatan_id(anon_client: TestClient) -> str:
-    """Ambil jabatan_id pertama dari catalog kombinasi (hasil seeding)."""
-    r = anon_client.get(CATALOG_BASE + "/kombinasi")
-    rows = r.json()
-    assert len(rows) > 0, "Tidak ada data kombinasi catalog setelah seeding"
-    return rows[0]["jabatan_id"]
-
-
-def _get_jabatan_id_for_unit(anon_client: TestClient, unit: str) -> str:
-    """Ambil jabatan_id dari catalog kombinasi yang cocok dengan unit tertentu."""
-    r = anon_client.get(CATALOG_BASE + "/kombinasi")
-    rows = r.json()
-    match = next((x for x in rows if x["unit"] == unit), None)
-    assert match is not None, f"Tidak ada kombinasi untuk unit '{unit}'"
-    return match["jabatan_id"]
-
-
 def _create_jabatan(client: TestClient, nama: str | None = None) -> dict:
     kode = _uniq("JBT")
     payload = {
@@ -53,24 +36,42 @@ def _create_jabatan(client: TestClient, nama: str | None = None) -> dict:
     return r.json()
 
 
-def _create_tp(client: TestClient, jabatan_id: str | None = None, nama: str | None = None) -> dict:
-    if jabatan_id is None:
+def _create_tp(
+    client: TestClient,
+    jabatan_ids: list[str] | None = None,
+    nama: str | None = None,
+) -> dict:
+    if jabatan_ids is None:
         jbt = _create_jabatan(client)
-        jabatan_id = jbt["id"]
-    payload = {"jabatan_id": jabatan_id, "nama": nama or f"Tugas Pokok {_uniq()}"}
+        jabatan_ids = [jbt["id"]]
+    payload = {"jabatan_ids": jabatan_ids, "nama": nama or f"Tugas Pokok {_uniq()}"}
     r = client.post(TP_BASE, json=payload)
     assert r.status_code == 201, r.text
     return r.json()
 
 
-def _create_dt(client: TestClient, tugas_pokok_id: str, nama: str | None = None) -> dict:
-    payload = {"nama": nama or f"Detil Tugas {_uniq()}", "tugas_pokok_id": tugas_pokok_id}
+def _create_dt(
+    client: TestClient,
+    tugas_pokok_id: str,
+    jabatan_ids: list[str],
+    nama: str | None = None,
+) -> dict:
+    payload = {
+        "nama": nama or f"Detil Tugas {_uniq()}",
+        "tugas_pokok_id": tugas_pokok_id,
+        "jabatan_ids": jabatan_ids,
+    }
     r = client.post(DT_BASE, json=payload)
     assert r.status_code == 201, r.text
     return r.json()
 
 
-def _create_ut(client: TestClient, detil_tugas_id: str, tugas_pokok_id: str) -> dict:
+def _create_ut(
+    client: TestClient,
+    detil_tugas_id: str,
+    tugas_pokok_id: str,
+    jabatan_id: str,
+) -> dict:
     kode = f"TI{uuid.uuid4().hex[:8]}"
     payload = {
         "kode": kode,
@@ -79,6 +80,7 @@ def _create_ut(client: TestClient, detil_tugas_id: str, tugas_pokok_id: str) -> 
         "urutan": 1,
         "detil_tugas_id": detil_tugas_id,
         "tugas_pokok_id": tugas_pokok_id,
+        "jabatan_id": jabatan_id,
     }
     r = client.post(UT_BASE, json=payload)
     assert r.status_code == 201, r.text
@@ -102,34 +104,35 @@ def test_tp_create_and_get(client: TestClient) -> None:
     tp = _create_tp(client)
     assert tp["id"].startswith("tp_")
     assert tp["nama"]
-    assert tp["jabatan_id"]
+    assert isinstance(tp["jabatan_ids"], list)
+    assert len(tp["jabatan_ids"]) >= 1
     r = client.get(f"{TP_BASE}/{tp['id']}")
     assert r.status_code == 200
     assert r.json()["id"] == tp["id"]
 
 
 def test_tp_create_requires_auth(anon_client: TestClient) -> None:
-    r = anon_client.post(TP_BASE, json={"jabatan_id": "jbt_xxx", "nama": "Tanpa Auth"})
+    r = anon_client.post(TP_BASE, json={"jabatan_ids": ["jbt_xxx"], "nama": "Tanpa Auth"})
     assert r.status_code == 401
 
 
-def test_tp_create_conflict_same_jabatan(client: TestClient) -> None:
+def test_tp_create_conflict_same_nama(client: TestClient) -> None:
+    """Nama sama → 409 (nama adalah kunci unik global, jabatan_ids tidak relevan)."""
     jbt = _create_jabatan(client)
     nama = f"TP Duplikat {_uniq()}"
-    _create_tp(client, jabatan_id=jbt["id"], nama=nama)
-    # Sama jabatan_id + sama nama → 409
-    r = client.post(TP_BASE, json={"jabatan_id": jbt["id"], "nama": nama})
+    _create_tp(client, jabatan_ids=[jbt["id"]], nama=nama)
+    # Sama nama → 409, walaupun jabatan_ids berbeda
+    jbt2 = _create_jabatan(client)
+    r = client.post(TP_BASE, json={"jabatan_ids": [jbt2["id"]], "nama": nama})
     assert r.status_code == 409
 
 
-def test_tp_create_no_conflict_different_jabatan(client: TestClient) -> None:
-    nama = f"TP Sama Nama {_uniq()}"
+def test_tp_create_multi_jabatan(client: TestClient) -> None:
+    """TP boleh punya lebih dari satu jabatan (M2M)."""
     jbt1 = _create_jabatan(client)
     jbt2 = _create_jabatan(client)
-    _create_tp(client, jabatan_id=jbt1["id"], nama=nama)
-    # Jabatan berbeda, nama sama → tidak konflik
-    r = client.post(TP_BASE, json={"jabatan_id": jbt2["id"], "nama": nama})
-    assert r.status_code == 201
+    tp = _create_tp(client, jabatan_ids=[jbt1["id"], jbt2["id"]])
+    assert set(tp["jabatan_ids"]) == {jbt1["id"], jbt2["id"]}
 
 
 def test_tp_etag_304(client: TestClient) -> None:
@@ -147,6 +150,16 @@ def test_tp_update(client: TestClient) -> None:
     r = client.patch(f"{TP_BASE}/{tp['id']}", json={"nama": nama_baru})
     assert r.status_code == 200
     assert r.json()["nama"] == nama_baru
+
+
+def test_tp_update_jabatan_ids(client: TestClient) -> None:
+    """Update jabatan_ids harus menggantikan seluruh daftar lama."""
+    jbt1 = _create_jabatan(client)
+    tp = _create_tp(client, jabatan_ids=[jbt1["id"]])
+    jbt2 = _create_jabatan(client)
+    r = client.patch(f"{TP_BASE}/{tp['id']}", json={"jabatan_ids": [jbt1["id"], jbt2["id"]]})
+    assert r.status_code == 200
+    assert set(r.json()["jabatan_ids"]) == {jbt1["id"], jbt2["id"]}
 
 
 def test_tp_delete(client: TestClient) -> None:
@@ -171,12 +184,12 @@ def test_tp_search(client: TestClient) -> None:
     assert body["items"][0]["id"] == tp["id"]
 
 
-def test_tp_search_by_jabatan_id(client: TestClient) -> None:
-    jbt = _create_jabatan(client)
-    tp = _create_tp(client, jabatan_id=jbt["id"])
+def test_tp_search_by_nama(client: TestClient) -> None:
+    nama = f"TP Search Nama {_uniq()}"
+    tp = _create_tp(client, nama=nama)
     r = client.post(
         f"{TP_BASE}/search",
-        json={"domain": [["jabatan_id", "=", jbt["id"]]], "limit": 50, "offset": 0},
+        json={"domain": [["nama", "=", nama]], "limit": 10, "offset": 0},
     )
     assert r.status_code == 200
     body = r.json()
@@ -190,8 +203,11 @@ def test_tp_search_by_jabatan_id(client: TestClient) -> None:
 
 
 @pytest.fixture(scope="module")
-def tp_for_dt(client: TestClient) -> dict:
-    return _create_tp(client, nama=f"TP untuk DT {_uniq()}")
+def tp_jbt_for_dt(client: TestClient) -> tuple[dict, str]:
+    """Returns (tp_dict, jabatan_id) so DT tests can pass jabatan_ids."""
+    jbt = _create_jabatan(client)
+    tp = _create_tp(client, jabatan_ids=[jbt["id"]], nama=f"TP untuk DT {_uniq()}")
+    return tp, jbt["id"]
 
 
 def test_dt_list_ok(anon_client: TestClient) -> None:
@@ -202,22 +218,51 @@ def test_dt_list_ok(anon_client: TestClient) -> None:
     assert body["total"] > 0  # seeded from task_catalog.json
 
 
-def test_dt_create_and_get(client: TestClient, tp_for_dt: dict) -> None:
-    dt = _create_dt(client, tp_for_dt["id"])
+def test_dt_create_and_get(client: TestClient, tp_jbt_for_dt: tuple[dict, str]) -> None:
+    tp, jbt_id = tp_jbt_for_dt
+    dt = _create_dt(client, tp["id"], jabatan_ids=[jbt_id])
     assert dt["id"].startswith("dt_")
-    assert dt["tugas_pokok_id"] == tp_for_dt["id"]
+    assert dt["tugas_pokok_id"] == tp["id"]
+    assert isinstance(dt["jabatan_ids"], list)
+    assert jbt_id in dt["jabatan_ids"]
     r = client.get(f"{DT_BASE}/{dt['id']}")
     assert r.status_code == 200
     assert r.json()["id"] == dt["id"]
 
 
-def test_dt_create_requires_auth(anon_client: TestClient, tp_for_dt: dict) -> None:
-    r = anon_client.post(DT_BASE, json={"nama": "Tanpa Auth", "tugas_pokok_id": tp_for_dt["id"]})
+def test_dt_create_requires_auth(anon_client: TestClient, tp_jbt_for_dt: tuple[dict, str]) -> None:
+    tp, jbt_id = tp_jbt_for_dt
+    r = anon_client.post(
+        DT_BASE,
+        json={
+            "nama": "Tanpa Auth",
+            "tugas_pokok_id": tp["id"],
+            "jabatan_ids": [jbt_id],
+        },
+    )
     assert r.status_code == 401
 
 
-def test_dt_etag_304(client: TestClient, tp_for_dt: dict) -> None:
-    dt = _create_dt(client, tp_for_dt["id"])
+def test_dt_jabatan_ids_must_be_subset_of_tp(
+    client: TestClient, tp_jbt_for_dt: tuple[dict, str]
+) -> None:
+    """jabatan_ids DT yang bukan subset dari TP → 422."""
+    tp, _ = tp_jbt_for_dt
+    jbt_lain = _create_jabatan(client)
+    r = client.post(
+        DT_BASE,
+        json={
+            "nama": f"DT Invalid {_uniq()}",
+            "tugas_pokok_id": tp["id"],
+            "jabatan_ids": [jbt_lain["id"]],
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_dt_etag_304(client: TestClient, tp_jbt_for_dt: tuple[dict, str]) -> None:
+    tp, jbt_id = tp_jbt_for_dt
+    dt = _create_dt(client, tp["id"], jabatan_ids=[jbt_id])
     r1 = client.get(f"{DT_BASE}/{dt['id']}")
     etag = r1.headers.get("etag")
     assert etag
@@ -225,16 +270,18 @@ def test_dt_etag_304(client: TestClient, tp_for_dt: dict) -> None:
     assert r2.status_code == 304
 
 
-def test_dt_update(client: TestClient, tp_for_dt: dict) -> None:
-    dt = _create_dt(client, tp_for_dt["id"])
+def test_dt_update(client: TestClient, tp_jbt_for_dt: tuple[dict, str]) -> None:
+    tp, jbt_id = tp_jbt_for_dt
+    dt = _create_dt(client, tp["id"], jabatan_ids=[jbt_id])
     nama_baru = f"Updated DT {_uniq()}"
     r = client.patch(f"{DT_BASE}/{dt['id']}", json={"nama": nama_baru})
     assert r.status_code == 200
     assert r.json()["nama"] == nama_baru
 
 
-def test_dt_delete(client: TestClient, tp_for_dt: dict) -> None:
-    dt = _create_dt(client, tp_for_dt["id"])
+def test_dt_delete(client: TestClient, tp_jbt_for_dt: tuple[dict, str]) -> None:
+    tp, jbt_id = tp_jbt_for_dt
+    dt = _create_dt(client, tp["id"], jabatan_ids=[jbt_id])
     assert client.delete(f"{DT_BASE}/{dt['id']}").status_code == 204
     assert client.get(f"{DT_BASE}/{dt['id']}").status_code == 404
 
@@ -243,16 +290,17 @@ def test_dt_not_found(anon_client: TestClient) -> None:
     assert anon_client.get(f"{DT_BASE}/dt_tidakada").status_code == 404
 
 
-def test_dt_search(client: TestClient, tp_for_dt: dict) -> None:
-    _create_dt(client, tp_for_dt["id"])
+def test_dt_search(client: TestClient, tp_jbt_for_dt: tuple[dict, str]) -> None:
+    tp, jbt_id = tp_jbt_for_dt
+    _create_dt(client, tp["id"], jabatan_ids=[jbt_id])
     r = client.post(
         f"{DT_BASE}/search",
-        json={"domain": [["tugas_pokok_id", "=", tp_for_dt["id"]]], "limit": 50, "offset": 0},
+        json={"domain": [["tugas_pokok_id", "=", tp["id"]]], "limit": 50, "offset": 0},
     )
     assert r.status_code == 200
     body = r.json()
     assert body["total"] >= 1
-    assert all(it["tugas_pokok_id"] == tp_for_dt["id"] for it in body["items"])
+    assert all(it["tugas_pokok_id"] == tp["id"] for it in body["items"])
 
 
 # --------------------------------------------------------------------------- #
@@ -261,13 +309,12 @@ def test_dt_search(client: TestClient, tp_for_dt: dict) -> None:
 
 
 @pytest.fixture(scope="module")
-def tp_for_ut(client: TestClient) -> dict:
-    return _create_tp(client, nama=f"TP untuk UT {_uniq()}")
-
-
-@pytest.fixture(scope="module")
-def dt_for_ut(client: TestClient, tp_for_ut: dict) -> dict:
-    return _create_dt(client, tp_for_ut["id"], nama=f"DT untuk UT {_uniq()}")
+def tp_dt_jbt_for_ut(client: TestClient) -> tuple[dict, dict, str]:
+    """Returns (tp_dict, dt_dict, jabatan_id) for UT tests."""
+    jbt = _create_jabatan(client)
+    tp = _create_tp(client, jabatan_ids=[jbt["id"]], nama=f"TP untuk UT {_uniq()}")
+    dt = _create_dt(client, tp["id"], jabatan_ids=[jbt["id"]], nama=f"DT untuk UT {_uniq()}")
+    return tp, dt, jbt["id"]
 
 
 def test_ut_list_ok(anon_client: TestClient) -> None:
@@ -278,18 +325,22 @@ def test_ut_list_ok(anon_client: TestClient) -> None:
     assert body["total"] >= 2738  # seeded from task_catalog.json
 
 
-def test_ut_create_and_get(client: TestClient, dt_for_ut: dict, tp_for_ut: dict) -> None:
-    ut = _create_ut(client, dt_for_ut["id"], tp_for_ut["id"])
+def test_ut_create_and_get(client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
     assert ut["id"].startswith("ut_")
-    assert ut["detil_tugas_id"] == dt_for_ut["id"]
-    assert ut["tugas_pokok_id"] == tp_for_ut["id"]
-    assert "jabatan_id" in ut  # diwarisi dari TugasPokok
+    assert ut["detil_tugas_id"] == dt["id"]
+    assert ut["tugas_pokok_id"] == tp["id"]
+    assert ut["jabatan_id"] == jbt_id
     r = client.get(f"{UT_BASE}/{ut['id']}")
     assert r.status_code == 200
     assert r.json()["id"] == ut["id"]
 
 
-def test_ut_create_requires_auth(anon_client: TestClient, dt_for_ut: dict, tp_for_ut: dict) -> None:
+def test_ut_create_requires_auth(
+    anon_client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]
+) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
     r = anon_client.post(
         UT_BASE,
         json={
@@ -297,15 +348,17 @@ def test_ut_create_requires_auth(anon_client: TestClient, dt_for_ut: dict, tp_fo
             "uraian": "Test",
             "unit": "TK",
             "urutan": 1,
-            "detil_tugas_id": dt_for_ut["id"],
-            "tugas_pokok_id": tp_for_ut["id"],
+            "detil_tugas_id": dt["id"],
+            "tugas_pokok_id": tp["id"],
+            "jabatan_id": jbt_id,
         },
     )
     assert r.status_code == 401
 
 
-def test_ut_create_conflict(client: TestClient, dt_for_ut: dict, tp_for_ut: dict) -> None:
-    ut = _create_ut(client, dt_for_ut["id"], tp_for_ut["id"])
+def test_ut_create_conflict(client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
     r = client.post(
         UT_BASE,
         json={
@@ -313,15 +366,38 @@ def test_ut_create_conflict(client: TestClient, dt_for_ut: dict, tp_for_ut: dict
             "uraian": "Duplikat",
             "unit": "TK",
             "urutan": 2,
-            "detil_tugas_id": dt_for_ut["id"],
-            "tugas_pokok_id": tp_for_ut["id"],
+            "detil_tugas_id": dt["id"],
+            "tugas_pokok_id": tp["id"],
+            "jabatan_id": jbt_id,
         },
     )
     assert r.status_code == 409
 
 
-def test_ut_etag_304(client: TestClient, dt_for_ut: dict, tp_for_ut: dict) -> None:
-    ut = _create_ut(client, dt_for_ut["id"], tp_for_ut["id"])
+def test_ut_jabatan_id_must_be_in_dt(
+    client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]
+) -> None:
+    """jabatan_id yang tidak ada di DT's jabatan_ids → 422."""
+    tp, dt, _ = tp_dt_jbt_for_ut
+    jbt_lain = _create_jabatan(client)
+    r = client.post(
+        UT_BASE,
+        json={
+            "kode": f"TI{_uniq()}",
+            "uraian": "Test jabatan invalid",
+            "unit": "TK",
+            "urutan": 1,
+            "detil_tugas_id": dt["id"],
+            "tugas_pokok_id": tp["id"],
+            "jabatan_id": jbt_lain["id"],
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_ut_etag_304(client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
     r1 = client.get(f"{UT_BASE}/{ut['id']}")
     etag = r1.headers.get("etag")
     assert etag
@@ -329,15 +405,17 @@ def test_ut_etag_304(client: TestClient, dt_for_ut: dict, tp_for_ut: dict) -> No
     assert r2.status_code == 304
 
 
-def test_ut_update(client: TestClient, dt_for_ut: dict, tp_for_ut: dict) -> None:
-    ut = _create_ut(client, dt_for_ut["id"], tp_for_ut["id"])
+def test_ut_update(client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
     r = client.patch(f"{UT_BASE}/{ut['id']}", json={"uraian": "Uraian sudah diperbarui"})
     assert r.status_code == 200
     assert r.json()["uraian"] == "Uraian sudah diperbarui"
 
 
-def test_ut_delete(client: TestClient, dt_for_ut: dict, tp_for_ut: dict) -> None:
-    ut = _create_ut(client, dt_for_ut["id"], tp_for_ut["id"])
+def test_ut_delete(client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
     assert client.delete(f"{UT_BASE}/{ut['id']}").status_code == 204
     assert client.get(f"{UT_BASE}/{ut['id']}").status_code == 404
 
@@ -346,11 +424,14 @@ def test_ut_not_found(anon_client: TestClient) -> None:
     assert anon_client.get(f"{UT_BASE}/ut_tidakada").status_code == 404
 
 
-def test_ut_search_by_tugas_pokok(client: TestClient, dt_for_ut: dict, tp_for_ut: dict) -> None:
-    ut = _create_ut(client, dt_for_ut["id"], tp_for_ut["id"])
+def test_ut_search_by_tugas_pokok(
+    client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]
+) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
     r = client.post(
         f"{UT_BASE}/search",
-        json={"domain": [["tugas_pokok_id", "=", tp_for_ut["id"]]], "limit": 50, "offset": 0},
+        json={"domain": [["tugas_pokok_id", "=", tp["id"]]], "limit": 50, "offset": 0},
     )
     assert r.status_code == 200
     body = r.json()
@@ -358,11 +439,14 @@ def test_ut_search_by_tugas_pokok(client: TestClient, dt_for_ut: dict, tp_for_ut
     assert any(it["id"] == ut["id"] for it in body["items"])
 
 
-def test_ut_search_by_detil_tugas(client: TestClient, dt_for_ut: dict, tp_for_ut: dict) -> None:
-    ut = _create_ut(client, dt_for_ut["id"], tp_for_ut["id"])
+def test_ut_search_by_detil_tugas(
+    client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]
+) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
     r = client.post(
         f"{UT_BASE}/search",
-        json={"domain": [["detil_tugas_id", "=", dt_for_ut["id"]]], "limit": 50, "offset": 0},
+        json={"domain": [["detil_tugas_id", "=", dt["id"]]], "limit": 50, "offset": 0},
     )
     assert r.status_code == 200
     body = r.json()
@@ -370,8 +454,9 @@ def test_ut_search_by_detil_tugas(client: TestClient, dt_for_ut: dict, tp_for_ut
     assert any(it["id"] == ut["id"] for it in body["items"])
 
 
-def test_ut_search_by_kode(client: TestClient, dt_for_ut: dict, tp_for_ut: dict) -> None:
-    ut = _create_ut(client, dt_for_ut["id"], tp_for_ut["id"])
+def test_ut_search_by_kode(client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
     r = client.post(
         f"{UT_BASE}/search",
         json={"domain": [["kode", "=", ut["kode"]]], "limit": 10, "offset": 0},
@@ -382,17 +467,17 @@ def test_ut_search_by_kode(client: TestClient, dt_for_ut: dict, tp_for_ut: dict)
     assert body["items"][0]["id"] == ut["id"]
 
 
-def test_ut_jabatan_id_diwarisi_dari_tugas_pokok(
-    client: TestClient, dt_for_ut: dict, tp_for_ut: dict
+def test_ut_jabatan_id_eksplisit(
+    client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]
 ) -> None:
-    """jabatan_id pada UraianTugas harus sama dengan jabatan_id pada TugasPokoknya."""
-    ut = _create_ut(client, dt_for_ut["id"], tp_for_ut["id"])
-    assert ut["jabatan_id"] == tp_for_ut["jabatan_id"]
+    """jabatan_id pada UraianTugas harus sama dengan yang dikirim saat create."""
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
+    assert ut["jabatan_id"] == jbt_id
 
 
 def test_ut_seeded_data_via_catalog_endpoint(anon_client: TestClient) -> None:
     """Pastikan catalog masih bisa diakses setelah seeding."""
-    # Ambil kombinasi pertama yang tersedia
     kombis = anon_client.get(CATALOG_BASE + "/kombinasi").json()
     assert len(kombis) > 0
     first = kombis[0]
@@ -409,9 +494,7 @@ def test_ut_seeded_data_via_catalog_endpoint(anon_client: TestClient) -> None:
 
 def test_catalog_with_null_detil_tugas(anon_client: TestClient) -> None:
     """Catalog untuk kombinasi yang punya task tanpa detil_tugas (detil_tugas_id=None) harus 200."""
-    # Cari kombinasi SMA Wakil Kepala Sekolah Bidang Kurikulum via jabatan name
     kombis = anon_client.get(CATALOG_BASE + "/kombinasi").json()
-    # Cari unit SMA
     sma_kombis = [x for x in kombis if x["unit"] == "SMA"]
     if not sma_kombis:
         pytest.skip("Tidak ada kombinasi SMA dalam catalog")
