@@ -7,6 +7,27 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-06-23
+
+### Ditambahkan
+
+- **Init DB otomatis saat deploy (tanpa langkah manual)** — image runtime kini
+  menyertakan `alembic.ini` + `migrations/`, dan `docker-entrypoint.sh` menjalankan
+  `python -m anjab_abk_backend.initdb` (modul baru) sebelum aplikasi naik: `alembic
+  upgrade head` lalu seed master data, dengan tunggu-DB-siap. **Idempoten & aman diulang
+  tiap `up -d`/restart** — `alembic_version` mencegah migrasi lama dijalankan ulang
+  (start kedua dst. no-op) dan seed melompati baris yang sudah ada. Dirancang untuk
+  deployment satu instance; multi-replica → jalankan `initdb` sebagai job init terpisah.
+- Test `test_init_idempoten_simulasi_up_d` memverifikasi migrasi + seed aman dijalankan
+  dua kali (jumlah baris stabil).
+
+### Diperbaiki
+
+- `migrate._resolve_base()` menemukan `alembic.ini`/`migrations/` baik saat dijalankan
+  dari repo (pytest, `pythonpath=src`) maupun dari paket ter-install di image runtime
+  (`WORKDIR`), dengan override `ANJAB_ALEMBIC_DIR` — memperbaiki keterbatasan sebelumnya
+  yang membuat migrasi tak bisa dijalankan dari dalam image runtime.
+
 ## [0.16.0] - 2026-06-23
 
 ### Ditambahkan

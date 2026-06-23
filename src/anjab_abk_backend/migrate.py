@@ -28,14 +28,35 @@ revisi baru, ``test_schema_matches_models`` gagal.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from alembic.config import Config
 
-# migrate.py ada di src/anjab_abk_backend/ ; alembic.ini & migrations/ ada di root repo.
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]
-_ALEMBIC_INI = _PROJECT_ROOT / "alembic.ini"
-_MIGRATIONS_DIR = _PROJECT_ROOT / "migrations"
+
+def _resolve_base() -> Path:
+    """Cari direktori yang memuat ``alembic.ini`` + ``migrations/``.
+
+    Lokasinya berbeda tergantung cara dijalankan:
+
+    - **Repo / pytest** (``pythonpath=["src"]``): paket dibaca dari ``src/anjab_abk_backend/``
+      sehingga ``parents[2]`` = root repo yang memuat keduanya.
+    - **Image runtime**: paket ter-*install* di ``site-packages`` (``parents[2]`` salah),
+      tetapi Dockerfile menyalin ``alembic.ini`` + ``migrations/`` ke ``WORKDIR`` (CWD).
+
+    Override eksplisit via env ``ANJAB_ALEMBIC_DIR`` bila perlu. Kandidat pertama yang
+    benar-benar memuat kedua berkas/direktori dipakai.
+    """
+    candidates = []
+    if env_dir := os.environ.get("ANJAB_ALEMBIC_DIR"):
+        candidates.append(Path(env_dir))
+    candidates.append(Path(__file__).resolve().parents[2])  # layout repo (src/<pkg>/..)
+    candidates.append(Path.cwd())  # WORKDIR image runtime
+    for base in candidates:
+        if (base / "alembic.ini").is_file() and (base / "migrations").is_dir():
+            return base
+    # Fallback: layout repo (pesan error Alembic akan jelas bila benar-benar tak ada).
+    return Path(__file__).resolve().parents[2]
 
 
 def make_alembic_config(url: str | None = None) -> Config:
@@ -47,8 +68,9 @@ def make_alembic_config(url: str | None = None) -> Config:
     dari environment) — berguna untuk mengarahkan migrasi ke database sekali-pakai
     saat test.
     """
-    config = Config(str(_ALEMBIC_INI))
-    config.set_main_option("script_location", str(_MIGRATIONS_DIR))
+    base = _resolve_base()
+    config = Config(str(base / "alembic.ini"))
+    config.set_main_option("script_location", str(base / "migrations"))
     if url is not None:
         config.set_main_option("sqlalchemy.url", url)
     return config

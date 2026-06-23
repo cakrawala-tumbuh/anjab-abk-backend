@@ -28,10 +28,20 @@ RUN pip install /tmp/*.whl \
     && rm -rf /tmp/*.whl \
     && useradd --create-home --uid 1000 appuser
 
+# Migrasi & entrypoint ikut ke image agar init DB OTOMATIS saat startup (tanpa langkah
+# deploy manual). Paket di-install ke site-packages, jadi alembic.ini + migrations/
+# disalin ke WORKDIR (/app) tempat `migrate._resolve_base()` & alembic CLI menemukannya.
+COPY alembic.ini ./
+COPY migrations ./migrations
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 USER appuser
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=2).status==200 else 1)"]
 
+# Entrypoint menjalankan `initdb` (migrasi + seed, idempoten) lalu exec CMD.
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["python", "-m", "anjab_abk_backend"]

@@ -27,11 +27,13 @@ import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import create_engine, inspect, make_url, text
+from sqlalchemy import create_engine, func, inspect, make_url, select, text
+from sqlalchemy.orm import Session
 
 from anjab_abk_backend.db import get_db_settings
 from anjab_abk_backend.migrate import current_heads, downgrade, make_alembic_config, upgrade
-from anjab_abk_backend.models import Base
+from anjab_abk_backend.models import Base, DcsSubSkalaModel
+from anjab_abk_backend.seed_db import seed_all
 
 
 def _script() -> ScriptDirectory:
@@ -135,3 +137,28 @@ def test_upgrade_downgrade_roundtrip(fresh_db_url: str) -> None:
         assert "dcs_item" in set(inspect(engine).get_table_names())
     finally:
         engine.dispose()
+
+
+def test_init_idempoten_simulasi_up_d(fresh_db_url: str) -> None:
+    """Init deploy (migrasi + seed) aman dijalankan berkali-kali — simulasi `up -d` ulang.
+
+    Mereplikasi yang dilakukan entrypoint container (`initdb`): `upgrade head` + `seed_all`.
+    Dijalankan dua kali pada DB yang sama; tidak boleh error dan jumlah baris master data
+    harus stabil (seed tidak menggandakan, migrasi tidak dijalankan ulang).
+    """
+
+    def init_and_count() -> int:
+        upgrade(fresh_db_url, "head")  # idempoten via tabel alembic_version
+        engine = create_engine(fresh_db_url)
+        try:
+            with Session(engine) as session:
+                seed_all(session)
+                session.commit()
+                return session.scalar(select(func.count()).select_from(DcsSubSkalaModel))
+        finally:
+            engine.dispose()
+
+    pertama = init_and_count()
+    kedua = init_and_count()  # deploy / `up -d` kedua
+    assert pertama > 0, "seed harus mengisi master data pada init pertama"
+    assert pertama == kedua, "init tidak idempoten: jumlah baris master data berubah saat diulang"

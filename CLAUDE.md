@@ -48,6 +48,13 @@ Alur saat model (`models.py`) berubah:
 
 Runner terprogram ada di `src/anjab_abk_backend/migrate.py` (dipakai test & tooling).
 
+**Deploy: init DB otomatis (tanpa langkah manual).** Image runtime menyertakan
+`alembic.ini` + `migrations/`; `docker-entrypoint.sh` menjalankan
+`python -m anjab_abk_backend.initdb` (migrasi + seed) sebelum app naik. Idempoten &
+aman diulang tiap `up -d` (tabel `alembic_version` mencegah migrasi diulang; seed
+melompati baris yang sudah ada). `create_app()` TIDAK menjalankan migrasi (bebas efek
+samping). Dirancang untuk **satu instance**; multi-replica → jadikan `initdb` job init terpisah.
+
 **Penjaga (di `tests/test_migrations.py`)**: `test_schema_matches_models` gagal bila
 model berubah tanpa revisi baru; `test_single_head` mencegah cabang divergen; harness
 test membangun schema lewat `alembic upgrade head` (bukan `create_all`) sehingga tiap
