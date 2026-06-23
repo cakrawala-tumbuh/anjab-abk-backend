@@ -30,6 +30,29 @@ tidak boleh lintas domain kecuali lewat `core`.
 - Entrypoint: `python -m anjab_abk_backend` (atau `uvicorn anjab_abk_backend.main:app`)
 - Migrasi: `alembic upgrade head`
 
+## Migrasi Database (mekanisme inkremental, gaya Odoo)
+
+Setiap perubahan struktur database = **satu berkas revisi Alembic baru** di
+`migrations/versions/` — JANGAN menumpuk banyak perubahan ke satu berkas, JANGAN
+mengedit revisi yang sudah pernah berjalan. Tiap revisi menyimpan `down_revision`
+sehingga membentuk rantai terurut yang diterapkan bertahap dari versi DB saat ini ke
+`head`.
+
+Alur saat model (`models.py`) berubah:
+
+1. Ubah model ORM.
+2. `make migration m="deskripsi perubahan"` — autogenerate revisi baru (pakai DB
+   ephemeral; berkas baru muncul di `migrations/versions/`).
+3. **Review** berkas revisi, sesuaikan bila perlu (autogenerate tak selalu sempurna).
+4. `alembic upgrade head` untuk menerapkan.
+
+Runner terprogram ada di `src/anjab_abk_backend/migrate.py` (dipakai test & tooling).
+
+**Penjaga (di `tests/test_migrations.py`)**: `test_schema_matches_models` gagal bila
+model berubah tanpa revisi baru; `test_single_head` mencegah cabang divergen; harness
+test membangun schema lewat `alembic upgrade head` (bukan `create_all`) sehingga tiap
+run test ikut memverifikasi migrasi.
+
 ## Konvensi & Invariants
 
 - Setiap endpoint wajib punya `response_model`, `summary`, `tags`, dan `responses` error.
@@ -69,7 +92,7 @@ DCS dan WCP beralih dari **enrollment otomatis** ke **sistem assignment**:
 
 ## Jangan Sentuh
 
-- `alembic/versions/` — migrasi historis yang sudah berjalan; jangan diedit tangan.
+- `migrations/versions/` — migrasi historis yang sudah berjalan; jangan diedit tangan (buat revisi baru).
 - `openapi.json` — di-generate `make export-openapi`; jangan edit tangan.
 - `src/anjab_abk_backend/security.py` kontrak `TokenVerifier` — seam ini diisi `backend-authentik-skill`, jangan ubah signature-nya.
 

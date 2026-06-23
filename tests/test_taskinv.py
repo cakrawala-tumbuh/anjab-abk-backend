@@ -19,7 +19,7 @@ def _uniq_periode() -> str:
     return f"{next(_year_counter)}-01"
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def jabatan_id_tk(anon_client: TestClient) -> str:
     """Jabatan_id dari catalog kombinasi yang cocok dengan unit TK."""
     kombis = anon_client.get(BASE + "/catalog/kombinasi").json()
@@ -588,22 +588,15 @@ def test_kuesioner_saya_tanpa_partisipan_ti(client: TestClient) -> None:
     assert r.status_code == 200
 
 
-def test_kuesioner_saya_universal_ti(client: TestClient, jabatan_id_tk: str) -> None:
+def test_kuesioner_saya_universal_ti(client: TestClient, jabatan_id_tk: str, db_session) -> None:
     """Task Inventory bersifat universal: partisipan melihat SEMUA sesi aktif
     (TAHAP1/TAHAP2/TAHAP3), bukan hanya yang cocok jabatannya; pemanggilan idempoten."""
     import uuid
 
     from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
-    from anjab_abk_backend.dependencies import (
-        get_partisipan_service,
-        get_ti_responden_service,
-        get_ti_sesi_service,
-    )
+    from anjab_abk_backend.core.services.partisipan_sql import SqlPartisipanService
 
-    par_service = get_partisipan_service()
-    par_service._data.clear()  # type: ignore[attr-defined]
-    get_ti_responden_service()._data.clear()  # type: ignore[attr-defined]
-    get_ti_sesi_service()._data.clear()  # type: ignore[attr-defined]
+    par_service = SqlPartisipanService(db_session)
 
     par_service.create(
         PartisipanCreate(
@@ -670,25 +663,23 @@ def test_sesi_create_tanpa_unit_jabatan_invalid(client: TestClient) -> None:
     assert r.status_code in (400, 422)
 
 
-def test_responden_sme_panel_check(client: TestClient) -> None:
+def test_responden_sme_panel_check(client: TestClient, db_session) -> None:
     """Partisipan hanya bisa jadi responden TI jika anggota SME panel jabatan sesi."""
     import uuid
 
     from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
     from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
-    from anjab_abk_backend.dependencies import (
-        get_partisipan_service,
-        get_sme_panel_service,
-    )
+    from anjab_abk_backend.core.services.partisipan_sql import SqlPartisipanService
 
     jabatan_id = f"jbt_{uuid.uuid4().hex[:8]}"
 
     # Buat SME panel untuk jabatan ini
-    sme_svc = get_sme_panel_service()
+    sme_svc = SqlSMEPanelService(db_session)
     panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id))
 
     # Buat partisipan A (akan menjadi anggota panel)
-    par_svc = get_partisipan_service()
+    par_svc = SqlPartisipanService(db_session)
     par_a = par_svc.create(
         PartisipanCreate(
             nama="Par A",
@@ -717,10 +708,10 @@ def test_responden_sme_panel_check(client: TestClient) -> None:
     # Gunakan jabatan_id yang memang ada di SME panel
     # Namun: jabatan ini tidak ada di catalog → cek validation
     # Untuk tes ini, buat sesi langsung via service (bypass catalog check)
-    from anjab_abk_backend.dependencies import get_ti_sesi_service
     from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
+    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
-    sesi_svc = get_ti_sesi_service()
+    sesi_svc = SqlTiSesiService(db_session)
     sesi_obj = sesi_svc.create(
         TiSesiCreate(
             jabatan_id=jabatan_id,
@@ -748,16 +739,18 @@ def test_responden_sme_panel_check(client: TestClient) -> None:
     assert r_b.status_code in (400, 422), r_b.text
 
 
-def test_responden_tanpa_jabatan_id_bebas(client: TestClient, jabatan_id_tk: str) -> None:
+def test_responden_tanpa_jabatan_id_bebas(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
     """Sesi dengan jabatan yang tidak punya SME panel: semua partisipan bisa didaftarkan."""
     import uuid
 
     # Buat jabatan baru tanpa SME panel
-    from anjab_abk_backend.dependencies import get_ti_sesi_service
     from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
+    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
     jabatan_baru_id = f"jbt_{uuid.uuid4().hex[:8]}"
-    sesi_svc = get_ti_sesi_service()
+    sesi_svc = SqlTiSesiService(db_session)
     sesi_obj = sesi_svc.create(
         TiSesiCreate(
             jabatan_id=jabatan_baru_id,

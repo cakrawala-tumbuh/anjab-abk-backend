@@ -1,0 +1,34 @@
+# Harness test: PostgreSQL ephemeral + container test (lint sudah ditangani target
+# `lint` di Makefile; file ini khusus `unit`/integrasi yang butuh DB nyata).
+#
+# Dipakai oleh `make unit`. Database hidup di volume Docker anonim yang dibuang lewat
+# `docker compose down -v` → TIDAK ada artefak di folder project. `conftest.py`
+# membuat schema (create_all) + seed master data, lalu pytest jalan terhadap DB ini.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: anjab_abk_test
+    # DB hanya untuk test → matikan fsync demi kecepatan (data disposable).
+    command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d anjab_abk_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  test:
+    # Pakai ulang image yang dibangun `make build` (TEST_IMAGE); build sebagai fallback.
+    image: ${TEST_IMAGE:-anjab-abk-backend-test}
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://app:secret@db:5432/anjab_abk_test
+      AUTHENTIK_ISSUER: https://auth.example.com/
+    command: ["pytest"]

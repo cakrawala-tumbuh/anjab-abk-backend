@@ -7,6 +7,34 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-06-23
+
+### Ditambahkan
+
+- **Persistensi PostgreSQL** — seam akses data diisi implementasi PostgreSQL nyata
+  (SQLAlchemy 2.0 sinkron + psycopg 3): `db.py` (engine, pool, sesi per-request),
+  `models.py` (model ORM `TIMESTAMPTZ`/`JSONB`), service `*_sql.py` per domain,
+  idempotency & readiness berbasis DB, plus `seed_db.py`. Kontrak API (router, skema,
+  Swagger, envelope error) tidak berubah — hanya backend penyimpanan.
+- **Mekanisme migrasi schema inkremental (gaya Odoo)** — setiap perubahan struktur
+  database menjadi satu berkas revisi Alembic tersendiri di `migrations/versions/`
+  (tidak ditumpuk dalam satu berkas). Runner terprogram `migrate.py` (`upgrade`/
+  `downgrade`/`current_heads`) dipakai oleh test & tooling.
+- **`make migration m="..."`** — autogenerate revisi baru dari selisih model ↔ schema
+  memakai PostgreSQL ephemeral (`scripts/make_migration.sh`); berkas baru ditulis ke
+  `migrations/versions/` untuk di-review sebelum di-commit.
+- **Test penjaga migrasi** (`tests/test_migrations.py`): single-head, integritas graf
+  revisi, satu revisi per berkas, kecocokan schema↔model (`compare_metadata`), serta
+  round-trip upgrade→downgrade→upgrade. Harness test kini membangun schema lewat
+  `alembic upgrade head` (bukan `create_all`) sehingga tiap run ikut memverifikasi migrasi.
+
+### Diperbaiki
+
+- `alembic.ini` post-write hook Ruff memakai `type = exec` (bukan `console_scripts`)
+  agar berjalan dengan distribusi biner Ruff yang tidak mendaftarkan entry point.
+- `migrations/env.py` menghormati `sqlalchemy.url` yang dipasang lewat Config (mis. DB
+  sekali-pakai saat test), hanya membaca dari environment bila kosong.
+
 ## [0.15.0] - 2026-06-23
 
 ### Diubah (Breaking)

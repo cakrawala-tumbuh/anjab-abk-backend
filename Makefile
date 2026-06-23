@@ -12,10 +12,11 @@
 IMAGE_NAME ?= $(shell basename $(CURDIR))-test
 DOCKERFILE ?= Dockerfile.test
 DOCKER_RUN  = docker run --rm $(IMAGE_NAME)
+COMPOSE_TEST = docker compose -f docker-compose.test.yml
 
 .DEFAULT_GOAL := test
 .PHONY: build lint unit test clean shell help \
-        backup restore backup-list
+        migration backup restore backup-list
 
 ## help: tampilkan daftar target
 help:
@@ -29,12 +30,20 @@ build:
 lint: build
 	$(DOCKER_RUN) sh -c "ruff check . && ruff format --check ."
 
-## unit: jalankan pytest di dalam container
+## unit: jalankan pytest (integrasi PostgreSQL) via docker compose; DB dibuang setelahnya
 unit: build
-	$(DOCKER_RUN) pytest
+	TEST_IMAGE=$(IMAGE_NAME) $(COMPOSE_TEST) up --abort-on-container-exit --exit-code-from test --remove-orphans; \
+	code=$$?; \
+	TEST_IMAGE=$(IMAGE_NAME) $(COMPOSE_TEST) down -v --remove-orphans >/dev/null 2>&1; \
+	exit $$code
 
 ## test: gate lengkap = lint + unit. Dipakai LOKAL dan CI (identik).
 test: lint unit
+
+## migration: buat revisi Alembic baru dari perubahan model — m="deskripsi" (satu berkas/perubahan)
+migration: build
+	@[ -n "$(m)" ] || { echo 'Pakai: make migration m="deskripsi perubahan"'; exit 1; }
+	@TEST_IMAGE=$(IMAGE_NAME) ./scripts/make_migration.sh "$(m)"
 
 ## clean: hapus image test
 clean:

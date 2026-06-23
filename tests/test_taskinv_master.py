@@ -202,7 +202,7 @@ def test_tp_search_by_nama(client: TestClient) -> None:
 # --------------------------------------------------------------------------- #
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def tp_jbt_for_dt(client: TestClient) -> tuple[dict, str]:
     """Returns (tp_dict, jabatan_id) so DT tests can pass jabatan_ids."""
     jbt = _create_jabatan(client)
@@ -308,7 +308,7 @@ def test_dt_search(client: TestClient, tp_jbt_for_dt: tuple[dict, str]) -> None:
 # --------------------------------------------------------------------------- #
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def tp_dt_jbt_for_ut(client: TestClient) -> tuple[dict, dict, str]:
     """Returns (tp_dict, dt_dict, jabatan_id) for UT tests."""
     jbt = _create_jabatan(client)

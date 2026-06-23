@@ -22,8 +22,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        from .db import dispose_engine, init_engine
+
         install_observability(app, cfg)
-        yield
+        init_engine()  # hangatkan pool koneksi PostgreSQL (lazy; aman bila DB belum ada)
+        try:
+            yield
+        finally:
+            dispose_engine()  # tutup semua koneksi pool saat shutdown
 
     app = FastAPI(**openapi_kwargs(cfg), lifespan=lifespan)
 

@@ -311,15 +311,13 @@ def test_kuesioner_saya_tanpa_partisipan(client: TestClient) -> None:
     assert r.status_code == 200
 
 
-def test_kuesioner_saya_dengan_assignment(client: TestClient) -> None:
+def test_kuesioner_saya_dengan_assignment(client: TestClient, db_session) -> None:
     """Assignment-based: kuesioner DCS muncul hanya setelah admin assign responden
     dengan partisipan_id; sesi tanpa assignment tidak muncul."""
     from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
-    from anjab_abk_backend.dependencies import get_partisipan_service
+    from anjab_abk_backend.core.services.partisipan_sql import SqlPartisipanService
 
-    par_service = get_partisipan_service()
-    # Reset store agar get_by_subject("test-user") deterministik (singleton sesi-scope).
-    par_service._data.clear()  # type: ignore[attr-defined]
+    par_service = SqlPartisipanService(db_session)
 
     par = par_service.create(
         PartisipanCreate(

@@ -1,5 +1,11 @@
 """Dependency injection umum: paginasi, service seam, principal auth, idempotency,
 rate limiting, dan readiness check.
+
+Provider data (sekolah, jabatan, sesi, dst.) kini terikat **sesi PostgreSQL per
+request** (lihat `db.get_session`): semua provider yang `Depends(get_session)`
+berbagi satu `Session` → satu unit-of-work/transaksi per request (commit di
+teardown setelah respons terbentuk). Verifier token & rate limiter tetap singleton
+(`lru_cache`) karena bukan data.
 """
 
 from __future__ import annotations
@@ -11,21 +17,30 @@ from typing import Annotated, Any
 from fastapi import Depends, Header, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from .anjab.services.jabatan import InMemoryJabatanService, JabatanService
-from .anjab.services.sme_panel import InMemorySMEPanelService, SMEPanelService
+from .anjab.services.jabatan import JabatanService
+from .anjab.services.jabatan_sql import SqlJabatanService
+from .anjab.services.sme_panel import SMEPanelService
+from .anjab.services.sme_panel_sql import SqlSMEPanelService
 from .config import Settings, get_settings
-from .core.services.jenjang_pendidikan import (
-    InMemoryJenjangPendidikanService,
-    JenjangPendidikanService,
-)
-from .core.services.mata_pelajaran import InMemoryMataPelajaranService, MataPelajaranService
-from .core.services.partisipan import InMemoryPartisipanService, PartisipanService
-from .core.services.sekolah import InMemorySekolahService, SekolahService
-from .dcs.services.jawaban import DcsJawabanService, InMemoryDcsJawabanService
-from .dcs.services.responden import DcsRespondenService, InMemoryDcsRespondenService
-from .dcs.services.sesi import DcsSesiService, InMemoryDcsSesiService
-from .dcs.services.subskala import DcsSubSkalaService, InMemoryDcsSubSkalaService
+from .core.services.jenjang_pendidikan import JenjangPendidikanService
+from .core.services.jenjang_pendidikan_sql import SqlJenjangPendidikanService
+from .core.services.mata_pelajaran import MataPelajaranService
+from .core.services.mata_pelajaran_sql import SqlMataPelajaranService
+from .core.services.partisipan import PartisipanService
+from .core.services.partisipan_sql import SqlPartisipanService
+from .core.services.sekolah import SekolahService
+from .core.services.sekolah_sql import SqlSekolahService
+from .db import get_session
+from .dcs.services.jawaban import DcsJawabanService
+from .dcs.services.jawaban_sql import SqlDcsJawabanService
+from .dcs.services.responden import DcsRespondenService
+from .dcs.services.responden_sql import SqlDcsRespondenService
+from .dcs.services.sesi import DcsSesiService
+from .dcs.services.sesi_sql import SqlDcsSesiService
+from .dcs.services.subskala import DcsSubSkalaService
+from .dcs.services.subskala_sql import SqlDcsSubSkalaService
 from .errors import ForbiddenError, RateLimitedError, UnauthorizedError
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
 from .services.authentik_provisioner import (
@@ -33,28 +48,44 @@ from .services.authentik_provisioner import (
     HttpAuthentikProvisioner,
     PlaceholderAuthentikProvisioner,
 )
-from .services.idempotency import IdempotencyStore, InMemoryIdempotencyStore
+from .services.idempotency import IdempotencyStore
+from .services.idempotency_sql import SqlIdempotencyStore
 from .services.ratelimit import AllowAllRateLimiter, RateLimiter
 from .services.readiness import ReadinessCheck
-from .taskinv.services.catalog import (
-    TiCatalogService,
-    UraianTugasBackedCatalogService,
-)
-from .taskinv.services.detail import InMemoryTiDetailService, TiDetailService
-from .taskinv.services.detil_tugas import DetilTugasService, InMemoryDetilTugasService
-from .taskinv.services.responden import InMemoryTiRespondenService, TiRespondenService
-from .taskinv.services.seleksi import InMemoryTiSeleksiService, TiSeleksiService
-from .taskinv.services.sesi import InMemoryTiSesiService, TiSesiService
-from .taskinv.services.tahap2 import InMemoryTiTahap2Service, TiTahap2Service
-from .taskinv.services.tugas_pokok import InMemoryTugasPokokService, TugasPokokService
-from .taskinv.services.uraian_tugas import InMemoryUraianTugasService, UraianTugasService
-from .ts.services.log import InMemoryTsLogService, TsLogService
-from .ts.services.responden import InMemoryTsRespondenService, TsRespondenService
-from .ts.services.sesi import InMemoryTsSesiService, TsSesiService
-from .wcp.services.dimensi import InMemoryWcpDimensiService, WcpDimensiService
-from .wcp.services.jawaban import InMemoryWcpJawabanService, WcpJawabanService
-from .wcp.services.responden import InMemoryWcpRespondenService, WcpRespondenService
-from .wcp.services.sesi import InMemoryWcpSesiService, WcpSesiService
+from .services.readiness_db import DatabaseReadinessCheck
+from .taskinv.services.catalog import TiCatalogService, UraianTugasBackedCatalogService
+from .taskinv.services.detail import TiDetailService
+from .taskinv.services.detail_sql import SqlTiDetailService
+from .taskinv.services.detil_tugas import DetilTugasService
+from .taskinv.services.detil_tugas_sql import SqlDetilTugasService
+from .taskinv.services.responden import TiRespondenService
+from .taskinv.services.responden_sql import SqlTiRespondenService
+from .taskinv.services.seleksi import TiSeleksiService
+from .taskinv.services.seleksi_sql import SqlTiSeleksiService
+from .taskinv.services.sesi import TiSesiService
+from .taskinv.services.sesi_sql import SqlTiSesiService
+from .taskinv.services.tahap2 import TiTahap2Service
+from .taskinv.services.tahap2_sql import SqlTiTahap2Service
+from .taskinv.services.tugas_pokok import TugasPokokService
+from .taskinv.services.tugas_pokok_sql import SqlTugasPokokService
+from .taskinv.services.uraian_tugas import UraianTugasService
+from .taskinv.services.uraian_tugas_sql import SqlUraianTugasService
+from .ts.services.log import TsLogService
+from .ts.services.log_sql import SqlTsLogService
+from .ts.services.responden import TsRespondenService
+from .ts.services.responden_sql import SqlTsRespondenService
+from .ts.services.sesi import TsSesiService
+from .ts.services.sesi_sql import SqlTsSesiService
+from .wcp.services.dimensi import WcpDimensiService
+from .wcp.services.dimensi_sql import SqlWcpDimensiService
+from .wcp.services.jawaban import WcpJawabanService
+from .wcp.services.jawaban_sql import SqlWcpJawabanService
+from .wcp.services.responden import WcpRespondenService
+from .wcp.services.responden_sql import SqlWcpRespondenService
+from .wcp.services.sesi import WcpSesiService
+from .wcp.services.sesi_sql import SqlWcpSesiService
+
+SessionDep = Annotated[Session, Depends(get_session)]
 
 
 @dataclass
@@ -73,287 +104,155 @@ def pagination_params(
 # --- Core services ---
 
 
-@lru_cache
-def _jenjang_singleton() -> InMemoryJenjangPendidikanService:
-    return InMemoryJenjangPendidikanService()
+def get_jenjang_pendidikan_service(session: SessionDep) -> JenjangPendidikanService:
+    """SEAM: implementasi `JenjangPendidikanService` berbasis PostgreSQL."""
+    return SqlJenjangPendidikanService(session)
 
 
-def get_jenjang_pendidikan_service() -> JenjangPendidikanService:
-    """SEAM: kembalikan implementasi `JenjangPendidikanService`. Ganti di sini saja."""
-    return _jenjang_singleton()
+def get_sekolah_service(session: SessionDep) -> SekolahService:
+    """SEAM: implementasi `SekolahService` berbasis PostgreSQL."""
+    return SqlSekolahService(session)
 
 
-@lru_cache
-def _sekolah_singleton() -> InMemorySekolahService:
-    return InMemorySekolahService()
+def get_mata_pelajaran_service(session: SessionDep) -> MataPelajaranService:
+    """SEAM: implementasi `MataPelajaranService` berbasis PostgreSQL."""
+    return SqlMataPelajaranService(session)
 
 
-def get_sekolah_service() -> SekolahService:
-    """SEAM: kembalikan implementasi `SekolahService`. Ganti di sini saja."""
-    return _sekolah_singleton()
-
-
-@lru_cache
-def _mata_pelajaran_singleton() -> InMemoryMataPelajaranService:
-    return InMemoryMataPelajaranService()
-
-
-def get_mata_pelajaran_service() -> MataPelajaranService:
-    """SEAM: kembalikan implementasi `MataPelajaranService`. Ganti di sini saja."""
-    return _mata_pelajaran_singleton()
-
-
-@lru_cache
-def _partisipan_singleton() -> InMemoryPartisipanService:
-    return InMemoryPartisipanService()
-
-
-def get_partisipan_service() -> PartisipanService:
-    """SEAM: kembalikan implementasi `PartisipanService`. Ganti di sini saja."""
-    return _partisipan_singleton()
+def get_partisipan_service(session: SessionDep) -> PartisipanService:
+    """SEAM: implementasi `PartisipanService` berbasis PostgreSQL."""
+    return SqlPartisipanService(session)
 
 
 # --- ANJAB services ---
 
 
-@lru_cache
-def _jabatan_singleton() -> InMemoryJabatanService:
-    return InMemoryJabatanService()
+def get_jabatan_service(session: SessionDep) -> JabatanService:
+    """SEAM: implementasi `JabatanService` berbasis PostgreSQL."""
+    return SqlJabatanService(session)
 
 
-def get_jabatan_service() -> JabatanService:
-    """SEAM: kembalikan implementasi `JabatanService`. Ganti di sini saja."""
-    return _jabatan_singleton()
-
-
-@lru_cache
-def _sme_panel_singleton() -> InMemorySMEPanelService:
-    return InMemorySMEPanelService()
-
-
-def get_sme_panel_service() -> SMEPanelService:
-    """SEAM: kembalikan implementasi `SMEPanelService`. Ganti di sini saja."""
-    return _sme_panel_singleton()
+def get_sme_panel_service(session: SessionDep) -> SMEPanelService:
+    """SEAM: implementasi `SMEPanelService` berbasis PostgreSQL."""
+    return SqlSMEPanelService(session)
 
 
 # --- WCP services ---
 
 
-@lru_cache
-def _wcp_dimensi_singleton() -> InMemoryWcpDimensiService:
-    return InMemoryWcpDimensiService()
+def get_wcp_dimensi_service(session: SessionDep) -> WcpDimensiService:
+    """SEAM: implementasi `WcpDimensiService` berbasis PostgreSQL."""
+    return SqlWcpDimensiService(session)
 
 
-def get_wcp_dimensi_service() -> WcpDimensiService:
-    """SEAM: kembalikan implementasi `WcpDimensiService`. Ganti di sini saja."""
-    return _wcp_dimensi_singleton()
+def get_wcp_sesi_service(session: SessionDep) -> WcpSesiService:
+    """SEAM: implementasi `WcpSesiService` berbasis PostgreSQL."""
+    return SqlWcpSesiService(session)
 
 
-@lru_cache
-def _wcp_sesi_singleton() -> InMemoryWcpSesiService:
-    return InMemoryWcpSesiService()
+def get_wcp_responden_service(session: SessionDep) -> WcpRespondenService:
+    """SEAM: implementasi `WcpRespondenService` berbasis PostgreSQL."""
+    return SqlWcpRespondenService(session)
 
 
-def get_wcp_sesi_service() -> WcpSesiService:
-    """SEAM: kembalikan implementasi `WcpSesiService`. Ganti di sini saja."""
-    return _wcp_sesi_singleton()
-
-
-@lru_cache
-def _wcp_responden_singleton() -> InMemoryWcpRespondenService:
-    return InMemoryWcpRespondenService()
-
-
-def get_wcp_responden_service() -> WcpRespondenService:
-    """SEAM: kembalikan implementasi `WcpRespondenService`. Ganti di sini saja."""
-    return _wcp_responden_singleton()
-
-
-@lru_cache
-def _wcp_jawaban_singleton() -> InMemoryWcpJawabanService:
-    return InMemoryWcpJawabanService()
-
-
-def get_wcp_jawaban_service() -> WcpJawabanService:
-    """SEAM: kembalikan implementasi `WcpJawabanService`. Ganti di sini saja."""
-    return _wcp_jawaban_singleton()
+def get_wcp_jawaban_service(session: SessionDep) -> WcpJawabanService:
+    """SEAM: implementasi `WcpJawabanService` berbasis PostgreSQL."""
+    return SqlWcpJawabanService(session)
 
 
 # --- DCS services ---
 
 
-@lru_cache
-def _dcs_subskala_singleton() -> InMemoryDcsSubSkalaService:
-    return InMemoryDcsSubSkalaService()
+def get_dcs_subskala_service(session: SessionDep) -> DcsSubSkalaService:
+    """SEAM: implementasi `DcsSubSkalaService` berbasis PostgreSQL."""
+    return SqlDcsSubSkalaService(session)
 
 
-def get_dcs_subskala_service() -> DcsSubSkalaService:
-    """SEAM: kembalikan implementasi `DcsSubSkalaService`. Ganti di sini saja."""
-    return _dcs_subskala_singleton()
+def get_dcs_sesi_service(session: SessionDep) -> DcsSesiService:
+    """SEAM: implementasi `DcsSesiService` berbasis PostgreSQL."""
+    return SqlDcsSesiService(session)
 
 
-@lru_cache
-def _dcs_sesi_singleton() -> InMemoryDcsSesiService:
-    return InMemoryDcsSesiService()
+def get_dcs_responden_service(session: SessionDep) -> DcsRespondenService:
+    """SEAM: implementasi `DcsRespondenService` berbasis PostgreSQL."""
+    return SqlDcsRespondenService(session)
 
 
-def get_dcs_sesi_service() -> DcsSesiService:
-    """SEAM: kembalikan implementasi `DcsSesiService`. Ganti di sini saja."""
-    return _dcs_sesi_singleton()
-
-
-@lru_cache
-def _dcs_responden_singleton() -> InMemoryDcsRespondenService:
-    return InMemoryDcsRespondenService()
-
-
-def get_dcs_responden_service() -> DcsRespondenService:
-    """SEAM: kembalikan implementasi `DcsRespondenService`. Ganti di sini saja."""
-    return _dcs_responden_singleton()
-
-
-@lru_cache
-def _dcs_jawaban_singleton() -> InMemoryDcsJawabanService:
-    return InMemoryDcsJawabanService()
-
-
-def get_dcs_jawaban_service() -> DcsJawabanService:
-    """SEAM: kembalikan implementasi `DcsJawabanService`. Ganti di sini saja."""
-    return _dcs_jawaban_singleton()
+def get_dcs_jawaban_service(session: SessionDep) -> DcsJawabanService:
+    """SEAM: implementasi `DcsJawabanService` berbasis PostgreSQL."""
+    return SqlDcsJawabanService(session)
 
 
 # --- Task Inventory master data services (TugasPokok / DetilTugas / UraianTugas) ---
 
 
-@lru_cache
-def _create_ti_master_services() -> (
-    tuple[
-        InMemoryTugasPokokService,
-        InMemoryDetilTugasService,
-        InMemoryUraianTugasService,
-        UraianTugasBackedCatalogService,
-    ]
-):
-    """Factory: buat dan seed Jabatan, TugasPokok, DetilTugas, UraianTugas lalu CatalogService."""
-    from .taskinv.seed import seed_catalog_models
-
-    jabatan_svc = _jabatan_singleton()
-    tp_svc = InMemoryTugasPokokService()
-    dt_svc = InMemoryDetilTugasService(tp_svc=tp_svc)
-    ut_svc = InMemoryUraianTugasService(dt_svc=dt_svc)
-    seed_catalog_models(tp_svc, dt_svc, ut_svc, jabatan_svc)
-    catalog_svc = UraianTugasBackedCatalogService(ut_svc=ut_svc, dt_svc=dt_svc, tp_svc=tp_svc)
-    return tp_svc, dt_svc, ut_svc, catalog_svc
+def get_tugas_pokok_service(session: SessionDep) -> TugasPokokService:
+    """SEAM: implementasi `TugasPokokService` berbasis PostgreSQL."""
+    return SqlTugasPokokService(session)
 
 
-def get_tugas_pokok_service() -> TugasPokokService:
-    """SEAM: kembalikan implementasi `TugasPokokService`. Ganti di sini saja."""
-    tp_svc, _, _, _ = _create_ti_master_services()
-    return tp_svc
+def get_detil_tugas_service(session: SessionDep) -> DetilTugasService:
+    """SEAM: implementasi `DetilTugasService` berbasis PostgreSQL."""
+    return SqlDetilTugasService(session)
 
 
-def get_detil_tugas_service() -> DetilTugasService:
-    """SEAM: kembalikan implementasi `DetilTugasService`. Ganti di sini saja."""
-    _, dt_svc, _, _ = _create_ti_master_services()
-    return dt_svc
+def get_uraian_tugas_service(session: SessionDep) -> UraianTugasService:
+    """SEAM: implementasi `UraianTugasService` berbasis PostgreSQL."""
+    return SqlUraianTugasService(session)
 
 
-def get_uraian_tugas_service() -> UraianTugasService:
-    """SEAM: kembalikan implementasi `UraianTugasService`. Ganti di sini saja."""
-    _, _, ut_svc, _ = _create_ti_master_services()
-    return ut_svc
+def get_ti_catalog_service(session: SessionDep) -> TiCatalogService:
+    """SEAM: katalog Task Inventory dirakit live dari UraianTugas/DetilTugas/TugasPokok (DB)."""
+    tp_svc = SqlTugasPokokService(session)
+    dt_svc = SqlDetilTugasService(session)
+    ut_svc = SqlUraianTugasService(session)
+    return UraianTugasBackedCatalogService(ut_svc=ut_svc, dt_svc=dt_svc, tp_svc=tp_svc)
 
 
 # --- Task Inventory services ---
 
 
-def get_ti_catalog_service() -> TiCatalogService:
-    """SEAM: kembalikan implementasi `TiCatalogService`. Ganti di sini saja."""
-    _, _, _, catalog_svc = _create_ti_master_services()
-    return catalog_svc
+def get_ti_sesi_service(session: SessionDep) -> TiSesiService:
+    """SEAM: implementasi `TiSesiService` berbasis PostgreSQL."""
+    return SqlTiSesiService(session)
 
 
-@lru_cache
-def _ti_sesi_singleton() -> InMemoryTiSesiService:
-    return InMemoryTiSesiService()
+def get_ti_responden_service(session: SessionDep) -> TiRespondenService:
+    """SEAM: implementasi `TiRespondenService` berbasis PostgreSQL."""
+    return SqlTiRespondenService(session)
 
 
-def get_ti_sesi_service() -> TiSesiService:
-    """SEAM: kembalikan implementasi `TiSesiService`. Ganti di sini saja."""
-    return _ti_sesi_singleton()
+def get_ti_seleksi_service(session: SessionDep) -> TiSeleksiService:
+    """SEAM: implementasi `TiSeleksiService` berbasis PostgreSQL."""
+    return SqlTiSeleksiService(session)
 
 
-@lru_cache
-def _ti_responden_singleton() -> InMemoryTiRespondenService:
-    return InMemoryTiRespondenService()
+def get_ti_detail_service(session: SessionDep) -> TiDetailService:
+    """SEAM: implementasi `TiDetailService` berbasis PostgreSQL."""
+    return SqlTiDetailService(session)
 
 
-def get_ti_responden_service() -> TiRespondenService:
-    """SEAM: kembalikan implementasi `TiRespondenService`. Ganti di sini saja."""
-    return _ti_responden_singleton()
-
-
-@lru_cache
-def _ti_seleksi_singleton() -> InMemoryTiSeleksiService:
-    return InMemoryTiSeleksiService()
-
-
-def get_ti_seleksi_service() -> TiSeleksiService:
-    """SEAM: kembalikan implementasi `TiSeleksiService`. Ganti di sini saja."""
-    return _ti_seleksi_singleton()
-
-
-@lru_cache
-def _ti_detail_singleton() -> InMemoryTiDetailService:
-    return InMemoryTiDetailService()
-
-
-def get_ti_detail_service() -> TiDetailService:
-    """SEAM: kembalikan implementasi `TiDetailService`. Ganti di sini saja."""
-    return _ti_detail_singleton()
-
-
-@lru_cache
-def _ti_tahap2_singleton() -> InMemoryTiTahap2Service:
-    return InMemoryTiTahap2Service()
-
-
-def get_ti_tahap2_service() -> TiTahap2Service:
-    """SEAM: kembalikan implementasi `TiTahap2Service`. Ganti di sini saja."""
-    return _ti_tahap2_singleton()
+def get_ti_tahap2_service(session: SessionDep) -> TiTahap2Service:
+    """SEAM: implementasi `TiTahap2Service` berbasis PostgreSQL."""
+    return SqlTiTahap2Service(session)
 
 
 # --- TS services ---
 
 
-@lru_cache
-def _ts_sesi_singleton() -> InMemoryTsSesiService:
-    return InMemoryTsSesiService()
+def get_ts_sesi_service(session: SessionDep) -> TsSesiService:
+    """SEAM: implementasi `TsSesiService` berbasis PostgreSQL."""
+    return SqlTsSesiService(session)
 
 
-def get_ts_sesi_service() -> TsSesiService:
-    """SEAM: kembalikan implementasi `TsSesiService`. Ganti di sini saja."""
-    return _ts_sesi_singleton()
+def get_ts_responden_service(session: SessionDep) -> TsRespondenService:
+    """SEAM: implementasi `TsRespondenService` berbasis PostgreSQL."""
+    return SqlTsRespondenService(session)
 
 
-@lru_cache
-def _ts_responden_singleton() -> InMemoryTsRespondenService:
-    return InMemoryTsRespondenService()
-
-
-def get_ts_responden_service() -> TsRespondenService:
-    """SEAM: kembalikan implementasi `TsRespondenService`. Ganti di sini saja."""
-    return _ts_responden_singleton()
-
-
-@lru_cache
-def _ts_log_singleton() -> InMemoryTsLogService:
-    return InMemoryTsLogService()
-
-
-def get_ts_log_service() -> TsLogService:
-    """SEAM: kembalikan implementasi `TsLogService`. Ganti di sini saja."""
-    return _ts_log_singleton()
+def get_ts_log_service(session: SessionDep) -> TsLogService:
+    """SEAM: implementasi `TsLogService` berbasis PostgreSQL."""
+    return SqlTsLogService(session)
 
 
 # --- Authentik Provisioner ---
@@ -444,20 +343,16 @@ def rate_limit(
 
 
 def get_readiness_checks() -> list[ReadinessCheck]:
-    """SEAM: daftar pemeriksaan kesiapan. Default kosong → langsung 'ready'."""
-    return []
+    """SEAM: pemeriksaan kesiapan. `/ready` kini ping PostgreSQL (503 bila DB mati)."""
+    return [DatabaseReadinessCheck()]
 
 
 # --- Idempotency ---
 
 
-@lru_cache
-def _idempotency_store_singleton() -> InMemoryIdempotencyStore:
-    return InMemoryIdempotencyStore()
-
-
-def get_idempotency_store() -> IdempotencyStore:
-    return _idempotency_store_singleton()
+def get_idempotency_store(session: SessionDep) -> IdempotencyStore:
+    """SEAM: store idempotency berbasis PostgreSQL (reserve via INSERT ON CONFLICT)."""
+    return SqlIdempotencyStore(session)
 
 
 @dataclass
