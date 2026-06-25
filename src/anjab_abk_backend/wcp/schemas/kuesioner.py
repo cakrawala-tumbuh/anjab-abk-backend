@@ -14,7 +14,7 @@ class WcpKuesionerItemRead(BaseModel):
 
     id: str = Field(description="ID responden.", examples=["wrsp_a1b2c3d4"])
     sesi_id: str = Field(description="ID sesi WCP.", examples=["wses_a1b2c3d4"])
-    jabatan_label: str = Field(description="Label jabatan responden.")
+    sesi_catatan: str | None = Field(default=None, description="Catatan sesi WCP.")
     sudah_submit: bool = Field(description="True jika jawaban sudah disubmit.")
     submitted_at: datetime | None = Field(default=None, description="Waktu submit.")
     created_at: datetime = Field(description="Waktu pendaftaran.")

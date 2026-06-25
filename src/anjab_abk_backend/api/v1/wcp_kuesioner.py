@@ -60,7 +60,7 @@ def kuesioner_saya(
             WcpKuesionerItemRead(
                 id=rsp.id,
                 sesi_id=rsp.sesi_id,
-                jabatan_label=rsp.jabatan_label,
+                sesi_catatan=sesi.catatan,
                 sudah_submit=rsp.sudah_submit,
                 submitted_at=rsp.submitted_at,
                 created_at=rsp.created_at,

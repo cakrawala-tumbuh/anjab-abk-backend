@@ -7,6 +7,16 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-06-25
+
+### Diubah
+
+- **`DcsKuesionerItemRead` & `WcpKuesionerItemRead`: ganti `jabatan_label` → `sesi_catatan`** —
+  endpoint `/kuesioner/saya` DCS dan WCP tidak lagi mengekspos `jabatan_label` responden ke
+  partisipan. Sebagai gantinya, field `sesi_catatan` (catatan sesi, nullable) dikembalikan
+  sebagai pengenal sesi. `jabatan_label` tetap ada di `DcsRespondenRead` dan `WcpRespondenRead`
+  untuk kebutuhan tampilan admin.
+
 ## [0.20.2] - 2026-06-25
 
 ### Diperbaiki

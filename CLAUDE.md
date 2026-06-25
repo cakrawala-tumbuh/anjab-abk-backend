@@ -85,6 +85,15 @@ Sesi Task Inventory tidak lagi memerlukan `unit` (jenjang). Sesi hanya terikat p
 - `SEARCHABLE_FIELDS` sesi TI tidak lagi mengandung `unit`.
 - Migrasi: kolom `unit` dihapus dari tabel `ti_sesi`.
 
+### [2026-06-25] DCS & WCP: Hilangkan jabatan dari tampilan partisipan
+
+`DcsKuesionerItemRead` dan `WcpKuesionerItemRead` tidak lagi mengekspos `jabatan_label`
+ke partisipan. Sebagai gantinya, field `sesi_catatan` (catatan sesi) ditampilkan sebagai
+label pengenal sesi di halaman kuesioner partisipan. Perubahan:
+- `DcsKuesionerItemRead` / `WcpKuesionerItemRead`: field `jabatan_label` diganti `sesi_catatan: str | None`.
+- Endpoint `/kuesioner/saya` DCS dan WCP: mengisi `sesi_catatan` dari `sesi.catatan`.
+- `jabatan_label` tetap ada di `DcsRespondenRead` / `WcpRespondenRead` (dipakai admin).
+
 ### [2026-06-21] DCS & WCP: Sesi tidak terikat jabatan
 
 Sesi DCS dan WCP tidak lagi memerlukan `jabatan_id`. Partisipan dengan jabatan apapun
