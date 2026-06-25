@@ -7,6 +7,23 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-06-25
+
+### Ditambahkan
+
+- **`jabatan_nama` di `TiSesiRead` dan `TiKombinasiRead`** — respons sesi dan katalog kombinasi
+  kini menyertakan nama jabatan yang di-resolve dari tabel `jabatan`, sehingga UI tidak perlu
+  menampilkan kode jabatan mentah.
+
+### Diubah
+
+- **Field `unit` dihapus dari sesi Task Inventory** — `TiSesiCreate`, `TiSesiRead`,
+  `TiHasilSesiRead`, dan `TiKuesionerItemRead` tidak lagi menyertakan field `unit`.
+  Uniqueness sesi berubah dari `(unit, jabatan_id, periode)` menjadi `(jabatan_id, periode)`.
+  Validasi create sesi kini selalu menggunakan `valid_kodes_for_jabatan(jabatan_id)`.
+- **Migrasi Alembic `d3e6f1a8b9c2`** menghapus kolom `unit` dari tabel `ti_sesi`.
+- **`SEARCHABLE_FIELDS` sesi TI** tidak lagi mengandung `unit`.
+
 ## [0.19.0] - 2026-06-25
 
 ### Diperbaiki

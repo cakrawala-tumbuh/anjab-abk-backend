@@ -26,7 +26,4 @@ class TiKuesionerItemRead(BaseModel):
     sesi_jabatan_id: str = Field(
         description="ID jabatan yang dikaji dalam sesi.", examples=["jbt_a1b2c3d4"]
     )
-    sesi_unit: str | None = Field(
-        default=None, description="Unit/jenjang yang dikaji.", examples=["TK"]
-    )
     sesi_periode: str = Field(description="Periode sesi (YYYY-MM).", examples=["2026-06"])

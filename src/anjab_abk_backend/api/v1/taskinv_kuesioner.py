@@ -71,7 +71,6 @@ def kuesioner_saya(
                 tahap3_submitted_at=rsp.tahap3_submitted_at,
                 created_at=rsp.created_at,
                 sesi_status=sesi.status,
-                sesi_unit=sesi.unit,
                 sesi_jabatan_id=sesi.jabatan_id,
                 sesi_periode=sesi.periode,
             )

@@ -21,6 +21,7 @@ from ..schemas.catalog import TiCatalogRead, TiKombinasiRead
 from ..seed import load_catalog
 
 if TYPE_CHECKING:
+    from ...anjab.services.jabatan import JabatanService
     from .detil_tugas import DetilTugasService
     from .tugas_pokok import TugasPokokService
     from .uraian_tugas import UraianTugasService
@@ -83,7 +84,7 @@ class InMemoryTiCatalogService:
     def list_kombinasi(self) -> list[TiKombinasiRead]:
         with self._lock:
             rows = [
-                TiKombinasiRead(unit=unit, jabatan_id=jid, jumlah_task=len(items))
+                TiKombinasiRead(unit=unit, jabatan_id=jid, jabatan_nama=jid, jumlah_task=len(items))
                 for (unit, jid), items in self._by_kombinasi.items()
             ]
         rows.sort(key=lambda r: (r.unit, r.jabatan_id))
@@ -136,10 +137,12 @@ class UraianTugasBackedCatalogService:
         ut_svc: UraianTugasService,
         dt_svc: DetilTugasService,
         tp_svc: TugasPokokService,
+        jabatan_svc: JabatanService | None = None,
     ) -> None:
         self._ut = ut_svc
         self._dt = dt_svc
         self._tp = tp_svc
+        self._jabatan_svc = jabatan_svc
 
     def _to_catalog(self, ut) -> TiCatalogRead:  # type: ignore[no-untyped-def]
         dt = self._dt.get(ut.detil_tugas_id) if ut.detil_tugas_id else None
@@ -160,14 +163,23 @@ class UraianTugasBackedCatalogService:
         all_ut, _ = self._ut.list(limit=10_000, offset=0)
         counts: dict[tuple[str, str], int] = {}
         for ut in all_ut:
-            # jabatan_id sudah ada di UraianTugasRead (denormalisasi)
             key = (ut.unit, ut.jabatan_id)
             counts[key] = counts.get(key, 0) + 1
+        jabatan_ids = list({jid for (_, jid) in counts})
+        jabatan_map: dict[str, str] = {}
+        if self._jabatan_svc:
+            for jid in jabatan_ids:
+                try:
+                    jabatan_map[jid] = self._jabatan_svc.get(jid).nama
+                except Exception:
+                    jabatan_map[jid] = jid
         rows = [
-            TiKombinasiRead(unit=unit, jabatan_id=jid, jumlah_task=cnt)
+            TiKombinasiRead(
+                unit=unit, jabatan_id=jid, jabatan_nama=jabatan_map.get(jid, jid), jumlah_task=cnt
+            )
             for (unit, jid), cnt in counts.items()
         ]
-        rows.sort(key=lambda r: (r.unit, r.jabatan_id))
+        rows.sort(key=lambda r: (r.unit, r.jabatan_nama))
         return rows
 
     def list_by_kombinasi(self, unit: str, jabatan_id: str) -> list[TiCatalogRead]:

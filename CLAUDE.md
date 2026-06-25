@@ -72,6 +72,19 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-06-25] Task Inventory: Sesi tidak perlu unit
+
+Sesi Task Inventory tidak lagi memerlukan `unit` (jenjang). Sesi hanya terikat pada
+`jabatan_id`. Perubahan:
+- `TiSesiCreate` / `TiSesiRead`: field `unit` dihapus; `jabatan_nama` ditambahkan ke `TiSesiRead`.
+- `TiHasilSesiRead`: field `unit` dihapus.
+- `TiKuesionerItemRead`: field `sesi_unit` dihapus.
+- `TiKombinasiRead`: field `jabatan_nama` ditambahkan (nama jabatan dari tabel Jabatan).
+- Uniqueness sesi berubah dari `(unit, jabatan_id, periode)` menjadi `(jabatan_id, periode)`.
+- Validasi create sesi selalu pakai `valid_kodes_for_jabatan(jabatan_id)`.
+- `SEARCHABLE_FIELDS` sesi TI tidak lagi mengandung `unit`.
+- Migrasi: kolom `unit` dihapus dari tabel `ti_sesi`.
+
 ### [2026-06-21] DCS & WCP: Sesi tidak terikat jabatan
 
 Sesi DCS dan WCP tidak lagi memerlukan `jabatan_id`. Partisipan dengan jabatan apapun

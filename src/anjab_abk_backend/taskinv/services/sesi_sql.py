@@ -20,7 +20,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ...errors import ConflictError, NotFoundError, ValidationAppError
-from ...models import TiSesiModel, TiSesiTaskTerpilihModel
+from ...models import JabatanModel, TiSesiModel, TiSesiTaskTerpilihModel
 from ...schemas.search import Domain, Order
 from ...services.domain import validate_searchable_fields
 from ...services.domain_sql import FieldMap, FieldSpec, compile_domain, order_by_columns
@@ -34,14 +34,13 @@ def _sesi_field_map() -> FieldMap:
     return {
         "id": FieldSpec(column=TiSesiModel.id),
         "jabatan_id": FieldSpec(column=TiSesiModel.jabatan_id),
-        "unit": FieldSpec(column=TiSesiModel.unit),
         "periode": FieldSpec(column=TiSesiModel.periode),
         "status": FieldSpec(column=TiSesiModel.status),
         "created_at": FieldSpec(column=TiSesiModel.created_at, order_column=TiSesiModel.created_at),
     }
 
 
-def _to_read(rec: TiSesiModel) -> TiSesiRead:
+def _to_read(rec: TiSesiModel, jabatan_nama: str | None = None) -> TiSesiRead:
     created = rec.created_at
     if created.tzinfo is None:
         created = created.replace(tzinfo=UTC)
@@ -49,7 +48,7 @@ def _to_read(rec: TiSesiModel) -> TiSesiRead:
     return TiSesiRead(
         id=rec.id,
         jabatan_id=rec.jabatan_id,
-        unit=rec.unit,
+        jabatan_nama=jabatan_nama,
         periode=rec.periode,
         status=rec.status,  # type: ignore[arg-type]
         koordinator_id=rec.koordinator_id,
@@ -73,49 +72,41 @@ class SqlTiSesiService:
             raise NotFoundError(f"Sesi Task Inventory '{sesi_id}' tidak ditemukan.")
         return rec
 
+    def _jabatan_map(self, jabatan_ids: list[str]) -> dict[str, str]:
+        if not jabatan_ids:
+            return {}
+        rows = self._s.scalars(select(JabatanModel).where(JabatanModel.id.in_(jabatan_ids))).all()
+        return {j.id: j.nama for j in rows}
+
     def list(self, *, limit: int, offset: int) -> tuple[list[TiSesiRead], int]:
         total = self._s.scalar(select(func.count()).select_from(TiSesiModel)) or 0
         rows = self._s.scalars(
             select(TiSesiModel).order_by(TiSesiModel.created_at.desc()).limit(limit).offset(offset)
         ).all()
-        return [_to_read(r) for r in rows], total
+        jmap = self._jabatan_map(list({r.jabatan_id for r in rows}))
+        return [_to_read(r, jmap.get(r.jabatan_id)) for r in rows], total
 
     def get(self, sesi_id: str) -> TiSesiRead:
-        return _to_read(self._get_model(sesi_id))
+        rec = self._get_model(sesi_id)
+        jab = self._s.get(JabatanModel, rec.jabatan_id)
+        return _to_read(rec, jab.nama if jab else None)
 
     def create(self, data: TiSesiCreate) -> TiSesiRead:
         if data.min_responden > data.max_responden:
             raise ValidationAppError("min_responden tidak boleh lebih besar dari max_responden.")
-        if data.unit is not None:
-            dup = self._s.scalar(
-                select(TiSesiModel.id).where(
-                    TiSesiModel.unit == data.unit,
-                    TiSesiModel.jabatan_id == data.jabatan_id,
-                    TiSesiModel.periode == data.periode,
-                )
+        dup = self._s.scalar(
+            select(TiSesiModel.id).where(
+                TiSesiModel.jabatan_id == data.jabatan_id,
+                TiSesiModel.periode == data.periode,
             )
-            if dup is not None:
-                raise ConflictError(
-                    f"Sesi untuk unit '{data.unit}' jabatan '{data.jabatan_id}'"
-                    f" periode '{data.periode}' sudah ada."
-                )
-        else:
-            dup = self._s.scalar(
-                select(TiSesiModel.id).where(
-                    TiSesiModel.unit.is_(None),
-                    TiSesiModel.jabatan_id == data.jabatan_id,
-                    TiSesiModel.periode == data.periode,
-                )
+        )
+        if dup is not None:
+            raise ConflictError(
+                f"Sesi untuk jabatan '{data.jabatan_id}'" f" periode '{data.periode}' sudah ada."
             )
-            if dup is not None:
-                raise ConflictError(
-                    f"Sesi tanpa unit untuk jabatan '{data.jabatan_id}'"
-                    f" periode '{data.periode}' sudah ada."
-                )
         rec = TiSesiModel(
             id=f"tises_{uuid.uuid4().hex[:8]}",
             jabatan_id=data.jabatan_id,
-            unit=data.unit,
             periode=data.periode,
             status="DRAFT",
             koordinator_id=data.koordinator_id,
@@ -125,7 +116,8 @@ class SqlTiSesiService:
         )
         self._s.add(rec)
         self._s.flush()
-        return _to_read(rec)
+        jab = self._s.get(JabatanModel, rec.jabatan_id)
+        return _to_read(rec, jab.nama if jab else None)
 
     def update(self, sesi_id: str, data: TiSesiUpdate) -> TiSesiRead:
         rec = self._get_model(sesi_id)
@@ -139,7 +131,8 @@ class SqlTiSesiService:
         for key, value in changes.items():
             setattr(rec, key, value)
         self._s.flush()
-        return _to_read(rec)
+        jab = self._s.get(JabatanModel, rec.jabatan_id)
+        return _to_read(rec, jab.nama if jab else None)
 
     def delete(self, sesi_id: str) -> None:
         rec = self._get_model(sesi_id)
@@ -147,18 +140,6 @@ class SqlTiSesiService:
             raise ValidationAppError("Sesi hanya dapat dihapus saat berstatus DRAFT.")
         self._s.delete(rec)
         self._s.flush()
-
-    def transition(self, sesi_id: str, target: StatusSesi) -> TiSesiRead:
-        rec = self._get_model(sesi_id)
-        expected = _VALID_TRANSITIONS.get(rec.status)  # type: ignore[arg-type]
-        if expected != target:
-            raise ValidationAppError(
-                f"Transisi dari '{rec.status}' ke '{target}' tidak valid."
-                f" Transisi yang diizinkan: '{rec.status}' → '{expected}'."
-            )
-        rec.status = target
-        self._s.flush()
-        return _to_read(rec)
 
     def freeze_task_terpilih(self, sesi_id: str, kodes: list[str]) -> TiSesiRead:
         """Bekukan himpunan task terpilih saat transisi TAHAP2 → TAHAP3."""
@@ -176,12 +157,26 @@ class SqlTiSesiService:
         rec.task_frozen = True
         rec.status = "TAHAP3"
         self._s.flush()
-        return _to_read(rec)
+        jab = self._s.get(JabatanModel, rec.jabatan_id)
+        return _to_read(rec, jab.nama if jab else None)
 
     def get_task_terpilih(self, sesi_id: str) -> list[str]:
         rec = self._get_model(sesi_id)
         terpilih = rec.task_terpilih
         return list(terpilih) if terpilih is not None else []
+
+    def transition(self, sesi_id: str, target: StatusSesi) -> TiSesiRead:
+        rec = self._get_model(sesi_id)
+        expected = _VALID_TRANSITIONS.get(rec.status)  # type: ignore[arg-type]
+        if expected != target:
+            raise ValidationAppError(
+                f"Transisi dari '{rec.status}' ke '{target}' tidak valid."
+                f" Transisi yang diizinkan: '{rec.status}' → '{expected}'."
+            )
+        rec.status = target
+        self._s.flush()
+        jab = self._s.get(JabatanModel, rec.jabatan_id)
+        return _to_read(rec, jab.nama if jab else None)
 
     def search(
         self, *, domain: Domain, order: Order, limit: int, offset: int
@@ -194,4 +189,5 @@ class SqlTiSesiService:
         rows = self._s.scalars(
             select(TiSesiModel).where(cond).order_by(*order_cols).limit(limit).offset(offset)
         ).all()
-        return [_to_read(r) for r in rows], total
+        jmap = self._jabatan_map(list({r.jabatan_id for r in rows}))
+        return [_to_read(r, jmap.get(r.jabatan_id)) for r in rows], total

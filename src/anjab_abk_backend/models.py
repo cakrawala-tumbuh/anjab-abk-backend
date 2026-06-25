@@ -413,7 +413,6 @@ class TiSesiModel(Base):
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
     jabatan_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
-    unit: Mapped[str | None] = mapped_column(String(20), nullable=True)
     periode: Mapped[str] = mapped_column(String(7), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
     koordinator_id: Mapped[str | None] = mapped_column(String(40), nullable=True)

@@ -20,15 +20,6 @@ class TiSesiCreate(BaseModel):
         description="ID jabatan yang dikaji (FK ke Jabatan).",
         examples=["jbt_a1b2c3d4"],
     )
-    unit: str | None = Field(
-        default=None,
-        max_length=50,
-        description=(
-            "Unit/jenjang yang dikaji (TK/SD/SMP/SMA). Opsional;"
-            " bila tidak diisi, sesi berlaku lintas unit."
-        ),
-        examples=["TK"],
-    )
     periode: str = Field(
         min_length=7,
         max_length=7,
@@ -71,7 +62,7 @@ class TiSesiRead(BaseModel):
 
     id: str = Field(description="ID sesi.", examples=["tises_a1b2c3d4"])
     jabatan_id: str = Field(description="ID jabatan yang dikaji.", examples=["jbt_a1b2c3d4"])
-    unit: str | None = Field(default=None, description="Unit/jenjang.", examples=["TK"])
+    jabatan_nama: str | None = Field(default=None, description="Nama jabatan yang dikaji.")
     periode: str = Field(description="Periode kajian (YYYY-MM).", examples=["2026-06"])
     status: StatusSesi = Field(description="Status sesi.", examples=["DRAFT"])
     min_responden: int = Field(description="Minimum responden.")

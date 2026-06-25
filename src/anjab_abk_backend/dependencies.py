@@ -206,7 +206,10 @@ def get_ti_catalog_service(session: SessionDep) -> TiCatalogService:
     tp_svc = SqlTugasPokokService(session)
     dt_svc = SqlDetilTugasService(session)
     ut_svc = SqlUraianTugasService(session)
-    return UraianTugasBackedCatalogService(ut_svc=ut_svc, dt_svc=dt_svc, tp_svc=tp_svc)
+    jabatan_svc = SqlJabatanService(session)
+    return UraianTugasBackedCatalogService(
+        ut_svc=ut_svc, dt_svc=dt_svc, tp_svc=tp_svc, jabatan_svc=jabatan_svc
+    )
 
 
 # --- Task Inventory services ---

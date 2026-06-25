@@ -106,7 +106,6 @@ def compute_hasil_sesi(
     tasks.sort(key=lambda t: (-t.jam_per_tahun_mean, -t.n_relevan, t.kode))
     return TiHasilSesiRead(
         sesi_id=sesi.id,
-        unit=sesi.unit,
         jabatan_id=sesi.jabatan_id,
         periode=sesi.periode,
         n_responden_tahap1=n_tahap1,

@@ -13,7 +13,7 @@ from ...schemas.search import Domain, Order
 from ...services.domain import run_search, validate_searchable_fields
 from ..schemas.sesi import StatusSesi, TiSesiCreate, TiSesiRead, TiSesiUpdate
 
-SEARCHABLE_FIELDS = frozenset({"id", "jabatan_id", "unit", "periode", "status", "created_at"})
+SEARCHABLE_FIELDS = frozenset({"id", "jabatan_id", "periode", "status", "created_at"})
 
 _VALID_TRANSITIONS: dict[StatusSesi, StatusSesi] = {
     "DRAFT": "TAHAP1",
@@ -33,7 +33,6 @@ class _Record:
     min_responden: int
     max_responden: int
     created_at: datetime
-    unit: str | None = None
     koordinator_id: str | None = None
     catatan: str | None = None
     task_terpilih: list[str] | None = field(default=None)
@@ -67,7 +66,6 @@ class InMemoryTiSesiService:
         return TiSesiRead(
             id=rec.id,
             jabatan_id=rec.jabatan_id,
-            unit=rec.unit,
             periode=rec.periode,
             status=rec.status,  # type: ignore[arg-type]
             koordinator_id=rec.koordinator_id,
@@ -97,32 +95,17 @@ class InMemoryTiSesiService:
         if data.min_responden > data.max_responden:
             raise ValidationAppError("min_responden tidak boleh lebih besar dari max_responden.")
         with self._lock:
-            if data.unit is not None:
-                # unit provided: unique on (unit, jabatan_id, periode)
-                if any(
-                    r.unit == data.unit
-                    and r.jabatan_id == data.jabatan_id
-                    and r.periode == data.periode
-                    for r in self._data.values()
-                ):
-                    raise ConflictError(
-                        f"Sesi untuk unit '{data.unit}' jabatan '{data.jabatan_id}'"
-                        f" periode '{data.periode}' sudah ada."
-                    )
-            else:
-                # unit not provided: unique on (jabatan_id, periode)
-                if any(
-                    r.unit is None and r.jabatan_id == data.jabatan_id and r.periode == data.periode
-                    for r in self._data.values()
-                ):
-                    raise ConflictError(
-                        f"Sesi tanpa unit untuk jabatan '{data.jabatan_id}'"
-                        f" periode '{data.periode}' sudah ada."
-                    )
+            if any(
+                r.jabatan_id == data.jabatan_id and r.periode == data.periode
+                for r in self._data.values()
+            ):
+                raise ConflictError(
+                    f"Sesi untuk jabatan '{data.jabatan_id}'"
+                    f" periode '{data.periode}' sudah ada."
+                )
             rec = _Record(
                 id=f"tises_{uuid.uuid4().hex[:8]}",
                 jabatan_id=data.jabatan_id,
-                unit=data.unit,
                 periode=data.periode,
                 status="DRAFT",
                 koordinator_id=data.koordinator_id,

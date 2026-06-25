@@ -45,4 +45,5 @@ class TiKombinasiRead(BaseModel):
 
     unit: str = Field(description="Unit/jenjang.", examples=["TK"])
     jabatan_id: str = Field(description="ID jabatan.", examples=["jbt_a1b2c3d4"])
+    jabatan_nama: str = Field(description="Nama jabatan.", examples=["Kepala Sekolah"])
     jumlah_task: int = Field(description="Jumlah task pada kombinasi ini.", examples=[42])

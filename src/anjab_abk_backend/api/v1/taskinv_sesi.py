@@ -61,7 +61,7 @@ def list_sesi(
     responses={
         **_AUTH,
         **_RATE,
-        409: {"model": ErrorResponse, "description": "Sesi untuk unit+jabatan+periode sudah ada."},
+        409: {"model": ErrorResponse, "description": "Sesi untuk jabatan+periode sudah ada."},
     },
 )
 def create_sesi(
@@ -70,9 +70,8 @@ def create_sesi(
         Body(
             openapi_examples={
                 "contoh": {
-                    "summary": "Sesi TI Kepala Sekolah TK",
+                    "summary": "Sesi TI Kepala Sekolah",
                     "value": {
-                        "unit": "TK",
                         "jabatan_id": "jbt_a1b2c3d4",
                         "periode": "2026-06",
                         "min_responden": 3,
@@ -87,17 +86,8 @@ def create_sesi(
     idem: Annotated[Idempotency, Depends(idempotency)],
     response: Response,
 ) -> TiSesiRead:
-    if payload.unit is not None:
-        if not catalog.valid_kodes(payload.unit, payload.jabatan_id):
-            raise ValidationAppError(
-                f"Tidak ada task catalog untuk kombinasi unit '{payload.unit}'"
-                f" dan jabatan '{payload.jabatan_id}'."
-            )
-    else:
-        if not catalog.valid_kodes_for_jabatan(payload.jabatan_id):
-            raise ValidationAppError(
-                f"Tidak ada task catalog untuk jabatan '{payload.jabatan_id}'."
-            )
+    if not catalog.valid_kodes_for_jabatan(payload.jabatan_id):
+        raise ValidationAppError(f"Tidak ada task catalog untuk jabatan '{payload.jabatan_id}'.")
     cached = idem.cached()
     if cached is not None:
         response.status_code = status.HTTP_200_OK

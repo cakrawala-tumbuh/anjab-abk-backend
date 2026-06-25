@@ -15,7 +15,7 @@ _year_counter = itertools.count(2000)
 
 
 def _uniq_periode() -> str:
-    """Periode YYYY-MM unik per pemanggilan (hindari konflik unit+jabatan+periode)."""
+    """Periode YYYY-MM unik per pemanggilan (hindari konflik jabatan+periode)."""
     return f"{next(_year_counter)}-01"
 
 
@@ -35,8 +35,6 @@ def _sesi_payload(jabatan_id: str, periode: str | None = None, **over) -> dict:
         "min_responden": 1,
         "max_responden": 10,
     }
-    if "unit" not in over:
-        payload["unit"] = UNIT  # default to UNIT for existing tests
     payload.update(over)
     return payload
 
@@ -71,8 +69,9 @@ def test_catalog_kombinasi(anon_client: TestClient) -> None:
     assert r.status_code == 200
     rows = r.json()
     assert len(rows) == 51
-    # Tiap baris punya jabatan_id (bukan kategori_jabatan)
+    # Tiap baris punya jabatan_id, jabatan_nama (bukan kategori_jabatan)
     assert all("jabatan_id" in x for x in rows)
+    assert all("jabatan_nama" in x for x in rows)
     target = next(x for x in rows if x["unit"] == UNIT)
     assert target["jumlah_task"] > 0
 
@@ -119,7 +118,7 @@ def test_sesi_create_requires_auth(anon_client: TestClient, jabatan_id_tk: str) 
 
 
 def test_sesi_create_invalid_kombinasi(client: TestClient) -> None:
-    r = client.post(SESI, json=_sesi_payload("jbt_tidakada", unit="ZZ"))
+    r = client.post(SESI, json=_sesi_payload("jbt_tidakada"))
     assert r.status_code in (400, 422)
 
 
@@ -637,12 +636,12 @@ def test_kuesioner_saya_universal_ti(client: TestClient, jabatan_id_tk: str, db_
 
 
 # --------------------------------------------------------------------------- #
-# Sesi tanpa unit + SME panel check
+# SME panel check
 # --------------------------------------------------------------------------- #
 
 
-def test_sesi_create_tanpa_unit(client: TestClient, jabatan_id_tk: str) -> None:
-    """Session tanpa unit dapat dibuat."""
+def test_sesi_create_jabatan_valid(client: TestClient, jabatan_id_tk: str) -> None:
+    """Sesi dapat dibuat dengan jabatan valid."""
     r = client.post(
         SESI,
         json={
@@ -653,11 +652,12 @@ def test_sesi_create_tanpa_unit(client: TestClient, jabatan_id_tk: str) -> None:
         },
     )
     assert r.status_code == 201, r.text
-    assert r.json()["unit"] is None
+    assert r.json()["jabatan_id"] == jabatan_id_tk
+    assert "jabatan_nama" in r.json()
 
 
-def test_sesi_create_tanpa_unit_jabatan_invalid(client: TestClient) -> None:
-    """Session tanpa unit dengan jabatan tidak valid ditolak."""
+def test_sesi_create_jabatan_invalid(client: TestClient) -> None:
+    """Sesi dengan jabatan tidak valid ditolak."""
     r = client.post(
         SESI,
         json={
@@ -720,7 +720,6 @@ def test_responden_sme_panel_check(client: TestClient, db_session) -> None:
     sesi_obj = sesi_svc.create(
         TiSesiCreate(
             jabatan_id=jabatan_id,
-            unit=None,
             periode=_uniq_periode(),
             min_responden=1,
             max_responden=10,
@@ -759,7 +758,6 @@ def test_responden_tanpa_jabatan_id_bebas(
     sesi_obj = sesi_svc.create(
         TiSesiCreate(
             jabatan_id=jabatan_baru_id,
-            unit=None,
             periode=_uniq_periode(),
             min_responden=1,
             max_responden=10,
