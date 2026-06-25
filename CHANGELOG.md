@@ -7,6 +7,14 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-06-25
+
+### Diuji
+
+- **Test `test_ut_seeded_data_via_catalog_endpoint`** kini memverifikasi bahwa field
+  `jabatan_nama` di respons endpoint `/catalog/kombinasi` berisi nama jabatan yang
+  sesungguhnya (bukan kode jabatan).
+
 ## [0.20.0] - 2026-06-25
 
 ### Ditambahkan

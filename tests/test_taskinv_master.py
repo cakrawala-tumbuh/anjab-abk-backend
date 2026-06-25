@@ -483,6 +483,11 @@ def test_ut_seeded_data_via_catalog_endpoint(anon_client: TestClient) -> None:
     first = kombis[0]
     jabatan_id = first["jabatan_id"]
     unit = first["unit"]
+    # jabatan_nama harus diisi dengan nama jabatan yang sebenarnya, bukan jabatan_id
+    assert "jabatan_nama" in first
+    assert isinstance(first["jabatan_nama"], str)
+    assert len(first["jabatan_nama"]) > 0
+    assert first["jabatan_nama"] != jabatan_id
 
     r = anon_client.get(CATALOG_BASE, params={"unit": unit, "jabatan_id": jabatan_id})
     assert r.status_code == 200
