@@ -62,9 +62,8 @@ def create_sesi(
         Body(
             openapi_examples={
                 "contoh": {
-                    "summary": "Sesi WCP Guru MTK",
+                    "summary": "Sesi WCP 2025-06",
                     "value": {
-                        "jabatan_id": "jbt_a1b2c3d4",
                         "periode": "2025-06",
                         "min_responden": 6,
                         "max_responden": 8,

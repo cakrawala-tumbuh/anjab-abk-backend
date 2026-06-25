@@ -7,6 +7,14 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.20.2] - 2026-06-25
+
+### Diperbaiki
+
+- **Contoh OpenAPI sesi DCS & WCP masih mencantumkan `jabatan_id`** — field ini sudah
+  dihapus sejak v0.11.0; contoh pada endpoint `POST /api/v1/dcs/sesi` dan
+  `POST /api/v1/wcp/sesi` diperbarui agar tidak memuat field yang tidak lagi relevan.
+
 ## [0.20.1] - 2026-06-25
 
 ### Diuji
