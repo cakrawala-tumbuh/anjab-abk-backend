@@ -7,6 +7,28 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-06-25
+
+### Diperbaiki
+
+- **Tautan identitas partisipan diselaraskan dengan klaim `sub` (sub_mode=user_email)** —
+  provider OAuth2 ANJAB-ABK memakai `sub_mode = user_email`, sehingga `sub` token = email.
+  Backend mencocokkan `partisipan.authentik_user_id == sub` saat login. Data lama mengisi
+  kolom ini dengan `placeholder_xxxxxxxx` (atau pk numerik Authentik) yang tak pernah sama
+  dengan `sub`, sehingga tautan hanya tertolong fallback email di `get_by_subject`. Migrasi
+  baru `a1c4e7f9b2d6` mem-backfill `authentik_user_id = email` untuk semua baris yang belum
+  cocok, agar pencocokan primer langsung tepat.
+
+### Diubah
+
+- **`AuthentikProvisioner.create_partisipan_user` mengembalikan subject OIDC (email),
+  bukan pk numerik** — `HttpAuthentikProvisioner` tetap membuat user di Authentik & memvalidasi
+  responsnya, namun mengembalikan email agar konsisten dengan `sub_mode=user_email`;
+  `PlaceholderAuthentikProvisioner` juga mengembalikan email (sebelumnya `placeholder_<hex>`).
+  Partisipan yang dibuat selanjutnya otomatis punya `authentik_user_id` yang benar.
+- **Kolom `partisipan.authentik_user_id` dilebarkan VARCHAR(64) → VARCHAR(254)** agar muat
+  email penuh (selebar kolom `email`) tanpa terpotong.
+
 ## [0.18.0] - 2026-06-23
 
 ### Ditambahkan

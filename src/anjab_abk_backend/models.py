@@ -129,7 +129,10 @@ class PartisipanModel(Base):
     masa_kerja_bulan: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     mata_pelajaran_utama_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
     aktif: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    authentik_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    # Menyimpan klaim `sub` token OIDC (identitas yang dicocokkan saat login). Dengan
+    # `sub_mode=user_email` di provider Authentik, nilainya adalah email — sehingga
+    # lebarnya disamakan dengan kolom `email` (254) agar tidak terpotong.
+    authentik_user_id: Mapped[str | None] = mapped_column(String(254), nullable=True, index=True)
     created_at: Mapped[datetime] = _ts(index=True)
 
     jabatan_tambahan: Mapped[list[PartisipanJabatanTambahanModel]] = relationship(

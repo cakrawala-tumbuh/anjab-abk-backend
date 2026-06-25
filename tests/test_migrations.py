@@ -162,3 +162,47 @@ def test_init_idempoten_simulasi_up_d(fresh_db_url: str) -> None:
     kedua = init_and_count()  # deploy / `up -d` kedua
     assert pertama > 0, "seed harus mengisi master data pada init pertama"
     assert pertama == kedua, "init tidak idempoten: jumlah baris master data berubah saat diulang"
+
+
+def test_backfill_authentik_user_id_ke_email(fresh_db_url: str) -> None:
+    """Revisi backfill mengganti placeholder/pk pada `authentik_user_id` menjadi email.
+
+    Bangun schema sampai revisi SEBELUM backfill, sisipkan baris dengan
+    `authentik_user_id` placeholder dan pk numerik (+ email panjang >64 char yang tak
+    muat di kolom lama), lalu `upgrade head` (menjalankan revisi backfill) dan pastikan
+    `authentik_user_id` setiap baris menjadi sama dengan email-nya.
+    """
+    upgrade(fresh_db_url, "b2bbd3afbe65")  # revisi tepat sebelum backfill
+    engine = create_engine(fresh_db_url)
+    email_panjang = "nama.yang.sangat.panjang.sekali.untuk.uji.kolom@subdomain.ypii.sch.id"
+    assert len(email_panjang) > 64
+    baris = [
+        ("par_mig01", "Placeholder", "placeholder@x.id", "placeholder_abcd1234"),
+        ("par_mig02", "Pk Numerik", "pknumerik@x.id", "4242"),
+        ("par_mig03", "Sudah Benar", "sudahbenar@x.id", "sudahbenar@x.id"),
+        ("par_mig04", "Email Panjang", email_panjang, "placeholder_ffff0000"),
+    ]
+    try:
+        with engine.begin() as conn:
+            for pid, nama, email, auth in baris:
+                conn.execute(
+                    text(
+                        "INSERT INTO partisipan "
+                        "(id, nama, email, sekolah_id, jabatan_utama_id, masa_kerja_tahun, "
+                        " masa_kerja_bulan, aktif, authentik_user_id, created_at) "
+                        "VALUES (:id, :nama, :email, 'skl_x', 'jbt_x', 0, 0, true, :auth, now())"
+                    ),
+                    {"id": pid, "nama": nama, "email": email, "auth": auth},
+                )
+
+        upgrade(fresh_db_url, "head")  # jalankan revisi backfill
+
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text("SELECT email, authentik_user_id FROM partisipan ORDER BY id")
+            ).all()
+        assert rows, "baris uji harus tetap ada setelah migrasi"
+        for email, auth in rows:
+            assert auth == email, f"authentik_user_id harus = email, dapat {auth!r} vs {email!r}"
+    finally:
+        engine.dispose()

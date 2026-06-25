@@ -3,14 +3,23 @@
 `AuthentikProvisioner` adalah kontrak (Protocol).
 `HttpAuthentikProvisioner` memanggil Authentik Admin REST API untuk membuat user
 dan memasukkannya ke grup partisipan.
-`PlaceholderAuthentikProvisioner` adalah standin yang mengembalikan ID palsu —
-  ganti dengan implementasi nyata setelah Authentik dikonfigurasi
-  (set env AUTHENTIK_API_URL, AUTHENTIK_API_TOKEN, AUTHENTIK_PARTISIPAN_GROUP_ID).
+`PlaceholderAuthentikProvisioner` adalah standin yang dipakai saat Authentik belum
+  dikonfigurasi (set env AUTHENTIK_API_URL, AUTHENTIK_API_TOKEN,
+  AUTHENTIK_PARTISIPAN_GROUP_ID untuk mengaktifkan implementasi nyata).
+
+Subject yang dikembalikan
+-------------------------
+`create_partisipan_user` mengembalikan **subject OIDC (`sub`)** yang akan muncul di
+token saat partisipan login — yaitu nilai yang dicocokkan backend ke
+`partisipan.authentik_user_id` (`PartisipanService.get_by_subject`). Kedua provider
+OAuth2 ANJAB-ABK (web & backend) memakai `sub_mode = user_email`, sehingga `sub` =
+**email**. Karena itu provisioner mengembalikan email, bukan pk numerik Authentik:
+pk tidak pernah sama dengan `sub` pada konfigurasi ini sehingga menyimpannya membuat
+tautan identitas meleset (hanya tertolong fallback email di `get_by_subject`).
 """
 
 from __future__ import annotations
 
-import uuid
 from typing import Protocol
 
 import httpx
@@ -25,7 +34,9 @@ class AuthentikProvisioner(Protocol):
         """Buat pengguna di Authentik dan tambah ke grup partisipan.
 
         Returns:
-            ID unik pengguna Authentik (pk) sebagai string.
+            Subject OIDC (`sub`) pengguna — dengan `sub_mode=user_email` ini adalah
+            email. Nilai ini disimpan ke `partisipan.authentik_user_id` dan dicocokkan
+            saat login.
 
         Raises:
             ConflictError: bila email/username sudah terdaftar di Authentik.
@@ -35,14 +46,16 @@ class AuthentikProvisioner(Protocol):
 
 
 class PlaceholderAuthentikProvisioner:
-    """Standin — kembalikan ID palsu.
+    """Standin saat Authentik belum dikonfigurasi.
 
     Aktif bila env AUTHENTIK_API_URL/AUTHENTIK_API_TOKEN/AUTHENTIK_PARTISIPAN_GROUP_ID
-    belum di-set. Ganti dengan HttpAuthentikProvisioner via konfigurasi env.
+    belum di-set. TIDAK membuat akun Authentik sungguhan; ia hanya mengembalikan subject
+    yang konsisten dengan `sub_mode=user_email` (email) agar tautan identitas tetap benar
+    di lingkungan dev/test. Ganti dengan HttpAuthentikProvisioner via konfigurasi env.
     """
 
     def create_partisipan_user(self, *, nama: str, email: str) -> str:
-        return f"placeholder_{uuid.uuid4().hex[:8]}"
+        return email
 
 
 class HttpAuthentikProvisioner:
@@ -86,4 +99,7 @@ class HttpAuthentikProvisioner:
                 f"Authentik mengembalikan status {resp.status_code}: {resp.text}"
             )
 
-        return str(resp.json()["pk"])
+        # Pastikan user benar-benar terbuat (memvalidasi respons), tetapi kembalikan
+        # SUBJECT OIDC (email) — bukan pk — agar cocok dengan `sub_mode=user_email`.
+        _ = resp.json()["pk"]
+        return email

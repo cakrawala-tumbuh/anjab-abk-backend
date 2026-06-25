@@ -39,6 +39,14 @@ def test_create_and_get(client: TestClient) -> None:
     assert r2.json()["id"] == data["id"]
 
 
+def test_create_menautkan_authentik_user_id_ke_email(client: TestClient) -> None:
+    """Tautan identitas: `authentik_user_id` = email (klaim `sub`, sub_mode=user_email)."""
+    payload = {**_PAYLOAD, "email": "tautan.subject@ypii.sch.id"}
+    r = client.post(BASE, json=payload)
+    assert r.status_code == 201
+    assert r.json()["authentik_user_id"] == "tautan.subject@ypii.sch.id"
+
+
 def test_create_requires_auth(anon_client: TestClient) -> None:
     r = anon_client.post(BASE, json=_PAYLOAD)
     assert r.status_code == 401
