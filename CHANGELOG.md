@@ -7,6 +7,15 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-06-25
+
+### Diperbaiki
+
+- **Tahap 2 Task Inventory: submit keputusan hanya bisa dilakukan admin** — endpoint
+  `POST /api/v1/task-inventory/sesi/{sesi_id}/tahap2` tidak memiliki pemeriksaan
+  otorisasi koordinator. Kini endpoint menolak permintaan dengan 403 jika pengirim
+  bukan admin dan bukan koordinator SME panel yang tercatat di `sesi.koordinator_id`.
+
 ## [0.21.0] - 2026-06-25
 
 ### Diubah

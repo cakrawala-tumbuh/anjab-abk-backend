@@ -15,8 +15,9 @@ from ...dependencies import (
     get_ti_tahap2_service,
     rate_limit,
 )
-from ...errors import ValidationAppError
+from ...errors import ForbiddenError, ValidationAppError
 from ...schemas.common import ErrorResponse
+from ...security import Principal
 from ...taskinv.schemas.tahap2 import TiTahap2ReviewRead, TiTahap2Submit
 from ...taskinv.services.catalog import TiCatalogService
 from ...taskinv.services.responden import TiRespondenService
@@ -26,7 +27,7 @@ from ...taskinv.services.tahap2 import TiTahap2Service
 
 router = APIRouter()
 
-_WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
+_RATE_GUARD = [Depends(rate_limit)]
 _NOT_FOUND_SESI = {404: {"model": ErrorResponse, "description": "Sesi tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
@@ -57,22 +58,29 @@ def get_tahap2_review(
     return tahap2_service.get_review(sesi_id, partial, counts, n_submitted)
 
 
+_FORBIDDEN_SESI = {
+    403: {"model": ErrorResponse, "description": "Bukan admin atau koordinator sesi."}
+}
+
+
 @router.post(
     "/{sesi_id}/tahap2",
     response_model=TiTahap2ReviewRead,
     summary="Submit keputusan koordinator untuk task-task Tahap 2",
     operation_id="taskinv_tahap2_submit",
-    dependencies=_WRITE_GUARDS,
+    dependencies=_RATE_GUARD,
     responses={
         **_AUTH,
         **_RATE,
         **_NOT_FOUND_SESI,
+        **_FORBIDDEN_SESI,
         422: {"model": ErrorResponse, "description": "Sesi bukan TAHAP2 / kode task tidak valid."},
     },
 )
 def submit_tahap2_keputusan(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
     payload: TiTahap2Submit,
+    principal: Annotated[Principal, Depends(get_current_principal)],
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
@@ -80,6 +88,11 @@ def submit_tahap2_keputusan(
     tahap2_service: Annotated[TiTahap2Service, Depends(get_ti_tahap2_service)],
 ) -> TiTahap2ReviewRead:
     sesi = sesi_service.get(sesi_id)
+    if "admin" not in principal.groups and principal.subject != sesi.koordinator_id:
+        raise ForbiddenError(
+            "Akses ditolak: hanya admin atau koordinator SME panel"
+            " yang dapat submit keputusan Tahap 2."
+        )
     if sesi.status != "TAHAP2":
         raise ValidationAppError(
             f"Keputusan koordinator hanya dapat disubmit saat sesi berstatus TAHAP2"
