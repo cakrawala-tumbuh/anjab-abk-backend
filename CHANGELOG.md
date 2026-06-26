@@ -7,6 +7,15 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-06-26
+
+### Diperbaiki
+
+- **`koordinator_id` sesi TI dapat diperbarui di luar status DRAFT** — guard update
+  sesi sebelumnya memblokir seluruh field saat status bukan DRAFT, termasuk
+  `koordinator_id`. Kini `koordinator_id` dapat diperbarui di status apapun;
+  field lain tetap hanya bisa diubah saat DRAFT.
+
 ## [0.21.1] - 2026-06-25
 
 ### Diperbaiki

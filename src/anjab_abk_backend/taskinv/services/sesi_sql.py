@@ -121,9 +121,9 @@ class SqlTiSesiService:
 
     def update(self, sesi_id: str, data: TiSesiUpdate) -> TiSesiRead:
         rec = self._get_model(sesi_id)
-        if rec.status != "DRAFT":
-            raise ValidationAppError("Sesi hanya dapat diperbarui saat berstatus DRAFT.")
         changes = data.model_dump(exclude_unset=True)
+        if rec.status != "DRAFT" and any(k != "koordinator_id" for k in changes):
+            raise ValidationAppError("Sesi hanya dapat diperbarui saat berstatus DRAFT.")
         new_min = changes.get("min_responden", rec.min_responden)
         new_max = changes.get("max_responden", rec.max_responden)
         if new_min > new_max:

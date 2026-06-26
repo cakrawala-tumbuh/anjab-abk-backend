@@ -123,7 +123,7 @@ class InMemoryTiSesiService:
             rec = self._data.get(sesi_id)
             if rec is None:
                 raise NotFoundError(f"Sesi Task Inventory '{sesi_id}' tidak ditemukan.")
-            if rec.status != "DRAFT":
+            if rec.status != "DRAFT" and any(k != "koordinator_id" for k in changes):
                 raise ValidationAppError("Sesi hanya dapat diperbarui saat berstatus DRAFT.")
             new_min = changes.get("min_responden", rec.min_responden)
             new_max = changes.get("max_responden", rec.max_responden)
