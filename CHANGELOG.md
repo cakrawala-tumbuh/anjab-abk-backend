@@ -7,6 +7,15 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.21.4] - 2026-06-26
+
+### Ditambahkan
+
+- **Endpoint `GET /api/v1/partisipan/saya`** — mengembalikan data partisipan pengguna
+  yang sedang login berdasarkan JWT Bearer. Menggunakan `get_by_subject` untuk lookup
+  partisipan dari `principal.subject` (sub JWT = email). Merespons 404 jika partisipan
+  tidak ditemukan.
+
 ## [0.21.3] - 2026-06-26
 
 ### Diperbaiki

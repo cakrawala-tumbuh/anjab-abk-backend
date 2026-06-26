@@ -19,10 +19,16 @@ from ...dependencies import (
     pagination_params,
     rate_limit,
 )
-from ...errors import ConflictError, PreconditionFailedError, PreconditionRequiredError
+from ...errors import (
+    ConflictError,
+    NotFoundError,
+    PreconditionFailedError,
+    PreconditionRequiredError,
+)
 from ...etag import compute_etag
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ...security import Principal
 from ...services.authentik_provisioner import AuthentikProvisioner
 
 router = APIRouter()
@@ -192,6 +198,23 @@ def search_partisipan(
         domain=req.domain, order=req.order, limit=req.limit, offset=req.offset
     )
     return Page[PartisipanRead](items=items, total=total, limit=req.limit, offset=req.offset)
+
+
+@router.get(
+    "/saya",
+    response_model=PartisipanRead,
+    summary="Partisipan saat ini (berdasarkan token Bearer)",
+    operation_id="partisipan_saya",
+    responses={**_AUTH, **_NOT_FOUND},
+)
+def get_partisipan_saya(
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+) -> PartisipanRead:
+    par = service.get_by_subject(principal.subject)
+    if par is None:
+        raise NotFoundError("Partisipan tidak ditemukan untuk pengguna ini.")
+    return par
 
 
 @router.get(
