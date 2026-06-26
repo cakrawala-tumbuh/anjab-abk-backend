@@ -26,6 +26,11 @@ class TiKuesionerItemRead(BaseModel):
     sesi_jabatan_id: str = Field(
         description="ID jabatan yang dikaji dalam sesi.", examples=["jbt_a1b2c3d4"]
     )
+    sesi_jabatan_nama: str | None = Field(
+        default=None,
+        description="Nama jabatan yang dikaji dalam sesi.",
+        examples=["Kepala Sekolah"],
+    )
     sesi_periode: str = Field(description="Periode sesi (YYYY-MM).", examples=["2026-06"])
     is_koordinator: bool = Field(
         default=False,

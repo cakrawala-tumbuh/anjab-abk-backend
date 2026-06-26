@@ -6,9 +6,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
+from ...anjab.services.jabatan import JabatanService
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     get_current_principal,
+    get_jabatan_service,
     get_partisipan_service,
     get_ti_responden_service,
     get_ti_sesi_service,
@@ -38,6 +40,7 @@ def kuesioner_saya(
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    jabatan_service: Annotated[JabatanService, Depends(get_jabatan_service)],
 ) -> list[TiKuesionerItemRead]:
     """Enrollment otomatis: Task Inventory bersifat universal — tiap partisipan
     mengisi SEMUA sesi aktif (TAHAP1/TAHAP2/TAHAP3), sambil membuat record
@@ -61,6 +64,11 @@ def kuesioner_saya(
             partisipan_id=par.id,
             nama=par.nama,
         )
+        try:
+            jabatan = jabatan_service.get(sesi.jabatan_id)
+            jabatan_nama = jabatan.nama
+        except Exception:
+            jabatan_nama = None
         result.append(
             TiKuesionerItemRead(
                 id=rsp.id,
@@ -72,6 +80,7 @@ def kuesioner_saya(
                 created_at=rsp.created_at,
                 sesi_status=sesi.status,
                 sesi_jabatan_id=sesi.jabatan_id,
+                sesi_jabatan_nama=jabatan_nama,
                 sesi_periode=sesi.periode,
                 is_koordinator=(sesi.koordinator_id is not None and par.id == sesi.koordinator_id),
             )

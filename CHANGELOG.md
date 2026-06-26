@@ -7,6 +7,14 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.21.6] - 2026-06-26
+
+### Ditambahkan
+
+- **Field `sesi_jabatan_nama` di `TiKuesionerItemRead`** — endpoint `GET /task-inventory/kuesioner/saya`
+  kini mengembalikan nama jabatan (`sesi_jabatan_nama`) sehingga frontend dapat menampilkan
+  nama jabatan yang terbaca manusia, bukan kode ID jabatan, pada halaman kuesioner partisipan.
+
 ## [0.21.5] - 2026-06-26
 
 ### Ditambahkan
