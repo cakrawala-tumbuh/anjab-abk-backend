@@ -7,6 +7,16 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.21.3] - 2026-06-26
+
+### Diperbaiki
+
+- **Koordinator Tahap 2 selalu mendapat 403** — pemeriksaan otorisasi di endpoint
+  `POST /api/v1/task-inventory/sesi/{sesi_id}/tahap2` membandingkan `principal.subject`
+  (UUID Authentik) langsung dengan `sesi.koordinator_id` (format `par_XXXX`), sehingga
+  selalu tidak cocok. Kini endpoint melakukan lookup partisipan via `get_by_subject`
+  terlebih dahulu, lalu membandingkan `par.id` dengan `koordinator_id`.
+
 ## [0.21.2] - 2026-06-26
 
 ### Diperbaiki

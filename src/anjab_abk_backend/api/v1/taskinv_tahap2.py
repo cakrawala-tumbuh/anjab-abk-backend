@@ -6,8 +6,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path
 
+from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     get_current_principal,
+    get_partisipan_service,
     get_ti_catalog_service,
     get_ti_responden_service,
     get_ti_seleksi_service,
@@ -82,17 +84,20 @@ def submit_tahap2_keputusan(
     payload: TiTahap2Submit,
     principal: Annotated[Principal, Depends(get_current_principal)],
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     catalog: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
     tahap2_service: Annotated[TiTahap2Service, Depends(get_ti_tahap2_service)],
 ) -> TiTahap2ReviewRead:
     sesi = sesi_service.get(sesi_id)
-    if "admin" not in principal.groups and principal.subject != sesi.koordinator_id:
-        raise ForbiddenError(
-            "Akses ditolak: hanya admin atau koordinator SME panel"
-            " yang dapat submit keputusan Tahap 2."
-        )
+    if "admin" not in principal.groups:
+        par = par_service.get_by_subject(principal.subject)
+        if par is None or par.id != sesi.koordinator_id:
+            raise ForbiddenError(
+                "Akses ditolak: hanya admin atau koordinator SME panel"
+                " yang dapat submit keputusan Tahap 2."
+            )
     if sesi.status != "TAHAP2":
         raise ValidationAppError(
             f"Keputusan koordinator hanya dapat disubmit saat sesi berstatus TAHAP2"
