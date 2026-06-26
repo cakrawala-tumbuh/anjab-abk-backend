@@ -73,6 +73,7 @@ def kuesioner_saya(
                 sesi_status=sesi.status,
                 sesi_jabatan_id=sesi.jabatan_id,
                 sesi_periode=sesi.periode,
+                is_koordinator=(sesi.koordinator_id is not None and par.id == sesi.koordinator_id),
             )
         )
     return result

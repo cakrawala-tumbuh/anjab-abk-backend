@@ -27,3 +27,7 @@ class TiKuesionerItemRead(BaseModel):
         description="ID jabatan yang dikaji dalam sesi.", examples=["jbt_a1b2c3d4"]
     )
     sesi_periode: str = Field(description="Periode sesi (YYYY-MM).", examples=["2026-06"])
+    is_koordinator: bool = Field(
+        default=False,
+        description="True jika pengguna ini adalah koordinator SME panel untuk sesi ini.",
+    )

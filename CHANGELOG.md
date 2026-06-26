@@ -7,6 +7,15 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.21.5] - 2026-06-26
+
+### Ditambahkan
+
+- **Field `is_koordinator` di `TiKuesionerItemRead`** — endpoint `GET /task-inventory/kuesioner/saya`
+  kini mengembalikan `is_koordinator: bool` yang bernilai `true` jika pengguna saat ini
+  adalah koordinator SME panel untuk sesi tersebut. Digunakan frontend untuk menampilkan
+  tombol "Review Koordinator" di halaman kuesioner partisipan.
+
 ## [0.21.4] - 2026-06-26
 
 ### Ditambahkan
