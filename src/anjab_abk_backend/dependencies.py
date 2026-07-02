@@ -42,6 +42,12 @@ from .dcs.services.sesi_sql import SqlDcsSesiService
 from .dcs.services.subskala import DcsSubSkalaService
 from .dcs.services.subskala_sql import SqlDcsSubSkalaService
 from .errors import ForbiddenError, RateLimitedError, UnauthorizedError
+from .opm.services.jawaban import OpmJawabanService
+from .opm.services.jawaban_sql import SqlOpmJawabanService
+from .opm.services.responden import OpmRespondenService
+from .opm.services.responden_sql import SqlOpmRespondenService
+from .opm.services.sesi import OpmSesiService
+from .opm.services.sesi_sql import SqlOpmSesiService
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
 from .services.authentik_provisioner import (
     AuthentikProvisioner,
@@ -256,6 +262,24 @@ def get_ts_responden_service(session: SessionDep) -> TsRespondenService:
 def get_ts_log_service(session: SessionDep) -> TsLogService:
     """SEAM: implementasi `TsLogService` berbasis PostgreSQL."""
     return SqlTsLogService(session)
+
+
+# --- OPM services ---
+
+
+def get_opm_sesi_service(session: SessionDep) -> OpmSesiService:
+    """SEAM: implementasi `OpmSesiService` berbasis PostgreSQL."""
+    return SqlOpmSesiService(session)
+
+
+def get_opm_responden_service(session: SessionDep) -> OpmRespondenService:
+    """SEAM: implementasi `OpmRespondenService` berbasis PostgreSQL."""
+    return SqlOpmRespondenService(session)
+
+
+def get_opm_jawaban_service(session: SessionDep) -> OpmJawabanService:
+    """SEAM: implementasi `OpmJawabanService` berbasis PostgreSQL."""
+    return SqlOpmJawabanService(session)
 
 
 # --- Authentik Provisioner ---

@@ -555,3 +555,69 @@ class TsLogModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
     )
+
+
+# ======================================================================================
+# OPM (Rating Tugas — Importance/Frequency/Criticality)
+# ======================================================================================
+
+
+class OpmSesiModel(Base):
+    __tablename__ = "opm_sesi"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    jabatan_id: Mapped[str] = mapped_column(String(40), nullable=False, unique=True, index=True)
+    ti_sesi_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    periode: Mapped[str] = mapped_column(String(7), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
+    min_responden: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    max_responden: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    catatan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = _ts(index=True)
+
+    task_links: Mapped[list[OpmSesiTaskModel]] = relationship(
+        back_populates="sesi", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class OpmSesiTaskModel(Base):
+    __tablename__ = "opm_sesi_task"
+    __table_args__ = (UniqueConstraint("sesi_id", "task_kode"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sesi_id: Mapped[str] = mapped_column(
+        ForeignKey("opm_sesi.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    task_kode: Mapped[str] = mapped_column(String(20), nullable=False)
+    uraian_tugas: Mapped[str] = mapped_column(Text, nullable=False)
+    tugas_pokok: Mapped[str] = mapped_column(String(300), nullable=False)
+    detil_tugas: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    urutan: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    sesi: Mapped[OpmSesiModel] = relationship(back_populates="task_links")
+
+
+class OpmRespondenModel(Base):
+    __tablename__ = "opm_responden"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    sesi_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    nama: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    jabatan_label: Mapped[str] = mapped_column(String(200), nullable=False)
+    partisipan_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    sudah_submit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = _ts(index=True)
+
+
+class OpmJawabanModel(Base):
+    __tablename__ = "opm_jawaban"
+    __table_args__ = (UniqueConstraint("responden_id", "task_kode"),)
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    responden_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    task_kode: Mapped[str] = mapped_column(String(20), nullable=False)
+    importance: Mapped[int] = mapped_column(Integer, nullable=False)
+    frequency: Mapped[int] = mapped_column(Integer, nullable=False)
+    criticality: Mapped[int] = mapped_column(Integer, nullable=False)
+    catatan: Mapped[str | None] = mapped_column(Text, nullable=True)

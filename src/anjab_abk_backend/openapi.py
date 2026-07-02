@@ -53,6 +53,25 @@ TAGS_METADATA = [
         ),
     },
     {
+        "name": "opm.kuesioner",
+        "description": "Kuesioner OPM (Rating Tugas) milik partisipan yang sedang login.",
+    },
+    {
+        "name": "opm.sesi",
+        "description": (
+            "Sesi rating OPM per jabatan — snapshot task dari Task Inventory frozen,"
+            " CRUD, dan transisi status (DRAFT→OPEN→CLOSED→ANALYZED)."
+        ),
+    },
+    {
+        "name": "opm.responden",
+        "description": "Responden dalam sesi OPM (auto dari anggota SME panel) dan submit rating.",
+    },
+    {
+        "name": "opm.hasil",
+        "description": "Analisis OPM: jalankan kalkulasi dan ambil hasil per sesi (mean/SD/flag).",
+    },
+    {
         "name": "dcs.sub-skala",
         "description": "Master data 3 sub-skala DCS dan 42 item pernyataan (read-only).",
     },

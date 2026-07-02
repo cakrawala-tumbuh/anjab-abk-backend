@@ -7,6 +7,24 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-07-02
+
+### Ditambahkan
+
+- **Instrumen OPM (Rating Tugas — Importance/Frequency/Criticality)** — instrumen baru untuk
+  menilai task hasil Task Inventory pada 3 dimensi skala 1–5 (Importance, Frequency, Criticality).
+  - Model baru: `OpmSesiModel` (satu sesi per jabatan, wajib punya SME panel), `OpmSesiTaskModel`
+    (snapshot task dari sesi TI yang sudah dibekukan), `OpmRespondenModel` (auto-terisi dari
+    anggota SME panel), `OpmJawabanModel`.
+  - Package `opm/` (schemas + services) dan router baru `api/v1/opm_sesi.py`, `opm_responden.py`,
+    `opm_hasil.py`, `opm_kuesioner.py` — mengikuti pola instrumen WCP/DCS: alur status
+    `DRAFT → OPEN → CLOSED → ANALYZED`, transisi, kuesioner-saya, dan analisis hasil
+    (mean/SD per dimensi + flag `selection_essential`/`workload_essential` dari mean, plus
+    proporsi rater per formula individual).
+  - Sesi OPM membekukan task via snapshot dari sesi Task Inventory (`ti_sesi_id`) yang sudah
+    `task_frozen=True`, sehingga tidak lagi bergantung pada TI setelah dibuat.
+  - Migrasi Alembic baru untuk 4 tabel `opm_*`.
+
 ## [0.21.6] - 2026-06-26
 
 ### Ditambahkan

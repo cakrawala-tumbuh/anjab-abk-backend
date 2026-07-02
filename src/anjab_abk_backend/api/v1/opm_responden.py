@@ -1,0 +1,165 @@
+"""Endpoint resource `OpmResponden` dan submit jawaban."""
+
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Path, Response, status
+
+from ...dependencies import (
+    get_current_principal,
+    get_opm_jawaban_service,
+    get_opm_responden_service,
+    get_opm_sesi_service,
+    rate_limit,
+)
+from ...errors import ValidationAppError
+from ...opm.schemas.jawaban import OpmJawabanBulkCreate, OpmJawabanRead
+from ...opm.schemas.responden import OpmRespondenCreate, OpmRespondenRead
+from ...opm.services.jawaban import OpmJawabanService
+from ...opm.services.responden import OpmRespondenService
+from ...opm.services.sesi import OpmSesiService
+from ...schemas.common import ErrorResponse
+
+router = APIRouter()
+
+_WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
+_NOT_FOUND_SESI = {404: {"model": ErrorResponse, "description": "Sesi OPM tidak ditemukan."}}
+_NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
+_AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
+_RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
+
+
+@router.get(
+    "/{sesi_id}/responden",
+    response_model=list[OpmRespondenRead],
+    summary="Daftar responden dalam sesi OPM",
+    operation_id="opm_responden_list",
+    responses=_NOT_FOUND_SESI,
+)
+def list_responden(
+    sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
+    sesi_service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
+    rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+) -> list[OpmRespondenRead]:
+    sesi_service.get(sesi_id)
+    return rsp_service.list_by_sesi(sesi_id)
+
+
+@router.post(
+    "/{sesi_id}/responden",
+    response_model=OpmRespondenRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Daftarkan responden manual ke sesi OPM (wajib anggota SME panel jabatan sesi)",
+    operation_id="opm_responden_create",
+    dependencies=_WRITE_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_NOT_FOUND_SESI,
+        409: {
+            "model": ErrorResponse,
+            "description": "Partisipan sudah terdaftar sebagai responden OPM di sesi ini.",
+        },
+        422: {
+            "model": ErrorResponse,
+            "description": "Sesi bukan DRAFT/OPEN, atau partisipan bukan anggota SME panel.",
+        },
+    },
+)
+def create_responden(
+    sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
+    payload: OpmRespondenCreate,
+    sesi_service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
+    rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+) -> OpmRespondenRead:
+    sesi = sesi_service.get(sesi_id)
+    if sesi.status not in ("DRAFT", "OPEN"):
+        raise ValidationAppError(
+            f"Responden hanya dapat ditambahkan saat sesi DRAFT/OPEN (saat ini: {sesi.status})."
+        )
+    return rsp_service.create(sesi_id, payload, sesi.max_responden, sesi.jabatan_id)
+
+
+@router.get(
+    "/responden/{responden_id}",
+    response_model=OpmRespondenRead,
+    summary="Ambil detail responden OPM",
+    operation_id="opm_responden_get",
+    responses=_NOT_FOUND_RSP,
+)
+def get_responden(
+    responden_id: Annotated[str, Path(description="ID responden.")],
+    rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+) -> OpmRespondenRead:
+    return rsp_service.get(responden_id)
+
+
+@router.delete(
+    "/responden/{responden_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Hapus responden (hanya jika belum submit)",
+    operation_id="opm_responden_delete",
+    dependencies=_WRITE_GUARDS,
+    responses={**_AUTH, **_RATE, **_NOT_FOUND_RSP},
+)
+def delete_responden(
+    responden_id: Annotated[str, Path(description="ID responden.")],
+    rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+) -> Response:
+    rsp_service.delete(responden_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/responden/{responden_id}/jawaban",
+    response_model=list[OpmJawabanRead],
+    status_code=status.HTTP_201_CREATED,
+    summary="Submit rating (Importance/Frequency/Criticality) untuk satu responden",
+    operation_id="opm_jawaban_submit",
+    dependencies=_WRITE_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_NOT_FOUND_RSP,
+        422: {
+            "model": ErrorResponse,
+            "description": "Sesi bukan OPEN, responden sudah submit, atau set task tidak lengkap.",
+        },
+    },
+)
+def submit_jawaban(
+    responden_id: Annotated[str, Path(description="ID responden.")],
+    payload: OpmJawabanBulkCreate,
+    sesi_service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
+    rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+    jwb_service: Annotated[OpmJawabanService, Depends(get_opm_jawaban_service)],
+) -> list[OpmJawabanRead]:
+    responden = rsp_service.get(responden_id)
+    sesi = sesi_service.get(responden.sesi_id)
+    if sesi.status != "OPEN":
+        raise ValidationAppError(
+            f"Jawaban hanya dapat disubmit saat sesi berstatus OPEN (saat ini: {sesi.status})."
+        )
+    if responden.sudah_submit:
+        raise ValidationAppError("Responden ini sudah mengirimkan jawaban.")
+    valid_task_kodes = sesi_service.get_task_kodes(responden.sesi_id)
+    results = jwb_service.bulk_create(responden_id, payload, valid_task_kodes)
+    rsp_service.mark_submitted(responden_id)
+    return results
+
+
+@router.get(
+    "/responden/{responden_id}/jawaban",
+    response_model=list[OpmJawabanRead],
+    summary="Lihat jawaban responden",
+    operation_id="opm_jawaban_list",
+    responses=_NOT_FOUND_RSP,
+)
+def list_jawaban(
+    responden_id: Annotated[str, Path(description="ID responden.")],
+    rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+    jwb_service: Annotated[OpmJawabanService, Depends(get_opm_jawaban_service)],
+) -> list[OpmJawabanRead]:
+    rsp_service.get(responden_id)
+    return jwb_service.list_by_responden(responden_id)

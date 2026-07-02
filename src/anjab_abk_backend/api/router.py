@@ -13,6 +13,10 @@ from .v1 import (
     jabatan,
     jenjang_pendidikan,
     mata_pelajaran,
+    opm_hasil,
+    opm_kuesioner,
+    opm_responden,
+    opm_sesi,
     partisipan,
     sekolah,
     sme_panel,
@@ -100,6 +104,26 @@ api_router.include_router(
     wcp_hasil.router,
     prefix="/wcp/sesi",
     tags=["wcp.hasil"],
+)
+api_router.include_router(
+    opm_kuesioner.router,
+    prefix="/opm",
+    tags=["opm.kuesioner"],
+)
+api_router.include_router(
+    opm_sesi.router,
+    prefix="/opm/sesi",
+    tags=["opm.sesi"],
+)
+api_router.include_router(
+    opm_responden.router,
+    prefix="/opm/sesi",
+    tags=["opm.responden"],
+)
+api_router.include_router(
+    opm_hasil.router,
+    prefix="/opm/sesi",
+    tags=["opm.hasil"],
 )
 api_router.include_router(
     dcs_subskala.router,
