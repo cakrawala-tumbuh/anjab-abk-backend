@@ -86,7 +86,7 @@ class TsLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str = Field(description="ID log.", examples=["tlog_a1b2c3d4"])
-    responden_id: str = Field(description="ID responden induk.", examples=["trsp_a1b2c3d4"])
+    partisipan_id: str = Field(description="ID partisipan pemilik log.", examples=["par_a1b2c3d4"])
     tanggal: date = Field(description="Tanggal pencatatan.")
     waktu_masuk: str = Field(description="Waktu masuk kerja (HH:MM).")
     waktu_keluar: str = Field(description="Waktu keluar kerja (HH:MM).")

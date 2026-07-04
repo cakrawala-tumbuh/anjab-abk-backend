@@ -51,7 +51,7 @@ def _validate_times_and_minutes(
 @dataclass
 class _Record:
     id: str
-    responden_id: str
+    partisipan_id: str
     tanggal: date
     waktu_masuk: str
     waktu_keluar: str
@@ -70,10 +70,10 @@ class _Record:
 class TsLogService(Protocol):
     """Kontrak operasi terhadap TsLog."""
 
-    def list_by_responden(self, responden_id: str) -> list[TsLogRead]: ...
-    def count_by_responden(self, responden_id: str) -> int: ...
+    def list_by_partisipan(self, partisipan_id: str) -> list[TsLogRead]: ...
+    def count_by_partisipan(self, partisipan_id: str) -> int: ...
     def get(self, log_id: str) -> TsLogRead: ...
-    def create(self, responden_id: str, data: TsLogCreate) -> TsLogRead: ...
+    def create(self, partisipan_id: str, data: TsLogCreate) -> TsLogRead: ...
     def update(self, log_id: str, data: TsLogUpdate) -> TsLogRead: ...
 
 
@@ -88,18 +88,18 @@ class InMemoryTsLogService:
     def _to_read(rec: _Record) -> TsLogRead:
         return TsLogRead.model_validate(rec)
 
-    def list_by_responden(self, responden_id: str) -> list[TsLogRead]:
+    def list_by_partisipan(self, partisipan_id: str) -> list[TsLogRead]:
         with self._lock:
             ordered = sorted(
-                (r for r in self._data.values() if r.responden_id == responden_id),
+                (r for r in self._data.values() if r.partisipan_id == partisipan_id),
                 key=lambda r: r.tanggal,
                 reverse=True,
             )
         return [self._to_read(r) for r in ordered]
 
-    def count_by_responden(self, responden_id: str) -> int:
+    def count_by_partisipan(self, partisipan_id: str) -> int:
         with self._lock:
-            return sum(1 for r in self._data.values() if r.responden_id == responden_id)
+            return sum(1 for r in self._data.values() if r.partisipan_id == partisipan_id)
 
     def get(self, log_id: str) -> TsLogRead:
         with self._lock:
@@ -108,7 +108,7 @@ class InMemoryTsLogService:
             raise NotFoundError(f"Log Time Study '{log_id}' tidak ditemukan.")
         return self._to_read(rec)
 
-    def create(self, responden_id: str, data: TsLogCreate) -> TsLogRead:
+    def create(self, partisipan_id: str, data: TsLogCreate) -> TsLogRead:
         _validate_times_and_minutes(
             data.waktu_masuk,
             data.waktu_keluar,
@@ -121,17 +121,17 @@ class InMemoryTsLogService:
         )
         with self._lock:
             already = any(
-                r.responden_id == responden_id and r.tanggal == data.tanggal
+                r.partisipan_id == partisipan_id and r.tanggal == data.tanggal
                 for r in self._data.values()
             )
             if already:
                 raise ConflictError(
-                    f"Log untuk responden '{responden_id}' tanggal '{data.tanggal}' sudah ada."
+                    f"Log untuk partisipan '{partisipan_id}' tanggal '{data.tanggal}' sudah ada."
                 )
             now = datetime.now(UTC)
             rec = _Record(
                 id=f"tlog_{uuid.uuid4().hex[:8]}",
-                responden_id=responden_id,
+                partisipan_id=partisipan_id,
                 tanggal=data.tanggal,
                 waktu_masuk=data.waktu_masuk,
                 waktu_keluar=data.waktu_keluar,

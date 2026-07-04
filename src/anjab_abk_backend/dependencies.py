@@ -78,10 +78,8 @@ from .taskinv.services.uraian_tugas import UraianTugasService
 from .taskinv.services.uraian_tugas_sql import SqlUraianTugasService
 from .ts.services.log import TsLogService
 from .ts.services.log_sql import SqlTsLogService
-from .ts.services.responden import TsRespondenService
-from .ts.services.responden_sql import SqlTsRespondenService
-from .ts.services.sesi import TsSesiService
-from .ts.services.sesi_sql import SqlTsSesiService
+from .ts.services.penugasan import TsPenugasanService
+from .ts.services.penugasan_sql import SqlTsPenugasanService
 from .wcp.services.dimensi import WcpDimensiService
 from .wcp.services.dimensi_sql import SqlWcpDimensiService
 from .wcp.services.jawaban import WcpJawabanService
@@ -249,14 +247,9 @@ def get_ti_tahap2_service(session: SessionDep) -> TiTahap2Service:
 # --- TS services ---
 
 
-def get_ts_sesi_service(session: SessionDep) -> TsSesiService:
-    """SEAM: implementasi `TsSesiService` berbasis PostgreSQL."""
-    return SqlTsSesiService(session)
-
-
-def get_ts_responden_service(session: SessionDep) -> TsRespondenService:
-    """SEAM: implementasi `TsRespondenService` berbasis PostgreSQL."""
-    return SqlTsRespondenService(session)
+def get_ts_penugasan_service(session: SessionDep) -> TsPenugasanService:
+    """SEAM: implementasi `TsPenugasanService` berbasis PostgreSQL."""
+    return SqlTsPenugasanService(session)
 
 
 def get_ts_log_service(session: SessionDep) -> TsLogService:

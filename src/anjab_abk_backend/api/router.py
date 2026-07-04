@@ -34,8 +34,7 @@ from .v1 import (
     taskinv_uraian_tugas,
     ts_kuesioner,
     ts_log,
-    ts_responden,
-    ts_sesi,
+    ts_penugasan,
     wcp_dimensi,
     wcp_hasil,
     wcp_kuesioner,
@@ -191,18 +190,13 @@ api_router.include_router(
     tags=["ts.kuesioner"],
 )
 api_router.include_router(
-    ts_sesi.router,
-    prefix="/time-study/sesi",
-    tags=["ts.sesi"],
-)
-api_router.include_router(
-    ts_responden.router,
-    prefix="/time-study/sesi",
-    tags=["ts.responden"],
+    ts_penugasan.router,
+    prefix="/time-study/penugasan",
+    tags=["ts.penugasan"],
 )
 api_router.include_router(
     ts_log.router,
-    prefix="/time-study/responden",
+    prefix="/time-study/penugasan",
     tags=["ts.log"],
 )
 api_router.include_router(

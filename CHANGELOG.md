@@ -7,6 +7,26 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diubah
+
+- **BREAKING: Time Study tanpa sesi — penugasan berbasis partisipan langsung.**
+  - Model `TsSesiModel`/`TsRespondenModel` dihapus; diganti `TsPenugasanModel` (satu
+    penugasan per partisipan, membawa flag `aktif` sebagai pengganti state machine
+    `DRAFT→OPEN→CLOSED→ANALYZED`).
+  - `TsLogModel.responden_id` diganti `partisipan_id`; constraint unik berubah dari
+    `(responden_id, tanggal)` menjadi `(partisipan_id, tanggal)`.
+  - Endpoint dirombak: `/api/v1/time-study/sesi` dan
+    `/api/v1/time-study/sesi/{sesi_id}/responden` diganti
+    `/api/v1/time-study/penugasan` (CRUD); `/api/v1/time-study/responden/{responden_id}/log`
+    menjadi `/api/v1/time-study/penugasan/{penugasan_id}/log`.
+  - `GET /api/v1/time-study/kuesioner/saya` kini mengembalikan penugasan aktif milik
+    partisipan (bukan daftar sesi berstatus OPEN); field `TsKuesionerItemRead` diringkas
+    menjadi `{id, aktif, jumlah_log, created_at}`.
+  - Pencatatan/pembaruan log ditolak (422) selama penugasan berstatus nonaktif.
+  - Migrasi Alembic membackfill `ts_penugasan` dari `ts_responden` ber-`partisipan_id`
+    dan mengaitkan ulang `ts_log` ke `partisipan_id`; log dari responden anonim
+    (tanpa `partisipan_id`) dihapus karena tak dapat dipetakan.
+
 ## [0.22.0] - 2026-07-02
 
 ### Ditambahkan

@@ -512,34 +512,24 @@ class TiDetailModel(Base):
 # ======================================================================================
 
 
-class TsSesiModel(Base):
-    __tablename__ = "ts_sesi"
+class TsPenugasanModel(Base):
+    """Penugasan Time Study — gerbang akses per partisipan (tanpa sesi)."""
+
+    __tablename__ = "ts_penugasan"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    jabatan_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
-    periode: Mapped[str] = mapped_column(String(7), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
+    partisipan_id: Mapped[str] = mapped_column(String(40), nullable=False, unique=True, index=True)
+    aktif: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     catatan: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = _ts(index=True)
-
-
-class TsRespondenModel(Base):
-    __tablename__ = "ts_responden"
-
-    id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    sesi_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
-    nama: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    jabatan_label: Mapped[str] = mapped_column(String(200), nullable=False)
-    partisipan_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
     created_at: Mapped[datetime] = _ts(index=True)
 
 
 class TsLogModel(Base):
     __tablename__ = "ts_log"
-    __table_args__ = (UniqueConstraint("responden_id", "tanggal"),)
+    __table_args__ = (UniqueConstraint("partisipan_id", "tanggal"),)
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    responden_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    partisipan_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     tanggal: Mapped[date] = mapped_column(Date, nullable=False)
     waktu_masuk: Mapped[str] = mapped_column(String(5), nullable=False)
     waktu_keluar: Mapped[str] = mapped_column(String(5), nullable=False)

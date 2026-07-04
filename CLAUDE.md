@@ -72,6 +72,27 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-04] Time Study: hapus sesi, penugasan berbasis partisipan
+
+Time Study tidak lagi memakai sesi. Mekanisme assign partisipan disederhanakan
+menjadi penugasan langsung per partisipan; partisipan mencatat log harian
+open-ended (tanpa periode) selama penugasannya aktif. Perubahan:
+- `TsSesiModel` & `TsRespondenModel` dihapus; diganti `TsPenugasanModel`
+  (`ts_penugasan`: `partisipan_id` unik, flag `aktif`, `catatan`) — satu penugasan
+  per partisipan, bukan per sesi.
+- `TsLogModel.responden_id` diganti `partisipan_id`; constraint unik berubah dari
+  `(responden_id, tanggal)` menjadi `(partisipan_id, tanggal)`.
+- State machine `DRAFT→OPEN→CLOSED→ANALYZED` dihapus dari TS; digantikan flag
+  `aktif` sederhana. Pencatatan/pembaruan log ditolak (422) saat penugasan nonaktif.
+- Endpoint: `/time-study/sesi` & `/time-study/sesi/{sesi_id}/responden` diganti
+  `/time-study/penugasan` (CRUD); `/time-study/responden/{responden_id}/log` menjadi
+  `/time-study/penugasan/{penugasan_id}/log`.
+- `TsKuesionerItemRead` diringkas menjadi `{id, aktif, jumlah_log, created_at}` —
+  field `sesi_*` dihapus; endpoint `/kuesioner/saya` memfilter penugasan `aktif`
+  (bukan status sesi OPEN).
+- Analisis/agregasi Time Study sengaja TIDAK dibangun di revisi ini (di luar
+  lingkup) — TS belum punya endpoint hasil/analisis nyata sebelumnya.
+
 ### [2026-06-25] Task Inventory: Sesi tidak perlu unit
 
 Sesi Task Inventory tidak lagi memerlukan `unit` (jenjang). Sesi hanya terikat pada

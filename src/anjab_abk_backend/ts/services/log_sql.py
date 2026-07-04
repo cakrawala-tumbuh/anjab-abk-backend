@@ -3,7 +3,7 @@
 MENGGANTI `InMemoryTsLogService` TANPA mengubah kontrak Protocol.
 
 Validasi waktu & menit dipakai ULANG dari `.log` (`_validate_times_and_minutes`).
-Keunikan `(responden_id, tanggal)` ditegakkan oleh constraint DB; flush dibungkus
+Keunikan `(partisipan_id, tanggal)` ditegakkan oleh constraint DB; flush dibungkus
 SAVEPOINT agar `IntegrityError` dipetakan ke `ConflictError` tanpa merusak
 transaksi request.
 """
@@ -34,7 +34,7 @@ def _to_read(rec: TsLogModel) -> TsLogRead:
         updated = updated.replace(tzinfo=UTC)
     return TsLogRead(
         id=rec.id,
-        responden_id=rec.responden_id,
+        partisipan_id=rec.partisipan_id,
         tanggal=rec.tanggal,
         waktu_masuk=rec.waktu_masuk,
         waktu_keluar=rec.waktu_keluar,
@@ -76,20 +76,20 @@ class SqlTsLogService:
         except IntegrityError as exc:
             raise ConflictError(on_conflict) from exc
 
-    def list_by_responden(self, responden_id: str) -> list[TsLogRead]:
+    def list_by_partisipan(self, partisipan_id: str) -> list[TsLogRead]:
         rows = self._s.scalars(
             select(TsLogModel)
-            .where(TsLogModel.responden_id == responden_id)
+            .where(TsLogModel.partisipan_id == partisipan_id)
             .order_by(TsLogModel.tanggal.desc())
         ).all()
         return [_to_read(r) for r in rows]
 
-    def count_by_responden(self, responden_id: str) -> int:
+    def count_by_partisipan(self, partisipan_id: str) -> int:
         return (
             self._s.scalar(
                 select(func.count())
                 .select_from(TsLogModel)
-                .where(TsLogModel.responden_id == responden_id)
+                .where(TsLogModel.partisipan_id == partisipan_id)
             )
             or 0
         )
@@ -97,7 +97,7 @@ class SqlTsLogService:
     def get(self, log_id: str) -> TsLogRead:
         return _to_read(self._get_model(log_id))
 
-    def create(self, responden_id: str, data: TsLogCreate) -> TsLogRead:
+    def create(self, partisipan_id: str, data: TsLogCreate) -> TsLogRead:
         _validate_times_and_minutes(
             data.waktu_masuk,
             data.waktu_keluar,
@@ -111,18 +111,18 @@ class SqlTsLogService:
         # Pre-cek untuk pesan ramah; unique constraint tetap jadi backstop balapan.
         already = self._s.scalar(
             select(TsLogModel.id).where(
-                TsLogModel.responden_id == responden_id,
+                TsLogModel.partisipan_id == partisipan_id,
                 TsLogModel.tanggal == data.tanggal,
             )
         )
         if already is not None:
             raise ConflictError(
-                f"Log untuk responden '{responden_id}' tanggal '{data.tanggal}' sudah ada."
+                f"Log untuk partisipan '{partisipan_id}' tanggal '{data.tanggal}' sudah ada."
             )
         now = datetime.now(UTC)
         rec = TsLogModel(
             id=f"tlog_{uuid.uuid4().hex[:8]}",
-            responden_id=responden_id,
+            partisipan_id=partisipan_id,
             tanggal=data.tanggal,
             waktu_masuk=data.waktu_masuk,
             waktu_keluar=data.waktu_keluar,
@@ -140,7 +140,7 @@ class SqlTsLogService:
         self._s.add(rec)
         self._flush_checked(
             on_conflict=(
-                f"Log untuk responden '{responden_id}' tanggal '{data.tanggal}' sudah ada."
+                f"Log untuk partisipan '{partisipan_id}' tanggal '{data.tanggal}' sudah ada."
             )
         )
         return _to_read(rec)
@@ -171,7 +171,7 @@ class SqlTsLogService:
         rec.updated_at = datetime.now(UTC)
         self._flush_checked(
             on_conflict=(
-                f"Log untuk responden '{rec.responden_id}' tanggal"
+                f"Log untuk partisipan '{rec.partisipan_id}' tanggal"
                 f" '{changes.get('tanggal', rec.tanggal)}' sudah ada."
             )
         )
