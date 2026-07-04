@@ -88,9 +88,14 @@ def test_list_responden_after_create(client: TestClient, open_sesi: dict) -> Non
     assert all(d["sesi_id"] == sesi_id for d in data)
 
 
-def test_list_responden_sesi_not_found(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{RSP_BASE}/dses_tidakada/responden")
+def test_list_responden_sesi_not_found(client: TestClient) -> None:
+    r = client.get(f"{RSP_BASE}/dses_tidakada/responden")
     assert r.status_code == 404
+
+
+def test_list_responden_requires_admin(anon_client: TestClient) -> None:
+    r = anon_client.get(f"{RSP_BASE}/dses_tidakada/responden")
+    assert r.status_code == 401
 
 
 # --- GET /responden/{responden_id} ---
@@ -105,9 +110,14 @@ def test_get_responden_ok(client: TestClient, open_sesi: dict) -> None:
     assert data["sudah_submit"] is False
 
 
-def test_get_responden_not_found(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{RSP_BASE}/responden/drsp_tidakada")
+def test_get_responden_not_found(client: TestClient) -> None:
+    r = client.get(f"{RSP_BASE}/responden/drsp_tidakada")
     assert r.status_code == 404
+
+
+def test_get_responden_requires_auth(anon_client: TestClient) -> None:
+    r = anon_client.get(f"{RSP_BASE}/responden/drsp_tidakada")
+    assert r.status_code == 401
 
 
 # --- DELETE /responden/{responden_id} ---
@@ -161,9 +171,14 @@ def test_list_jawaban_after_submit(client: TestClient, open_sesi: dict) -> None:
     assert item_ids == set(ALL_ITEM_IDS)
 
 
-def test_list_jawaban_responden_not_found(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{RSP_BASE}/responden/drsp_tidakada/jawaban")
+def test_list_jawaban_responden_not_found(client: TestClient) -> None:
+    r = client.get(f"{RSP_BASE}/responden/drsp_tidakada/jawaban")
     assert r.status_code == 404
+
+
+def test_list_jawaban_requires_auth(anon_client: TestClient) -> None:
+    r = anon_client.get(f"{RSP_BASE}/responden/drsp_tidakada/jawaban")
+    assert r.status_code == 401
 
 
 # --- GET /{sesi_id}/hasil (sukses) ---
@@ -367,3 +382,84 @@ def test_kuesioner_saya_dengan_assignment(client: TestClient, db_session) -> Non
     # Idempoten: pemanggilan ulang tidak menggandakan entri.
     r3 = client.get(f"{DCS_KUESIONER_BASE}/saya")
     assert [i["id"] for i in r3.json()] == [item["id"]]
+
+
+# --------------------------------------------------------------------------- #
+# Otorisasi object-level (BOLA/IDOR): partisipan tidak boleh akses responden
+# DCS milik partisipan lain lewat penebakan responden_id.
+# --------------------------------------------------------------------------- #
+
+
+def test_get_responden_forbidden_for_non_owner(
+    client: TestClient, open_sesi: dict, client_as, partisipan_factory
+) -> None:
+    par_a = partisipan_factory("dcs-bola-a")
+    partisipan_factory("dcs-bola-b")
+    rsp = client.post(
+        f"{RSP_BASE}/{open_sesi['id']}/responden",
+        json={"jabatan_label": "Guru A", "partisipan_id": par_a},
+    ).json()
+
+    as_b = client_as("dcs-bola-b")
+    assert as_b.get(f"{RSP_BASE}/responden/{rsp['id']}").status_code == 403
+
+    as_a = client_as("dcs-bola-a")
+    r = as_a.get(f"{RSP_BASE}/responden/{rsp['id']}")
+    assert r.status_code == 200
+    assert r.json()["id"] == rsp["id"]
+
+
+def test_submit_jawaban_forbidden_for_non_owner(
+    client: TestClient, open_sesi: dict, client_as, partisipan_factory
+) -> None:
+    par_a = partisipan_factory("dcs-bola-c")
+    partisipan_factory("dcs-bola-d")
+    rsp = client.post(
+        f"{RSP_BASE}/{open_sesi['id']}/responden",
+        json={"jabatan_label": "Guru A", "partisipan_id": par_a},
+    ).json()
+
+    as_d = client_as("dcs-bola-d")
+    r = as_d.post(
+        f"{RSP_BASE}/responden/{rsp['id']}/jawaban",
+        json={"jawaban": _all_jawaban()},
+    )
+    assert r.status_code == 403
+
+
+def test_list_jawaban_forbidden_for_non_owner_allowed_for_owner_and_admin(
+    client: TestClient, open_sesi: dict, client_as, partisipan_factory
+) -> None:
+    par_a = partisipan_factory("dcs-bola-e")
+    partisipan_factory("dcs-bola-f")
+    rsp = client.post(
+        f"{RSP_BASE}/{open_sesi['id']}/responden",
+        json={"jabatan_label": "Guru A", "partisipan_id": par_a},
+    ).json()
+    _submit(client, rsp["id"])
+
+    as_f = client_as("dcs-bola-f")
+    assert as_f.get(f"{RSP_BASE}/responden/{rsp['id']}/jawaban").status_code == 403
+
+    as_a = client_as("dcs-bola-e")
+    r = as_a.get(f"{RSP_BASE}/responden/{rsp['id']}/jawaban")
+    assert r.status_code == 200
+    assert len(r.json()) == 42
+
+    as_admin = client_as("dcs-bola-other-admin", groups=["admin"])
+    assert as_admin.get(f"{RSP_BASE}/responden/{rsp['id']}/jawaban").status_code == 200
+
+
+def test_list_responden_forbidden_for_non_admin(open_sesi: dict, client_as) -> None:
+    as_partisipan = client_as("dcs-bola-g")
+    r = as_partisipan.get(f"{RSP_BASE}/{open_sesi['id']}/responden")
+    assert r.status_code == 403
+
+
+def test_create_responden_forbidden_for_non_admin(open_sesi: dict, client_as) -> None:
+    as_partisipan = client_as("dcs-bola-h")
+    r = as_partisipan.post(
+        f"{RSP_BASE}/{open_sesi['id']}/responden",
+        json={"jabatan_label": "Guru"},
+    )
+    assert r.status_code == 403

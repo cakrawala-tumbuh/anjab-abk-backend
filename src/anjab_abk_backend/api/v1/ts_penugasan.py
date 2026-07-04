@@ -6,30 +6,40 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Response, status
 
+from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     Pagination,
+    authorize_responden_access,
     get_current_principal,
+    get_partisipan_service,
     get_ts_penugasan_service,
     pagination_params,
     rate_limit,
+    require_admin,
 )
 from ...schemas.common import ErrorResponse, Page
+from ...security import Principal
 from ...ts.schemas.penugasan import TsPenugasanCreate, TsPenugasanRead, TsPenugasanUpdate
 from ...ts.services.penugasan import TsPenugasanService
 
 router = APIRouter()
 
-_WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
+_ADMIN_GUARDS = [Depends(require_admin), Depends(rate_limit)]
 _NOT_FOUND = {404: {"model": ErrorResponse, "description": "Penugasan Time Study tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
+_FORBIDDEN = {
+    403: {"model": ErrorResponse, "description": "Bukan admin atau bukan pemilik penugasan."}
+}
 
 
 @router.get(
     "",
     response_model=Page[TsPenugasanRead],
-    summary="Daftar penugasan Time Study",
+    summary="Daftar penugasan Time Study (admin)",
     operation_id="ts_penugasan_list",
+    dependencies=[Depends(require_admin)],
+    responses={**_AUTH, **_FORBIDDEN},
 )
 def list_penugasan(
     page: Annotated[Pagination, Depends(pagination_params)],
@@ -43,12 +53,13 @@ def list_penugasan(
     "",
     response_model=TsPenugasanRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Tugaskan partisipan ke Time Study",
+    summary="Tugaskan partisipan ke Time Study (admin)",
     operation_id="ts_penugasan_create",
-    dependencies=_WRITE_GUARDS,
+    dependencies=_ADMIN_GUARDS,
     responses={
         **_AUTH,
         **_RATE,
+        **_FORBIDDEN,
         409: {
             "model": ErrorResponse,
             "description": "Partisipan sudah memiliki penugasan Time Study.",
@@ -65,24 +76,28 @@ def create_penugasan(
 @router.get(
     "/{penugasan_id}",
     response_model=TsPenugasanRead,
-    summary="Ambil penugasan Time Study",
+    summary="Ambil penugasan Time Study (admin atau pemilik)",
     operation_id="ts_penugasan_get",
-    responses=_NOT_FOUND,
+    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND},
 )
 def get_penugasan(
     penugasan_id: Annotated[str, Path(description="ID penugasan Time Study.")],
+    principal: Annotated[Principal, Depends(get_current_principal)],
     service: Annotated[TsPenugasanService, Depends(get_ts_penugasan_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
 ) -> TsPenugasanRead:
-    return service.get(penugasan_id)
+    penugasan = service.get(penugasan_id)
+    authorize_responden_access(principal, penugasan.partisipan_id, par_service)
+    return penugasan
 
 
 @router.patch(
     "/{penugasan_id}",
     response_model=TsPenugasanRead,
-    summary="Perbarui penugasan Time Study (mis. nonaktifkan)",
+    summary="Perbarui penugasan Time Study (admin; mis. nonaktifkan)",
     operation_id="ts_penugasan_update",
-    dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND},
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
 )
 def update_penugasan(
     penugasan_id: Annotated[str, Path(description="ID penugasan Time Study.")],
@@ -95,10 +110,10 @@ def update_penugasan(
 @router.delete(
     "/{penugasan_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Hapus penugasan Time Study",
+    summary="Hapus penugasan Time Study (admin)",
     operation_id="ts_penugasan_delete",
-    dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND},
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
 )
 def delete_penugasan(
     penugasan_id: Annotated[str, Path(description="ID penugasan Time Study.")],

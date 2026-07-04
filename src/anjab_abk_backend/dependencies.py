@@ -334,6 +334,25 @@ def require_admin(
     return principal
 
 
+def authorize_responden_access(
+    principal: Principal,
+    partisipan_id: str | None,
+    par_service: PartisipanService,
+) -> None:
+    """Guard otorisasi object-level: admin ATAU partisipan pemilik `responden`.
+
+    `partisipan_id` adalah pemilik responden/penugasan yang diakses (`None` untuk
+    responden anonim/tanpa tautan partisipan — hanya dapat diakses admin). Dipakai
+    di endpoint TI/DCS/WCP/OPM/TS agar partisipan tidak dapat membaca atau menulis
+    data responden milik partisipan lain lewat penebakan ID (BOLA/IDOR).
+    """
+    if "admin" in principal.groups:
+        return
+    par = par_service.get_by_subject(principal.subject)
+    if par is None or partisipan_id is None or par.id != partisipan_id:
+        raise ForbiddenError("Akses ditolak: Anda bukan pemilik data responden ini.")
+
+
 # --- Rate limiting ---
 
 

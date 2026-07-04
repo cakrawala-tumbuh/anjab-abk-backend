@@ -6,12 +6,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Response, status
 
+from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    authorize_responden_access,
     get_current_principal,
     get_opm_jawaban_service,
     get_opm_responden_service,
     get_opm_sesi_service,
+    get_partisipan_service,
     rate_limit,
+    require_admin,
 )
 from ...errors import ValidationAppError
 from ...opm.schemas.jawaban import OpmJawabanBulkCreate, OpmJawabanRead
@@ -20,22 +24,28 @@ from ...opm.services.jawaban import OpmJawabanService
 from ...opm.services.responden import OpmRespondenService
 from ...opm.services.sesi import OpmSesiService
 from ...schemas.common import ErrorResponse
+from ...security import Principal
 
 router = APIRouter()
 
 _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
+_ADMIN_GUARDS = [Depends(require_admin), Depends(rate_limit)]
 _NOT_FOUND_SESI = {404: {"model": ErrorResponse, "description": "Sesi OPM tidak ditemukan."}}
 _NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
+_FORBIDDEN = {
+    403: {"model": ErrorResponse, "description": "Bukan admin atau bukan pemilik responden."}
+}
 
 
 @router.get(
     "/{sesi_id}/responden",
     response_model=list[OpmRespondenRead],
-    summary="Daftar responden dalam sesi OPM",
+    summary="Daftar responden dalam sesi OPM (admin)",
     operation_id="opm_responden_list",
-    responses=_NOT_FOUND_SESI,
+    dependencies=[Depends(require_admin)],
+    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_SESI},
 )
 def list_responden(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
@@ -50,12 +60,13 @@ def list_responden(
     "/{sesi_id}/responden",
     response_model=OpmRespondenRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Daftarkan responden manual ke sesi OPM (wajib anggota SME panel jabatan sesi)",
+    summary="Daftarkan responden manual ke sesi OPM (admin; wajib anggota SME panel jabatan sesi)",
     operation_id="opm_responden_create",
-    dependencies=_WRITE_GUARDS,
+    dependencies=_ADMIN_GUARDS,
     responses={
         **_AUTH,
         **_RATE,
+        **_FORBIDDEN,
         **_NOT_FOUND_SESI,
         409: {
             "model": ErrorResponse,
@@ -84,24 +95,28 @@ def create_responden(
 @router.get(
     "/responden/{responden_id}",
     response_model=OpmRespondenRead,
-    summary="Ambil detail responden OPM",
+    summary="Ambil detail responden OPM (admin atau pemilik)",
     operation_id="opm_responden_get",
-    responses=_NOT_FOUND_RSP,
+    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def get_responden(
     responden_id: Annotated[str, Path(description="ID responden.")],
+    principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
 ) -> OpmRespondenRead:
-    return rsp_service.get(responden_id)
+    responden = rsp_service.get(responden_id)
+    authorize_responden_access(principal, responden.partisipan_id, par_service)
+    return responden
 
 
 @router.delete(
     "/responden/{responden_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Hapus responden (hanya jika belum submit)",
+    summary="Hapus responden (admin; hanya jika belum submit)",
     operation_id="opm_responden_delete",
-    dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND_RSP},
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def delete_responden(
     responden_id: Annotated[str, Path(description="ID responden.")],
@@ -121,6 +136,7 @@ def delete_responden(
     responses={
         **_AUTH,
         **_RATE,
+        **_FORBIDDEN,
         **_NOT_FOUND_RSP,
         422: {
             "model": ErrorResponse,
@@ -131,11 +147,14 @@ def delete_responden(
 def submit_jawaban(
     responden_id: Annotated[str, Path(description="ID responden.")],
     payload: OpmJawabanBulkCreate,
+    principal: Annotated[Principal, Depends(get_current_principal)],
     sesi_service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
     rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
     jwb_service: Annotated[OpmJawabanService, Depends(get_opm_jawaban_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
 ) -> list[OpmJawabanRead]:
     responden = rsp_service.get(responden_id)
+    authorize_responden_access(principal, responden.partisipan_id, par_service)
     sesi = sesi_service.get(responden.sesi_id)
     if sesi.status != "OPEN":
         raise ValidationAppError(
@@ -152,14 +171,17 @@ def submit_jawaban(
 @router.get(
     "/responden/{responden_id}/jawaban",
     response_model=list[OpmJawabanRead],
-    summary="Lihat jawaban responden",
+    summary="Lihat jawaban responden (admin atau pemilik)",
     operation_id="opm_jawaban_list",
-    responses=_NOT_FOUND_RSP,
+    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def list_jawaban(
     responden_id: Annotated[str, Path(description="ID responden.")],
+    principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
     jwb_service: Annotated[OpmJawabanService, Depends(get_opm_jawaban_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
 ) -> list[OpmJawabanRead]:
-    rsp_service.get(responden_id)
+    responden = rsp_service.get(responden_id)
+    authorize_responden_access(principal, responden.partisipan_id, par_service)
     return jwb_service.list_by_responden(responden_id)

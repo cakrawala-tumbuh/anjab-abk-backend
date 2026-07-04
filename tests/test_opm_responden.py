@@ -248,3 +248,78 @@ def test_kuesioner_saya_hanya_open(client: TestClient, jabatan_id_tk: str, db_se
     assert data[0]["sesi_id"] == sesi_id
     assert data[0]["sesi_status"] == "OPEN"
     assert data[0]["sudah_submit"] is False
+
+
+# --------------------------------------------------------------------------- #
+# Otorisasi object-level (BOLA/IDOR): partisipan tidak boleh akses responden
+# OPM milik partisipan lain lewat penebakan responden_id.
+# --------------------------------------------------------------------------- #
+
+
+def _link_authentik_user(db_session, partisipan_id: str, subject: str) -> None:
+    """Tautkan partisipan yang sudah ada ke `subject` login (untuk test kepemilikan)."""
+    from anjab_abk_backend.models import PartisipanModel
+
+    obj = db_session.get(PartisipanModel, partisipan_id)
+    obj.authentik_user_id = subject
+    db_session.flush()
+
+
+def test_get_responden_forbidden_for_non_owner(
+    client: TestClient, jabatan_id_tk: str, client_as, db_session
+) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    par_a, par_b = ctx["partisipan_ids"]
+    _link_authentik_user(db_session, par_a, "opm-bola-a")
+    _link_authentik_user(db_session, par_b, "opm-bola-b")
+
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    rsp_a = next(r for r in responden if r["partisipan_id"] == par_a)
+
+    as_b = client_as("opm-bola-b")
+    assert as_b.get(f"{SESI_BASE}/responden/{rsp_a['id']}").status_code == 403
+
+    as_a = client_as("opm-bola-a")
+    r = as_a.get(f"{SESI_BASE}/responden/{rsp_a['id']}")
+    assert r.status_code == 200
+    assert r.json()["id"] == rsp_a["id"]
+
+
+def test_submit_jawaban_forbidden_for_non_owner(
+    client: TestClient, jabatan_id_tk: str, client_as, db_session
+) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    par_a, par_b = ctx["partisipan_ids"]
+    _link_authentik_user(db_session, par_a, "opm-bola-c")
+    _link_authentik_user(db_session, par_b, "opm-bola-d")
+    client.post(f"{SESI_BASE}/{sesi['id']}/buka")
+
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    rsp_a = next(r for r in responden if r["partisipan_id"] == par_a)
+
+    as_d = client_as("opm-bola-d")
+    r = as_d.post(f"{SESI_BASE}/responden/{rsp_a['id']}/jawaban", json=_bulk_payload(ctx["kodes"]))
+    assert r.status_code == 403
+
+
+def test_list_responden_forbidden_for_non_admin(
+    client: TestClient, jabatan_id_tk: str, client_as
+) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    as_partisipan = client_as("opm-bola-e")
+    r = as_partisipan.get(f"{SESI_BASE}/{sesi['id']}/responden")
+    assert r.status_code == 403
+
+
+def test_admin_can_access_any_responden(
+    client: TestClient, jabatan_id_tk: str, client_as, db_session
+) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    par_a, _ = ctx["partisipan_ids"]
+    _link_authentik_user(db_session, par_a, "opm-bola-f")
+
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    rsp_a = next(r for r in responden if r["partisipan_id"] == par_a)
+
+    as_admin = client_as("opm-bola-other-admin", groups=["admin"])
+    assert as_admin.get(f"{SESI_BASE}/responden/{rsp_a['id']}").status_code == 200

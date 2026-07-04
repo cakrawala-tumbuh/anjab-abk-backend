@@ -6,8 +6,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, status
 
+from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    authorize_responden_access,
     get_current_principal,
+    get_partisipan_service,
     get_ti_detail_service,
     get_ti_responden_service,
     get_ti_sesi_service,
@@ -15,6 +18,7 @@ from ...dependencies import (
 )
 from ...errors import ValidationAppError
 from ...schemas.common import ErrorResponse
+from ...security import Principal
 from ...taskinv.schemas.detail import TiDetailRead, TiDetailSubmit
 from ...taskinv.services.detail import TiDetailService
 from ...taskinv.services.responden import TiRespondenService
@@ -26,6 +30,9 @@ _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
 _NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
+_FORBIDDEN = {
+    403: {"model": ErrorResponse, "description": "Bukan admin atau bukan pemilik responden."}
+}
 
 
 @router.post(
@@ -38,6 +45,7 @@ _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan
     responses={
         **_AUTH,
         **_RATE,
+        **_FORBIDDEN,
         **_NOT_FOUND_RSP,
         409: {"model": ErrorResponse, "description": "Detail sudah disubmit."},
         422: {"model": ErrorResponse, "description": "task_kode di luar himpunan terpilih."},
@@ -46,11 +54,14 @@ _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan
 def submit_detail(
     responden_id: Annotated[str, Path(description="ID responden.")],
     payload: TiDetailSubmit,
+    principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     detail_service: Annotated[TiDetailService, Depends(get_ti_detail_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
 ) -> list[TiDetailRead]:
     responden = rsp_service.get(responden_id)
+    authorize_responden_access(principal, responden.partisipan_id, par_service)
     sesi = sesi_service.get(responden.sesi_id)
     if sesi.status != "TAHAP3":
         raise ValidationAppError(
@@ -68,14 +79,17 @@ def submit_detail(
 @router.get(
     "/responden/{responden_id}/detail",
     response_model=list[TiDetailRead],
-    summary="Lihat detail Tahap 3 satu responden",
+    summary="Lihat detail Tahap 3 satu responden (admin atau pemilik)",
     operation_id="taskinv_detail_list",
-    responses=_NOT_FOUND_RSP,
+    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def list_detail(
     responden_id: Annotated[str, Path(description="ID responden.")],
+    principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     detail_service: Annotated[TiDetailService, Depends(get_ti_detail_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
 ) -> list[TiDetailRead]:
-    rsp_service.get(responden_id)
+    responden = rsp_service.get(responden_id)
+    authorize_responden_access(principal, responden.partisipan_id, par_service)
     return detail_service.list_by_responden(responden_id)

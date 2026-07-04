@@ -38,6 +38,17 @@ def _fake_verifier() -> TokenVerifier:
     return _FakeVerifier()
 
 
+class _SubjectVerifier:
+    """Verifier test yang menerima semua token sebagai `Principal(subject, groups)` tetap."""
+
+    def __init__(self, subject: str, groups: list[str] | None = None) -> None:
+        self._subject = subject
+        self._groups = groups if groups is not None else ["partisipan"]
+
+    def verify(self, token: str) -> Principal:
+        return Principal(subject=self._subject, username=self._subject, groups=self._groups)
+
+
 @pytest.fixture(scope="session")
 def settings() -> Settings:
     return Settings(
@@ -109,6 +120,59 @@ def client(app) -> TestClient:
     with TestClient(app, raise_server_exceptions=True) as c:
         c.headers.update({"Authorization": "Bearer test-token"})
         yield c
+
+
+@pytest.fixture
+def client_as(app):
+    """Factory: ``client_as(subject, groups=["partisipan"]) -> TestClient``.
+
+    Mengoverride verifier token pada `app` agar SETIAP token diterima sebagai
+    `Principal(subject, groups)` tetap — dipakai untuk test otorisasi object-level
+    (BOLA/IDOR) yang butuh 2+ identitas partisipan berbeda dalam satu test. Peringatan:
+    override berlaku pada `app` (bukan hanya client yang dikembalikan) — panggilan
+    berikutnya ke fixture `client`/`anon_client` dalam test yang sama ikut memakai
+    identitas terakhir yang di-set lewat factory ini. Untuk kebutuhan admin setelah
+    memakai factory ini, panggil ``client_as("admin-x", groups=["admin"])`` alih-alih
+    fixture `client`.
+    """
+
+    def _make(subject: str, groups: list[str] | None = None) -> TestClient:
+        app.dependency_overrides[get_token_verifier] = lambda: _SubjectVerifier(subject, groups)
+        c = TestClient(app, raise_server_exceptions=True)
+        c.headers.update({"Authorization": f"Bearer {subject}-token"})
+        return c
+
+    return _make
+
+
+@pytest.fixture
+def partisipan_factory(db_session: Session):
+    """Factory: ``partisipan_factory(subject, **overrides) -> partisipan_id``.
+
+    Membuat record `Partisipan` nyata di DB test dengan `authentik_user_id=subject`,
+    agar `PartisipanService.get_by_subject(subject)` (dipakai `authorize_responden_access`)
+    dapat menemukannya — untuk test kepemilikan responden lintas partisipan.
+    """
+    import uuid
+
+    from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
+    from anjab_abk_backend.core.services.partisipan_sql import SqlPartisipanService
+
+    svc = SqlPartisipanService(db_session)
+
+    def _create(subject: str, **overrides) -> str:
+        defaults = {
+            "nama": f"Partisipan {subject}",
+            "email": f"{subject.replace('_', '.')}@test.id",
+            "sekolah_id": "skl_test",
+            "jabatan_utama_id": f"jbt_{uuid.uuid4().hex[:8]}",
+            "masa_kerja_tahun": 1,
+        }
+        defaults.update(overrides)
+        par = svc.create(PartisipanCreate(**defaults), authentik_user_id=subject)
+        return par.id
+
+    return _create
 
 
 @pytest.fixture

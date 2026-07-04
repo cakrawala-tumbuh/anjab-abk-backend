@@ -7,6 +7,30 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-07-04
+
+### Diperbaiki
+
+- **Keamanan: Broken Object-Level Authorization (BOLA/IDOR) pada endpoint responden
+  Task Inventory, DCS, WCP, OPM, dan Time Study.** Partisipan sebelumnya dapat melihat
+  atau mengubah data responden/penugasan milik partisipan lain hanya dengan menebak
+  `responden_id`/`penugasan_id` — beberapa endpoint GET bahkan tidak mewajibkan token
+  sama sekali.
+  - Helper baru `authorize_responden_access` di `dependencies.py`: admin selalu
+    diizinkan; selain itu hanya partisipan pemilik record yang diizinkan, lainnya
+    ditolak `403`.
+  - Diterapkan pada endpoint per-responden: `GET/POST` seleksi & detail Tahap 1/3
+    Task Inventory, `GET/POST` jawaban DCS/WCP/OPM, dan `GET/POST/PATCH` log Time Study.
+  - `GET /time-study/penugasan/{id}/log/{log_id}` & `PATCH` kini juga memverifikasi
+    `log_id` benar-benar milik `penugasan_id` di path (mencegah kombinasi silang).
+
+### Diubah (Breaking)
+
+- Endpoint manajemen responden/penugasan (`list`, `create`, `delete` responden Task
+  Inventory/DCS/WCP/OPM; `list`, `create`, `update`, `delete` penugasan Time Study)
+  kini **admin-only** — sebelumnya dapat diakses oleh partisipan mana pun yang
+  terautentikasi (atau, untuk beberapa endpoint GET, tanpa autentikasi sama sekali).
+
 ## [0.23.0] - 2026-07-04
 
 ### Diubah

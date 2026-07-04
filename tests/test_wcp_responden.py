@@ -89,9 +89,14 @@ def test_list_responden_after_create(client: TestClient, open_sesi: dict) -> Non
     assert all(d["sesi_id"] == sesi_id for d in data)
 
 
-def test_list_responden_sesi_not_found(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{SESI_BASE}/wses_tidakada/responden")
+def test_list_responden_sesi_not_found(client: TestClient) -> None:
+    r = client.get(f"{SESI_BASE}/wses_tidakada/responden")
     assert r.status_code == 404
+
+
+def test_list_responden_requires_admin(anon_client: TestClient) -> None:
+    r = anon_client.get(f"{SESI_BASE}/wses_tidakada/responden")
+    assert r.status_code == 401
 
 
 def test_create_responden_duplicate_partisipan_rejected(
@@ -164,9 +169,14 @@ def test_list_jawaban_after_submit(client: TestClient, open_sesi: dict) -> None:
     assert item_ids == set(_get_all_item_ids(client))
 
 
-def test_list_jawaban_responden_not_found(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{SESI_BASE}/responden/wrsp_tidakada/jawaban")
+def test_list_jawaban_responden_not_found(client: TestClient) -> None:
+    r = client.get(f"{SESI_BASE}/responden/wrsp_tidakada/jawaban")
     assert r.status_code == 404
+
+
+def test_list_jawaban_requires_auth(anon_client: TestClient) -> None:
+    r = anon_client.get(f"{SESI_BASE}/responden/wrsp_tidakada/jawaban")
+    assert r.status_code == 401
 
 
 # --- GET /{sesi_id}/hasil (sukses) ---
@@ -259,3 +269,66 @@ def test_kuesioner_saya_dengan_assignment_wcp(client: TestClient, db_session) ->
     # Idempoten: pemanggilan ulang tidak menggandakan entri.
     r3 = client.get(f"{WCP_KUESIONER_BASE}/saya")
     assert [i["id"] for i in r3.json()] == [item["id"]]
+
+
+# --------------------------------------------------------------------------- #
+# Otorisasi object-level (BOLA/IDOR): partisipan tidak boleh akses responden
+# WCP milik partisipan lain lewat penebakan responden_id.
+# --------------------------------------------------------------------------- #
+
+
+def test_get_responden_forbidden_for_non_owner(
+    client: TestClient, open_sesi: dict, client_as, partisipan_factory
+) -> None:
+    par_a = partisipan_factory("wcp-bola-a")
+    partisipan_factory("wcp-bola-b")
+    rsp = client.post(
+        f"{SESI_BASE}/{open_sesi['id']}/responden",
+        json={"jabatan_label": "Guru A", "partisipan_id": par_a},
+    ).json()
+
+    as_b = client_as("wcp-bola-b")
+    assert as_b.get(f"{SESI_BASE}/responden/{rsp['id']}").status_code == 403
+
+    as_a = client_as("wcp-bola-a")
+    r = as_a.get(f"{SESI_BASE}/responden/{rsp['id']}")
+    assert r.status_code == 200
+    assert r.json()["id"] == rsp["id"]
+
+
+def test_submit_jawaban_forbidden_for_non_owner(
+    client: TestClient, open_sesi: dict, client_as, partisipan_factory
+) -> None:
+    par_a = partisipan_factory("wcp-bola-c")
+    partisipan_factory("wcp-bola-d")
+    rsp = client.post(
+        f"{SESI_BASE}/{open_sesi['id']}/responden",
+        json={"jabatan_label": "Guru A", "partisipan_id": par_a},
+    ).json()
+    item_ids = _get_all_item_ids(client)
+
+    as_d = client_as("wcp-bola-d")
+    r = as_d.post(
+        f"{SESI_BASE}/responden/{rsp['id']}/jawaban",
+        json={"jawaban": [{"item_id": iid, "skor_raw": 4} for iid in item_ids]},
+    )
+    assert r.status_code == 403
+
+
+def test_list_responden_forbidden_for_non_admin(open_sesi: dict, client_as) -> None:
+    as_partisipan = client_as("wcp-bola-e")
+    r = as_partisipan.get(f"{SESI_BASE}/{open_sesi['id']}/responden")
+    assert r.status_code == 403
+
+
+def test_admin_can_access_any_responden(
+    client: TestClient, open_sesi: dict, client_as, partisipan_factory
+) -> None:
+    par_a = partisipan_factory("wcp-bola-f")
+    rsp = client.post(
+        f"{SESI_BASE}/{open_sesi['id']}/responden",
+        json={"jabatan_label": "Guru A", "partisipan_id": par_a},
+    ).json()
+
+    as_admin = client_as("wcp-bola-other-admin", groups=["admin"])
+    assert as_admin.get(f"{SESI_BASE}/responden/{rsp['id']}").status_code == 200

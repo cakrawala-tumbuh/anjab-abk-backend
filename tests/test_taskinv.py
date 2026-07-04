@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -766,3 +767,93 @@ def test_responden_tanpa_jabatan_id_bebas(
     assert sesi_obj.jabatan_id == jabatan_baru_id
     r = _add_responden(client, sesi_obj.id, "Partisipan Bebas")
     assert r["id"].startswith("trsp_")
+
+
+# --------------------------------------------------------------------------- #
+# Otorisasi object-level (BOLA/IDOR): partisipan tidak boleh akses responden
+# Task Inventory milik partisipan lain lewat penebakan responden_id.
+# --------------------------------------------------------------------------- #
+
+
+def test_get_responden_forbidden_for_non_owner(
+    client: TestClient, client_as, partisipan_factory, db_session
+) -> None:
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+    from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
+    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
+
+    jabatan_id = f"jbt_{uuid.uuid4().hex[:8]}"
+    par_a = partisipan_factory("ti-bola-a", jabatan_utama_id=jabatan_id)
+    par_b = partisipan_factory("ti-bola-b", jabatan_utama_id=jabatan_id)
+
+    sme_svc = SqlSMEPanelService(db_session)
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id))
+    sme_svc.add_anggota(panel.id, par_a)
+    sme_svc.add_anggota(panel.id, par_b)
+
+    sesi_svc = SqlTiSesiService(db_session)
+    sesi_obj = sesi_svc.create(
+        TiSesiCreate(
+            jabatan_id=jabatan_id, periode=_uniq_periode(), min_responden=1, max_responden=10
+        )
+    )
+    rsp = client.post(
+        f"{SESI}/{sesi_obj.id}/responden",
+        json={"partisipan_id": par_a, "nama": "A"},
+    ).json()
+
+    as_b = client_as("ti-bola-b")
+    assert as_b.get(f"{SESI}/responden/{rsp['id']}").status_code == 403
+
+    as_a = client_as("ti-bola-a")
+    r = as_a.get(f"{SESI}/responden/{rsp['id']}")
+    assert r.status_code == 200
+    assert r.json()["id"] == rsp["id"]
+
+
+def test_submit_seleksi_forbidden_for_non_owner(
+    client: TestClient, client_as, partisipan_factory, jabatan_id_tk: str, db_session
+) -> None:
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+
+    par_a = partisipan_factory("ti-bola-c", jabatan_utama_id=jabatan_id_tk)
+    par_b = partisipan_factory("ti-bola-d", jabatan_utama_id=jabatan_id_tk)
+
+    sme_svc = SqlSMEPanelService(db_session)
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_tk))
+    sme_svc.add_anggota(panel.id, par_a)
+    sme_svc.add_anggota(panel.id, par_b)
+
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    rsp = client.post(f"{SESI}/{sid}/responden", json={"partisipan_id": par_a, "nama": "A"}).json()
+
+    as_d = client_as("ti-bola-d")
+    r = as_d.post(f"{SESI}/responden/{rsp['id']}/seleksi", json={"task_kode": kodes})
+    assert r.status_code == 403
+
+    as_a = client_as("ti-bola-c")
+    r_ok = as_a.post(f"{SESI}/responden/{rsp['id']}/seleksi", json={"task_kode": kodes})
+    assert r_ok.status_code == 201
+
+
+def test_list_responden_forbidden_for_non_admin(
+    client: TestClient, client_as, jabatan_id_tk: str
+) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    as_partisipan = client_as("ti-bola-e")
+    r = as_partisipan.get(f"{SESI}/{sesi['id']}/responden")
+    assert r.status_code == 403
+
+
+def test_create_responden_forbidden_for_non_admin(
+    client: TestClient, client_as, jabatan_id_tk: str
+) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    as_partisipan = client_as("ti-bola-f")
+    r = as_partisipan.post(f"{SESI}/{sesi['id']}/responden", json={"nama": "X"})
+    assert r.status_code == 403
