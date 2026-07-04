@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-07-04
+
 ### Diubah
 
 - **BREAKING: Time Study tanpa sesi — penugasan berbasis partisipan langsung.**
