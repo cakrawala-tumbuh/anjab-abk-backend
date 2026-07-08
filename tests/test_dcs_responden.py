@@ -40,11 +40,17 @@ def _add_responden(client: TestClient, sesi_id: str, partisipan_id: str | None =
     return client.post(f"{RSP_BASE}/{sesi_id}/responden", json=body).json()
 
 
-def _submit(client: TestClient, responden_id: str, skor: int = 3) -> None:
-    r = client.post(
+def _save_draft(client: TestClient, responden_id: str, jawaban: list[dict]) -> None:
+    r = client.put(
         f"{RSP_BASE}/responden/{responden_id}/jawaban",
-        json={"jawaban": _all_jawaban(skor)},
+        json={"jawaban": jawaban},
     )
+    assert r.status_code == 200
+
+
+def _submit(client: TestClient, responden_id: str, skor: int = 3) -> None:
+    _save_draft(client, responden_id, _all_jawaban(skor))
+    r = client.post(f"{RSP_BASE}/responden/{responden_id}/jawaban/submit")
     assert r.status_code == 201
 
 
@@ -181,6 +187,78 @@ def test_list_jawaban_requires_auth(anon_client: TestClient) -> None:
     assert r.status_code == 401
 
 
+# --- PUT /responden/{responden_id}/jawaban (draft-save) & POST .../jawaban/submit ---
+
+
+def test_save_draft_jawaban_parsial_lalu_lengkap(client: TestClient, open_sesi: dict) -> None:
+    rsp = _add_responden(client, open_sesi["id"])
+    sebagian = _all_jawaban()[:10]
+    r = client.put(f"{RSP_BASE}/responden/{rsp['id']}/jawaban", json={"jawaban": sebagian})
+    assert r.status_code == 200
+    assert len(r.json()) == 10
+    assert len(client.get(f"{RSP_BASE}/responden/{rsp['id']}/jawaban").json()) == 10
+
+    sisanya = _all_jawaban()[10:]
+    r2 = client.put(f"{RSP_BASE}/responden/{rsp['id']}/jawaban", json={"jawaban": sisanya})
+    assert r2.status_code == 200
+
+    r_submit = client.post(f"{RSP_BASE}/responden/{rsp['id']}/jawaban/submit")
+    assert r_submit.status_code == 201
+    assert len(r_submit.json()) == 42
+
+    responden = client.get(f"{RSP_BASE}/responden/{rsp['id']}").json()
+    assert responden["sudah_submit"] is True
+
+
+def test_save_draft_jawaban_overwrite_item_sama(client: TestClient, open_sesi: dict) -> None:
+    """Upsert: menyimpan ulang item_id yang sama meng-update, bukan duplikat."""
+    rsp = _add_responden(client, open_sesi["id"])
+    item_id = ALL_ITEM_IDS[0]
+    client.put(
+        f"{RSP_BASE}/responden/{rsp['id']}/jawaban",
+        json={"jawaban": [{"item_id": item_id, "skor_raw": 2}]},
+    )
+    r = client.put(
+        f"{RSP_BASE}/responden/{rsp['id']}/jawaban",
+        json={"jawaban": [{"item_id": item_id, "skor_raw": 5}]},
+    )
+    assert r.status_code == 200
+    data = client.get(f"{RSP_BASE}/responden/{rsp['id']}/jawaban").json()
+    assert len(data) == 1
+    assert data[0]["skor_raw"] == 5
+
+
+def test_save_draft_jawaban_rejected_after_submit(client: TestClient, open_sesi: dict) -> None:
+    rsp = _add_responden(client, open_sesi["id"])
+    _submit(client, rsp["id"])
+    r = client.put(f"{RSP_BASE}/responden/{rsp['id']}/jawaban", json={"jawaban": _all_jawaban()})
+    assert r.status_code == 422
+
+
+def test_submit_jawaban_rejected_when_incomplete(client: TestClient, open_sesi: dict) -> None:
+    rsp = _add_responden(client, open_sesi["id"])
+    _save_draft(client, rsp["id"], _all_jawaban()[:5])
+    r = client.post(f"{RSP_BASE}/responden/{rsp['id']}/jawaban/submit")
+    assert r.status_code == 422
+
+
+def test_submit_jawaban_succeeds_without_body(client: TestClient, open_sesi: dict) -> None:
+    rsp = _add_responden(client, open_sesi["id"])
+    _save_draft(client, rsp["id"], _all_jawaban())
+    r = client.post(f"{RSP_BASE}/responden/{rsp['id']}/jawaban/submit")
+    assert r.status_code == 201
+    assert len(r.json()) == 42
+
+
+def test_save_draft_jawaban_item_tidak_dikenal_ditolak(client: TestClient, open_sesi: dict) -> None:
+    rsp = _add_responden(client, open_sesi["id"])
+    r = client.put(
+        f"{RSP_BASE}/responden/{rsp['id']}/jawaban",
+        json={"jawaban": [{"item_id": "TIDAK_ADA", "skor_raw": 3}]},
+    )
+    assert r.status_code == 409
+
+
 # --- GET /{sesi_id}/hasil (sukses) ---
 
 
@@ -228,10 +306,11 @@ def test_analisis_dengan_wcp_sesi_k_index(client: TestClient) -> None:
             f"{WCP_SESI_BASE}/{wcp_sesi_id}/responden",
             json={"jabatan_label": "Guru WCP"},
         ).json()
-        client.post(
+        client.put(
             f"{WCP_SESI_BASE}/responden/{wcp_rsp['id']}/jawaban",
             json={"jawaban": [{"item_id": iid, "skor_raw": 4} for iid in all_wcp_item_ids]},
         )
+        client.post(f"{WCP_SESI_BASE}/responden/{wcp_rsp['id']}/jawaban/submit")
 
     client.post(f"{WCP_SESI_BASE}/{wcp_sesi_id}/tutup")
     client.post(f"{WCP_SESI_BASE}/{wcp_sesi_id}/analisis")
@@ -409,7 +488,7 @@ def test_get_responden_forbidden_for_non_owner(
     assert r.json()["id"] == rsp["id"]
 
 
-def test_submit_jawaban_forbidden_for_non_owner(
+def test_save_draft_jawaban_forbidden_for_non_owner(
     client: TestClient, open_sesi: dict, client_as, partisipan_factory
 ) -> None:
     par_a = partisipan_factory("dcs-bola-c")
@@ -420,7 +499,7 @@ def test_submit_jawaban_forbidden_for_non_owner(
     ).json()
 
     as_d = client_as("dcs-bola-d")
-    r = as_d.post(
+    r = as_d.put(
         f"{RSP_BASE}/responden/{rsp['id']}/jawaban",
         json={"jawaban": _all_jawaban()},
     )

@@ -2,9 +2,10 @@
 
 MENGGANTI `InMemoryDcsJawabanService` TANPA mengubah kontrak Protocol.
 
-Uniqueness `(responden_id, item_id)` dijaga unique constraint di tabel; flush
-dalam SAVEPOINT memetakan `IntegrityError` → `ConflictError` (409) tanpa merusak
-transaksi request.
+Uniqueness `(responden_id, item_id)` dijaga unique constraint di tabel; `upsert`
+melakukan get-or-update per item sehingga draft boleh disimpan berulang kali
+sebelum finalisasi. `submit` hanya memvalidasi kelengkapan baris yang sudah ada
+di DB (tanpa payload) lalu mengembalikannya.
 """
 
 from __future__ import annotations
@@ -12,12 +13,11 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ...errors import ConflictError
+from ...errors import ConflictError, ValidationAppError
 from ...models import DcsJawabanModel
-from ..schemas.jawaban import DcsJawabanBulkCreate, DcsJawabanRead
+from ..schemas.jawaban import DcsJawabanRead, DcsJawabanUpsert
 
 
 def _to_read(rec: DcsJawabanModel) -> DcsJawabanRead:
@@ -52,49 +52,52 @@ class SqlDcsJawabanService:
         ).all()
         return dict(rows)  # type: ignore[arg-type]
 
-    def bulk_create(
-        self, responden_id: str, data: DcsJawabanBulkCreate, valid_item_ids: set[str]
+    def upsert(
+        self, responden_id: str, data: DcsJawabanUpsert, valid_item_ids: set[str]
     ) -> list[DcsJawabanRead]:
         submitted_ids = {j.item_id for j in data.jawaban}
-        missing = valid_item_ids - submitted_ids
-        if missing:
-            raise ConflictError(
-                f"Item berikut belum dijawab: {', '.join(sorted(missing)[:5])}..."
-                if len(missing) > 5
-                else f"Item berikut belum dijawab: {', '.join(sorted(missing))}."
-            )
         unknown = submitted_ids - valid_item_ids
         if unknown:
             raise ConflictError(f"Item tidak dikenal: {', '.join(sorted(unknown))}.")
 
-        already_exists = self._s.scalar(
-            select(DcsJawabanModel.id).where(DcsJawabanModel.responden_id == responden_id)
-        )
-        if already_exists is not None:
-            raise ConflictError(
-                f"Responden '{responden_id}' sudah memiliki jawaban. "
-                "Hapus terlebih dahulu jika ingin mengisi ulang."
-            )
-
-        new_records: list[DcsJawabanModel] = []
+        results: list[DcsJawabanModel] = []
         for item in data.jawaban:
-            rec = DcsJawabanModel(
-                id=f"djwb_{uuid.uuid4().hex[:8]}",
-                responden_id=responden_id,
-                item_id=item.item_id,
-                skor_raw=item.skor_raw,
+            existing = self._s.scalar(
+                select(DcsJawabanModel).where(
+                    DcsJawabanModel.responden_id == responden_id,
+                    DcsJawabanModel.item_id == item.item_id,
+                )
             )
-            self._s.add(rec)
-            new_records.append(rec)
-        try:
-            with self._s.begin_nested():
-                self._s.flush()
-        except IntegrityError as exc:
-            raise ConflictError(
-                f"Responden '{responden_id}' sudah memiliki jawaban. "
-                "Hapus terlebih dahulu jika ingin mengisi ulang."
-            ) from exc
-        return [_to_read(r) for r in new_records]
+            if existing is not None:
+                existing.skor_raw = item.skor_raw
+                results.append(existing)
+            else:
+                rec = DcsJawabanModel(
+                    id=f"djwb_{uuid.uuid4().hex[:8]}",
+                    responden_id=responden_id,
+                    item_id=item.item_id,
+                    skor_raw=item.skor_raw,
+                )
+                self._s.add(rec)
+                results.append(rec)
+        self._s.flush()
+        return [_to_read(r) for r in results]
+
+    def submit(self, responden_id: str, valid_item_ids: set[str]) -> list[DcsJawabanRead]:
+        rows = self._s.scalars(
+            select(DcsJawabanModel)
+            .where(DcsJawabanModel.responden_id == responden_id)
+            .order_by(DcsJawabanModel.item_id.asc())
+        ).all()
+        existing_ids = {r.item_id for r in rows}
+        missing = valid_item_ids - existing_ids
+        if missing:
+            raise ValidationAppError(
+                f"Item berikut belum dijawab: {', '.join(sorted(missing)[:5])}..."
+                if len(missing) > 5
+                else f"Item berikut belum dijawab: {', '.join(sorted(missing))}."
+            )
+        return [_to_read(r) for r in rows]
 
     def delete_by_responden(self, responden_id: str) -> None:
         rows = self._s.scalars(

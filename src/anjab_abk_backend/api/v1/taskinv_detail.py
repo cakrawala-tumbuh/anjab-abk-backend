@@ -19,7 +19,7 @@ from ...dependencies import (
 from ...errors import ValidationAppError
 from ...schemas.common import ErrorResponse
 from ...security import Principal
-from ...taskinv.schemas.detail import TiDetailRead, TiDetailSubmit
+from ...taskinv.schemas.detail import TiDetailRead, TiDetailUpsert
 from ...taskinv.services.detail import TiDetailService
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.sesi import TiSesiService
@@ -35,11 +35,54 @@ _FORBIDDEN = {
 }
 
 
-@router.post(
+@router.put(
     "/responden/{responden_id}/detail",
     response_model=list[TiDetailRead],
+    summary="Simpan draft detail (parsial) Tahap 3 untuk satu responden",
+    operation_id="taskinv_detail_save_draft",
+    dependencies=_WRITE_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOT_FOUND_RSP,
+        422: {
+            "model": ErrorResponse,
+            "description": "task_kode di luar himpunan terpilih, sesi bukan TAHAP3,"
+            " atau responden sudah submit.",
+        },
+    },
+)
+def save_draft_detail(
+    responden_id: Annotated[str, Path(description="ID responden.")],
+    payload: TiDetailUpsert,
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
+    sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    detail_service: Annotated[TiDetailService, Depends(get_ti_detail_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+) -> list[TiDetailRead]:
+    responden = rsp_service.get(responden_id)
+    authorize_responden_access(principal, responden.partisipan_id, par_service)
+    sesi = sesi_service.get(responden.sesi_id)
+    if sesi.status != "TAHAP3":
+        raise ValidationAppError(
+            f"Detail Tahap 3 hanya dapat disimpan saat sesi berstatus TAHAP3"
+            f" (saat ini: {sesi.status})."
+        )
+    if responden.tahap3_submit:
+        raise ValidationAppError(
+            "Responden ini sudah menyelesaikan Tahap 3; draft tidak bisa diubah."
+        )
+    valid = set(sesi_service.get_task_terpilih(sesi.id))
+    return detail_service.upsert(responden_id, sesi.id, payload, valid)
+
+
+@router.post(
+    "/responden/{responden_id}/detail/submit",
+    response_model=list[TiDetailRead],
     status_code=status.HTTP_201_CREATED,
-    summary="Submit detail Tahap 3 untuk satu responden",
+    summary="Finalisasi (submit) detail Tahap 3 tersimpan untuk satu responden",
     operation_id="taskinv_detail_submit",
     dependencies=_WRITE_GUARDS,
     responses={
@@ -47,13 +90,16 @@ _FORBIDDEN = {
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND_RSP,
-        409: {"model": ErrorResponse, "description": "Detail sudah disubmit."},
-        422: {"model": ErrorResponse, "description": "task_kode di luar himpunan terpilih."},
+        422: {
+            "model": ErrorResponse,
+            "description": (
+                "Sesi bukan TAHAP3, responden sudah submit, atau belum ada entri detail."
+            ),
+        },
     },
 )
 def submit_detail(
     responden_id: Annotated[str, Path(description="ID responden.")],
-    payload: TiDetailSubmit,
     principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
@@ -70,8 +116,7 @@ def submit_detail(
         )
     if responden.tahap3_submit:
         raise ValidationAppError("Responden ini sudah menyelesaikan Tahap 3.")
-    valid = set(sesi_service.get_task_terpilih(sesi.id))
-    result = detail_service.submit(responden_id, sesi.id, payload, valid)
+    result = detail_service.submit(responden_id)
     rsp_service.mark_tahap3(responden_id)
     return result
 

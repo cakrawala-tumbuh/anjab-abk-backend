@@ -37,11 +37,13 @@ def _add_responden(client: TestClient, sesi_id: str) -> dict:
 
 
 def _submit(client: TestClient, responden_id: str, skor: int = 3) -> None:
-    r = client.post(
+    r = client.put(
         f"{BASE_SESI}/responden/{responden_id}/jawaban",
         json={"jawaban": _all_jawaban(skor)},
     )
-    assert r.status_code == 201
+    assert r.status_code == 200
+    r2 = client.post(f"{BASE_SESI}/responden/{responden_id}/jawaban/submit")
+    assert r2.status_code == 201
 
 
 @pytest.fixture
@@ -55,22 +57,24 @@ def sesi_dengan_responden(client: TestClient) -> dict:
     return sesi
 
 
-def test_submit_wrong_count_rejected(client: TestClient) -> None:
+def test_submit_incomplete_draft_rejected(client: TestClient) -> None:
     sesi = _build_sesi(client)
     rsp = _add_responden(client, sesi["id"])
-    r = client.post(
+    r = client.put(
         f"{BASE_SESI}/responden/{rsp['id']}/jawaban",
         json={"jawaban": [{"item_id": "D1a", "skor_raw": 3}]},
     )
-    assert r.status_code == 422
+    assert r.status_code == 200
+    r2 = client.post(f"{BASE_SESI}/responden/{rsp['id']}/jawaban/submit")
+    assert r2.status_code == 422
 
 
-def test_submit_unknown_item_rejected(client: TestClient) -> None:
+def test_save_draft_unknown_item_rejected(client: TestClient) -> None:
     sesi = _build_sesi(client)
     rsp = _add_responden(client, sesi["id"])
     jawaban = _all_jawaban()
     jawaban[0]["item_id"] = "UNKNOWN99"
-    r = client.post(
+    r = client.put(
         f"{BASE_SESI}/responden/{rsp['id']}/jawaban",
         json={"jawaban": jawaban},
     )

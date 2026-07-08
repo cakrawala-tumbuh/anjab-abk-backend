@@ -43,12 +43,18 @@ def _add_responden(client: TestClient, sesi_id: str, label: str = "Guru") -> dic
     ).json()
 
 
+def _save_draft(client: TestClient, responden_id: str, jawaban: list[dict]) -> None:
+    r = client.put(
+        f"{SESI_BASE}/responden/{responden_id}/jawaban",
+        json={"jawaban": jawaban},
+    )
+    assert r.status_code == 200
+
+
 def _submit(client: TestClient, responden_id: str, skor: int = 4) -> None:
     item_ids = _get_all_item_ids(client)
-    r = client.post(
-        f"{SESI_BASE}/responden/{responden_id}/jawaban",
-        json={"jawaban": [{"item_id": iid, "skor_raw": skor} for iid in item_ids]},
-    )
+    _save_draft(client, responden_id, [{"item_id": iid, "skor_raw": skor} for iid in item_ids])
+    r = client.post(f"{SESI_BASE}/responden/{responden_id}/jawaban/submit")
     assert r.status_code == 201
 
 
@@ -179,6 +185,57 @@ def test_list_jawaban_requires_auth(anon_client: TestClient) -> None:
     assert r.status_code == 401
 
 
+# --- PUT /responden/{responden_id}/jawaban (draft-save) & POST .../jawaban/submit ---
+
+
+def test_save_draft_jawaban_parsial_lalu_lengkap(client: TestClient, open_sesi: dict) -> None:
+    rsp = _add_responden(client, open_sesi["id"])
+    item_ids = _get_all_item_ids(client)
+    sebagian = [{"item_id": iid, "skor_raw": 4} for iid in item_ids[:10]]
+    r = client.put(f"{SESI_BASE}/responden/{rsp['id']}/jawaban", json={"jawaban": sebagian})
+    assert r.status_code == 200
+    assert len(r.json()) == 10
+
+    sisanya = [{"item_id": iid, "skor_raw": 4} for iid in item_ids[10:]]
+    r2 = client.put(f"{SESI_BASE}/responden/{rsp['id']}/jawaban", json={"jawaban": sisanya})
+    assert r2.status_code == 200
+
+    r_submit = client.post(f"{SESI_BASE}/responden/{rsp['id']}/jawaban/submit")
+    assert r_submit.status_code == 201
+    assert len(r_submit.json()) == 72
+
+    responden = client.get(f"{SESI_BASE}/responden/{rsp['id']}").json()
+    assert responden["sudah_submit"] is True
+
+
+def test_save_draft_jawaban_rejected_after_submit(client: TestClient, open_sesi: dict) -> None:
+    rsp = _add_responden(client, open_sesi["id"])
+    _submit(client, rsp["id"])
+    item_ids = _get_all_item_ids(client)
+    r = client.put(
+        f"{SESI_BASE}/responden/{rsp['id']}/jawaban",
+        json={"jawaban": [{"item_id": iid, "skor_raw": 4} for iid in item_ids]},
+    )
+    assert r.status_code == 422
+
+
+def test_submit_jawaban_rejected_when_incomplete(client: TestClient, open_sesi: dict) -> None:
+    rsp = _add_responden(client, open_sesi["id"])
+    item_ids = _get_all_item_ids(client)
+    _save_draft(client, rsp["id"], [{"item_id": iid, "skor_raw": 4} for iid in item_ids[:5]])
+    r = client.post(f"{SESI_BASE}/responden/{rsp['id']}/jawaban/submit")
+    assert r.status_code == 422
+
+
+def test_submit_jawaban_succeeds_without_body(client: TestClient, open_sesi: dict) -> None:
+    rsp = _add_responden(client, open_sesi["id"])
+    item_ids = _get_all_item_ids(client)
+    _save_draft(client, rsp["id"], [{"item_id": iid, "skor_raw": 4} for iid in item_ids])
+    r = client.post(f"{SESI_BASE}/responden/{rsp['id']}/jawaban/submit")
+    assert r.status_code == 201
+    assert len(r.json()) == 72
+
+
 # --- GET /{sesi_id}/hasil (sukses) ---
 
 
@@ -296,7 +353,7 @@ def test_get_responden_forbidden_for_non_owner(
     assert r.json()["id"] == rsp["id"]
 
 
-def test_submit_jawaban_forbidden_for_non_owner(
+def test_save_draft_jawaban_forbidden_for_non_owner(
     client: TestClient, open_sesi: dict, client_as, partisipan_factory
 ) -> None:
     par_a = partisipan_factory("wcp-bola-c")
@@ -308,7 +365,7 @@ def test_submit_jawaban_forbidden_for_non_owner(
     item_ids = _get_all_item_ids(client)
 
     as_d = client_as("wcp-bola-d")
-    r = as_d.post(
+    r = as_d.put(
         f"{SESI_BASE}/responden/{rsp['id']}/jawaban",
         json={"jawaban": [{"item_id": iid, "skor_raw": 4} for iid in item_ids]},
     )

@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Response, status
 
 from ...core.services.partisipan import PartisipanService
-from ...dcs.schemas.jawaban import DcsJawabanBulkCreate, DcsJawabanRead
+from ...dcs.schemas.jawaban import DcsJawabanRead, DcsJawabanUpsert
 from ...dcs.schemas.responden import DcsRespondenCreate, DcsRespondenRead
 from ...dcs.services.jawaban import DcsJawabanService
 from ...dcs.services.responden import DcsRespondenService
@@ -125,11 +125,45 @@ def delete_responden(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post(
+@router.put(
     "/responden/{responden_id}/jawaban",
     response_model=list[DcsJawabanRead],
+    summary="Simpan draft jawaban (parsial) untuk satu responden",
+    operation_id="dcs_jawaban_save_draft",
+    dependencies=_WRITE_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOT_FOUND_RSP,
+        409: {"model": ErrorResponse, "description": "Item tidak dikenal."},
+        422: {"model": ErrorResponse, "description": "Responden sudah submit final."},
+    },
+)
+def save_draft_jawaban(
+    responden_id: Annotated[str, Path(description="ID responden.")],
+    payload: DcsJawabanUpsert,
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    rsp_service: Annotated[DcsRespondenService, Depends(get_dcs_responden_service)],
+    jwb_service: Annotated[DcsJawabanService, Depends(get_dcs_jawaban_service)],
+    sk_service: Annotated[DcsSubSkalaService, Depends(get_dcs_subskala_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+) -> list[DcsJawabanRead]:
+    responden = rsp_service.get(responden_id)
+    authorize_responden_access(principal, responden.partisipan_id, par_service)
+    if responden.sudah_submit:
+        raise ValidationAppError(
+            "Responden ini sudah mengirimkan jawaban; draft tidak bisa diubah."
+        )
+    valid_item_ids = {item.item_id for item in sk_service.list_item()}
+    return jwb_service.upsert(responden_id, payload, valid_item_ids)
+
+
+@router.post(
+    "/responden/{responden_id}/jawaban/submit",
+    response_model=list[DcsJawabanRead],
     status_code=status.HTTP_201_CREATED,
-    summary="Submit 42 jawaban untuk satu responden",
+    summary="Finalisasi (submit) 42 jawaban tersimpan untuk satu responden",
     operation_id="dcs_jawaban_submit",
     dependencies=_WRITE_GUARDS,
     responses={
@@ -137,12 +171,14 @@ def delete_responden(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND_RSP,
-        409: {"model": ErrorResponse, "description": "Jawaban sudah ada atau item tidak valid."},
+        422: {
+            "model": ErrorResponse,
+            "description": "Responden sudah submit, atau jawaban tersimpan belum lengkap.",
+        },
     },
 )
 def submit_jawaban(
     responden_id: Annotated[str, Path(description="ID responden.")],
-    payload: DcsJawabanBulkCreate,
     principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[DcsRespondenService, Depends(get_dcs_responden_service)],
     jwb_service: Annotated[DcsJawabanService, Depends(get_dcs_jawaban_service)],
@@ -154,7 +190,7 @@ def submit_jawaban(
     if responden.sudah_submit:
         raise ValidationAppError("Responden ini sudah mengirimkan jawaban.")
     valid_item_ids = {item.item_id for item in sk_service.list_item()}
-    results = jwb_service.bulk_create(responden_id, payload, valid_item_ids)
+    results = jwb_service.submit(responden_id, valid_item_ids)
     rsp_service.mark_submitted(responden_id)
     return results
 

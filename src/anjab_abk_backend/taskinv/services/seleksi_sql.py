@@ -3,7 +3,10 @@
 MENGGANTI `InMemoryTiSeleksiService` TANPA mengubah kontrak Protocol.
 
 Disimpan 1 baris per (responden, task_kode) di `ti_seleksi` agar mudah menghitung
-union antar responden dan jumlah relevansi per task.
+union antar responden dan jumlah relevansi per task. `save_draft` melakukan
+full-replace (hapus baris lama, insert set baru) — representasi paling natural
+untuk "pilihan saat ini" sebuah checkbox set. `submit` hanya memvalidasi baris
+yang sudah ada di DB (≥1) lalu mengembalikannya, tanpa menulis apapun.
 """
 
 from __future__ import annotations
@@ -14,7 +17,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ...errors import ConflictError, ValidationAppError
+from ...errors import ValidationAppError
 from ...models import TiSeleksiModel
 from ..schemas.seleksi import TiSeleksiRead
 
@@ -25,7 +28,7 @@ class SqlTiSeleksiService:
     def __init__(self, session: Session) -> None:
         self._s = session
 
-    def submit(
+    def save_draft(
         self, responden_id: str, sesi_id: str, kodes: list[str], valid_kodes: set[str]
     ) -> TiSeleksiRead:
         unik = sorted(set(kodes))
@@ -35,11 +38,14 @@ class SqlTiSeleksiService:
                 f"Kode task tidak valid untuk kombinasi sesi: {', '.join(sorted(unknown)[:5])}"
                 + ("..." if len(unknown) > 5 else ".")
             )
-        already = self._s.scalar(
-            select(TiSeleksiModel.id).where(TiSeleksiModel.responden_id == responden_id)
-        )
-        if already is not None:
-            raise ConflictError(f"Responden '{responden_id}' sudah submit seleksi Tahap 1.")
+        existing_rows = self._s.scalars(
+            select(TiSeleksiModel).where(TiSeleksiModel.responden_id == responden_id)
+        ).all()
+        for rec in existing_rows:
+            self._s.delete(rec)
+        # Flush delete dulu: insert baru bisa memakai ulang task_kode yang sama
+        # tanpa melanggar UniqueConstraint(responden_id, task_kode).
+        self._s.flush()
         now = datetime.now(UTC)
         for kode in unik:
             self._s.add(
@@ -55,6 +61,14 @@ class SqlTiSeleksiService:
         return TiSeleksiRead(
             responden_id=responden_id, sesi_id=sesi_id, task_kode=unik, submitted_at=now
         )
+
+    def submit(self, responden_id: str) -> TiSeleksiRead:
+        result = self.get_by_responden(responden_id)
+        if result is None or not result.task_kode:
+            raise ValidationAppError(
+                "Responden harus memilih minimal 1 task sebelum submit Tahap 1."
+            )
+        return result
 
     def get_by_responden(self, responden_id: str) -> TiSeleksiRead | None:
         rows = self._s.scalars(

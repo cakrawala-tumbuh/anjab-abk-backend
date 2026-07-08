@@ -22,15 +22,18 @@ class WcpJawabanItem(BaseModel):
     )
 
 
-class WcpJawabanBulkCreate(BaseModel):
-    """Payload bulk submission 72 jawaban untuk satu responden."""
+class WcpJawabanUpsert(BaseModel):
+    """Payload draft-save (upsert parsial) jawaban untuk satu responden.
+
+    Boleh 0..72 item; tiap item di-upsert per `item_id`. Kelengkapan 72 item
+    divalidasi terpisah saat finalisasi (`POST .../jawaban/submit`).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     jawaban: list[WcpJawabanItem] = Field(
-        min_length=72,
         max_length=72,
-        description="Tepat 72 jawaban, satu per item WCP.",
+        description="0..72 jawaban parsial, satu per item WCP.",
     )
 
 

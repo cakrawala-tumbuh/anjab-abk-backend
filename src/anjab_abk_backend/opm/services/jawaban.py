@@ -7,8 +7,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Protocol
 
-from ...errors import ConflictError, ValidationAppError
-from ..schemas.jawaban import OpmJawabanBulkCreate, OpmJawabanRead
+from ...errors import ValidationAppError
+from ..schemas.jawaban import OpmJawabanRead, OpmJawabanUpsert
 
 
 @dataclass
@@ -41,14 +41,22 @@ def _validate_task_set(kodes_list: list[str], valid_task_kodes: set[str]) -> Non
         )
 
 
+def _validate_task_subset(kodes_list: list[str], valid_task_kodes: set[str]) -> None:
+    """Set task_kode yang di-upsert (draft, boleh parsial) harus subset dari snapshot sesi."""
+    unknown = set(kodes_list) - valid_task_kodes
+    if unknown:
+        raise ValidationAppError(f"Kode task tidak dikenal: {', '.join(sorted(unknown))}.")
+
+
 class OpmJawabanService(Protocol):
     """Kontrak operasi terhadap OpmJawaban."""
 
     def list_by_responden(self, responden_id: str) -> list[OpmJawabanRead]: ...
     def get_raw_by_responden(self, responden_id: str) -> dict[str, tuple[int, int, int]]: ...
-    def bulk_create(
-        self, responden_id: str, data: OpmJawabanBulkCreate, valid_task_kodes: set[str]
+    def upsert(
+        self, responden_id: str, data: OpmJawabanUpsert, valid_task_kodes: set[str]
     ) -> list[OpmJawabanRead]: ...
+    def submit(self, responden_id: str, valid_task_kodes: set[str]) -> list[OpmJawabanRead]: ...
     def delete_by_responden(self, responden_id: str) -> None: ...
 
 
@@ -79,32 +87,50 @@ class InMemoryOpmJawabanService:
                 if r.responden_id == responden_id
             }
 
-    def bulk_create(
-        self, responden_id: str, data: OpmJawabanBulkCreate, valid_task_kodes: set[str]
+    def upsert(
+        self, responden_id: str, data: OpmJawabanUpsert, valid_task_kodes: set[str]
     ) -> list[OpmJawabanRead]:
-        _validate_task_set([j.task_kode for j in data.jawaban], valid_task_kodes)
+        _validate_task_subset([j.task_kode for j in data.jawaban], valid_task_kodes)
 
         with self._lock:
-            already_exists = any(r.responden_id == responden_id for r in self._data.values())
-            if already_exists:
-                raise ConflictError(
-                    f"Responden '{responden_id}' sudah memiliki jawaban. "
-                    "Hapus terlebih dahulu jika ingin mengisi ulang."
-                )
-            new_records: list[_Record] = []
+            results: list[_Record] = []
             for item in data.jawaban:
-                rec = _Record(
-                    id=f"opjw_{uuid.uuid4().hex[:8]}",
-                    responden_id=responden_id,
-                    task_kode=item.task_kode,
-                    importance=item.importance,
-                    frequency=item.frequency,
-                    criticality=item.criticality,
-                    catatan=item.catatan,
+                existing = next(
+                    (
+                        r
+                        for r in self._data.values()
+                        if r.responden_id == responden_id and r.task_kode == item.task_kode
+                    ),
+                    None,
                 )
-                self._data[rec.id] = rec
-                new_records.append(rec)
-        return [self._to_read(r) for r in new_records]
+                if existing is not None:
+                    existing.importance = item.importance
+                    existing.frequency = item.frequency
+                    existing.criticality = item.criticality
+                    existing.catatan = item.catatan
+                    results.append(existing)
+                else:
+                    rec = _Record(
+                        id=f"opjw_{uuid.uuid4().hex[:8]}",
+                        responden_id=responden_id,
+                        task_kode=item.task_kode,
+                        importance=item.importance,
+                        frequency=item.frequency,
+                        criticality=item.criticality,
+                        catatan=item.catatan,
+                    )
+                    self._data[rec.id] = rec
+                    results.append(rec)
+        return [self._to_read(r) for r in results]
+
+    def submit(self, responden_id: str, valid_task_kodes: set[str]) -> list[OpmJawabanRead]:
+        with self._lock:
+            rows = sorted(
+                (r for r in self._data.values() if r.responden_id == responden_id),
+                key=lambda r: r.task_kode,
+            )
+        _validate_task_set([r.task_kode for r in rows], valid_task_kodes)
+        return [self._to_read(r) for r in rows]
 
     def delete_by_responden(self, responden_id: str) -> None:
         with self._lock:

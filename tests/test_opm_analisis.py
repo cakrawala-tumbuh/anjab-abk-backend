@@ -38,8 +38,10 @@ def _submit(
     jawaban = [
         {"task_kode": k, "importance": imp, "frequency": freq, "criticality": crit} for k in kodes
     ]
-    r = client.post(f"{SESI_BASE}/responden/{responden_id}/jawaban", json={"jawaban": jawaban})
-    assert r.status_code == 201, r.text
+    r = client.put(f"{SESI_BASE}/responden/{responden_id}/jawaban", json={"jawaban": jawaban})
+    assert r.status_code == 200, r.text
+    r2 = client.post(f"{SESI_BASE}/responden/{responden_id}/jawaban/submit")
+    assert r2.status_code == 201, r2.text
 
 
 def test_analisis_butuh_closed_422(client: TestClient, jabatan_id_tk: str) -> None:

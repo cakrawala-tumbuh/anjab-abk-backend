@@ -35,17 +35,18 @@ class OpmJawabanItem(BaseModel):
     catatan: str | None = Field(default=None, max_length=500, description="Catatan opsional.")
 
 
-class OpmJawabanBulkCreate(BaseModel):
-    """Payload bulk submission rating untuk satu responden.
+class OpmJawabanUpsert(BaseModel):
+    """Payload draft-save (upsert parsial) rating untuk satu responden.
 
-    Kelengkapan set `task_kode` divalidasi service terhadap snapshot task sesi
-    (jumlah task per sesi dinamis, bergantung Task Inventory sumber).
+    Boleh 0..N item; tiap item di-upsert per `task_kode`. Kelengkapan set
+    `task_kode` (harus persis sama dengan snapshot task sesi) divalidasi
+    terpisah saat finalisasi (`POST .../jawaban/submit`).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     jawaban: list[OpmJawabanItem] = Field(
-        min_length=1, description="Rating untuk setiap task dalam snapshot sesi."
+        default_factory=list, description="Rating parsial untuk task dalam snapshot sesi."
     )
 
 

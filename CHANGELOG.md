@@ -7,6 +7,31 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-07-08
+
+### Ditambahkan
+
+- **Simpan draft sebelum submit final — DCS, WCP, OPM, Task Inventory Tahap 1 & 3.**
+  Kelima instrumen ini tadinya "submit sekali jadi" (satu `POST` bulk yang wajib
+  lengkap dan langsung mengunci status). Sekarang partisipan dapat menyimpan
+  progres bertahap sebelum finalisasi:
+  - `PUT .../jawaban` (atau `.../seleksi`, `.../detail`) — upsert payload **parsial**
+    (boleh 0..N item); ditolak (422) bila responden sudah submit final. Task
+    Inventory Tahap 1 (seleksi) memakai semantik **full-replace** (representasi
+    alami untuk "pilihan saat ini" sebuah checkbox set); DCS/WCP/OPM/Tahap 3
+    (detail) memakai upsert per item.
+  - `POST .../jawaban/submit` (atau `.../seleksi/submit`, `.../detail/submit`) —
+    endpoint baru tanpa body: memvalidasi kelengkapan dari baris yang sudah
+    tersimpan di DB, lalu menandai flag submit + timestamp.
+
+### Diubah (Breaking)
+
+- `POST .../jawaban`, `POST .../seleksi`, `POST .../detail` (submit sekali-jadi,
+  wajib lengkap) **dihapus** — diganti pasangan `PUT` (draft) + `POST .../submit`
+  (finalisasi) di atas. Skema request `*BulkCreate`/`*Submit` diganti
+  `*Upsert`/`*DraftSave` (tanpa syarat kelengkapan; validasi kelengkapan pindah ke
+  endpoint submit).
+
 ## [0.24.0] - 2026-07-04
 
 ### Diperbaiki

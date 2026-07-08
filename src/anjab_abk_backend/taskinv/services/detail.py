@@ -7,8 +7,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Protocol
 
-from ...errors import ConflictError, ValidationAppError
-from ..schemas.detail import TiDetailRead, TiDetailSubmit
+from ...errors import ValidationAppError
+from ..schemas.detail import TiDetailRead, TiDetailUpsert
 
 
 @dataclass
@@ -32,9 +32,10 @@ class _Record:
 class TiDetailService(Protocol):
     """Kontrak operasi terhadap detail Tahap 2."""
 
-    def submit(
-        self, responden_id: str, sesi_id: str, data: TiDetailSubmit, valid_kodes: set[str]
+    def upsert(
+        self, responden_id: str, sesi_id: str, data: TiDetailUpsert, valid_kodes: set[str]
     ) -> list[TiDetailRead]: ...
+    def submit(self, responden_id: str) -> list[TiDetailRead]: ...
     def list_by_responden(self, responden_id: str) -> list[TiDetailRead]: ...
     def list_by_sesi(self, sesi_id: str) -> list[TiDetailRead]: ...
     def count_responden_submitted(self, sesi_id: str) -> int: ...
@@ -52,12 +53,10 @@ class InMemoryTiDetailService:
     def _to_read(rec: _Record) -> TiDetailRead:
         return TiDetailRead.model_validate(rec)
 
-    def submit(
-        self, responden_id: str, sesi_id: str, data: TiDetailSubmit, valid_kodes: set[str]
+    def upsert(
+        self, responden_id: str, sesi_id: str, data: TiDetailUpsert, valid_kodes: set[str]
     ) -> list[TiDetailRead]:
         kodes = [item.task_kode for item in data.detail]
-        if len(kodes) != len(set(kodes)):
-            raise ValidationAppError("Terdapat task_kode duplikat dalam payload detail.")
         unknown = set(kodes) - valid_kodes
         if unknown:
             raise ValidationAppError(
@@ -65,29 +64,56 @@ class InMemoryTiDetailService:
                 + ("..." if len(unknown) > 5 else ".")
             )
         with self._lock:
-            if any(r.responden_id == responden_id for r in self._data.values()):
-                raise ConflictError(f"Responden '{responden_id}' sudah submit detail Tahap 2.")
-            new: list[_Record] = []
+            results: list[_Record] = []
             for item in data.detail:
-                rec = _Record(
-                    id=f"tdet_{uuid.uuid4().hex[:8]}",
-                    responden_id=responden_id,
-                    sesi_id=sesi_id,
-                    task_kode=item.task_kode,
-                    sumber_bukti=item.sumber_bukti,
-                    kondisi=item.kondisi,
-                    frekuensi_teks=item.frekuensi_teks,
-                    durasi_per_kali=item.durasi_per_kali,
-                    jam_per_minggu=item.jam_per_minggu,
-                    peak4w_hours=item.peak4w_hours,
-                    ai_mode=item.ai_mode,
-                    va_type=item.va_type,
-                    dcs_flag=item.dcs_flag,
-                    catatan=item.catatan,
+                existing = next(
+                    (
+                        r
+                        for r in self._data.values()
+                        if r.responden_id == responden_id and r.task_kode == item.task_kode
+                    ),
+                    None,
                 )
-                self._data[rec.id] = rec
-                new.append(rec)
-        return [self._to_read(r) for r in new]
+                if existing is not None:
+                    existing.sumber_bukti = item.sumber_bukti
+                    existing.kondisi = item.kondisi
+                    existing.frekuensi_teks = item.frekuensi_teks
+                    existing.durasi_per_kali = item.durasi_per_kali
+                    existing.jam_per_minggu = item.jam_per_minggu
+                    existing.peak4w_hours = item.peak4w_hours
+                    existing.ai_mode = item.ai_mode
+                    existing.va_type = item.va_type
+                    existing.dcs_flag = item.dcs_flag
+                    existing.catatan = item.catatan
+                    results.append(existing)
+                else:
+                    rec = _Record(
+                        id=f"tdet_{uuid.uuid4().hex[:8]}",
+                        responden_id=responden_id,
+                        sesi_id=sesi_id,
+                        task_kode=item.task_kode,
+                        sumber_bukti=item.sumber_bukti,
+                        kondisi=item.kondisi,
+                        frekuensi_teks=item.frekuensi_teks,
+                        durasi_per_kali=item.durasi_per_kali,
+                        jam_per_minggu=item.jam_per_minggu,
+                        peak4w_hours=item.peak4w_hours,
+                        ai_mode=item.ai_mode,
+                        va_type=item.va_type,
+                        dcs_flag=item.dcs_flag,
+                        catatan=item.catatan,
+                    )
+                    self._data[rec.id] = rec
+                    results.append(rec)
+        return [self._to_read(r) for r in results]
+
+    def submit(self, responden_id: str) -> list[TiDetailRead]:
+        rows = self.list_by_responden(responden_id)
+        if not rows:
+            raise ValidationAppError(
+                "Responden harus mengisi minimal 1 entri detail sebelum submit Tahap 3."
+            )
+        return rows
 
     def list_by_responden(self, responden_id: str) -> list[TiDetailRead]:
         with self._lock:

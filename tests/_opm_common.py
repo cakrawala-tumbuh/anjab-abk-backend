@@ -85,7 +85,9 @@ def _setup_jabatan_panel_ti(client: TestClient, jabatan_id: str) -> dict:
     assert r.status_code == 200, r.text
 
     for rsp in (ra.json(), rb.json()):
-        r = client.post(f"{TI_SESI}/responden/{rsp['id']}/seleksi", json={"task_kode": kodes})
+        r = client.put(f"{TI_SESI}/responden/{rsp['id']}/seleksi", json={"task_kode": kodes})
+        assert r.status_code == 200, r.text
+        r = client.post(f"{TI_SESI}/responden/{rsp['id']}/seleksi/submit")
         assert r.status_code == 201, r.text
 
     r = client.post(f"{TI_SESI}/{ti_sesi_id}/mulai-tahap2")

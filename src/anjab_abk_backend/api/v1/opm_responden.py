@@ -18,7 +18,7 @@ from ...dependencies import (
     require_admin,
 )
 from ...errors import ValidationAppError
-from ...opm.schemas.jawaban import OpmJawabanBulkCreate, OpmJawabanRead
+from ...opm.schemas.jawaban import OpmJawabanRead, OpmJawabanUpsert
 from ...opm.schemas.responden import OpmRespondenCreate, OpmRespondenRead
 from ...opm.services.jawaban import OpmJawabanService
 from ...opm.services.responden import OpmRespondenService
@@ -126,11 +126,52 @@ def delete_responden(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post(
+@router.put(
     "/responden/{responden_id}/jawaban",
     response_model=list[OpmJawabanRead],
+    summary="Simpan draft rating (Importance/Frequency/Criticality) untuk satu responden",
+    operation_id="opm_jawaban_save_draft",
+    dependencies=_WRITE_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOT_FOUND_RSP,
+        422: {
+            "model": ErrorResponse,
+            "description": "Sesi bukan OPEN, responden sudah submit, atau kode task tidak dikenal.",
+        },
+    },
+)
+def save_draft_jawaban(
+    responden_id: Annotated[str, Path(description="ID responden.")],
+    payload: OpmJawabanUpsert,
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    sesi_service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
+    rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+    jwb_service: Annotated[OpmJawabanService, Depends(get_opm_jawaban_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+) -> list[OpmJawabanRead]:
+    responden = rsp_service.get(responden_id)
+    authorize_responden_access(principal, responden.partisipan_id, par_service)
+    sesi = sesi_service.get(responden.sesi_id)
+    if sesi.status != "OPEN":
+        raise ValidationAppError(
+            f"Jawaban hanya dapat disimpan saat sesi berstatus OPEN (saat ini: {sesi.status})."
+        )
+    if responden.sudah_submit:
+        raise ValidationAppError(
+            "Responden ini sudah mengirimkan jawaban; draft tidak bisa diubah."
+        )
+    valid_task_kodes = sesi_service.get_task_kodes(responden.sesi_id)
+    return jwb_service.upsert(responden_id, payload, valid_task_kodes)
+
+
+@router.post(
+    "/responden/{responden_id}/jawaban/submit",
+    response_model=list[OpmJawabanRead],
     status_code=status.HTTP_201_CREATED,
-    summary="Submit rating (Importance/Frequency/Criticality) untuk satu responden",
+    summary="Finalisasi (submit) rating tersimpan untuk satu responden",
     operation_id="opm_jawaban_submit",
     dependencies=_WRITE_GUARDS,
     responses={
@@ -146,7 +187,6 @@ def delete_responden(
 )
 def submit_jawaban(
     responden_id: Annotated[str, Path(description="ID responden.")],
-    payload: OpmJawabanBulkCreate,
     principal: Annotated[Principal, Depends(get_current_principal)],
     sesi_service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
     rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
@@ -163,7 +203,7 @@ def submit_jawaban(
     if responden.sudah_submit:
         raise ValidationAppError("Responden ini sudah mengirimkan jawaban.")
     valid_task_kodes = sesi_service.get_task_kodes(responden.sesi_id)
-    results = jwb_service.bulk_create(responden_id, payload, valid_task_kodes)
+    results = jwb_service.submit(responden_id, valid_task_kodes)
     rsp_service.mark_submitted(responden_id)
     return results
 

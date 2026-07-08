@@ -72,6 +72,40 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-08] DCS/WCP/OPM/Task Inventory Tahap1&3: pisah draft-save dari submit final
+
+Semua instrumen yang tadinya "submit sekali jadi" (satu `POST` bulk yang wajib
+lengkap & langsung mengunci status) sekarang mendukung simpan progres bertahap
+sebelum finalisasi. Pola diseragamkan di 5 lokasi: DCS jawaban, WCP jawaban, OPM
+jawaban, Task Inventory seleksi (Tahap 1), Task Inventory detail (Tahap 3).
+Time Study (sudah resumable secara alami via CRUD log harian) dan Task Inventory
+Tahap 2 (keputusan koordinator, bukan partisipan) tidak disentuh.
+
+- **`PUT .../jawaban`** (atau `.../seleksi`, `.../detail`) — endpoint baru, upsert
+  payload **parsial** (boleh 0..N item, `*BulkCreate`/`*Submit` lama diganti
+  `*Upsert`/`*DraftSave` dengan `min_length` dihapus). Insert baris baru atau
+  update baris existing per unique key (`(responden_id, item_id)` untuk
+  DCS/WCP/OPM jawaban & TI detail; `(responden_id, task_kode)` untuk TI detail).
+  Ditolak (422) bila responden sudah submit final. TI-Seleksi memakai semantik
+  **full-replace** (hapus semua baris lama punya responden, insert set baru) —
+  paling natural untuk representasi "pilihan saat ini" sebuah checkbox set.
+- **`POST .../jawaban/submit`** (atau `.../seleksi/submit`, `.../detail/submit`)
+  — endpoint baru, **tanpa body**. Memvalidasi baris yang sudah tersimpan di DB
+  memenuhi syarat kelengkapan (DCS 42 item, WCP 72 item, OPM & TI-Detail: subset
+  valid tanpa kekurangan/asing, TI-Seleksi: minimal 1 task terpilih), lalu
+  menandai flag submit (`sudah_submit`/`tahap1_submit`/`tahap3_submit`) +
+  timestamp.
+- **`POST .../jawaban`** (lama, bulk sekali jadi) **dihapus** — bukan
+  dipertahankan sebagai alias. Frontend memanggil `PUT` (simpan) lalu
+  `POST .../submit` (finalisasi) berurutan; tombol "Simpan" hanya memanggil
+  `PUT`.
+- Service Protocol tiap instrumen: method `bulk_create()`/`submit()` lama diganti
+  `upsert()` (atau `save_draft()` untuk TI-Seleksi) + `submit()` baru yang hanya
+  memvalidasi dari DB (tanpa payload).
+- Tidak ada migrasi Alembic — kolom `sudah_submit`/`submitted_at`/
+  `tahap1_submit`/`tahap3_submit` yang sudah ada cukup; draft = "baris ada di DB
+  tapi flag submit masih `False`".
+
 ### [2026-07-04] Time Study: hapus sesi, penugasan berbasis partisipan
 
 Time Study tidak lagi memakai sesi. Mekanisme assign partisipan disederhanakan

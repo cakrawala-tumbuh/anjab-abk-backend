@@ -7,14 +7,19 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class TiSeleksiSubmit(BaseModel):
-    """Payload submit seleksi relevansi Tahap 1: daftar kode task yang relevan."""
+class TiSeleksiDraftSave(BaseModel):
+    """Payload draft-save (full-replace) seleksi relevansi Tahap 1.
+
+    Menggantikan seluruh pilihan responden saat ini; boleh kosong (belum memilih
+    task apapun). Kelengkapan (≥1 task terpilih) divalidasi terpisah saat
+    finalisasi (`POST .../seleksi/submit`).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     task_kode: list[str] = Field(
-        min_length=1,
-        description="Daftar kode task yang relevan untuk responden ini (≥1).",
+        default_factory=list,
+        description="Daftar kode task yang relevan untuk responden ini saat ini.",
         examples=[["TIf0b59714", "TIa1b2c3d4"]],
     )
 

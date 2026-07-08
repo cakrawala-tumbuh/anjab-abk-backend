@@ -21,7 +21,7 @@ from ...dependencies import (
 from ...errors import ValidationAppError
 from ...schemas.common import ErrorResponse
 from ...security import Principal
-from ...wcp.schemas.jawaban import WcpJawabanBulkCreate, WcpJawabanRead
+from ...wcp.schemas.jawaban import WcpJawabanRead, WcpJawabanUpsert
 from ...wcp.schemas.responden import WcpRespondenCreate, WcpRespondenRead
 from ...wcp.services.dimensi import WcpDimensiService
 from ...wcp.services.jawaban import WcpJawabanService
@@ -124,11 +124,45 @@ def delete_responden(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post(
+@router.put(
     "/responden/{responden_id}/jawaban",
     response_model=list[WcpJawabanRead],
+    summary="Simpan draft jawaban (parsial) untuk satu responden",
+    operation_id="wcp_jawaban_save_draft",
+    dependencies=_WRITE_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOT_FOUND_RSP,
+        409: {"model": ErrorResponse, "description": "Item tidak dikenal."},
+        422: {"model": ErrorResponse, "description": "Responden sudah submit final."},
+    },
+)
+def save_draft_jawaban(
+    responden_id: Annotated[str, Path(description="ID responden.")],
+    payload: WcpJawabanUpsert,
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
+    jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
+    dim_service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+) -> list[WcpJawabanRead]:
+    responden = rsp_service.get(responden_id)
+    authorize_responden_access(principal, responden.partisipan_id, par_service)
+    if responden.sudah_submit:
+        raise ValidationAppError(
+            "Responden ini sudah mengirimkan jawaban; draft tidak bisa diubah."
+        )
+    valid_item_ids = {item.item_id for item in dim_service.list_item()}
+    return jwb_service.upsert(responden_id, payload, valid_item_ids)
+
+
+@router.post(
+    "/responden/{responden_id}/jawaban/submit",
+    response_model=list[WcpJawabanRead],
     status_code=status.HTTP_201_CREATED,
-    summary="Submit 72 jawaban untuk satu responden",
+    summary="Finalisasi (submit) 72 jawaban tersimpan untuk satu responden",
     operation_id="wcp_jawaban_submit",
     dependencies=_WRITE_GUARDS,
     responses={
@@ -136,12 +170,14 @@ def delete_responden(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND_RSP,
-        409: {"model": ErrorResponse, "description": "Jawaban sudah ada atau item tidak valid."},
+        422: {
+            "model": ErrorResponse,
+            "description": "Responden sudah submit, atau jawaban tersimpan belum lengkap.",
+        },
     },
 )
 def submit_jawaban(
     responden_id: Annotated[str, Path(description="ID responden.")],
-    payload: WcpJawabanBulkCreate,
     principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
@@ -153,7 +189,7 @@ def submit_jawaban(
     if responden.sudah_submit:
         raise ValidationAppError("Responden ini sudah mengirimkan jawaban.")
     valid_item_ids = {item.item_id for item in dim_service.list_item()}
-    results = jwb_service.bulk_create(responden_id, payload, valid_item_ids)
+    results = jwb_service.submit(responden_id, valid_item_ids)
     rsp_service.mark_submitted(responden_id)
     return results
 

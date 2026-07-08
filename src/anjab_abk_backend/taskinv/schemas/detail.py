@@ -32,17 +32,18 @@ class TiDetailItem(BaseModel):
     catatan: str | None = Field(default=None, max_length=500, description="Catatan ambiguitas.")
 
 
-class TiDetailSubmit(BaseModel):
-    """Payload submit detail Tahap 2 untuk satu responden.
+class TiDetailUpsert(BaseModel):
+    """Payload draft-save (upsert parsial) detail Tahap 3 untuk satu responden.
 
-    Boleh subset dari himpunan terpilih (hanya task yang benar-benar dikerjakan responden),
-    tetapi setiap `task_kode` wajib termasuk himpunan terpilih sesi.
+    Boleh 0..N entri; tiap entri di-upsert per `task_kode`, dan wajib termasuk
+    himpunan terpilih sesi. Kelengkapan minimal (≥1 entri) divalidasi terpisah
+    saat finalisasi (`POST .../detail/submit`).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     detail: list[TiDetailItem] = Field(
-        min_length=1, description="Daftar entri detail, satu per task relevan."
+        default_factory=list, description="Daftar entri detail parsial, satu per task relevan."
     )
 
 

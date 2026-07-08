@@ -2,9 +2,10 @@
 
 MENGGANTI `InMemoryTiDetailService` TANPA mengubah kontrak Protocol.
 
-Satu baris per (responden, task_kode) di `ti_detail`. Submit divalidasi:
-duplikat task_kode dalam payload → 422; task_kode di luar himpunan terpilih → 422;
-responden yang sudah submit → 409.
+Satu baris per (responden, task_kode) di `ti_detail`. `upsert` melakukan
+get-or-update per task_kode (harus termasuk himpunan terpilih sesi) sehingga
+draft boleh disimpan berulang kali sebelum finalisasi. `submit` hanya
+memvalidasi minimal 1 baris sudah ada di DB lalu mengembalikannya.
 """
 
 from __future__ import annotations
@@ -14,9 +15,9 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ...errors import ConflictError, ValidationAppError
+from ...errors import ValidationAppError
 from ...models import TiDetailModel
-from ..schemas.detail import TiDetailRead, TiDetailSubmit
+from ..schemas.detail import TiDetailRead, TiDetailUpsert
 
 
 def _to_read(rec: TiDetailModel) -> TiDetailRead:
@@ -44,45 +45,65 @@ class SqlTiDetailService:
     def __init__(self, session: Session) -> None:
         self._s = session
 
-    def submit(
-        self, responden_id: str, sesi_id: str, data: TiDetailSubmit, valid_kodes: set[str]
+    def upsert(
+        self, responden_id: str, sesi_id: str, data: TiDetailUpsert, valid_kodes: set[str]
     ) -> list[TiDetailRead]:
         kodes = [item.task_kode for item in data.detail]
-        if len(kodes) != len(set(kodes)):
-            raise ValidationAppError("Terdapat task_kode duplikat dalam payload detail.")
         unknown = set(kodes) - valid_kodes
         if unknown:
             raise ValidationAppError(
                 f"task_kode di luar himpunan terpilih: {', '.join(sorted(unknown)[:5])}"
                 + ("..." if len(unknown) > 5 else ".")
             )
-        already = self._s.scalar(
-            select(TiDetailModel.id).where(TiDetailModel.responden_id == responden_id)
-        )
-        if already is not None:
-            raise ConflictError(f"Responden '{responden_id}' sudah submit detail Tahap 2.")
-        new: list[TiDetailModel] = []
+        results: list[TiDetailModel] = []
         for item in data.detail:
-            rec = TiDetailModel(
-                id=f"tdet_{uuid.uuid4().hex[:8]}",
-                responden_id=responden_id,
-                sesi_id=sesi_id,
-                task_kode=item.task_kode,
-                sumber_bukti=item.sumber_bukti,
-                kondisi=item.kondisi,
-                frekuensi_teks=item.frekuensi_teks,
-                durasi_per_kali=item.durasi_per_kali,
-                jam_per_minggu=item.jam_per_minggu,
-                peak4w_hours=item.peak4w_hours,
-                ai_mode=item.ai_mode,
-                va_type=item.va_type,
-                dcs_flag=item.dcs_flag,
-                catatan=item.catatan,
+            existing = self._s.scalar(
+                select(TiDetailModel).where(
+                    TiDetailModel.responden_id == responden_id,
+                    TiDetailModel.task_kode == item.task_kode,
+                )
             )
-            self._s.add(rec)
-            new.append(rec)
+            if existing is not None:
+                existing.sumber_bukti = item.sumber_bukti
+                existing.kondisi = item.kondisi
+                existing.frekuensi_teks = item.frekuensi_teks
+                existing.durasi_per_kali = item.durasi_per_kali
+                existing.jam_per_minggu = item.jam_per_minggu
+                existing.peak4w_hours = item.peak4w_hours
+                existing.ai_mode = item.ai_mode
+                existing.va_type = item.va_type
+                existing.dcs_flag = item.dcs_flag
+                existing.catatan = item.catatan
+                results.append(existing)
+            else:
+                rec = TiDetailModel(
+                    id=f"tdet_{uuid.uuid4().hex[:8]}",
+                    responden_id=responden_id,
+                    sesi_id=sesi_id,
+                    task_kode=item.task_kode,
+                    sumber_bukti=item.sumber_bukti,
+                    kondisi=item.kondisi,
+                    frekuensi_teks=item.frekuensi_teks,
+                    durasi_per_kali=item.durasi_per_kali,
+                    jam_per_minggu=item.jam_per_minggu,
+                    peak4w_hours=item.peak4w_hours,
+                    ai_mode=item.ai_mode,
+                    va_type=item.va_type,
+                    dcs_flag=item.dcs_flag,
+                    catatan=item.catatan,
+                )
+                self._s.add(rec)
+                results.append(rec)
         self._s.flush()
-        return [_to_read(r) for r in new]
+        return [_to_read(r) for r in results]
+
+    def submit(self, responden_id: str) -> list[TiDetailRead]:
+        rows = self.list_by_responden(responden_id)
+        if not rows:
+            raise ValidationAppError(
+                "Responden harus mengisi minimal 1 entri detail sebelum submit Tahap 3."
+            )
+        return rows
 
     def list_by_responden(self, responden_id: str) -> list[TiDetailRead]:
         rows = self._s.scalars(

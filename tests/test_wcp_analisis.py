@@ -36,6 +36,16 @@ def open_sesi(client: TestClient) -> dict:
     return client.get(f"{SESI_BASE}/{sesi['id']}").json()
 
 
+def _save_draft(client: TestClient, responden_id: str, jawaban: dict) -> None:
+    r = client.put(f"/api/v1/wcp/sesi/responden/{responden_id}/jawaban", json=jawaban)
+    assert r.status_code == 200
+
+
+def _submit(client: TestClient, responden_id: str) -> None:
+    r = client.post(f"/api/v1/wcp/sesi/responden/{responden_id}/jawaban/submit")
+    assert r.status_code == 201
+
+
 def _add_and_submit_responden(
     client: TestClient, anon_client: TestClient, sesi_id: str, skor: int = 4
 ) -> dict:
@@ -44,10 +54,8 @@ def _add_and_submit_responden(
         json={"jabatan_label": "Guru Test"},
     ).json()
     item_ids = _get_all_item_ids(anon_client)
-    client.post(
-        f"/api/v1/wcp/sesi/responden/{rsp['id']}/jawaban",
-        json=_make_jawaban(item_ids, skor),
-    )
+    _save_draft(client, rsp["id"], _make_jawaban(item_ids, skor))
+    _submit(client, rsp["id"])
     return rsp
 
 
@@ -85,10 +93,8 @@ def test_submit_jawaban_marks_submitted(
         json={"jabatan_label": "Guru IPA"},
     ).json()
     item_ids = _get_all_item_ids(anon_client)
-    r = client.post(
-        f"/api/v1/wcp/sesi/responden/{rsp['id']}/jawaban",
-        json=_make_jawaban(item_ids, 3),
-    )
+    _save_draft(client, rsp["id"], _make_jawaban(item_ids, 3))
+    r = client.post(f"/api/v1/wcp/sesi/responden/{rsp['id']}/jawaban/submit")
     assert r.status_code == 201
     assert len(r.json()) == 72
 
@@ -104,8 +110,9 @@ def test_cannot_submit_twice(client: TestClient, anon_client: TestClient, open_s
     ).json()
     item_ids = _get_all_item_ids(anon_client)
     jawaban = _make_jawaban(item_ids, 4)
-    client.post(f"/api/v1/wcp/sesi/responden/{rsp['id']}/jawaban", json=jawaban)
-    r = client.post(f"/api/v1/wcp/sesi/responden/{rsp['id']}/jawaban", json=jawaban)
+    _save_draft(client, rsp["id"], jawaban)
+    _submit(client, rsp["id"])
+    r = client.post(f"/api/v1/wcp/sesi/responden/{rsp['id']}/jawaban/submit")
     assert r.status_code in (400, 409, 422)
 
 
@@ -147,10 +154,8 @@ def test_hasil_responden_scoring(
         json={"jabatan_label": "Guru Seni"},
     ).json()
     item_ids = _get_all_item_ids(anon_client)
-    client.post(
-        f"/api/v1/wcp/sesi/responden/{rsp['id']}/jawaban",
-        json=_make_jawaban(item_ids, 4),
-    )
+    _save_draft(client, rsp["id"], _make_jawaban(item_ids, 4))
+    _submit(client, rsp["id"])
     r = client.get(f"/api/v1/wcp/sesi/responden/{rsp['id']}/hasil")
     assert r.status_code == 200
     hasil = r.json()

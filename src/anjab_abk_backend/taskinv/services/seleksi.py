@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
-from ...errors import ConflictError, ValidationAppError
+from ...errors import ValidationAppError
 from ..schemas.seleksi import TiSeleksiRead
 
 
@@ -28,9 +28,10 @@ class _Record:
 class TiSeleksiService(Protocol):
     """Kontrak operasi terhadap seleksi Tahap 1."""
 
-    def submit(
+    def save_draft(
         self, responden_id: str, sesi_id: str, kodes: list[str], valid_kodes: set[str]
     ) -> TiSeleksiRead: ...
+    def submit(self, responden_id: str) -> TiSeleksiRead: ...
     def get_by_responden(self, responden_id: str) -> TiSeleksiRead | None: ...
     def union_terpilih(self, sesi_id: str) -> list[str]: ...
     def unanimous_terpilih(self, sesi_id: str, total_submitted: int) -> list[str]: ...
@@ -46,7 +47,7 @@ class InMemoryTiSeleksiService:
         self._lock = threading.Lock()
         self._data: dict[str, _Record] = {}
 
-    def submit(
+    def save_draft(
         self, responden_id: str, sesi_id: str, kodes: list[str], valid_kodes: set[str]
     ) -> TiSeleksiRead:
         unik = sorted(set(kodes))
@@ -57,8 +58,9 @@ class InMemoryTiSeleksiService:
                 + ("..." if len(unknown) > 5 else ".")
             )
         with self._lock:
-            if any(r.responden_id == responden_id for r in self._data.values()):
-                raise ConflictError(f"Responden '{responden_id}' sudah submit seleksi Tahap 1.")
+            to_delete = [rid for rid, r in self._data.items() if r.responden_id == responden_id]
+            for rid in to_delete:
+                del self._data[rid]
             now = datetime.now(UTC)
             for kode in unik:
                 rec = _Record(
@@ -72,6 +74,14 @@ class InMemoryTiSeleksiService:
         return TiSeleksiRead(
             responden_id=responden_id, sesi_id=sesi_id, task_kode=unik, submitted_at=now
         )
+
+    def submit(self, responden_id: str) -> TiSeleksiRead:
+        result = self.get_by_responden(responden_id)
+        if result is None or not result.task_kode:
+            raise ValidationAppError(
+                "Responden harus memilih minimal 1 task sebelum submit Tahap 1."
+            )
+        return result
 
     def get_by_responden(self, responden_id: str) -> TiSeleksiRead | None:
         with self._lock:

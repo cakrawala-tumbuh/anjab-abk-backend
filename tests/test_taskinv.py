@@ -60,6 +60,22 @@ def _add_responden(client: TestClient, sesi_id: str, nama: str) -> dict:
     return r.json()
 
 
+def _seleksi_submit(client: TestClient, responden_id: str, kodes: list[str]) -> dict:
+    r = client.put(f"{SESI}/responden/{responden_id}/seleksi", json={"task_kode": kodes})
+    assert r.status_code == 200, r.text
+    r2 = client.post(f"{SESI}/responden/{responden_id}/seleksi/submit")
+    assert r2.status_code == 201, r2.text
+    return r2.json()
+
+
+def _detail_submit(client: TestClient, responden_id: str, detail: list[dict]) -> list[dict]:
+    r = client.put(f"{SESI}/responden/{responden_id}/detail", json={"detail": detail})
+    assert r.status_code == 200, r.text
+    r2 = client.post(f"{SESI}/responden/{responden_id}/detail/submit")
+    assert r2.status_code == 201, r2.text
+    return r2.json()
+
+
 # --------------------------------------------------------------------------- #
 # Catalog
 # --------------------------------------------------------------------------- #
@@ -191,12 +207,7 @@ def test_mulai_tahap2_guard_belum_semua_submit(client: TestClient, jabatan_id_tk
     r1 = _add_responden(client, sid, "A")
     _add_responden(client, sid, "B")  # tidak submit
     kodes = _catalog_kodes(client, jabatan_id_tk, 3)
-    assert (
-        client.post(
-            f"{SESI}/responden/{r1['id']}/seleksi", json={"task_kode": kodes[:2]}
-        ).status_code
-        == 201
-    )
+    _seleksi_submit(client, r1["id"], kodes[:2])
     # 1 dari 2 submit → tanpa paksa harus gagal
     r = client.post(f"{SESI}/{sid}/mulai-tahap2")
     assert r.status_code in (400, 422)
@@ -219,8 +230,8 @@ def test_mulai_tahap3_dengan_review_koordinator(client: TestClient, jabatan_id_t
     rb = _add_responden(client, sid, "B")
     # A pilih K0,K1 ; B pilih K1,K2
     # K1 = unanimous (2/2), K0 & K2 = partial (1/2) → perlu review koordinator
-    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": [kodes[0], kodes[1]]})
-    client.post(f"{SESI}/responden/{rb['id']}/seleksi", json={"task_kode": [kodes[1], kodes[2]]})
+    _seleksi_submit(client, ra["id"], [kodes[0], kodes[1]])
+    _seleksi_submit(client, rb["id"], [kodes[1], kodes[2]])
 
     # Masuk TAHAP2 (koordinator review)
     r2 = client.post(f"{SESI}/{sid}/mulai-tahap2")
@@ -274,8 +285,8 @@ def test_mulai_tahap3_paksa_tanpa_review(client: TestClient, jabatan_id_tk: str)
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
     rb = _add_responden(client, sid, "B")
-    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": [kodes[0]]})
-    client.post(f"{SESI}/responden/{rb['id']}/seleksi", json={"task_kode": [kodes[1]]})
+    _seleksi_submit(client, ra["id"], [kodes[0]])
+    _seleksi_submit(client, rb["id"], [kodes[1]])
     client.post(f"{SESI}/{sid}/mulai-tahap2")
 
     # Tanpa review koordinator, paksa → sukses (partial diabaikan, hanya unanimous)
@@ -297,8 +308,8 @@ def test_mulai_tahap3_unanimous_otomatis(client: TestClient, jabatan_id_tk: str)
     ra = _add_responden(client, sid, "A")
     rb = _add_responden(client, sid, "B")
     # Keduanya pilih K0 dan K1 → semua unanimous
-    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
-    client.post(f"{SESI}/responden/{rb['id']}/seleksi", json={"task_kode": kodes})
+    _seleksi_submit(client, ra["id"], kodes)
+    _seleksi_submit(client, rb["id"], kodes)
 
     client.post(f"{SESI}/{sid}/mulai-tahap2")
 
@@ -324,7 +335,7 @@ def test_seleksi_invalid_kode(client: TestClient, jabatan_id_tk: str) -> None:
     sid = sesi["id"]
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     r = _add_responden(client, sid, "A")
-    res = client.post(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": ["TItidakvalid"]})
+    res = client.put(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": ["TItidakvalid"]})
     assert res.status_code in (400, 422)
 
 
@@ -333,7 +344,7 @@ def test_seleksi_requires_tahap1(client: TestClient, jabatan_id_tk: str) -> None
     sid = sesi["id"]
     r = _add_responden(client, sid, "A")
     kodes = _catalog_kodes(client, jabatan_id_tk, 1)
-    res = client.post(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": kodes})
+    res = client.put(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": kodes})
     assert res.status_code in (400, 422)
 
 
@@ -343,16 +354,60 @@ def test_seleksi_double_submit_conflict(client: TestClient, jabatan_id_tk: str) 
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     r = _add_responden(client, sid, "A")
     kodes = _catalog_kodes(client, jabatan_id_tk, 2)
-    assert (
-        client.post(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": kodes}).status_code
-        == 201
-    )
-    res = client.post(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": kodes})
+    _seleksi_submit(client, r["id"], kodes)
+    res = client.post(f"{SESI}/responden/{r['id']}/seleksi/submit")
     assert res.status_code in (400, 409, 422)
     # get seleksi
     g = client.get(f"{SESI}/responden/{r['id']}/seleksi")
     assert g.status_code == 200
     assert set(g.json()["task_kode"]) == set(kodes)
+
+
+def test_save_draft_seleksi_full_replace(client: TestClient, jabatan_id_tk: str) -> None:
+    """PUT seleksi full-replace: pilihan lama diganti seluruhnya, bukan digabung."""
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    r = _add_responden(client, sid, "A")
+    kodes = _catalog_kodes(client, jabatan_id_tk, 3)
+
+    r1 = client.put(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": [kodes[0]]})
+    assert r1.status_code == 200
+    assert r1.json()["task_kode"] == [kodes[0]]
+
+    r2 = client.put(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": [kodes[1], kodes[2]]})
+    assert r2.status_code == 200
+    assert set(r2.json()["task_kode"]) == {kodes[1], kodes[2]}
+
+    g = client.get(f"{SESI}/responden/{r['id']}/seleksi")
+    assert set(g.json()["task_kode"]) == {kodes[1], kodes[2]}
+
+
+def test_save_draft_seleksi_rejected_after_submit(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    r = _add_responden(client, sid, "A")
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    _seleksi_submit(client, r["id"], kodes)
+
+    res = client.put(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": kodes})
+    assert res.status_code == 422
+
+
+def test_submit_seleksi_rejected_when_no_task_selected(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    r = _add_responden(client, sid, "A")
+
+    r1 = client.put(f"{SESI}/responden/{r['id']}/seleksi", json={"task_kode": []})
+    assert r1.status_code == 200
+
+    res = client.post(f"{SESI}/responden/{r['id']}/seleksi/submit")
+    assert res.status_code == 422
 
 
 # --------------------------------------------------------------------------- #
@@ -370,8 +425,8 @@ def test_full_three_phase_flow(client: TestClient, jabatan_id_tk: str) -> None:
     ra = _add_responden(client, sid, "A")
     rb = _add_responden(client, sid, "B")
     # A pilih K0,K1 ; B pilih K1,K2 → K1 unanimous, K0+K2 partial
-    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": [kodes[0], kodes[1]]})
-    client.post(f"{SESI}/responden/{rb['id']}/seleksi", json={"task_kode": [kodes[1], kodes[2]]})
+    _seleksi_submit(client, ra["id"], [kodes[0], kodes[1]])
+    _seleksi_submit(client, rb["id"], [kodes[1], kodes[2]])
 
     # Tahap 2: koordinator setujui K0, tolak K2
     assert client.post(f"{SESI}/{sid}/mulai-tahap2").json()["status"] == "TAHAP2"
@@ -412,16 +467,8 @@ def test_full_three_phase_flow(client: TestClient, jabatan_id_tk: str) -> None:
             "dcs_flag": False,
         }
 
-    da = client.post(
-        f"{SESI}/responden/{ra['id']}/detail",
-        json={"detail": [_ditem(kodes[0], 2.0), _ditem(kodes[1], 4.0)]},
-    )
-    assert da.status_code == 201, da.text
-    db = client.post(
-        f"{SESI}/responden/{rb['id']}/detail",
-        json={"detail": [_ditem(kodes[1], 6.0)]},
-    )
-    assert db.status_code == 201, db.text
+    _detail_submit(client, ra["id"], [_ditem(kodes[0], 2.0), _ditem(kodes[1], 4.0)])
+    _detail_submit(client, rb["id"], [_ditem(kodes[1], 6.0)])
 
     # Tutup → analisis
     assert client.post(f"{SESI}/{sid}/tutup").json()["status"] == "CLOSED"
@@ -454,12 +501,12 @@ def test_detail_kode_diluar_terpilih_ditolak(client: TestClient, jabatan_id_tk: 
     kodes = _catalog_kodes(client, jabatan_id_tk, 4)
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
-    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": [kodes[0]]})
+    _seleksi_submit(client, ra["id"], [kodes[0]])
     # Masuk TAHAP2 lalu TAHAP3 (K0 unanimous karena 1 responden memilihnya)
     client.post(f"{SESI}/{sid}/mulai-tahap2")
     client.post(f"{SESI}/{sid}/mulai-tahap3")
     # kodes[3] tidak ada di terpilih (hanya kodes[0])
-    res = client.post(
+    res = client.put(
         f"{SESI}/responden/{ra['id']}/detail",
         json={
             "detail": [
@@ -486,10 +533,10 @@ def test_detail_requires_tahap3(client: TestClient, jabatan_id_tk: str) -> None:
     kodes = _catalog_kodes(client, jabatan_id_tk, 1)
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
-    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
+    _seleksi_submit(client, ra["id"], kodes)
     client.post(f"{SESI}/{sid}/mulai-tahap2")
     # Di TAHAP2, belum bisa submit detail
-    res = client.post(
+    res = client.put(
         f"{SESI}/responden/{ra['id']}/detail",
         json={
             "detail": [
@@ -521,7 +568,7 @@ def test_responden_delete_setelah_submit_ditolak(client: TestClient, jabatan_id_
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
     kodes = _catalog_kodes(client, jabatan_id_tk, 1)
-    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
+    _seleksi_submit(client, ra["id"], kodes)
     r = client.delete(f"{SESI}/responden/{ra['id']}")
     assert r.status_code in (400, 422)
 
@@ -533,7 +580,7 @@ def test_detail_enum_invalid(client: TestClient, jabatan_id_tk: str, field: str)
     kodes = _catalog_kodes(client, jabatan_id_tk, 1)
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
-    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
+    _seleksi_submit(client, ra["id"], kodes)
     client.post(f"{SESI}/{sid}/mulai-tahap2")
     client.post(f"{SESI}/{sid}/mulai-tahap3")
     item = {
@@ -547,7 +594,79 @@ def test_detail_enum_invalid(client: TestClient, jabatan_id_tk: str, field: str)
         "va_type": "VA-Core",
     }
     item[field] = "NILAI_SALAH"
-    res = client.post(f"{SESI}/responden/{ra['id']}/detail", json={"detail": [item]})
+    res = client.put(f"{SESI}/responden/{ra['id']}/detail", json={"detail": [item]})
+    assert res.status_code == 422
+
+
+def _detail_item(kode: str, jpm: float = 1.0) -> dict:
+    return {
+        "task_kode": kode,
+        "sumber_bukti": "Aktual",
+        "kondisi": "Baseline",
+        "frekuensi_teks": "Harian",
+        "durasi_per_kali": 30,
+        "jam_per_minggu": jpm,
+        "ai_mode": "Human-led",
+        "va_type": "VA-Core",
+    }
+
+
+def test_save_draft_detail_parsial_lalu_lengkap(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, jabatan_id_tk, 2)
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    _seleksi_submit(client, ra["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    client.post(f"{SESI}/{sid}/mulai-tahap3")
+
+    r1 = client.put(
+        f"{SESI}/responden/{ra['id']}/detail", json={"detail": [_detail_item(kodes[0])]}
+    )
+    assert r1.status_code == 200
+    assert len(r1.json()) == 1
+
+    r2 = client.put(
+        f"{SESI}/responden/{ra['id']}/detail", json={"detail": [_detail_item(kodes[1])]}
+    )
+    assert r2.status_code == 200
+
+    r_submit = client.post(f"{SESI}/responden/{ra['id']}/detail/submit")
+    assert r_submit.status_code == 201
+    assert len(r_submit.json()) == 2
+
+    assert client.get(f"{SESI}/responden/{ra['id']}").json()["tahap3_submit"] is True
+
+
+def test_save_draft_detail_rejected_after_submit(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    _seleksi_submit(client, ra["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    client.post(f"{SESI}/{sid}/mulai-tahap3")
+    _detail_submit(client, ra["id"], [_detail_item(kodes[0])])
+
+    res = client.put(
+        f"{SESI}/responden/{ra['id']}/detail", json={"detail": [_detail_item(kodes[0])]}
+    )
+    assert res.status_code == 422
+
+
+def test_submit_detail_rejected_when_empty(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    _seleksi_submit(client, ra["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    client.post(f"{SESI}/{sid}/mulai-tahap3")
+
+    res = client.post(f"{SESI}/responden/{ra['id']}/detail/submit")
     assert res.status_code == 422
 
 
@@ -571,7 +690,7 @@ def test_tahap2_submit_keputusan_non_partial_ditolak(
     kodes = _catalog_kodes(client, jabatan_id_tk, 1)
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, "A")
-    client.post(f"{SESI}/responden/{ra['id']}/seleksi", json={"task_kode": kodes})
+    _seleksi_submit(client, ra["id"], kodes)
     client.post(f"{SESI}/{sid}/mulai-tahap2")
     # kodes[0] dipilih oleh semua (1 responden = 1 = unanimous), bukan partial
     r = client.post(
@@ -812,7 +931,7 @@ def test_get_responden_forbidden_for_non_owner(
     assert r.json()["id"] == rsp["id"]
 
 
-def test_submit_seleksi_forbidden_for_non_owner(
+def test_save_draft_seleksi_forbidden_for_non_owner(
     client: TestClient, client_as, partisipan_factory, jabatan_id_tk: str, db_session
 ) -> None:
     from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
@@ -833,12 +952,14 @@ def test_submit_seleksi_forbidden_for_non_owner(
     rsp = client.post(f"{SESI}/{sid}/responden", json={"partisipan_id": par_a, "nama": "A"}).json()
 
     as_d = client_as("ti-bola-d")
-    r = as_d.post(f"{SESI}/responden/{rsp['id']}/seleksi", json={"task_kode": kodes})
+    r = as_d.put(f"{SESI}/responden/{rsp['id']}/seleksi", json={"task_kode": kodes})
     assert r.status_code == 403
 
     as_a = client_as("ti-bola-c")
-    r_ok = as_a.post(f"{SESI}/responden/{rsp['id']}/seleksi", json={"task_kode": kodes})
-    assert r_ok.status_code == 201
+    r_ok = as_a.put(f"{SESI}/responden/{rsp['id']}/seleksi", json={"task_kode": kodes})
+    assert r_ok.status_code == 200
+    r_submit = as_a.post(f"{SESI}/responden/{rsp['id']}/seleksi/submit")
+    assert r_submit.status_code == 201
 
 
 def test_list_responden_forbidden_for_non_admin(

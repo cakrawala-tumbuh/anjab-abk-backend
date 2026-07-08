@@ -22,15 +22,18 @@ class DcsJawabanItem(BaseModel):
     )
 
 
-class DcsJawabanBulkCreate(BaseModel):
-    """Payload bulk submission 42 jawaban untuk satu responden."""
+class DcsJawabanUpsert(BaseModel):
+    """Payload draft-save (upsert parsial) jawaban untuk satu responden.
+
+    Boleh 0..42 item; tiap item di-upsert per `item_id`. Kelengkapan 42 item
+    divalidasi terpisah saat finalisasi (`POST .../jawaban/submit`).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     jawaban: list[DcsJawabanItem] = Field(
-        min_length=42,
         max_length=42,
-        description="Tepat 42 jawaban, satu per item DCS.",
+        description="0..42 jawaban parsial, satu per item DCS.",
     )
 
 

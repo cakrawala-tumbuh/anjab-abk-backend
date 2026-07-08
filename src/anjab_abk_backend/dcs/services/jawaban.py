@@ -7,8 +7,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Protocol
 
-from ...errors import ConflictError
-from ..schemas.jawaban import DcsJawabanBulkCreate, DcsJawabanRead
+from ...errors import ConflictError, ValidationAppError
+from ..schemas.jawaban import DcsJawabanRead, DcsJawabanUpsert
 
 
 @dataclass
@@ -23,9 +23,10 @@ class DcsJawabanService(Protocol):
     """Kontrak operasi terhadap DcsJawaban."""
 
     def list_by_responden(self, responden_id: str) -> list[DcsJawabanRead]: ...
-    def bulk_create(
-        self, responden_id: str, data: DcsJawabanBulkCreate, valid_item_ids: set[str]
+    def upsert(
+        self, responden_id: str, data: DcsJawabanUpsert, valid_item_ids: set[str]
     ) -> list[DcsJawabanRead]: ...
+    def submit(self, responden_id: str, valid_item_ids: set[str]) -> list[DcsJawabanRead]: ...
     def delete_by_responden(self, responden_id: str) -> None: ...
 
 
@@ -55,39 +56,54 @@ class InMemoryDcsJawabanService:
                 r.item_id: r.skor_raw for r in self._data.values() if r.responden_id == responden_id
             }
 
-    def bulk_create(
-        self, responden_id: str, data: DcsJawabanBulkCreate, valid_item_ids: set[str]
+    def upsert(
+        self, responden_id: str, data: DcsJawabanUpsert, valid_item_ids: set[str]
     ) -> list[DcsJawabanRead]:
         submitted_ids = {j.item_id for j in data.jawaban}
-        missing = valid_item_ids - submitted_ids
-        if missing:
-            raise ConflictError(
-                f"Item berikut belum dijawab: {', '.join(sorted(missing)[:5])}..."
-                if len(missing) > 5
-                else f"Item berikut belum dijawab: {', '.join(sorted(missing))}."
-            )
         unknown = submitted_ids - valid_item_ids
         if unknown:
             raise ConflictError(f"Item tidak dikenal: {', '.join(sorted(unknown))}.")
 
         with self._lock:
-            already_exists = any(r.responden_id == responden_id for r in self._data.values())
-            if already_exists:
-                raise ConflictError(
-                    f"Responden '{responden_id}' sudah memiliki jawaban. "
-                    "Hapus terlebih dahulu jika ingin mengisi ulang."
-                )
-            new_records: list[_Record] = []
+            results: list[_Record] = []
             for item in data.jawaban:
-                rec = _Record(
-                    id=f"djwb_{uuid.uuid4().hex[:8]}",
-                    responden_id=responden_id,
-                    item_id=item.item_id,
-                    skor_raw=item.skor_raw,
+                existing = next(
+                    (
+                        r
+                        for r in self._data.values()
+                        if r.responden_id == responden_id and r.item_id == item.item_id
+                    ),
+                    None,
                 )
-                self._data[rec.id] = rec
-                new_records.append(rec)
-        return [self._to_read(r) for r in new_records]
+                if existing is not None:
+                    existing.skor_raw = item.skor_raw
+                    results.append(existing)
+                else:
+                    rec = _Record(
+                        id=f"djwb_{uuid.uuid4().hex[:8]}",
+                        responden_id=responden_id,
+                        item_id=item.item_id,
+                        skor_raw=item.skor_raw,
+                    )
+                    self._data[rec.id] = rec
+                    results.append(rec)
+        return [self._to_read(r) for r in results]
+
+    def submit(self, responden_id: str, valid_item_ids: set[str]) -> list[DcsJawabanRead]:
+        with self._lock:
+            rows = sorted(
+                (r for r in self._data.values() if r.responden_id == responden_id),
+                key=lambda r: r.item_id,
+            )
+        existing_ids = {r.item_id for r in rows}
+        missing = valid_item_ids - existing_ids
+        if missing:
+            raise ValidationAppError(
+                f"Item berikut belum dijawab: {', '.join(sorted(missing)[:5])}..."
+                if len(missing) > 5
+                else f"Item berikut belum dijawab: {', '.join(sorted(missing))}."
+            )
+        return [self._to_read(r) for r in rows]
 
     def delete_by_responden(self, responden_id: str) -> None:
         with self._lock:
