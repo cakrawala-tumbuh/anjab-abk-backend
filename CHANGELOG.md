@@ -7,6 +7,18 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-07-12
+
+### Diperbaiki
+
+- **`DELETE` sesi (DCS/OPM/WCP/Task Inventory) kini hanya admin.** Keempat
+  endpoint `DELETE /{dcs|opm|wcp|taskinv}/sesi/{sesi_id}` sebelumnya memakai
+  guard `_WRITE_GUARDS` (siapapun yang login boleh menghapus), berbeda dari
+  endpoint `DELETE` responden/penugasan yang sudah dibatasi admin. Menghapus
+  sebuah Sesi men-cascade hapus seluruh responden & jawaban di bawahnya,
+  sehingga celah ini kini ditutup: keempat endpoint memakai `_ADMIN_GUARDS`
+  (`require_admin`) dengan response `403` bila bukan admin.
+
 ## [0.25.0] - 2026-07-08
 
 ### Ditambahkan

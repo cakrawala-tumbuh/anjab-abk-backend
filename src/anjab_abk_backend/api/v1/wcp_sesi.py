@@ -14,6 +14,7 @@ from ...dependencies import (
     idempotency,
     pagination_params,
     rate_limit,
+    require_admin,
 )
 from ...errors import ConflictError
 from ...schemas.common import ErrorResponse, Page
@@ -24,9 +25,11 @@ from ...wcp.services.sesi import WcpSesiService
 router = APIRouter()
 
 _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
+_ADMIN_GUARDS = [Depends(require_admin), Depends(rate_limit)]
 _NOT_FOUND = {404: {"model": ErrorResponse, "description": "Sesi WCP tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
+_FORBIDDEN = {403: {"model": ErrorResponse, "description": "Bukan admin."}}
 
 
 @router.get(
@@ -143,8 +146,8 @@ def update_sesi(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Hapus sesi WCP (hanya saat DRAFT)",
     operation_id="wcp_sesi_delete",
-    dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND},
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
 )
 def delete_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi WCP.")],
