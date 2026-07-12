@@ -1,4 +1,4 @@
-"""SEAM akses data untuk resource `WcpResponden`."""
+"""SEAM akses data untuk resource `WcpResponden` (penugasan langsung ke instrumen singleton)."""
 
 from __future__ import annotations
 
@@ -9,13 +9,12 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from ...errors import ConflictError, NotFoundError, ValidationAppError
-from ..schemas.responden import WcpRespondenCreate, WcpRespondenRead
+from ..schemas.responden import WcpRespondenRead
 
 
 @dataclass
 class _Record:
     id: str
-    sesi_id: str
     jabatan_label: str
     sudah_submit: bool
     created_at: datetime
@@ -27,18 +26,24 @@ class _Record:
 class WcpRespondenService(Protocol):
     """Kontrak operasi terhadap WcpResponden."""
 
-    def list_by_sesi(self, sesi_id: str) -> list[WcpRespondenRead]: ...
+    def list_all(self) -> list[WcpRespondenRead]: ...
     def list_by_partisipan(self, partisipan_id: str) -> list[WcpRespondenRead]: ...
     def get(self, responden_id: str) -> WcpRespondenRead: ...
     def create(
-        self, sesi_id: str, data: WcpRespondenCreate, max_responden: int
+        self, partisipan_id: str, nama: str | None, jabatan_label: str
     ) -> WcpRespondenRead: ...
+    def create_banyak(self, partisipan_ids: list[str]) -> list[WcpRespondenRead]: ...
     def mark_submitted(self, responden_id: str) -> WcpRespondenRead: ...
     def delete(self, responden_id: str) -> None: ...
 
 
 class InMemoryWcpRespondenService:
-    """Placeholder in-memory thread-safe."""
+    """Placeholder in-memory thread-safe.
+
+    Tidak punya akses ke `PartisipanService`/instrumen (murni scaffold Protocol) —
+    `create_banyak` memakai `nama=None` dan `jabatan_label` berupa placeholder yang
+    menyebut `partisipan_id`-nya.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -48,12 +53,9 @@ class InMemoryWcpRespondenService:
     def _to_read(rec: _Record) -> WcpRespondenRead:
         return WcpRespondenRead.model_validate(rec)
 
-    def list_by_sesi(self, sesi_id: str) -> list[WcpRespondenRead]:
+    def list_all(self) -> list[WcpRespondenRead]:
         with self._lock:
-            ordered = sorted(
-                (r for r in self._data.values() if r.sesi_id == sesi_id),
-                key=lambda r: r.created_at,
-            )
+            ordered = sorted(self._data.values(), key=lambda r: r.created_at)
         return [self._to_read(r) for r in ordered]
 
     def list_by_partisipan(self, partisipan_id: str) -> list[WcpRespondenRead]:
@@ -64,10 +66,6 @@ class InMemoryWcpRespondenService:
             )
         return [self._to_read(r) for r in ordered]
 
-    def count_by_sesi(self, sesi_id: str) -> int:
-        with self._lock:
-            return sum(1 for r in self._data.values() if r.sesi_id == sesi_id)
-
     def get(self, responden_id: str) -> WcpRespondenRead:
         with self._lock:
             rec = self._data.get(responden_id)
@@ -75,32 +73,32 @@ class InMemoryWcpRespondenService:
             raise NotFoundError(f"Responden WCP '{responden_id}' tidak ditemukan.")
         return self._to_read(rec)
 
-    def create(
-        self, sesi_id: str, data: WcpRespondenCreate, max_responden: int
-    ) -> WcpRespondenRead:
-        with self._lock:
-            current_count = sum(1 for r in self._data.values() if r.sesi_id == sesi_id)
-            if current_count >= max_responden:
-                raise ValidationAppError(
-                    f"Sesi sudah mencapai batas maksimum {max_responden} responden."
-                )
-            if data.partisipan_id is not None:
-                already = any(r.partisipan_id == data.partisipan_id for r in self._data.values())
-                if already:
-                    raise ConflictError(
-                        f"Partisipan '{data.partisipan_id}' sudah terdaftar sebagai responden WCP."
-                    )
-            rec = _Record(
-                id=f"wrsp_{uuid.uuid4().hex[:8]}",
-                sesi_id=sesi_id,
-                nama=data.nama,
-                jabatan_label=data.jabatan_label,
-                partisipan_id=data.partisipan_id,
-                sudah_submit=False,
-                created_at=datetime.now(UTC),
+    def _insert(self, partisipan_id: str, nama: str | None, jabatan_label: str) -> _Record:
+        already = any(r.partisipan_id == partisipan_id for r in self._data.values())
+        if already:
+            raise ConflictError(
+                f"Partisipan '{partisipan_id}' sudah terdaftar sebagai responden WCP."
             )
-            self._data[rec.id] = rec
+        rec = _Record(
+            id=f"wrsp_{uuid.uuid4().hex[:8]}",
+            nama=nama,
+            jabatan_label=jabatan_label,
+            partisipan_id=partisipan_id,
+            sudah_submit=False,
+            created_at=datetime.now(UTC),
+        )
+        self._data[rec.id] = rec
+        return rec
+
+    def create(self, partisipan_id: str, nama: str | None, jabatan_label: str) -> WcpRespondenRead:
+        with self._lock:
+            rec = self._insert(partisipan_id, nama, jabatan_label)
             return self._to_read(rec)
+
+    def create_banyak(self, partisipan_ids: list[str]) -> list[WcpRespondenRead]:
+        with self._lock:
+            recs = [self._insert(pid, None, f"(auto:{pid})") for pid in partisipan_ids]
+            return [self._to_read(r) for r in recs]
 
     def mark_submitted(self, responden_id: str) -> WcpRespondenRead:
         with self._lock:

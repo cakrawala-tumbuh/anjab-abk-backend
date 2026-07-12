@@ -32,8 +32,8 @@ class WcpHasilRespondenRead(BaseModel):
     dimensi: list[WcpHasilDimensiRespondenRead] = Field(description="Skor per dimensi (12 entri).")
 
 
-class WcpHasilDimensiSesiRead(BaseModel):
-    """Hasil agregat satu dimensi untuk satu sesi (seluruh responden)."""
+class WcpHasilDimensiRead(BaseModel):
+    """Hasil agregat satu dimensi (seluruh responden ber-submit instrumen WCP)."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -49,12 +49,10 @@ class WcpHasilDimensiSesiRead(BaseModel):
     interpretasi: Interpretasi = Field(description="Interpretasi skor.", examples=["CUKUP"])
 
 
-class WcpHasilSesiRead(BaseModel):
-    """Hasil analisis lengkap satu sesi WCP (seluruh dimensi)."""
+class WcpHasilRead(BaseModel):
+    """Hasil analisis lengkap instrumen WCP (seluruh dimensi)."""
 
     model_config = ConfigDict(from_attributes=True)
 
-    sesi_id: str = Field(description="ID sesi.")
-    periode: str = Field(description="Periode survei.")
     n_responden: int = Field(description="Total responden yang submit.")
-    dimensi: list[WcpHasilDimensiSesiRead] = Field(description="Hasil per dimensi (12 entri).")
+    dimensi: list[WcpHasilDimensiRead] = Field(description="Hasil per dimensi (12 entri).")

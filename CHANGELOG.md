@@ -7,6 +7,60 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-07-13
+
+### Diubah (BREAKING)
+
+- **DCS & WCP: hapus entitas sesi, ganti pola singleton + penugasan langsung.**
+  Meniru pola yang sudah dipakai Time Study (`TsPenugasanModel`, lihat revisi
+  `0a58616358f4`). Alasan: 1 deployment backend = 1 studi (sudah menjadi
+  keputusan produk sejak beberapa revisi lalu) — entitas sesi per-instrumen
+  jadi lapisan tak berguna yang hanya menambah kerumitan operasional (admin
+  harus buat & buka sesi dulu sebelum bisa assign responden).
+  - Tabel `dcs_sesi`/`wcp_sesi` **dihapus total**, diganti `dcs_instrumen`/
+    `wcp_instrumen` — **singleton**, satu baris tetap (`id='dcs'`/`id='wcp'`)
+    dibuat oleh migrasi. Tidak ada endpoint create/delete instrumen.
+  - Status instrumen `OPEN → CLOSED → ANALYZED` (tanpa `DRAFT` — instrumen
+    sudah `OPEN` sejak migrasi). Reopen `CLOSED → OPEN` diizinkan selama
+    belum `ANALYZED`.
+  - Kolom `periode` dan `max_responden` **dihapus** (redundan — 1 deployment
+    = 1 studi; tidak ada lagi batas atas jumlah responden, hanya
+    `min_responden` sebagai cutoff analisis).
+  - `dcs_responden`/`wcp_responden` kehilangan kolom `sesi_id`; `partisipan_id`
+    kini **unik** lintas seluruh responden (`UNIQUE`, PostgreSQL mengizinkan
+    banyak `NULL`).
+  - **Endpoint dihapus total** (tanpa deprecation): seluruh
+    `.../sesi/{sesi_id}/...` DCS & WCP, termasuk create/update/delete/search
+    sesi dan parameter query `wcp_sesi_id` pada analisis K-Index DCS.
+  - **Endpoint baru**: `GET/PATCH /dcs/instrumen` (atau `/wcp/instrumen`),
+    `POST /dcs/instrumen/tutup`, `POST /dcs/instrumen/buka-ulang`,
+    `GET/POST /dcs/responden` (bulk — body `partisipan_ids: list[str]`,
+    minimal 1), `GET/DELETE /dcs/responden/{id}`, `PUT/POST/GET
+    /dcs/responden/{id}/jawaban*`, `POST /dcs/analisis`, `GET /dcs/hasil`,
+    `GET /dcs/hasil-responden/{id}` (idem WCP).
+  - K-Index DCS kini selalu dihitung otomatis dari instrumen WCP (tanpa
+    parameter); `wcp_risk`/`k_index` bernilai `null` hanya bila WCP belum
+    punya responden ber-submit.
+  - **Deviasi dari desain awal (perlu diverifikasi konsumen API)**:
+    `DcsRespondenCreate`/`WcpRespondenCreate` HANYA menerima `partisipan_ids`
+    (bukan lagi `nama`/`jabatan_label` per baris) — assign massal kini murni
+    berbasis partisipan yang sudah terdaftar di `core.partisipan` (validasi
+    lewat `PartisipanService.get()`, 404 bila `partisipan_id` tidak ada).
+    `nama` & `jabatan_label` di baris responden diisi OTOMATIS dari data
+    partisipan (`partisipan.nama`, `partisipan.jabatan_utama_id` — kolom
+    `jabatan_label` TETAP teks bebas, bukan FK, sesuai keputusan yang
+    dikunci; nilainya sekadar disalin, bukan diresolusi ke nama jabatan).
+    Sebagai konsekuensi, pembuatan responden ANONIM (tanpa `partisipan_id`)
+    tidak lagi didukung lewat endpoint publik manapun untuk DCS/WCP.
+  - Migrasi (`3b10e24fa970`, satu berkas untuk DCS & WCP) menolak jalan
+    (`RuntimeError`) bila ditemukan >1 sesi DCS/WCP yang MASING-MASING
+    punya ≥1 responden — instrumen singleton tak bisa mewakili lebih dari
+    satu kumpulan responden. `min_responden`/`catatan`/status disalin dari
+    sesi ber-responden bila ada (default dipakai bila tidak ada).
+  - Downgrade migrasi best-effort (struktur tabel lama dipulihkan kosong,
+    data tidak direkonstruksi) — mengikuti konvensi `0a58616358f4`.
+  - TI dan OPM (sesi jabatan) **tidak disentuh** oleh revisi ini.
+
 ## [0.28.0] - 2026-07-12
 
 ### Ditambahkan

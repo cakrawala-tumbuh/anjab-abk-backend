@@ -1,17 +1,15 @@
-"""Test endpoint DCS: responden, jawaban, dan hasil (endpoint yang belum tercakup)."""
+"""Test endpoint DCS: responden (penugasan langsung), jawaban, dan kuesioner saya."""
 
 from __future__ import annotations
-
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
 
 from anjab_abk_backend.dcs.seed import ITEM
 
-SESI_BASE = "/api/v1/dcs/sesi"
-RSP_BASE = "/api/v1/dcs/sesi"
-WCP_SESI_BASE = "/api/v1/wcp/sesi"
+RSP_BASE = "/api/v1/dcs/responden"
+INSTRUMEN_BASE = "/api/v1/dcs/instrumen"
+DCS_KUESIONER_BASE = "/api/v1/dcs/kuesioner"
 
 ALL_ITEM_IDS = [item[0] for item in ITEM]
 
@@ -20,525 +18,263 @@ def _all_jawaban(skor: int = 3) -> list[dict]:
     return [{"item_id": iid, "skor_raw": skor} for iid in ALL_ITEM_IDS]
 
 
-def _build_sesi(client: TestClient, min_responden: int = 2, max_responden: int = 4) -> dict:
-    sesi = client.post(
-        SESI_BASE,
-        json={
-            "periode": "2025-09",
-            "min_responden": min_responden,
-            "max_responden": max_responden,
-        },
-    ).json()
-    client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    return client.get(f"{SESI_BASE}/{sesi['id']}").json()
-
-
-def _add_responden(client: TestClient, sesi_id: str, partisipan_id: str | None = None) -> dict:
-    body: dict = {"jabatan_label": "Guru Test"}
-    if partisipan_id:
-        body["partisipan_id"] = partisipan_id
-    return client.post(f"{RSP_BASE}/{sesi_id}/responden", json=body).json()
+def _assign(client: TestClient, partisipan_ids: list[str]) -> list[dict]:
+    r = client.post(RSP_BASE, json={"partisipan_ids": partisipan_ids})
+    assert r.status_code == 201, r.text
+    return r.json()
 
 
 def _save_draft(client: TestClient, responden_id: str, jawaban: list[dict]) -> None:
-    r = client.put(
-        f"{RSP_BASE}/responden/{responden_id}/jawaban",
-        json={"jawaban": jawaban},
-    )
+    r = client.put(f"{RSP_BASE}/{responden_id}/jawaban", json={"jawaban": jawaban})
     assert r.status_code == 200
 
 
 def _submit(client: TestClient, responden_id: str, skor: int = 3) -> None:
     _save_draft(client, responden_id, _all_jawaban(skor))
-    r = client.post(f"{RSP_BASE}/responden/{responden_id}/jawaban/submit")
+    r = client.post(f"{RSP_BASE}/{responden_id}/jawaban/submit")
     assert r.status_code == 201
 
 
 @pytest.fixture
-def open_sesi(client: TestClient) -> dict:
-    return _build_sesi(client)
+def par_a(partisipan_factory) -> str:
+    return partisipan_factory("dcs-rsp-a")
 
 
 @pytest.fixture
-def analyzed_sesi(client: TestClient) -> dict:
-    sesi = _build_sesi(client)
-    sesi_id = sesi["id"]
-    for _ in range(2):
-        rsp = _add_responden(client, sesi_id)
-        _submit(client, rsp["id"])
-    client.post(f"{SESI_BASE}/{sesi_id}/tutup")
-    client.post(f"{SESI_BASE}/{sesi_id}/analisis")
-    return client.get(f"{SESI_BASE}/{sesi_id}").json()
+def par_b(partisipan_factory) -> str:
+    return partisipan_factory("dcs-rsp-b")
 
 
-DCS_KUESIONER_BASE = "/api/v1/dcs/kuesioner"
+# --- GET/POST /dcs/responden ---
 
 
-# --- GET /{sesi_id}/responden ---
-
-
-def test_list_responden_empty(client: TestClient, open_sesi: dict) -> None:
-    r = client.get(f"{RSP_BASE}/{open_sesi['id']}/responden")
+def test_list_responden_empty(client: TestClient) -> None:
+    r = client.get(RSP_BASE)
     assert r.status_code == 200
     assert r.json() == []
 
 
-def test_list_responden_after_create(client: TestClient, open_sesi: dict) -> None:
-    sesi_id = open_sesi["id"]
-    _add_responden(client, sesi_id)
-    _add_responden(client, sesi_id)
-    r = client.get(f"{RSP_BASE}/{sesi_id}/responden")
+def test_create_responden_bulk_5_dalam_satu_request(client: TestClient, partisipan_factory) -> None:
+    ids = [partisipan_factory(f"dcs-bulk-{i}") for i in range(5)]
+    created = _assign(client, ids)
+    assert len(created) == 5
+    assert {c["partisipan_id"] for c in created} == set(ids)
+
+    r = client.get(RSP_BASE)
+    assert len(r.json()) == 5
+
+
+def test_create_responden_derives_nama_dan_jabatan_label(client: TestClient, par_a: str) -> None:
+    created = _assign(client, [par_a])[0]
+    assert created["partisipan_id"] == par_a
+    assert created["nama"]
+    assert created["jabatan_label"]
+    assert created["sudah_submit"] is False
+
+
+def test_list_responden_requires_admin(client_as) -> None:
+    as_partisipan = client_as("dcs-rsp-nonadmin")
+    r = as_partisipan.get(RSP_BASE)
+    assert r.status_code == 403
+
+
+def test_create_responden_forbidden_for_non_admin(client_as) -> None:
+    as_partisipan = client_as("dcs-rsp-nonadmin2")
+    r = as_partisipan.post(RSP_BASE, json={"partisipan_ids": ["par_x"]})
+    assert r.status_code == 403
+
+
+def test_create_responden_partisipan_duplikat_dalam_satu_request_ditolak(
+    client: TestClient, par_a: str
+) -> None:
+    r = client.post(RSP_BASE, json={"partisipan_ids": [par_a, par_a]})
+    assert r.status_code == 409
+
+
+def test_create_responden_partisipan_sudah_terdaftar_ditolak(
+    client: TestClient, par_a: str
+) -> None:
+    _assign(client, [par_a])
+    r = client.post(RSP_BASE, json={"partisipan_ids": [par_a]})
+    assert r.status_code == 409
+
+
+def test_create_responden_saat_closed_ditolak(client: TestClient, par_a: str) -> None:
+    client.post(f"{INSTRUMEN_BASE}/tutup")
+    r = client.post(RSP_BASE, json={"partisipan_ids": [par_a]})
+    assert r.status_code == 409
+
+
+def test_tidak_ada_lagi_batas_atas_jumlah_responden(client: TestClient, partisipan_factory) -> None:
+    ids = [partisipan_factory(f"dcs-nomax-{i}") for i in range(12)]
+    created = _assign(client, ids)
+    assert len(created) == 12
+
+
+# --- GET /dcs/responden/{id} ---
+
+
+def test_get_responden_ok(client: TestClient, par_a: str) -> None:
+    rsp = _assign(client, [par_a])[0]
+    r = client.get(f"{RSP_BASE}/{rsp['id']}")
     assert r.status_code == 200
-    data = r.json()
-    assert len(data) == 2
-    assert all(d["sesi_id"] == sesi_id for d in data)
-
-
-def test_list_responden_sesi_not_found(client: TestClient) -> None:
-    r = client.get(f"{RSP_BASE}/dses_tidakada/responden")
-    assert r.status_code == 404
-
-
-def test_list_responden_requires_admin(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{RSP_BASE}/dses_tidakada/responden")
-    assert r.status_code == 401
-
-
-# --- GET /responden/{responden_id} ---
-
-
-def test_get_responden_ok(client: TestClient, open_sesi: dict) -> None:
-    rsp = _add_responden(client, open_sesi["id"])
-    r = client.get(f"{RSP_BASE}/responden/{rsp['id']}")
-    assert r.status_code == 200
-    data = r.json()
-    assert data["id"] == rsp["id"]
-    assert data["sudah_submit"] is False
+    assert r.json()["id"] == rsp["id"]
 
 
 def test_get_responden_not_found(client: TestClient) -> None:
-    r = client.get(f"{RSP_BASE}/responden/drsp_tidakada")
+    r = client.get(f"{RSP_BASE}/drsp_tidakada")
     assert r.status_code == 404
 
 
 def test_get_responden_requires_auth(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{RSP_BASE}/responden/drsp_tidakada")
+    r = anon_client.get(f"{RSP_BASE}/drsp_tidakada")
     assert r.status_code == 401
 
 
-# --- DELETE /responden/{responden_id} ---
+# --- DELETE /dcs/responden/{id} ---
 
 
-def test_delete_responden_not_submitted(client: TestClient, open_sesi: dict) -> None:
-    rsp = _add_responden(client, open_sesi["id"])
-    r = client.delete(f"{RSP_BASE}/responden/{rsp['id']}")
+def test_delete_responden_not_submitted(client: TestClient, par_a: str) -> None:
+    rsp = _assign(client, [par_a])[0]
+    r = client.delete(f"{RSP_BASE}/{rsp['id']}")
     assert r.status_code == 204
-    assert client.get(f"{RSP_BASE}/responden/{rsp['id']}").status_code == 404
+    assert client.get(f"{RSP_BASE}/{rsp['id']}").status_code == 404
 
 
-def test_delete_responden_after_submit_rejected(client: TestClient, open_sesi: dict) -> None:
-    rsp = _add_responden(client, open_sesi["id"])
+def test_delete_responden_after_submit_rejected(client: TestClient, par_a: str) -> None:
+    rsp = _assign(client, [par_a])[0]
     _submit(client, rsp["id"])
-    r = client.delete(f"{RSP_BASE}/responden/{rsp['id']}")
-    assert r.status_code in (400, 422)
-
-
-def test_delete_responden_requires_auth(anon_client: TestClient, client: TestClient) -> None:
-    sesi = _build_sesi(client)
-    rsp = _add_responden(client, sesi["id"])
-    r = anon_client.delete(f"{RSP_BASE}/responden/{rsp['id']}")
-    assert r.status_code == 401
+    r = client.delete(f"{RSP_BASE}/{rsp['id']}")
+    assert r.status_code == 422
 
 
 def test_delete_responden_not_found(client: TestClient) -> None:
-    r = client.delete(f"{RSP_BASE}/responden/drsp_tidakada")
+    r = client.delete(f"{RSP_BASE}/drsp_tidakada")
     assert r.status_code == 404
 
 
-# --- GET /responden/{responden_id}/jawaban ---
+# --- Jawaban ---
 
 
-def test_list_jawaban_before_submit(client: TestClient, open_sesi: dict) -> None:
-    rsp = _add_responden(client, open_sesi["id"])
-    r = client.get(f"{RSP_BASE}/responden/{rsp['id']}/jawaban")
+def test_list_jawaban_before_submit(client: TestClient, par_a: str) -> None:
+    rsp = _assign(client, [par_a])[0]
+    r = client.get(f"{RSP_BASE}/{rsp['id']}/jawaban")
     assert r.status_code == 200
     assert r.json() == []
 
 
-def test_list_jawaban_after_submit(client: TestClient, open_sesi: dict) -> None:
-    rsp = _add_responden(client, open_sesi["id"])
-    _submit(client, rsp["id"])
-    r = client.get(f"{RSP_BASE}/responden/{rsp['id']}/jawaban")
-    assert r.status_code == 200
-    data = r.json()
-    assert len(data) == 42
-    assert all(j["responden_id"] == rsp["id"] for j in data)
-    item_ids = {j["item_id"] for j in data}
-    assert item_ids == set(ALL_ITEM_IDS)
-
-
-def test_list_jawaban_responden_not_found(client: TestClient) -> None:
-    r = client.get(f"{RSP_BASE}/responden/drsp_tidakada/jawaban")
-    assert r.status_code == 404
-
-
-def test_list_jawaban_requires_auth(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{RSP_BASE}/responden/drsp_tidakada/jawaban")
-    assert r.status_code == 401
-
-
-# --- PUT /responden/{responden_id}/jawaban (draft-save) & POST .../jawaban/submit ---
-
-
-def test_save_draft_jawaban_parsial_lalu_lengkap(client: TestClient, open_sesi: dict) -> None:
-    rsp = _add_responden(client, open_sesi["id"])
+def test_save_draft_lalu_submit(client: TestClient, par_a: str) -> None:
+    rsp = _assign(client, [par_a])[0]
     sebagian = _all_jawaban()[:10]
-    r = client.put(f"{RSP_BASE}/responden/{rsp['id']}/jawaban", json={"jawaban": sebagian})
+    r = client.put(f"{RSP_BASE}/{rsp['id']}/jawaban", json={"jawaban": sebagian})
     assert r.status_code == 200
     assert len(r.json()) == 10
-    assert len(client.get(f"{RSP_BASE}/responden/{rsp['id']}/jawaban").json()) == 10
 
     sisanya = _all_jawaban()[10:]
-    r2 = client.put(f"{RSP_BASE}/responden/{rsp['id']}/jawaban", json={"jawaban": sisanya})
+    r2 = client.put(f"{RSP_BASE}/{rsp['id']}/jawaban", json={"jawaban": sisanya})
     assert r2.status_code == 200
 
-    r_submit = client.post(f"{RSP_BASE}/responden/{rsp['id']}/jawaban/submit")
+    r_submit = client.post(f"{RSP_BASE}/{rsp['id']}/jawaban/submit")
     assert r_submit.status_code == 201
     assert len(r_submit.json()) == 42
 
-    responden = client.get(f"{RSP_BASE}/responden/{rsp['id']}").json()
+    responden = client.get(f"{RSP_BASE}/{rsp['id']}").json()
     assert responden["sudah_submit"] is True
 
 
-def test_save_draft_jawaban_overwrite_item_sama(client: TestClient, open_sesi: dict) -> None:
-    """Upsert: menyimpan ulang item_id yang sama meng-update, bukan duplikat."""
-    rsp = _add_responden(client, open_sesi["id"])
-    item_id = ALL_ITEM_IDS[0]
-    client.put(
-        f"{RSP_BASE}/responden/{rsp['id']}/jawaban",
-        json={"jawaban": [{"item_id": item_id, "skor_raw": 2}]},
-    )
-    r = client.put(
-        f"{RSP_BASE}/responden/{rsp['id']}/jawaban",
-        json={"jawaban": [{"item_id": item_id, "skor_raw": 5}]},
-    )
-    assert r.status_code == 200
-    data = client.get(f"{RSP_BASE}/responden/{rsp['id']}/jawaban").json()
-    assert len(data) == 1
-    assert data[0]["skor_raw"] == 5
-
-
-def test_save_draft_jawaban_rejected_after_submit(client: TestClient, open_sesi: dict) -> None:
-    rsp = _add_responden(client, open_sesi["id"])
-    _submit(client, rsp["id"])
-    r = client.put(f"{RSP_BASE}/responden/{rsp['id']}/jawaban", json={"jawaban": _all_jawaban()})
-    assert r.status_code == 422
-
-
-def test_submit_jawaban_rejected_when_incomplete(client: TestClient, open_sesi: dict) -> None:
-    rsp = _add_responden(client, open_sesi["id"])
+def test_submit_incomplete_rejected(client: TestClient, par_a: str) -> None:
+    rsp = _assign(client, [par_a])[0]
     _save_draft(client, rsp["id"], _all_jawaban()[:5])
-    r = client.post(f"{RSP_BASE}/responden/{rsp['id']}/jawaban/submit")
+    r = client.post(f"{RSP_BASE}/{rsp['id']}/jawaban/submit")
     assert r.status_code == 422
 
 
-def test_submit_jawaban_succeeds_without_body(client: TestClient, open_sesi: dict) -> None:
-    rsp = _add_responden(client, open_sesi["id"])
-    _save_draft(client, rsp["id"], _all_jawaban())
-    r = client.post(f"{RSP_BASE}/responden/{rsp['id']}/jawaban/submit")
-    assert r.status_code == 201
-    assert len(r.json()) == 42
-
-
-def test_save_draft_jawaban_item_tidak_dikenal_ditolak(client: TestClient, open_sesi: dict) -> None:
-    rsp = _add_responden(client, open_sesi["id"])
+def test_save_draft_item_tidak_dikenal_ditolak(client: TestClient, par_a: str) -> None:
+    rsp = _assign(client, [par_a])[0]
     r = client.put(
-        f"{RSP_BASE}/responden/{rsp['id']}/jawaban",
+        f"{RSP_BASE}/{rsp['id']}/jawaban",
         json={"jawaban": [{"item_id": "TIDAK_ADA", "skor_raw": 3}]},
     )
     assert r.status_code == 409
 
 
-# --- GET /{sesi_id}/hasil (sukses) ---
+def test_save_draft_rejected_after_submit(client: TestClient, par_a: str) -> None:
+    rsp = _assign(client, [par_a])[0]
+    _submit(client, rsp["id"])
+    r = client.put(f"{RSP_BASE}/{rsp['id']}/jawaban", json={"jawaban": _all_jawaban()})
+    assert r.status_code == 422
 
 
-def test_get_hasil_sesi_success(client: TestClient, analyzed_sesi: dict) -> None:
-    sesi_id = analyzed_sesi["id"]
-    r = client.get(f"{SESI_BASE}/{sesi_id}/hasil")
-    assert r.status_code == 200
-    data = r.json()
-    assert data["sesi_id"] == sesi_id
-    assert data["n_responden"] == 2
-    assert len(data["sub_skala"]) == 3
-    assert data["risk_flag"] in ("HIGH", "MODERATE", "LOW")
-    kode_list = {s["subskala_kode"] for s in data["sub_skala"]}
-    assert kode_list == {"DEMAND", "CONTROL", "SUPPORT"}
+def test_save_draft_rejected_saat_instrumen_closed(client: TestClient, par_a: str) -> None:
+    rsp = _assign(client, [par_a])[0]
+    client.post(f"{INSTRUMEN_BASE}/tutup")
+    r = client.put(f"{RSP_BASE}/{rsp['id']}/jawaban", json={"jawaban": _all_jawaban()})
+    assert r.status_code == 422
 
 
-def test_get_hasil_sesi_not_found(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{SESI_BASE}/dses_tidakada/hasil")
-    assert r.status_code == 404
+def test_submit_rejected_saat_instrumen_closed(client: TestClient, par_a: str) -> None:
+    rsp = _assign(client, [par_a])[0]
+    _save_draft(client, rsp["id"], _all_jawaban())
+    client.post(f"{INSTRUMEN_BASE}/tutup")
+    r = client.post(f"{RSP_BASE}/{rsp['id']}/jawaban/submit")
+    assert r.status_code == 422
 
 
-# --- POST /{sesi_id}/analisis?wcp_sesi_id=... (K-Index) ---
-
-
-def test_analisis_dengan_wcp_sesi_k_index(client: TestClient) -> None:
-    wcp_sesi = client.post(
-        WCP_SESI_BASE,
-        json={
-            "periode": "2025-09",
-            "min_responden": 2,
-            "max_responden": 4,
-        },
-    ).json()
-    wcp_sesi_id = wcp_sesi["id"]
-    client.post(f"{WCP_SESI_BASE}/{wcp_sesi_id}/buka")
-
-    all_wcp_item_ids: list[str] = []
-    r = client.get("/api/v1/wcp/dimensi")
-    for dim in r.json():
-        r2 = client.get(f"/api/v1/wcp/dimensi/{dim['kode']}/items")
-        all_wcp_item_ids.extend(i["item_id"] for i in r2.json())
-
-    for _ in range(2):
-        wcp_rsp = client.post(
-            f"{WCP_SESI_BASE}/{wcp_sesi_id}/responden",
-            json={"jabatan_label": "Guru WCP"},
-        ).json()
-        client.put(
-            f"{WCP_SESI_BASE}/responden/{wcp_rsp['id']}/jawaban",
-            json={"jawaban": [{"item_id": iid, "skor_raw": 4} for iid in all_wcp_item_ids]},
-        )
-        client.post(f"{WCP_SESI_BASE}/responden/{wcp_rsp['id']}/jawaban/submit")
-
-    client.post(f"{WCP_SESI_BASE}/{wcp_sesi_id}/tutup")
-    client.post(f"{WCP_SESI_BASE}/{wcp_sesi_id}/analisis")
-
-    dcs_sesi = _build_sesi(client)
-    dcs_sesi_id = dcs_sesi["id"]
-    for _ in range(2):
-        rsp = _add_responden(client, dcs_sesi_id)
-        _submit(client, rsp["id"])
-    client.post(f"{SESI_BASE}/{dcs_sesi_id}/tutup")
-
-    r = client.post(
-        f"{SESI_BASE}/{dcs_sesi_id}/analisis",
-        params={"wcp_sesi_id": wcp_sesi_id},
-    )
-    assert r.status_code == 200
-    data = r.json()
-    assert data["sesi_id"] == dcs_sesi_id
-    assert data["k_index"] is not None
-    assert 0.0 <= data["k_index"] <= 1.0
-
-
-# --- partisipan_id pada responden ---
-
-
-def test_create_responden_with_partisipan_id(client: TestClient, open_sesi: dict) -> None:
-    par_id = f"par_{uuid.uuid4().hex[:8]}"
-    r = client.post(
-        f"{RSP_BASE}/{open_sesi['id']}/responden",
-        json={"jabatan_label": "Guru Sains", "partisipan_id": par_id},
-    )
-    assert r.status_code == 201
-    data = r.json()
-    assert data["partisipan_id"] == par_id
-
-
-def test_create_responden_without_partisipan_id(client: TestClient, open_sesi: dict) -> None:
-    r = client.post(
-        f"{RSP_BASE}/{open_sesi['id']}/responden",
-        json={"jabatan_label": "Guru Seni"},
-    )
-    assert r.status_code == 201
-    assert r.json()["partisipan_id"] is None
-
-
-# --- constraint: 1 partisipan_id maksimal 1 responden DCS ---
-
-
-def test_create_responden_partisipan_id_duplikat_ditolak(client: TestClient) -> None:
-    par_id = f"par_{uuid.uuid4().hex[:8]}"
-    sesi1 = _build_sesi(client)
-    sesi2 = _build_sesi(client)
-
-    # Daftarkan ke sesi pertama — harus berhasil.
-    r1 = client.post(
-        f"{RSP_BASE}/{sesi1['id']}/responden",
-        json={"jabatan_label": "Guru A", "partisipan_id": par_id},
-    )
-    assert r1.status_code == 201
-
-    # Daftarkan ke sesi kedua dengan partisipan_id yang sama — harus ditolak (409).
-    r2 = client.post(
-        f"{RSP_BASE}/{sesi2['id']}/responden",
-        json={"jabatan_label": "Guru B", "partisipan_id": par_id},
-    )
-    assert r2.status_code == 409
-
-
-def test_create_responden_tanpa_partisipan_id_boleh_duplikat(client: TestClient) -> None:
-    """Responden tanpa partisipan_id (anonim) boleh didaftarkan ke beberapa sesi."""
-    sesi1 = _build_sesi(client)
-    sesi2 = _build_sesi(client)
-
-    r1 = client.post(
-        f"{RSP_BASE}/{sesi1['id']}/responden",
-        json={"jabatan_label": "Anonim A"},
-    )
-    assert r1.status_code == 201
-
-    r2 = client.post(
-        f"{RSP_BASE}/{sesi2['id']}/responden",
-        json={"jabatan_label": "Anonim B"},
-    )
-    assert r2.status_code == 201
-
-
-# --- GET /kuesioner/saya (DCS) ---
+# --- GET /dcs/kuesioner/saya ---
 
 
 def test_kuesioner_saya_tanpa_partisipan(client: TestClient) -> None:
     r = client.get(f"{DCS_KUESIONER_BASE}/saya")
     assert r.status_code == 200
-
-
-def test_kuesioner_saya_dengan_assignment(client: TestClient, db_session) -> None:
-    """Assignment-based: kuesioner DCS muncul hanya setelah admin assign responden
-    dengan partisipan_id; sesi tanpa assignment tidak muncul."""
-    from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
-    from anjab_abk_backend.core.services.partisipan_sql import SqlPartisipanService
-
-    par_service = SqlPartisipanService(db_session)
-
-    par = par_service.create(
-        PartisipanCreate(
-            nama="Partisipan Kuesioner DCS",
-            email=f"ksr_dcs_{uuid.uuid4().hex[:4]}@test.id",
-            sekolah_id="skl_dummy",
-            jabatan_utama_id=f"jbt_{uuid.uuid4().hex[:8]}",
-            masa_kerja_tahun=2,
-        ),
-        authentik_user_id="test-user",
-    )
-
-    # Buat sesi DCS dan buka.
-    sesi = client.post(
-        SESI_BASE,
-        json={
-            "periode": "2025-09",
-            "min_responden": 2,
-            "max_responden": 4,
-        },
-    ).json()
-    client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    _build_sesi(client)  # sesi jabatan acak — tanpa assignment, tidak boleh muncul
-
-    # Sebelum di-assign: kuesioner kosong.
-    r = client.get(f"{DCS_KUESIONER_BASE}/saya")
-    assert r.status_code == 200
     assert r.json() == []
 
-    # Admin assign partisipan ke sesi (buat responden dengan partisipan_id).
-    assign_r = client.post(
-        f"{RSP_BASE}/{sesi['id']}/responden",
-        json={"jabatan_label": "Guru DCS", "partisipan_id": par.id},
-    )
-    assert assign_r.status_code == 201
 
-    # Setelah di-assign: kuesioner muncul.
-    r2 = client.get(f"{DCS_KUESIONER_BASE}/saya")
-    assert r2.status_code == 200
-    data = r2.json()
-    assert len(data) == 1
-    item = data[0]
-    assert item["sesi_id"] == sesi["id"]
-    assert item["sesi_status"] == "OPEN"
-    assert item["sudah_submit"] is False
-
-    # Idempoten: pemanggilan ulang tidak menggandakan entri.
-    r3 = client.get(f"{DCS_KUESIONER_BASE}/saya")
-    assert [i["id"] for i in r3.json()] == [item["id"]]
-
-
-# --------------------------------------------------------------------------- #
-# Otorisasi object-level (BOLA/IDOR): partisipan tidak boleh akses responden
-# DCS milik partisipan lain lewat penebakan responden_id.
-# --------------------------------------------------------------------------- #
-
-
-def test_get_responden_forbidden_for_non_owner(
-    client: TestClient, open_sesi: dict, client_as, partisipan_factory
+def test_kuesioner_saya_dengan_assignment(
+    client: TestClient, client_as, partisipan_factory
 ) -> None:
-    par_a = partisipan_factory("dcs-bola-a")
-    partisipan_factory("dcs-bola-b")
-    rsp = client.post(
-        f"{RSP_BASE}/{open_sesi['id']}/responden",
-        json={"jabatan_label": "Guru A", "partisipan_id": par_a},
-    ).json()
+    par_id = partisipan_factory("dcs-ksr-b")
+    # `client_as` mengoverride verifier pada `app` bersama (lihat conftest.py) — jalankan
+    # SEMUA aksi admin lewat `client` DULU, baru pindah identitas via `client_as`.
+    _assign(client, [par_id])
+    as_p = client_as("dcs-ksr-b")
 
-    as_b = client_as("dcs-bola-b")
-    assert as_b.get(f"{RSP_BASE}/responden/{rsp['id']}").status_code == 403
+    data = as_p.get(f"{DCS_KUESIONER_BASE}/saya").json()
+    assert len(data) == 1
+    assert data[0]["instrumen_status"] == "OPEN"
+    assert data[0]["sudah_submit"] is False
 
-    as_a = client_as("dcs-bola-a")
-    r = as_a.get(f"{RSP_BASE}/responden/{rsp['id']}")
+
+def test_kuesioner_saya_kosong_saat_instrumen_closed(
+    client: TestClient, client_as, partisipan_factory
+) -> None:
+    par_id = partisipan_factory("dcs-ksr-c")
+    _assign(client, [par_id])
+    client.post(f"{INSTRUMEN_BASE}/tutup")
+    as_p = client_as("dcs-ksr-c")
+
+    assert as_p.get(f"{DCS_KUESIONER_BASE}/saya").json() == []
+
+
+# --- Otorisasi object-level (BOLA/IDOR) ---
+
+
+def test_get_responden_forbidden_for_non_owner(client: TestClient, client_as, par_a: str) -> None:
+    rsp = _assign(client, [par_a])[0]
+
+    as_owner = client_as("dcs-rsp-a")
+    r = as_owner.get(f"{RSP_BASE}/{rsp['id']}")
     assert r.status_code == 200
-    assert r.json()["id"] == rsp["id"]
+
+    as_other = client_as("dcs-bola-other", groups=["partisipan"])
+    r2 = as_other.get(f"{RSP_BASE}/{rsp['id']}")
+    assert r2.status_code == 403
 
 
 def test_save_draft_jawaban_forbidden_for_non_owner(
-    client: TestClient, open_sesi: dict, client_as, partisipan_factory
+    client: TestClient, client_as, par_a: str
 ) -> None:
-    par_a = partisipan_factory("dcs-bola-c")
-    partisipan_factory("dcs-bola-d")
-    rsp = client.post(
-        f"{RSP_BASE}/{open_sesi['id']}/responden",
-        json={"jabatan_label": "Guru A", "partisipan_id": par_a},
-    ).json()
+    rsp = _assign(client, [par_a])[0]
 
-    as_d = client_as("dcs-bola-d")
-    r = as_d.put(
-        f"{RSP_BASE}/responden/{rsp['id']}/jawaban",
-        json={"jawaban": _all_jawaban()},
-    )
-    assert r.status_code == 403
-
-
-def test_list_jawaban_forbidden_for_non_owner_allowed_for_owner_and_admin(
-    client: TestClient, open_sesi: dict, client_as, partisipan_factory
-) -> None:
-    par_a = partisipan_factory("dcs-bola-e")
-    partisipan_factory("dcs-bola-f")
-    rsp = client.post(
-        f"{RSP_BASE}/{open_sesi['id']}/responden",
-        json={"jabatan_label": "Guru A", "partisipan_id": par_a},
-    ).json()
-    _submit(client, rsp["id"])
-
-    as_f = client_as("dcs-bola-f")
-    assert as_f.get(f"{RSP_BASE}/responden/{rsp['id']}/jawaban").status_code == 403
-
-    as_a = client_as("dcs-bola-e")
-    r = as_a.get(f"{RSP_BASE}/responden/{rsp['id']}/jawaban")
-    assert r.status_code == 200
-    assert len(r.json()) == 42
-
-    as_admin = client_as("dcs-bola-other-admin", groups=["admin"])
-    assert as_admin.get(f"{RSP_BASE}/responden/{rsp['id']}/jawaban").status_code == 200
-
-
-def test_list_responden_forbidden_for_non_admin(open_sesi: dict, client_as) -> None:
-    as_partisipan = client_as("dcs-bola-g")
-    r = as_partisipan.get(f"{RSP_BASE}/{open_sesi['id']}/responden")
-    assert r.status_code == 403
-
-
-def test_create_responden_forbidden_for_non_admin(open_sesi: dict, client_as) -> None:
-    as_partisipan = client_as("dcs-bola-h")
-    r = as_partisipan.post(
-        f"{RSP_BASE}/{open_sesi['id']}/responden",
-        json={"jabatan_label": "Guru"},
-    )
+    as_other = client_as("dcs-bola-other2", groups=["partisipan"])
+    r = as_other.put(f"{RSP_BASE}/{rsp['id']}/jawaban", json={"jawaban": _all_jawaban()})
     assert r.status_code == 403

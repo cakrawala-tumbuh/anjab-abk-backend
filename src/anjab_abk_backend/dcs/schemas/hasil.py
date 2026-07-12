@@ -33,8 +33,8 @@ class DcsHasilRespondenRead(BaseModel):
     )
 
 
-class DcsHasilSubSkalaSesiRead(BaseModel):
-    """Hasil agregat satu sub-skala untuk satu sesi (seluruh responden)."""
+class DcsHasilSubSkalaRead(BaseModel):
+    """Hasil agregat satu sub-skala (seluruh responden ber-submit instrumen DCS)."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,15 +50,13 @@ class DcsHasilSubSkalaSesiRead(BaseModel):
     )
 
 
-class DcsHasilSesiRead(BaseModel):
-    """Hasil analisis lengkap satu sesi DCS (seluruh sub-skala + risk flag + K-Index)."""
+class DcsHasilRead(BaseModel):
+    """Hasil analisis lengkap instrumen DCS (seluruh sub-skala + risk flag + K-Index)."""
 
     model_config = ConfigDict(from_attributes=True)
 
-    sesi_id: str = Field(description="ID sesi.")
-    periode: str = Field(description="Periode survei.")
     n_responden: int = Field(description="Total responden yang submit.")
-    sub_skala: list[DcsHasilSubSkalaSesiRead] = Field(description="Hasil per sub-skala (3 entri).")
+    sub_skala: list[DcsHasilSubSkalaRead] = Field(description="Hasil per sub-skala (3 entri).")
     risk_flag: DcsRiskFlag = Field(
         description=(
             "Flag risiko DCS: HIGH = demand tinggi + control/support rendah; "
@@ -69,8 +67,9 @@ class DcsHasilSesiRead(BaseModel):
     k_index: float | None = Field(
         default=None,
         description=(
-            "K-Index psikososial (0–1). None jika wcp_sesi_id tidak disertakan. "
-            "Rumus: 0,40×DemandPressure + 0,25×ControlDeficit + 0,25×SupportDeficit + 0,10×WCPRisk."
+            "K-Index psikososial (0–1). None jika instrumen WCP belum punya responden"
+            " ber-submit. Rumus: 0,40×DemandPressure + 0,25×ControlDeficit +"
+            " 0,25×SupportDeficit + 0,10×WCPRisk."
         ),
         examples=[0.42],
     )

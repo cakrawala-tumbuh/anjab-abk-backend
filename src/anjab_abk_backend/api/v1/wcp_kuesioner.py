@@ -10,15 +10,14 @@ from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     get_current_principal,
     get_partisipan_service,
+    get_wcp_instrumen_service,
     get_wcp_responden_service,
-    get_wcp_sesi_service,
 )
-from ...errors import NotFoundError
 from ...schemas.common import ErrorResponse
 from ...security import Principal
 from ...wcp.schemas.kuesioner import WcpKuesionerItemRead
+from ...wcp.services.instrumen import WcpInstrumenService
 from ...wcp.services.responden import WcpRespondenService
-from ...wcp.services.sesi import WcpSesiService
 
 router = APIRouter()
 
@@ -36,9 +35,9 @@ def kuesioner_saya(
     principal: Annotated[Principal, Depends(get_current_principal)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
-    sesi_service: Annotated[WcpSesiService, Depends(get_wcp_sesi_service)],
+    instrumen_service: Annotated[WcpInstrumenService, Depends(get_wcp_instrumen_service)],
 ) -> list[WcpKuesionerItemRead]:
-    """Kembalikan sesi WCP yang sudah di-assign ke partisipan dan berstatus OPEN.
+    """Kembalikan kuesioner WCP yang sudah di-assign ke partisipan, bila instrumen OPEN.
 
     Partisipan hanya melihat kuesioner WCP yang telah di-assign secara eksplisit
     oleh admin (record responden sudah dibuat dengan ``partisipan_id`` mereka).
@@ -48,24 +47,20 @@ def kuesioner_saya(
     if par is None:
         return []
 
+    instrumen = instrumen_service.get()
+    if instrumen.status != "OPEN":
+        return []
+
     result = []
     for rsp in rsp_service.list_by_partisipan(par.id):
-        try:
-            sesi = sesi_service.get(rsp.sesi_id)
-        except NotFoundError:
-            continue
-        if sesi.status != "OPEN":
-            continue
         result.append(
             WcpKuesionerItemRead(
                 id=rsp.id,
-                sesi_id=rsp.sesi_id,
-                sesi_catatan=sesi.catatan,
+                catatan=instrumen.catatan,
                 sudah_submit=rsp.sudah_submit,
                 submitted_at=rsp.submitted_at,
                 created_at=rsp.created_at,
-                sesi_status=sesi.status,
-                sesi_periode=sesi.periode,
+                instrumen_status=instrumen.status,
             )
         )
     return result

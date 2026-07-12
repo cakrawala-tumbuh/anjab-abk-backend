@@ -21,7 +21,6 @@ from sqlalchemy.orm import Session
 from anjab_abk_backend.models import (
     DcsJawabanModel,
     DcsRespondenModel,
-    DcsSesiModel,
     OpmJawabanModel,
     OpmRespondenModel,
     OpmSesiModel,
@@ -32,7 +31,6 @@ from anjab_abk_backend.models import (
     TiTahap2Model,
     WcpJawabanModel,
     WcpRespondenModel,
-    WcpSesiModel,
 )
 
 
@@ -41,52 +39,6 @@ def _count(db_session: Session, model, **filters) -> int:
     for key, value in filters.items():
         stmt = stmt.where(getattr(model, key) == value)
     return db_session.scalar(stmt) or 0
-
-
-def test_hapus_dcs_sesi_cascade_responden_jawaban(client: TestClient, db_session: Session) -> None:
-    sesi_id = f"dses_{uuid.uuid4().hex[:8]}"
-    rsp_id = f"drsp_{uuid.uuid4().hex[:8]}"
-    db_session.add(DcsSesiModel(id=sesi_id, periode="2026-01", status="DRAFT", catatan=None))
-    db_session.flush()
-    db_session.add(
-        DcsRespondenModel(id=rsp_id, sesi_id=sesi_id, jabatan_label="Guru", sudah_submit=False)
-    )
-    db_session.flush()
-    db_session.add(
-        DcsJawabanModel(
-            id=f"djwb_{uuid.uuid4().hex[:8]}", responden_id=rsp_id, item_id="D01", skor_raw=3
-        )
-    )
-    db_session.flush()
-
-    r = client.delete(f"/api/v1/dcs/sesi/{sesi_id}", params={"paksa": True})
-    assert r.status_code == 204
-
-    assert _count(db_session, DcsRespondenModel, sesi_id=sesi_id) == 0
-    assert _count(db_session, DcsJawabanModel, responden_id=rsp_id) == 0
-
-
-def test_hapus_wcp_sesi_cascade_responden_jawaban(client: TestClient, db_session: Session) -> None:
-    sesi_id = f"wses_{uuid.uuid4().hex[:8]}"
-    rsp_id = f"wrsp_{uuid.uuid4().hex[:8]}"
-    db_session.add(WcpSesiModel(id=sesi_id, periode="2026-01", status="DRAFT", catatan=None))
-    db_session.flush()
-    db_session.add(
-        WcpRespondenModel(id=rsp_id, sesi_id=sesi_id, jabatan_label="Guru", sudah_submit=False)
-    )
-    db_session.flush()
-    db_session.add(
-        WcpJawabanModel(
-            id=f"wjwb_{uuid.uuid4().hex[:8]}", responden_id=rsp_id, item_id="W01", skor_raw=3
-        )
-    )
-    db_session.flush()
-
-    r = client.delete(f"/api/v1/wcp/sesi/{sesi_id}", params={"paksa": True})
-    assert r.status_code == 204
-
-    assert _count(db_session, WcpRespondenModel, sesi_id=sesi_id) == 0
-    assert _count(db_session, WcpJawabanModel, responden_id=rsp_id) == 0
 
 
 def test_hapus_opm_sesi_cascade_responden_jawaban(client: TestClient, db_session: Session) -> None:
@@ -179,13 +131,8 @@ def test_hapus_ti_sesi_cascade_responden_seleksi_detail_tahap2(
 
 def test_hapus_dcs_responden_cascade_jawaban(client: TestClient, db_session: Session) -> None:
     """Regresi: `responden_sql.py::delete()` dulu tidak menghapus jawaban anaknya."""
-    sesi_id = f"dses_{uuid.uuid4().hex[:8]}"
     rsp_id = f"drsp_{uuid.uuid4().hex[:8]}"
-    db_session.add(DcsSesiModel(id=sesi_id, periode="2026-01", status="OPEN"))
-    db_session.flush()
-    db_session.add(
-        DcsRespondenModel(id=rsp_id, sesi_id=sesi_id, jabatan_label="Guru", sudah_submit=False)
-    )
+    db_session.add(DcsRespondenModel(id=rsp_id, jabatan_label="Guru", sudah_submit=False))
     db_session.flush()
     db_session.add(
         DcsJawabanModel(
@@ -194,7 +141,25 @@ def test_hapus_dcs_responden_cascade_jawaban(client: TestClient, db_session: Ses
     )
     db_session.flush()
 
-    r = client.delete(f"/api/v1/dcs/sesi/responden/{rsp_id}")
+    r = client.delete(f"/api/v1/dcs/responden/{rsp_id}")
     assert r.status_code == 204
 
     assert _count(db_session, DcsJawabanModel, responden_id=rsp_id) == 0
+
+
+def test_hapus_wcp_responden_cascade_jawaban(client: TestClient, db_session: Session) -> None:
+    """Regresi WCP: hapus responden ikut menghapus jawabannya (FK CASCADE)."""
+    rsp_id = f"wrsp_{uuid.uuid4().hex[:8]}"
+    db_session.add(WcpRespondenModel(id=rsp_id, jabatan_label="Guru", sudah_submit=False))
+    db_session.flush()
+    db_session.add(
+        WcpJawabanModel(
+            id=f"wjwb_{uuid.uuid4().hex[:8]}", responden_id=rsp_id, item_id="W01", skor_raw=3
+        )
+    )
+    db_session.flush()
+
+    r = client.delete(f"/api/v1/wcp/responden/{rsp_id}")
+    assert r.status_code == 204
+
+    assert _count(db_session, WcpJawabanModel, responden_id=rsp_id) == 0

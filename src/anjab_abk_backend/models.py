@@ -233,28 +233,27 @@ class DcsItemModel(Base):
     urutan: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
-class DcsSesiModel(Base):
-    __tablename__ = "dcs_sesi"
+class DcsInstrumenModel(Base):
+    """Instrumen DCS singleton — satu baris tetap (`id='dcs'`), tanpa sesi."""
 
-    id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    periode: Mapped[str] = mapped_column(String(7), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
+    __tablename__ = "dcs_instrumen"
+
+    id: Mapped[str] = mapped_column(String(10), primary_key=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="OPEN")
     min_responden: Mapped[int] = mapped_column(Integer, nullable=False, default=6)
-    max_responden: Mapped[int] = mapped_column(Integer, nullable=False, default=8)
     catatan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = _ts(index=True)
 
 
 class DcsRespondenModel(Base):
     __tablename__ = "dcs_responden"
+    __table_args__ = (UniqueConstraint("partisipan_id"),)
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    sesi_id: Mapped[str] = mapped_column(
-        ForeignKey("dcs_sesi.id", ondelete="CASCADE"), nullable=False, index=True
-    )
     nama: Mapped[str | None] = mapped_column(String(200), nullable=True)
     jabatan_label: Mapped[str] = mapped_column(String(200), nullable=False)
-    partisipan_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    partisipan_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
     sudah_submit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = _ts(index=True)
@@ -300,28 +299,27 @@ class WcpItemModel(Base):
     urutan: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
-class WcpSesiModel(Base):
-    __tablename__ = "wcp_sesi"
+class WcpInstrumenModel(Base):
+    """Instrumen WCP singleton — satu baris tetap (`id='wcp'`), tanpa sesi."""
 
-    id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    periode: Mapped[str] = mapped_column(String(7), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
+    __tablename__ = "wcp_instrumen"
+
+    id: Mapped[str] = mapped_column(String(10), primary_key=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="OPEN")
     min_responden: Mapped[int] = mapped_column(Integer, nullable=False, default=6)
-    max_responden: Mapped[int] = mapped_column(Integer, nullable=False, default=8)
     catatan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = _ts(index=True)
 
 
 class WcpRespondenModel(Base):
     __tablename__ = "wcp_responden"
+    __table_args__ = (UniqueConstraint("partisipan_id"),)
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    sesi_id: Mapped[str] = mapped_column(
-        ForeignKey("wcp_sesi.id", ondelete="CASCADE"), nullable=False, index=True
-    )
     nama: Mapped[str | None] = mapped_column(String(200), nullable=True)
     jabatan_label: Mapped[str] = mapped_column(String(200), nullable=False)
-    partisipan_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    partisipan_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
     sudah_submit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = _ts(index=True)

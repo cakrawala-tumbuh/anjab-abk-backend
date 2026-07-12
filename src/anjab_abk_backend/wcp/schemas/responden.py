@@ -8,26 +8,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class WcpRespondenCreate(BaseModel):
-    """Payload pendaftaran responden ke dalam sesi WCP."""
+    """Payload penugasan (assign) responden WCP — bulk, minimal 1 partisipan."""
 
     model_config = ConfigDict(extra="forbid")
 
-    nama: str | None = Field(
-        default=None,
-        max_length=200,
-        description="Nama responden (opsional, boleh anonim).",
-        examples=["Budi Santoso, S.Pd."],
-    )
-    jabatan_label: str = Field(
+    partisipan_ids: list[str] = Field(
         min_length=1,
-        max_length=200,
-        description="Label jabatan responden (teks bebas).",
-        examples=["Guru Matematika"],
-    )
-    partisipan_id: str | None = Field(
-        default=None,
-        description="ID partisipan yang terhubung (opsional, untuk fitur 'Kuesioner Saya').",
-        examples=["par_a1b2c3d4"],
+        description="Daftar ID partisipan yang ditugaskan sebagai responden WCP (bulk).",
+        examples=[["par_a1b2c3d4", "par_b2c3d4e5"]],
     )
 
 
@@ -37,7 +25,6 @@ class WcpRespondenRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str = Field(description="ID responden.", examples=["wrsp_a1b2c3d4"])
-    sesi_id: str = Field(description="ID sesi induk.", examples=["wses_a1b2c3d4"])
     nama: str | None = Field(default=None, description="Nama responden.")
     jabatan_label: str = Field(description="Label jabatan responden.")
     partisipan_id: str | None = Field(

@@ -6,12 +6,11 @@ import statistics
 
 from ..schemas.hasil import (
     Interpretasi,
+    WcpHasilDimensiRead,
     WcpHasilDimensiRespondenRead,
-    WcpHasilDimensiSesiRead,
+    WcpHasilRead,
     WcpHasilRespondenRead,
-    WcpHasilSesiRead,
 )
-from ..schemas.sesi import WcpSesiRead
 from ..seed import DIMENSI, ITEM
 
 
@@ -107,16 +106,15 @@ def compute_hasil_responden(
     return WcpHasilRespondenRead(responden_id=responden_id, dimensi=dimensi_results)
 
 
-def compute_hasil_sesi(
-    sesi: WcpSesiRead,
+def compute_hasil(
     responden_raw_scores: list[tuple[str, dict[str, int]]],
-) -> WcpHasilSesiRead:
-    """Hitung hasil agregat sesi dari semua responden yang sudah submit.
+) -> WcpHasilRead:
+    """Hitung hasil agregat instrumen dari semua responden yang sudah submit.
 
     responden_raw_scores: list of (responden_id, {item_id: skor_raw})
     """
     n = len(responden_raw_scores)
-    dimensi_results: list[WcpHasilDimensiSesiRead] = []
+    dimensi_results: list[WcpHasilDimensiRead] = []
 
     for kode_dim, nama, is_risk in _DIMENSI_SORTED:
         item_ids = _DIM_ITEMS.get(kode_dim, [])
@@ -139,7 +137,7 @@ def compute_hasil_sesi(
             skor_std = statistics.stdev(per_responden) if len(per_responden) > 1 else 0.0
 
         dimensi_results.append(
-            WcpHasilDimensiSesiRead(
+            WcpHasilDimensiRead(
                 dimensi_kode=kode_dim,
                 dimensi_nama=nama,
                 is_risk=is_risk,
@@ -151,9 +149,7 @@ def compute_hasil_sesi(
             )
         )
 
-    return WcpHasilSesiRead(
-        sesi_id=sesi.id,
-        periode=sesi.periode,
+    return WcpHasilRead(
         n_responden=n,
         dimensi=dimensi_results,
     )

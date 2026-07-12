@@ -5,13 +5,12 @@ from __future__ import annotations
 import statistics
 
 from ..schemas.hasil import (
+    DcsHasilRead,
     DcsHasilRespondenRead,
-    DcsHasilSesiRead,
+    DcsHasilSubSkalaRead,
     DcsHasilSubSkalaRespondenRead,
-    DcsHasilSubSkalaSesiRead,
     DcsRiskFlag,
 )
-from ..schemas.sesi import DcsSesiRead
 from ..seed import ITEM, SUB_SKALA
 
 # Threshold interpretasi DCS (Karasek model)
@@ -139,18 +138,17 @@ def compute_hasil_responden(
     )
 
 
-def compute_hasil_sesi(
-    sesi: DcsSesiRead,
+def compute_hasil(
     responden_raw_scores: list[tuple[str, dict[str, int]]],
     wcp_risk_score: float | None = None,
-) -> DcsHasilSesiRead:
-    """Hitung hasil agregat sesi dari semua responden yang sudah submit.
+) -> DcsHasilRead:
+    """Hitung hasil agregat instrumen dari semua responden yang sudah submit.
 
     responden_raw_scores: list of (responden_id, {item_id: skor_raw})
     wcp_risk_score: skor risiko WCP ternormalisasi (0–1), opsional untuk K-Index.
     """
     n = len(responden_raw_scores)
-    sub_skala_results: list[DcsHasilSubSkalaSesiRead] = []
+    sub_skala_results: list[DcsHasilSubSkalaRead] = []
     mean_by_sk: dict[str, float] = {}
 
     for kode, nama in _SUB_SKALA_SORTED:
@@ -172,7 +170,7 @@ def compute_hasil_sesi(
 
         mean_by_sk[kode] = skor_mean
         sub_skala_results.append(
-            DcsHasilSubSkalaSesiRead(
+            DcsHasilSubSkalaRead(
                 subskala_kode=kode,
                 subskala_nama=nama,
                 n_responden=len(per_responden),
@@ -197,9 +195,7 @@ def compute_hasil_sesi(
             wcp_risk_score,
         )
 
-    return DcsHasilSesiRead(
-        sesi_id=sesi.id,
-        periode=sesi.periode,
+    return DcsHasilRead(
         n_responden=n,
         sub_skala=sub_skala_results,
         risk_flag=risk_flag,

@@ -33,12 +33,12 @@ from .core.services.partisipan_sql import SqlPartisipanService
 from .core.services.sekolah import SekolahService
 from .core.services.sekolah_sql import SqlSekolahService
 from .db import get_session
+from .dcs.services.instrumen import DcsInstrumenService
+from .dcs.services.instrumen_sql import SqlDcsInstrumenService
 from .dcs.services.jawaban import DcsJawabanService
 from .dcs.services.jawaban_sql import SqlDcsJawabanService
 from .dcs.services.responden import DcsRespondenService
 from .dcs.services.responden_sql import SqlDcsRespondenService
-from .dcs.services.sesi import DcsSesiService
-from .dcs.services.sesi_sql import SqlDcsSesiService
 from .dcs.services.subskala import DcsSubSkalaService
 from .dcs.services.subskala_sql import SqlDcsSubSkalaService
 from .errors import ForbiddenError, RateLimitedError, UnauthorizedError
@@ -82,12 +82,12 @@ from .ts.services.penugasan import TsPenugasanService
 from .ts.services.penugasan_sql import SqlTsPenugasanService
 from .wcp.services.dimensi import WcpDimensiService
 from .wcp.services.dimensi_sql import SqlWcpDimensiService
+from .wcp.services.instrumen import WcpInstrumenService
+from .wcp.services.instrumen_sql import SqlWcpInstrumenService
 from .wcp.services.jawaban import WcpJawabanService
 from .wcp.services.jawaban_sql import SqlWcpJawabanService
 from .wcp.services.responden import WcpRespondenService
 from .wcp.services.responden_sql import SqlWcpRespondenService
-from .wcp.services.sesi import WcpSesiService
-from .wcp.services.sesi_sql import SqlWcpSesiService
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
@@ -149,14 +149,17 @@ def get_wcp_dimensi_service(session: SessionDep) -> WcpDimensiService:
     return SqlWcpDimensiService(session)
 
 
-def get_wcp_sesi_service(session: SessionDep) -> WcpSesiService:
-    """SEAM: implementasi `WcpSesiService` berbasis PostgreSQL."""
-    return SqlWcpSesiService(session)
+def get_wcp_instrumen_service(session: SessionDep) -> WcpInstrumenService:
+    """SEAM: implementasi `WcpInstrumenService` berbasis PostgreSQL."""
+    return SqlWcpInstrumenService(session)
 
 
-def get_wcp_responden_service(session: SessionDep) -> WcpRespondenService:
+def get_wcp_responden_service(
+    session: SessionDep,
+    partisipan_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+) -> WcpRespondenService:
     """SEAM: implementasi `WcpRespondenService` berbasis PostgreSQL."""
-    return SqlWcpRespondenService(session)
+    return SqlWcpRespondenService(session, partisipan_service)
 
 
 def get_wcp_jawaban_service(session: SessionDep) -> WcpJawabanService:
@@ -172,14 +175,17 @@ def get_dcs_subskala_service(session: SessionDep) -> DcsSubSkalaService:
     return SqlDcsSubSkalaService(session)
 
 
-def get_dcs_sesi_service(session: SessionDep) -> DcsSesiService:
-    """SEAM: implementasi `DcsSesiService` berbasis PostgreSQL."""
-    return SqlDcsSesiService(session)
+def get_dcs_instrumen_service(session: SessionDep) -> DcsInstrumenService:
+    """SEAM: implementasi `DcsInstrumenService` berbasis PostgreSQL."""
+    return SqlDcsInstrumenService(session)
 
 
-def get_dcs_responden_service(session: SessionDep) -> DcsRespondenService:
+def get_dcs_responden_service(
+    session: SessionDep,
+    partisipan_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+) -> DcsRespondenService:
     """SEAM: implementasi `DcsRespondenService` berbasis PostgreSQL."""
-    return SqlDcsRespondenService(session)
+    return SqlDcsRespondenService(session, partisipan_service)
 
 
 def get_dcs_jawaban_service(session: SessionDep) -> DcsJawabanService:

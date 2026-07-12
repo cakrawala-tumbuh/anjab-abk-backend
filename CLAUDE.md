@@ -72,6 +72,57 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-12] DCS & WCP: hapus entitas sesi, ganti pola singleton + penugasan langsung
+
+DCS dan WCP tidak lagi memakai sesi — meniru pola yang sudah dipakai Time Study
+(`TsPenugasanModel`, lihat entri `[2026-07-04]` di bawah). TI dan OPM (sesi
+jabatan) **tidak disentuh**. Perubahan:
+
+- `DcsSesiModel`/`WcpSesiModel` **dihapus**, diganti `DcsInstrumenModel`/
+  `WcpInstrumenModel` (tabel `dcs_instrumen`/`wcp_instrumen`) — **singleton**:
+  satu baris tetap (`id='dcs'`/`id='wcp'`) dibuat oleh migrasi. Tidak ada
+  endpoint create/delete instrumen — hanya `get()`/`update()` (min_responden,
+  catatan) dan transisi `tutup()`/`buka_ulang()`/`set_analyzed()`.
+- Status instrumen: `OPEN → CLOSED → ANALYZED` (tanpa `DRAFT`; sudah `OPEN`
+  sejak migrasi). Reopen `CLOSED → OPEN` diizinkan selama belum `ANALYZED`.
+  `_VALID_TRANSITIONS = {"OPEN": {"CLOSED"}, "CLOSED": {"OPEN", "ANALYZED"},
+  "ANALYZED": set()}`.
+- Kolom `periode` dan `max_responden` **dihapus** (1 deployment = 1 studi;
+  tidak ada lagi batas atas jumlah responden — hanya `min_responden` sebagai
+  cutoff analisis, default 6).
+- `DcsRespondenModel`/`WcpRespondenModel` kehilangan `sesi_id` (+FK); kolom
+  `partisipan_id` menjadi `UNIQUE` lintas SELURUH responden (PostgreSQL
+  mengizinkan banyak `NULL` — responden anonim tetap boleh berulang).
+- **Penugasan (assign) bersifat bulk**: `POST /dcs/responden` (atau
+  `/wcp/responden`) menerima `{"partisipan_ids": [...]}` (list, minimal 1),
+  atomik dalam satu transaksi. `nama`/`jabatan_label` responden diisi OTOMATIS
+  dari `PartisipanService` (`nama`, `jabatan_utama_id`) — payload TIDAK lagi
+  menerima `nama`/`jabatan_label` per baris, sehingga responden ANONIM (tanpa
+  `partisipan_id`) tidak lagi bisa dibuat lewat endpoint publik manapun untuk
+  DCS/WCP. `jabatan_label` tetap kolom teks bebas (bukan FK) — nilainya
+  sekadar disalin dari `jabatan_utama_id`, bukan diresolusi ke nama jabatan
+  (di luar lingkup revisi ini).
+- Endpoint peta baru: `GET/PATCH /dcs/instrumen`, `POST /dcs/instrumen/tutup`,
+  `POST /dcs/instrumen/buka-ulang`, `GET/POST /dcs/responden`, `GET/DELETE
+  /dcs/responden/{id}`, `PUT/POST/GET /dcs/responden/{id}/jawaban*`,
+  `POST /dcs/analisis`, `GET /dcs/hasil`, `GET /dcs/hasil-responden/{id}`,
+  `GET /dcs/kuesioner/saya` (idem `/wcp/...`). Seluruh endpoint lama
+  `.../sesi/{sesi_id}/...` **dihapus total tanpa deprecation**.
+- K-Index DCS: parameter query `wcp_sesi_id` **dihapus** — `POST
+  /dcs/analisis` & `GET /dcs/hasil` selalu membaca instrumen WCP satu-satunya;
+  `k_index`/`k_index_wcp_risk` bernilai `null` hanya bila WCP belum punya
+  responden ber-submit (bukan lagi karena parameter tak disertakan).
+- `compute_hasil_sesi()` → `compute_hasil()` (DCS & WCP): parameter `sesi`
+  dihapus (tidak ada lagi `sesi_id`/`periode` di respons hasil); LOGIKA
+  STATISTIK (mean/stdev/Cronbach alpha/risk_flag/k_index) **tidak berubah**.
+- Migrasi (`3b10e24fa970`, satu berkas mencakup DCS & WCP) menolak jalan
+  (`RuntimeError`, pesan menyebut `sesi_id` bermasalah) bila ditemukan >1 sesi
+  DCS/WCP yang MASING-MASING punya ≥1 responden. `min_responden`/`catatan`/
+  status disalin dari sesi ber-responden bila ada; default dipakai bila tidak
+  ada (`status=OPEN`, `min_responden=6`, `catatan=NULL`). Downgrade
+  best-effort (struktur lama dipulihkan kosong, data tak direkonstruksi),
+  mengikuti konvensi `0a58616358f4`.
+
 ### [2026-07-12] Force-delete sesi admin (`paksa=true`) + FK `ON DELETE CASCADE`
 
 Dua perbaikan terkait DELETE sesi (DCS/WCP/OPM/Task Inventory):

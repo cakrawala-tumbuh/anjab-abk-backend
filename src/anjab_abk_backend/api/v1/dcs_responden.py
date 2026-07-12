@@ -1,4 +1,4 @@
-"""Endpoint resource `DcsResponden` dan submit jawaban."""
+"""Endpoint resource `DcsResponden` (penugasan langsung) dan jawaban."""
 
 from __future__ import annotations
 
@@ -11,14 +11,12 @@ from ...dcs.schemas.jawaban import DcsJawabanRead, DcsJawabanUpsert
 from ...dcs.schemas.responden import DcsRespondenCreate, DcsRespondenRead
 from ...dcs.services.jawaban import DcsJawabanService
 from ...dcs.services.responden import DcsRespondenService
-from ...dcs.services.sesi import DcsSesiService
 from ...dcs.services.subskala import DcsSubSkalaService
 from ...dependencies import (
     authorize_responden_access,
     get_current_principal,
     get_dcs_jawaban_service,
     get_dcs_responden_service,
-    get_dcs_sesi_service,
     get_dcs_subskala_service,
     get_partisipan_service,
     rate_limit,
@@ -32,7 +30,6 @@ router = APIRouter()
 
 _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
 _ADMIN_GUARDS = [Depends(require_admin), Depends(rate_limit)]
-_NOT_FOUND_SESI = {404: {"model": ErrorResponse, "description": "Sesi DCS tidak ditemukan."}}
 _NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
@@ -42,57 +39,48 @@ _FORBIDDEN = {
 
 
 @router.get(
-    "/{sesi_id}/responden",
+    "",
     response_model=list[DcsRespondenRead],
-    summary="Daftar responden dalam sesi DCS (admin)",
+    summary="Daftar seluruh responden DCS (admin)",
     operation_id="dcs_responden_list",
     dependencies=[Depends(require_admin)],
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_SESI},
+    responses={**_AUTH, **_FORBIDDEN},
 )
 def list_responden(
-    sesi_id: Annotated[str, Path(description="ID sesi DCS.")],
-    sesi_service: Annotated[DcsSesiService, Depends(get_dcs_sesi_service)],
     rsp_service: Annotated[DcsRespondenService, Depends(get_dcs_responden_service)],
 ) -> list[DcsRespondenRead]:
-    sesi_service.get(sesi_id)
-    return rsp_service.list_by_sesi(sesi_id)
+    return rsp_service.list_all()
 
 
 @router.post(
-    "/{sesi_id}/responden",
-    response_model=DcsRespondenRead,
+    "",
+    response_model=list[DcsRespondenRead],
     status_code=status.HTTP_201_CREATED,
-    summary="Daftarkan responden ke sesi DCS (admin)",
+    summary="Tugaskan (assign) responden DCS — bulk (admin)",
     operation_id="dcs_responden_create",
     dependencies=_ADMIN_GUARDS,
     responses={
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
-        **_NOT_FOUND_SESI,
         409: {
             "model": ErrorResponse,
-            "description": "Partisipan sudah terdaftar sebagai responden DCS.",
+            "description": (
+                "Instrumen DCS tidak OPEN, atau salah satu partisipan sudah terdaftar"
+                " sebagai responden DCS."
+            ),
         },
     },
 )
 def create_responden(
-    sesi_id: Annotated[str, Path(description="ID sesi DCS.")],
     payload: DcsRespondenCreate,
-    sesi_service: Annotated[DcsSesiService, Depends(get_dcs_sesi_service)],
     rsp_service: Annotated[DcsRespondenService, Depends(get_dcs_responden_service)],
-) -> DcsRespondenRead:
-    sesi = sesi_service.get(sesi_id)
-    if sesi.status != "OPEN":
-        raise ValidationAppError(
-            f"Responden hanya dapat ditambahkan saat sesi berstatus OPEN"
-            f" (saat ini: {sesi.status})."
-        )
-    return rsp_service.create(sesi_id, payload, sesi.max_responden)
+) -> list[DcsRespondenRead]:
+    return rsp_service.create_banyak(payload.partisipan_ids)
 
 
 @router.get(
-    "/responden/{responden_id}",
+    "/{responden_id}",
     response_model=DcsRespondenRead,
     summary="Ambil detail responden DCS (admin atau pemilik)",
     operation_id="dcs_responden_get",
@@ -110,7 +98,7 @@ def get_responden(
 
 
 @router.delete(
-    "/responden/{responden_id}",
+    "/{responden_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Hapus responden (admin; hanya jika belum submit)",
     operation_id="dcs_responden_delete",
@@ -126,7 +114,7 @@ def delete_responden(
 
 
 @router.put(
-    "/responden/{responden_id}/jawaban",
+    "/{responden_id}/jawaban",
     response_model=list[DcsJawabanRead],
     summary="Simpan draft jawaban (parsial) untuk satu responden",
     operation_id="dcs_jawaban_save_draft",
@@ -137,7 +125,10 @@ def delete_responden(
         **_FORBIDDEN,
         **_NOT_FOUND_RSP,
         409: {"model": ErrorResponse, "description": "Item tidak dikenal."},
-        422: {"model": ErrorResponse, "description": "Responden sudah submit final."},
+        422: {
+            "model": ErrorResponse,
+            "description": "Responden sudah submit final, atau instrumen tidak OPEN.",
+        },
     },
 )
 def save_draft_jawaban(
@@ -160,7 +151,7 @@ def save_draft_jawaban(
 
 
 @router.post(
-    "/responden/{responden_id}/jawaban/submit",
+    "/{responden_id}/jawaban/submit",
     response_model=list[DcsJawabanRead],
     status_code=status.HTTP_201_CREATED,
     summary="Finalisasi (submit) 42 jawaban tersimpan untuk satu responden",
@@ -173,7 +164,10 @@ def save_draft_jawaban(
         **_NOT_FOUND_RSP,
         422: {
             "model": ErrorResponse,
-            "description": "Responden sudah submit, atau jawaban tersimpan belum lengkap.",
+            "description": (
+                "Responden sudah submit, jawaban tersimpan belum lengkap, atau instrumen"
+                " tidak OPEN."
+            ),
         },
     },
 )
@@ -196,7 +190,7 @@ def submit_jawaban(
 
 
 @router.get(
-    "/responden/{responden_id}/jawaban",
+    "/{responden_id}/jawaban",
     response_model=list[DcsJawabanRead],
     summary="Lihat jawaban responden DCS (admin atau pemilik)",
     operation_id="dcs_jawaban_list",

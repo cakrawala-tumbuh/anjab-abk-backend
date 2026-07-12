@@ -6,9 +6,9 @@ from fastapi import APIRouter
 
 from .v1 import (
     dcs_hasil,
+    dcs_instrumen,
     dcs_kuesioner,
     dcs_responden,
-    dcs_sesi,
     dcs_subskala,
     jabatan,
     jenjang_pendidikan,
@@ -37,9 +37,9 @@ from .v1 import (
     ts_penugasan,
     wcp_dimensi,
     wcp_hasil,
+    wcp_instrumen,
     wcp_kuesioner,
     wcp_responden,
-    wcp_sesi,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -90,18 +90,18 @@ api_router.include_router(
     tags=["wcp.dimensi"],
 )
 api_router.include_router(
-    wcp_sesi.router,
-    prefix="/wcp/sesi",
-    tags=["wcp.sesi"],
+    wcp_instrumen.router,
+    prefix="/wcp/instrumen",
+    tags=["wcp.instrumen"],
 )
 api_router.include_router(
     wcp_responden.router,
-    prefix="/wcp/sesi",
+    prefix="/wcp/responden",
     tags=["wcp.responden"],
 )
 api_router.include_router(
     wcp_hasil.router,
-    prefix="/wcp/sesi",
+    prefix="/wcp",
     tags=["wcp.hasil"],
 )
 api_router.include_router(
@@ -130,18 +130,18 @@ api_router.include_router(
     tags=["dcs.sub-skala"],
 )
 api_router.include_router(
-    dcs_sesi.router,
-    prefix="/dcs/sesi",
-    tags=["dcs.sesi"],
+    dcs_instrumen.router,
+    prefix="/dcs/instrumen",
+    tags=["dcs.instrumen"],
 )
 api_router.include_router(
     dcs_responden.router,
-    prefix="/dcs/sesi",
+    prefix="/dcs/responden",
     tags=["dcs.responden"],
 )
 api_router.include_router(
     dcs_hasil.router,
-    prefix="/dcs/sesi",
+    prefix="/dcs",
     tags=["dcs.hasil"],
 )
 api_router.include_router(

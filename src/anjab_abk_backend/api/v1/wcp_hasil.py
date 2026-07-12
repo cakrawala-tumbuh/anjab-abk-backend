@@ -8,97 +8,93 @@ from fastapi import APIRouter, Depends, Path
 
 from ...dependencies import (
     get_current_principal,
+    get_wcp_instrumen_service,
     get_wcp_jawaban_service,
     get_wcp_responden_service,
-    get_wcp_sesi_service,
     rate_limit,
 )
 from ...errors import ValidationAppError
 from ...schemas.common import ErrorResponse
-from ...wcp.schemas.hasil import WcpHasilRespondenRead, WcpHasilSesiRead
-from ...wcp.services.analisis import compute_hasil_responden, compute_hasil_sesi
+from ...wcp.schemas.hasil import WcpHasilRead, WcpHasilRespondenRead
+from ...wcp.services.analisis import compute_hasil, compute_hasil_responden
+from ...wcp.services.instrumen import WcpInstrumenService
 from ...wcp.services.jawaban import WcpJawabanService
 from ...wcp.services.responden import WcpRespondenService
-from ...wcp.services.sesi import WcpSesiService
 
 router = APIRouter()
 
 _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
-_NOT_FOUND_SESI = {404: {"model": ErrorResponse, "description": "Sesi WCP tidak ditemukan."}}
-_NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
+_NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
 
 
 @router.post(
-    "/{sesi_id}/analisis",
-    response_model=WcpHasilSesiRead,
+    "/analisis",
+    response_model=WcpHasilRead,
     summary="Jalankan analisis WCP (CLOSED → ANALYZED)",
-    operation_id="wcp_analisis_run",
+    operation_id="wcp_analisis",
     dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND_SESI},
+    responses={**_AUTH, **_RATE},
 )
 def run_analisis(
-    sesi_id: Annotated[str, Path(description="ID sesi WCP.")],
-    sesi_service: Annotated[WcpSesiService, Depends(get_wcp_sesi_service)],
+    instrumen_service: Annotated[WcpInstrumenService, Depends(get_wcp_instrumen_service)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
-) -> WcpHasilSesiRead:
-    sesi = sesi_service.get(sesi_id)
-    if sesi.status not in ("CLOSED", "ANALYZED"):
+) -> WcpHasilRead:
+    instrumen = instrumen_service.get()
+    if instrumen.status not in ("CLOSED", "ANALYZED"):
         raise ValidationAppError(
-            f"Analisis hanya dapat dijalankan saat sesi berstatus CLOSED atau ANALYZED"
-            f" (saat ini: {sesi.status})."
+            f"Analisis hanya dapat dijalankan saat instrumen berstatus CLOSED atau ANALYZED"
+            f" (saat ini: {instrumen.status})."
         )
 
-    responden_list = rsp_service.list_by_sesi(sesi_id)
+    responden_list = rsp_service.list_all()
     submitted = [r for r in responden_list if r.sudah_submit]
 
-    if len(submitted) < sesi.min_responden:
+    if len(submitted) < instrumen.min_responden:
         raise ValidationAppError(
-            f"Analisis membutuhkan minimal {sesi.min_responden} responden yang sudah submit,"
-            f" baru ada {len(submitted)}."
+            f"Analisis membutuhkan minimal {instrumen.min_responden} responden yang sudah"
+            f" submit, baru ada {len(submitted)}."
         )
 
     responden_raw: list[tuple[str, dict[str, int]]] = [
         (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted
     ]
 
-    if sesi.status == "CLOSED":
-        sesi_service.transition(sesi_id, "ANALYZED")
+    if instrumen.status == "CLOSED":
+        instrumen_service.set_analyzed()
 
-    return compute_hasil_sesi(sesi, responden_raw)
+    return compute_hasil(responden_raw)
 
 
 @router.get(
-    "/{sesi_id}/hasil",
-    response_model=WcpHasilSesiRead,
-    summary="Lihat hasil analisis sesi WCP",
-    operation_id="wcp_hasil_sesi_get",
-    responses=_NOT_FOUND_SESI,
+    "/hasil",
+    response_model=WcpHasilRead,
+    summary="Lihat hasil analisis instrumen WCP",
+    operation_id="wcp_hasil",
 )
-def get_hasil_sesi(
-    sesi_id: Annotated[str, Path(description="ID sesi WCP.")],
-    sesi_service: Annotated[WcpSesiService, Depends(get_wcp_sesi_service)],
+def get_hasil(
+    instrumen_service: Annotated[WcpInstrumenService, Depends(get_wcp_instrumen_service)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
-) -> WcpHasilSesiRead:
-    sesi = sesi_service.get(sesi_id)
-    if sesi.status != "ANALYZED":
+) -> WcpHasilRead:
+    instrumen = instrumen_service.get()
+    if instrumen.status != "ANALYZED":
         raise ValidationAppError(
             f"Hasil hanya tersedia setelah analisis dijalankan"
-            f" (status saat ini: {sesi.status})."
+            f" (status saat ini: {instrumen.status})."
         )
-    responden_list = rsp_service.list_by_sesi(sesi_id)
+    responden_list = rsp_service.list_all()
     submitted = [r for r in responden_list if r.sudah_submit]
     responden_raw: list[tuple[str, dict[str, int]]] = [
         (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted
     ]
-    return compute_hasil_sesi(sesi, responden_raw)
+    return compute_hasil(responden_raw)
 
 
 @router.get(
-    "/responden/{responden_id}/hasil",
+    "/hasil-responden/{responden_id}",
     response_model=WcpHasilRespondenRead,
     summary="Lihat hasil analisis per responden",
     operation_id="wcp_hasil_responden_get",

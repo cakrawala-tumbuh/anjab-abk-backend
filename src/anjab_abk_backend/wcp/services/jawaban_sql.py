@@ -5,7 +5,10 @@ MENGGANTI `InMemoryWcpJawabanService` TANPA mengubah kontrak Protocol.
 Uniqueness `(responden_id, item_id)` dijaga oleh `UniqueConstraint` di model;
 `upsert` melakukan get-or-update per item sehingga draft boleh disimpan berulang
 kali sebelum finalisasi. `submit` hanya memvalidasi kelengkapan baris yang sudah
-ada di DB (tanpa payload) lalu mengembalikannya.
+ada di DB (tanpa payload) lalu mengembalikannya. Sejak instrumen menjadi singleton
+(bukan lagi per kumpulan responden terpisah), gerbang "hanya boleh diubah saat
+OPEN" dicek langsung di sini terhadap baris tunggal `wcp_instrumen` (lewat objek
+`Session` yang sama) alih-alih lewat status kumpulan responden seperti sebelumnya.
 """
 
 from __future__ import annotations
@@ -16,8 +19,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...errors import ConflictError, ValidationAppError
-from ...models import WcpJawabanModel
+from ...models import WcpInstrumenModel, WcpJawabanModel
 from ..schemas.jawaban import WcpJawabanRead, WcpJawabanUpsert
+from .instrumen import INSTRUMEN_ID
 
 
 def _to_read(rec: WcpJawabanModel) -> WcpJawabanRead:
@@ -34,6 +38,15 @@ class SqlWcpJawabanService:
 
     def __init__(self, session: Session) -> None:
         self._s = session
+
+    def _require_instrumen_open(self) -> None:
+        instrumen = self._s.get(WcpInstrumenModel, INSTRUMEN_ID)
+        status = instrumen.status if instrumen is not None else "TIDAK ADA"
+        if status != "OPEN":
+            raise ValidationAppError(
+                f"Jawaban hanya dapat diubah saat instrumen WCP berstatus OPEN"
+                f" (saat ini: {status})."
+            )
 
     def list_by_responden(self, responden_id: str) -> list[WcpJawabanRead]:
         rows = self._s.scalars(
@@ -55,6 +68,7 @@ class SqlWcpJawabanService:
     def upsert(
         self, responden_id: str, data: WcpJawabanUpsert, valid_item_ids: set[str]
     ) -> list[WcpJawabanRead]:
+        self._require_instrumen_open()
         submitted_ids = {j.item_id for j in data.jawaban}
         unknown = submitted_ids - valid_item_ids
         if unknown:
@@ -84,6 +98,7 @@ class SqlWcpJawabanService:
         return [_to_read(r) for r in results]
 
     def submit(self, responden_id: str, valid_item_ids: set[str]) -> list[WcpJawabanRead]:
+        self._require_instrumen_open()
         rows = self._s.scalars(
             select(WcpJawabanModel)
             .where(WcpJawabanModel.responden_id == responden_id)

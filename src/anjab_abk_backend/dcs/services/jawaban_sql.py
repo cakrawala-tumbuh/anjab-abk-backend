@@ -5,7 +5,10 @@ MENGGANTI `InMemoryDcsJawabanService` TANPA mengubah kontrak Protocol.
 Uniqueness `(responden_id, item_id)` dijaga unique constraint di tabel; `upsert`
 melakukan get-or-update per item sehingga draft boleh disimpan berulang kali
 sebelum finalisasi. `submit` hanya memvalidasi kelengkapan baris yang sudah ada
-di DB (tanpa payload) lalu mengembalikannya.
+di DB (tanpa payload) lalu mengembalikannya. Sejak instrumen menjadi singleton
+(bukan lagi per kumpulan responden terpisah), gerbang "hanya boleh diubah saat
+OPEN" dicek langsung di sini terhadap baris tunggal `dcs_instrumen` (lewat objek
+`Session` yang sama) alih-alih lewat status kumpulan responden seperti sebelumnya.
 """
 
 from __future__ import annotations
@@ -16,8 +19,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...errors import ConflictError, ValidationAppError
-from ...models import DcsJawabanModel
+from ...models import DcsInstrumenModel, DcsJawabanModel
 from ..schemas.jawaban import DcsJawabanRead, DcsJawabanUpsert
+from .instrumen import INSTRUMEN_ID
 
 
 def _to_read(rec: DcsJawabanModel) -> DcsJawabanRead:
@@ -34,6 +38,15 @@ class SqlDcsJawabanService:
 
     def __init__(self, session: Session) -> None:
         self._s = session
+
+    def _require_instrumen_open(self) -> None:
+        instrumen = self._s.get(DcsInstrumenModel, INSTRUMEN_ID)
+        status = instrumen.status if instrumen is not None else "TIDAK ADA"
+        if status != "OPEN":
+            raise ValidationAppError(
+                f"Jawaban hanya dapat diubah saat instrumen DCS berstatus OPEN"
+                f" (saat ini: {status})."
+            )
 
     def list_by_responden(self, responden_id: str) -> list[DcsJawabanRead]:
         rows = self._s.scalars(
@@ -55,6 +68,7 @@ class SqlDcsJawabanService:
     def upsert(
         self, responden_id: str, data: DcsJawabanUpsert, valid_item_ids: set[str]
     ) -> list[DcsJawabanRead]:
+        self._require_instrumen_open()
         submitted_ids = {j.item_id for j in data.jawaban}
         unknown = submitted_ids - valid_item_ids
         if unknown:
@@ -84,6 +98,7 @@ class SqlDcsJawabanService:
         return [_to_read(r) for r in results]
 
     def submit(self, responden_id: str, valid_item_ids: set[str]) -> list[DcsJawabanRead]:
+        self._require_instrumen_open()
         rows = self._s.scalars(
             select(DcsJawabanModel)
             .where(DcsJawabanModel.responden_id == responden_id)

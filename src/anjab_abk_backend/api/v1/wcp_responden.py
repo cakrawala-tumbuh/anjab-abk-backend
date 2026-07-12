@@ -1,4 +1,4 @@
-"""Endpoint resource `WcpResponden` dan submit jawaban."""
+"""Endpoint resource `WcpResponden` (penugasan langsung) dan jawaban."""
 
 from __future__ import annotations
 
@@ -14,7 +14,6 @@ from ...dependencies import (
     get_wcp_dimensi_service,
     get_wcp_jawaban_service,
     get_wcp_responden_service,
-    get_wcp_sesi_service,
     rate_limit,
     require_admin,
 )
@@ -26,13 +25,11 @@ from ...wcp.schemas.responden import WcpRespondenCreate, WcpRespondenRead
 from ...wcp.services.dimensi import WcpDimensiService
 from ...wcp.services.jawaban import WcpJawabanService
 from ...wcp.services.responden import WcpRespondenService
-from ...wcp.services.sesi import WcpSesiService
 
 router = APIRouter()
 
 _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
 _ADMIN_GUARDS = [Depends(require_admin), Depends(rate_limit)]
-_NOT_FOUND_SESI = {404: {"model": ErrorResponse, "description": "Sesi WCP tidak ditemukan."}}
 _NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
@@ -42,56 +39,48 @@ _FORBIDDEN = {
 
 
 @router.get(
-    "/{sesi_id}/responden",
+    "",
     response_model=list[WcpRespondenRead],
-    summary="Daftar responden dalam sesi WCP (admin)",
+    summary="Daftar seluruh responden WCP (admin)",
     operation_id="wcp_responden_list",
     dependencies=[Depends(require_admin)],
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_SESI},
+    responses={**_AUTH, **_FORBIDDEN},
 )
 def list_responden(
-    sesi_id: Annotated[str, Path(description="ID sesi WCP.")],
-    sesi_service: Annotated[WcpSesiService, Depends(get_wcp_sesi_service)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
 ) -> list[WcpRespondenRead]:
-    sesi_service.get(sesi_id)
-    return rsp_service.list_by_sesi(sesi_id)
+    return rsp_service.list_all()
 
 
 @router.post(
-    "/{sesi_id}/responden",
-    response_model=WcpRespondenRead,
+    "",
+    response_model=list[WcpRespondenRead],
     status_code=status.HTTP_201_CREATED,
-    summary="Daftarkan responden ke sesi WCP (admin)",
+    summary="Tugaskan (assign) responden WCP — bulk (admin)",
     operation_id="wcp_responden_create",
     dependencies=_ADMIN_GUARDS,
     responses={
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
-        **_NOT_FOUND_SESI,
         409: {
             "model": ErrorResponse,
-            "description": "Partisipan sudah terdaftar sebagai responden WCP.",
+            "description": (
+                "Instrumen WCP tidak OPEN, atau salah satu partisipan sudah terdaftar"
+                " sebagai responden WCP."
+            ),
         },
     },
 )
 def create_responden(
-    sesi_id: Annotated[str, Path(description="ID sesi WCP.")],
     payload: WcpRespondenCreate,
-    sesi_service: Annotated[WcpSesiService, Depends(get_wcp_sesi_service)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
-) -> WcpRespondenRead:
-    sesi = sesi_service.get(sesi_id)
-    if sesi.status != "OPEN":
-        raise ValidationAppError(
-            f"Responden hanya dapat ditambahkan saat sesi berstatus OPEN (saat ini: {sesi.status})."
-        )
-    return rsp_service.create(sesi_id, payload, sesi.max_responden)
+) -> list[WcpRespondenRead]:
+    return rsp_service.create_banyak(payload.partisipan_ids)
 
 
 @router.get(
-    "/responden/{responden_id}",
+    "/{responden_id}",
     response_model=WcpRespondenRead,
     summary="Ambil detail responden WCP (admin atau pemilik)",
     operation_id="wcp_responden_get",
@@ -109,7 +98,7 @@ def get_responden(
 
 
 @router.delete(
-    "/responden/{responden_id}",
+    "/{responden_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Hapus responden (admin; hanya jika belum submit)",
     operation_id="wcp_responden_delete",
@@ -125,7 +114,7 @@ def delete_responden(
 
 
 @router.put(
-    "/responden/{responden_id}/jawaban",
+    "/{responden_id}/jawaban",
     response_model=list[WcpJawabanRead],
     summary="Simpan draft jawaban (parsial) untuk satu responden",
     operation_id="wcp_jawaban_save_draft",
@@ -136,7 +125,10 @@ def delete_responden(
         **_FORBIDDEN,
         **_NOT_FOUND_RSP,
         409: {"model": ErrorResponse, "description": "Item tidak dikenal."},
-        422: {"model": ErrorResponse, "description": "Responden sudah submit final."},
+        422: {
+            "model": ErrorResponse,
+            "description": "Responden sudah submit final, atau instrumen tidak OPEN.",
+        },
     },
 )
 def save_draft_jawaban(
@@ -159,7 +151,7 @@ def save_draft_jawaban(
 
 
 @router.post(
-    "/responden/{responden_id}/jawaban/submit",
+    "/{responden_id}/jawaban/submit",
     response_model=list[WcpJawabanRead],
     status_code=status.HTTP_201_CREATED,
     summary="Finalisasi (submit) 72 jawaban tersimpan untuk satu responden",
@@ -172,7 +164,10 @@ def save_draft_jawaban(
         **_NOT_FOUND_RSP,
         422: {
             "model": ErrorResponse,
-            "description": "Responden sudah submit, atau jawaban tersimpan belum lengkap.",
+            "description": (
+                "Responden sudah submit, jawaban tersimpan belum lengkap, atau instrumen"
+                " tidak OPEN."
+            ),
         },
     },
 )
@@ -195,7 +190,7 @@ def submit_jawaban(
 
 
 @router.get(
-    "/responden/{responden_id}/jawaban",
+    "/{responden_id}/jawaban",
     response_model=list[WcpJawabanRead],
     summary="Lihat jawaban responden (admin atau pemilik)",
     operation_id="wcp_jawaban_list",

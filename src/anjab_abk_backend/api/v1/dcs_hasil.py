@@ -4,18 +4,18 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path
 
-from ...dcs.schemas.hasil import DcsHasilRespondenRead, DcsHasilSesiRead
-from ...dcs.services.analisis import compute_hasil_responden, compute_hasil_sesi
+from ...dcs.schemas.hasil import DcsHasilRead, DcsHasilRespondenRead
+from ...dcs.services.analisis import compute_hasil, compute_hasil_responden
+from ...dcs.services.instrumen import DcsInstrumenService
 from ...dcs.services.jawaban import DcsJawabanService
 from ...dcs.services.responden import DcsRespondenService
-from ...dcs.services.sesi import DcsSesiService
 from ...dependencies import (
     get_current_principal,
+    get_dcs_instrumen_service,
     get_dcs_jawaban_service,
     get_dcs_responden_service,
-    get_dcs_sesi_service,
     get_wcp_jawaban_service,
     get_wcp_responden_service,
     rate_limit,
@@ -30,24 +30,22 @@ from ...wcp.services.responden import WcpRespondenService
 router = APIRouter()
 
 _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
-_NOT_FOUND_SESI = {404: {"model": ErrorResponse, "description": "Sesi DCS tidak ditemukan."}}
-_NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
+_NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
 
 # Kode dimensi risiko WCP (is_risk=True): CH, SD, PI
 _WCP_RISK_KODES = frozenset(kode for kode, _, _, is_risk in DIMENSI if is_risk)
 
 
 def _compute_wcp_risk_score(
-    wcp_sesi_id: str,
     wcp_rsp_service: WcpRespondenService,
     wcp_jwb_service: WcpJawabanService,
-) -> float:
-    """Hitung skor risiko WCP ternormalisasi (0–1) dari rata-rata dimensi risiko (CH/SD/PI)."""
-    submitted = [r for r in wcp_rsp_service.list_by_sesi(wcp_sesi_id) if r.sudah_submit]
+) -> float | None:
+    """Skor risiko WCP ternormalisasi (0–1); `None` bila WCP belum punya responden submit."""
+    submitted = [r for r in wcp_rsp_service.list_all() if r.sudah_submit]
     if not submitted:
-        return 0.0
+        return None
 
     risk_scores: list[float] = []
     for rsp in submitted:
@@ -62,100 +60,80 @@ def _compute_wcp_risk_score(
 
 
 @router.post(
-    "/{sesi_id}/analisis",
-    response_model=DcsHasilSesiRead,
+    "/analisis",
+    response_model=DcsHasilRead,
     summary="Jalankan analisis DCS (CLOSED → ANALYZED)",
-    operation_id="dcs_analisis_run",
+    operation_id="dcs_analisis",
     dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND_SESI},
+    responses={**_AUTH, **_RATE},
 )
 def run_analisis(
-    sesi_id: Annotated[str, Path(description="ID sesi DCS.")],
-    sesi_service: Annotated[DcsSesiService, Depends(get_dcs_sesi_service)],
+    instrumen_service: Annotated[DcsInstrumenService, Depends(get_dcs_instrumen_service)],
     rsp_service: Annotated[DcsRespondenService, Depends(get_dcs_responden_service)],
     jwb_service: Annotated[DcsJawabanService, Depends(get_dcs_jawaban_service)],
     wcp_rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     wcp_jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
-    wcp_sesi_id: Annotated[
-        str | None,
-        Query(
-            description=(
-                "ID sesi WCP yang bersesuaian untuk menghitung K-Index. "
-                "Jika tidak disertakan, k_index akan bernilai null."
-            )
-        ),
-    ] = None,
-) -> DcsHasilSesiRead:
-    sesi = sesi_service.get(sesi_id)
-    if sesi.status not in ("CLOSED", "ANALYZED"):
+) -> DcsHasilRead:
+    instrumen = instrumen_service.get()
+    if instrumen.status not in ("CLOSED", "ANALYZED"):
         raise ValidationAppError(
-            f"Analisis hanya dapat dijalankan saat sesi berstatus CLOSED atau ANALYZED"
-            f" (saat ini: {sesi.status})."
+            f"Analisis hanya dapat dijalankan saat instrumen berstatus CLOSED atau ANALYZED"
+            f" (saat ini: {instrumen.status})."
         )
 
-    responden_list = rsp_service.list_by_sesi(sesi_id)
+    responden_list = rsp_service.list_all()
     submitted = [r for r in responden_list if r.sudah_submit]
 
-    if len(submitted) < sesi.min_responden:
+    if len(submitted) < instrumen.min_responden:
         raise ValidationAppError(
-            f"Analisis membutuhkan minimal {sesi.min_responden} responden yang sudah submit,"
-            f" baru ada {len(submitted)}."
+            f"Analisis membutuhkan minimal {instrumen.min_responden} responden yang sudah"
+            f" submit, baru ada {len(submitted)}."
         )
 
     responden_raw: list[tuple[str, dict[str, int]]] = [
         (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted
     ]
 
-    wcp_risk: float | None = None
-    if wcp_sesi_id:
-        wcp_risk = _compute_wcp_risk_score(wcp_sesi_id, wcp_rsp_service, wcp_jwb_service)
+    wcp_risk = _compute_wcp_risk_score(wcp_rsp_service, wcp_jwb_service)
 
-    if sesi.status == "CLOSED":
-        sesi_service.transition(sesi_id, "ANALYZED")
+    if instrumen.status == "CLOSED":
+        instrumen_service.set_analyzed()
 
-    return compute_hasil_sesi(sesi, responden_raw, wcp_risk)
+    return compute_hasil(responden_raw, wcp_risk)
 
 
 @router.get(
-    "/{sesi_id}/hasil",
-    response_model=DcsHasilSesiRead,
-    summary="Lihat hasil analisis sesi DCS",
-    operation_id="dcs_hasil_sesi_get",
-    responses=_NOT_FOUND_SESI,
+    "/hasil",
+    response_model=DcsHasilRead,
+    summary="Lihat hasil analisis instrumen DCS",
+    operation_id="dcs_hasil",
 )
-def get_hasil_sesi(
-    sesi_id: Annotated[str, Path(description="ID sesi DCS.")],
-    sesi_service: Annotated[DcsSesiService, Depends(get_dcs_sesi_service)],
+def get_hasil(
+    instrumen_service: Annotated[DcsInstrumenService, Depends(get_dcs_instrumen_service)],
     rsp_service: Annotated[DcsRespondenService, Depends(get_dcs_responden_service)],
     jwb_service: Annotated[DcsJawabanService, Depends(get_dcs_jawaban_service)],
     wcp_rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     wcp_jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
-    wcp_sesi_id: Annotated[
-        str | None,
-        Query(description="ID sesi WCP untuk menyertakan K-Index dalam respons."),
-    ] = None,
-) -> DcsHasilSesiRead:
-    sesi = sesi_service.get(sesi_id)
-    if sesi.status != "ANALYZED":
+) -> DcsHasilRead:
+    instrumen = instrumen_service.get()
+    if instrumen.status != "ANALYZED":
         raise ValidationAppError(
             f"Hasil hanya tersedia setelah analisis dijalankan"
-            f" (status saat ini: {sesi.status})."
+            f" (status saat ini: {instrumen.status})."
         )
-    responden_list = rsp_service.list_by_sesi(sesi_id)
+    responden_list = rsp_service.list_all()
     submitted = [r for r in responden_list if r.sudah_submit]
     responden_raw: list[tuple[str, dict[str, int]]] = [
         (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted
     ]
 
-    wcp_risk: float | None = None
-    if wcp_sesi_id:
-        wcp_risk = _compute_wcp_risk_score(wcp_sesi_id, wcp_rsp_service, wcp_jwb_service)
+    wcp_risk = _compute_wcp_risk_score(wcp_rsp_service, wcp_jwb_service)
 
-    return compute_hasil_sesi(sesi, responden_raw, wcp_risk)
+    return compute_hasil(responden_raw, wcp_risk)
 
 
 @router.get(
-    "/responden/{responden_id}/hasil",
+    "/hasil-responden/{responden_id}",
     response_model=DcsHasilRespondenRead,
     summary="Lihat hasil analisis per responden DCS",
     operation_id="dcs_hasil_responden_get",
