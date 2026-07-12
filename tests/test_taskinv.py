@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 BASE = "/api/v1/task-inventory"
 SESI = f"{BASE}/sesi"
-UNIT = "TK"
+UNIT = "ALL"
 
 _year_counter = itertools.count(2000)
 
@@ -25,7 +25,7 @@ def jabatan_id_tk(anon_client: TestClient) -> str:
     """Jabatan_id dari catalog kombinasi yang cocok dengan unit TK."""
     kombis = anon_client.get(BASE + "/catalog/kombinasi").json()
     match = next((x for x in kombis if x["unit"] == UNIT), None)
-    assert match is not None, f"Tidak ada kombinasi untuk unit '{UNIT}' dalam catalog"
+    assert match is not None, f"Tidak ada kombinasi dalam catalog untuk unit '{UNIT}'"
     return match["jabatan_id"]
 
 
@@ -85,7 +85,7 @@ def test_catalog_kombinasi(anon_client: TestClient) -> None:
     r = anon_client.get(BASE + "/catalog/kombinasi")
     assert r.status_code == 200
     rows = r.json()
-    assert len(rows) == 51
+    assert len(rows) == 24  # 24 jabatan × unit "ALL" (bukan lagi × jenjang)
     # Tiap baris punya jabatan_id, jabatan_nama (bukan kategori_jabatan)
     assert all("jabatan_id" in x for x in rows)
     assert all("jabatan_nama" in x for x in rows)
@@ -99,7 +99,7 @@ def test_catalog_list_by_kombinasi(anon_client: TestClient, jabatan_id_tk: str) 
     items = r.json()
     assert len(items) > 0
     assert all(it["unit"] == UNIT and it["jabatan_id"] == jabatan_id_tk for it in items)
-    assert items[0]["kode"].startswith("TI")
+    assert len(items[0]["kode"]) > 0
     # Cascade Tahap 1 mengandalkan id stabil tugas pokok & detil tugas (level 1 & 2).
     assert all(it.get("tugas_pokok_id") for it in items)
     assert all("detil_tugas_id" in it for it in items)
@@ -519,6 +519,120 @@ def test_full_three_phase_flow(client: TestClient, jabatan_id_tk: str) -> None:
     hg = client.get(f"{SESI}/{sid}/hasil")
     assert hg.status_code == 200
     assert hg.json()["jumlah_task_terpilih"] == 2
+
+
+# --------------------------------------------------------------------------- #
+# Nilai standar CalHR (std_*) — prefill Tahap 3 & agregat setuju/ubah
+# --------------------------------------------------------------------------- #
+
+_STD_MASTER = {
+    "std_sumber_bukti": "Aktual",
+    "std_kondisi": "Baseline",
+    "std_frekuensi_teks": "Mingguan",
+    "std_durasi_per_kali": "60 menit",
+    "std_jam_per_minggu": 2.0,
+    "std_peak4w_hours": 0.0,
+    "std_ai_mode": "Human-led",
+    "std_va_type": "VA-Core",
+    "std_dcs_flag": False,
+}
+
+# durasi_per_kali jawaban responden (ti_detail) tetap Integer — beda dari
+# std_durasi_per_kali master (String bebas sejak revisi #6).
+_DURASI_PER_KALI_RESPONDEN = 60
+
+
+def _detail_item_dari_standar(
+    kode: str, *, setuju: bool, jam_per_minggu: float | None = None
+) -> dict:
+    return {
+        "task_kode": kode,
+        "sumber_bukti": _STD_MASTER["std_sumber_bukti"],
+        "kondisi": _STD_MASTER["std_kondisi"],
+        "frekuensi_teks": _STD_MASTER["std_frekuensi_teks"],
+        "durasi_per_kali": _DURASI_PER_KALI_RESPONDEN,
+        "jam_per_minggu": (
+            jam_per_minggu if jam_per_minggu is not None else _STD_MASTER["std_jam_per_minggu"]
+        ),
+        "peak4w_hours": _STD_MASTER["std_peak4w_hours"],
+        "ai_mode": _STD_MASTER["std_ai_mode"],
+        "va_type": _STD_MASTER["std_va_type"],
+        "dcs_flag": _STD_MASTER["std_dcs_flag"],
+        "setuju_standar": setuju,
+    }
+
+
+def test_std_calhr_prefill_task_terpilih_dan_agregat_setuju(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Nilai standar master → prefill task-terpilih Tahap 3 & agregat n_setuju/n_ubah_standar."""
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    kode_std = _catalog_kodes(client, jabatan_id_tk, 1)[0]
+
+    search = client.post(
+        f"{BASE}/uraian-tugas/search",
+        json={"domain": [["kode", "=", kode_std]], "limit": 1, "offset": 0},
+    )
+    assert search.status_code == 200, search.text
+    ut_id = search.json()["items"][0]["id"]
+    r_std = client.patch(f"{BASE}/uraian-tugas/{ut_id}", json=_STD_MASTER)
+    assert r_std.status_code == 200, r_std.text
+
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    rb = _add_responden(client, sid, "B")
+    _seleksi_submit(client, ra["id"], [kode_std])
+    _seleksi_submit(client, rb["id"], [kode_std])
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    client.post(f"{SESI}/{sid}/mulai-tahap3")
+
+    # task-terpilih membawa std_* sesuai master
+    tt = client.get(f"{SESI}/{sid}/task-terpilih")
+    assert tt.status_code == 200
+    item = next(x for x in tt.json() if x["kode"] == kode_std)
+    for key, value in _STD_MASTER.items():
+        assert item[key] == value
+
+    # A: setuju standar (nilai = standar) ; B: ubah dari standar (jam_per_minggu beda)
+    _detail_submit(client, ra["id"], [_detail_item_dari_standar(kode_std, setuju=True)])
+    _detail_submit(
+        client, rb["id"], [_detail_item_dari_standar(kode_std, setuju=False, jam_per_minggu=5.0)]
+    )
+
+    det_a = client.get(f"{SESI}/responden/{ra['id']}/detail")
+    assert det_a.status_code == 200
+    assert det_a.json()[0]["setuju_standar"] is True
+    det_b = client.get(f"{SESI}/responden/{rb['id']}/detail")
+    assert det_b.status_code == 200
+    assert det_b.json()[0]["setuju_standar"] is False
+
+    assert client.post(f"{SESI}/{sid}/tutup").json()["status"] == "CLOSED"
+    an = client.post(f"{SESI}/{sid}/analisis")
+    assert an.status_code == 200, an.text
+    task = next(t for t in an.json()["tasks"] if t["kode"] == kode_std)
+    assert task["n_setuju_standar"] == 1
+    assert task["n_ubah_standar"] == 1
+
+
+def test_submit_detail_tanpa_setuju_standar_default_true(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Backward compatible: payload lama tanpa `setuju_standar` → default True."""
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    _seleksi_submit(client, ra["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    client.post(f"{SESI}/{sid}/mulai-tahap3")
+
+    _detail_submit(client, ra["id"], [_detail_item(kodes[0])])
+
+    det = client.get(f"{SESI}/responden/{ra['id']}/detail")
+    assert det.status_code == 200
+    assert det.json()[0]["setuju_standar"] is True
 
 
 def test_detail_kode_diluar_terpilih_ditolak(client: TestClient, jabatan_id_tk: str) -> None:

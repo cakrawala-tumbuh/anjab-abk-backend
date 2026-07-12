@@ -254,7 +254,7 @@ def test_kuesioner_saya_hanya_open(client: TestClient, jabatan_id_tk: str, db_se
     client.post(f"{SME_BASE}/{panel_id}/anggota", json={"partisipan_id": par.id})
 
     r_catalog = client.get(
-        "/api/v1/task-inventory/catalog", params={"unit": "TK", "jabatan_id": jabatan_id_tk}
+        "/api/v1/task-inventory/catalog", params={"unit": "ALL", "jabatan_id": jabatan_id_tk}
     )
     kodes = [it["kode"] for it in r_catalog.json()[:2]]
 

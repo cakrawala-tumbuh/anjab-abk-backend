@@ -40,6 +40,15 @@ def compute_task_terpilih(
                 uraian_tugas=cat.uraian_tugas if cat else "",
                 n_relevan=n_relevan,
                 pct_relevan=_pct(n_relevan, n_tahap1),
+                std_sumber_bukti=cat.std_sumber_bukti if cat else None,
+                std_kondisi=cat.std_kondisi if cat else None,
+                std_frekuensi_teks=cat.std_frekuensi_teks if cat else None,
+                std_durasi_per_kali=cat.std_durasi_per_kali if cat else None,
+                std_jam_per_minggu=cat.std_jam_per_minggu if cat else None,
+                std_peak4w_hours=cat.std_peak4w_hours if cat else None,
+                std_ai_mode=cat.std_ai_mode if cat else None,
+                std_va_type=cat.std_va_type if cat else None,
+                std_dcs_flag=cat.std_dcs_flag if cat else None,
             )
         )
     rows.sort(key=lambda r: (-r.n_relevan, r.kode))
@@ -83,6 +92,9 @@ def compute_hasil_sesi(
             if d.dcs_flag:
                 dcs_count += 1
 
+        n_setuju = sum(1 for d in entries if d.setuju_standar)
+        n_ubah = len(entries) - n_setuju
+
         total_jpm += jpm_mean
         tasks.append(
             TiHasilTaskRead(
@@ -100,6 +112,8 @@ def compute_hasil_sesi(
                 ai_mode_dist=ai_dist,
                 va_type_dist=va_dist,
                 dcs_flag_count=dcs_count,
+                n_setuju_standar=n_setuju,
+                n_ubah_standar=n_ubah,
             )
         )
 

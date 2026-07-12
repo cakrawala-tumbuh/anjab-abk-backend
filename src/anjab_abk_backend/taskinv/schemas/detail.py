@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from pydantic import BaseModel, ConfigDict, Field
 
-SumberBukti = Literal["Formal", "Aktual", "Keduanya"]
-Kondisi = Literal["Baseline", "Peak", "Both"]
-AiMode = Literal["Human-led", "Co-Pilot", "AI-assisted"]
-VaType = Literal["VA-Core", "VA-Enable", "NVA-Residual"]
+from .calhr import AiMode, Kondisi, SumberBukti, VaType
 
 
 class TiDetailItem(BaseModel):
@@ -29,6 +24,9 @@ class TiDetailItem(BaseModel):
     ai_mode: AiMode = Field(description="Human-led/Co-Pilot/AI-assisted.")
     va_type: VaType = Field(description="VA-Core/VA-Enable/NVA-Residual.")
     dcs_flag: bool = Field(default=False, description="True bila ada risiko DCS.")
+    setuju_standar: bool = Field(
+        default=True, description="True bila partisipan menerima nilai standar master apa adanya."
+    )
     catatan: str | None = Field(default=None, max_length=500, description="Catatan ambiguitas.")
 
 
@@ -65,4 +63,5 @@ class TiDetailRead(BaseModel):
     ai_mode: AiMode
     va_type: VaType
     dcs_flag: bool
+    setuju_standar: bool
     catatan: str | None = None

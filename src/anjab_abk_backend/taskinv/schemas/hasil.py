@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .calhr import AiMode, Kondisi, SumberBukti, VaType
+
 
 class TiTaskTerpilihRead(BaseModel):
     """Satu task pada himpunan terpilih (beku setelah TAHAP2) + statistik relevansi."""
@@ -16,6 +18,15 @@ class TiTaskTerpilihRead(BaseModel):
     uraian_tugas: str = Field(description="Uraian tugas.")
     n_relevan: int = Field(description="Jumlah partisipan yang menandai task ini relevan.")
     pct_relevan: float = Field(description="Persentase partisipan (terhadap submit Tahap 1).")
+    std_sumber_bukti: SumberBukti | None = None
+    std_kondisi: Kondisi | None = None
+    std_frekuensi_teks: str | None = None
+    std_durasi_per_kali: str | None = None
+    std_jam_per_minggu: float | None = None
+    std_peak4w_hours: float | None = None
+    std_ai_mode: AiMode | None = None
+    std_va_type: VaType | None = None
+    std_dcs_flag: bool | None = None
 
 
 class TiHasilTaskRead(BaseModel):
@@ -37,6 +48,8 @@ class TiHasilTaskRead(BaseModel):
     ai_mode_dist: dict[str, int] = Field(description="Distribusi AI_Mode.")
     va_type_dist: dict[str, int] = Field(description="Distribusi VA_Type.")
     dcs_flag_count: int = Field(description="Jumlah responden yang menandai risiko DCS.")
+    n_setuju_standar: int = Field(description="Jumlah responden yang menerima nilai standar.")
+    n_ubah_standar: int = Field(description="Jumlah responden yang mengubah dari nilai standar.")
 
 
 class TiHasilSesiRead(BaseModel):

@@ -177,12 +177,13 @@ def partisipan_factory(db_session: Session):
 
 @pytest.fixture
 def jabatan_id_tk(anon_client: TestClient) -> str:
-    """Jabatan_id dari catalog kombinasi Task Inventory yang cocok dengan unit TK.
+    """Jabatan_id dari catalog kombinasi Task Inventory (unit selalu "ALL" sejak
+    revisi master data Task Bank v2_19 — `unit` bukan lagi pembeda kombinasi).
 
     Dipakai bersama oleh `test_taskinv.py` dan test OPM (`_opm_common.py`) — satu
     sumber jabatan ber-catalog nyata (baris `jabatan` sungguhan, bukan ID acak).
     """
     kombis = anon_client.get("/api/v1/task-inventory/catalog/kombinasi").json()
-    match = next((x for x in kombis if x["unit"] == "TK"), None)
-    assert match is not None, "Tidak ada kombinasi untuk unit 'TK' dalam catalog"
+    match = next((x for x in kombis if x["unit"] == "ALL"), None)
+    assert match is not None, "Tidak ada kombinasi dalam catalog"
     return match["jabatan_id"]

@@ -35,6 +35,7 @@ def _to_read(rec: TiDetailModel) -> TiDetailRead:
         ai_mode=rec.ai_mode,  # type: ignore[arg-type]
         va_type=rec.va_type,  # type: ignore[arg-type]
         dcs_flag=rec.dcs_flag,
+        setuju_standar=rec.setuju_standar,
         catatan=rec.catatan,
     )
 
@@ -73,6 +74,7 @@ class SqlTiDetailService:
                 existing.ai_mode = item.ai_mode
                 existing.va_type = item.va_type
                 existing.dcs_flag = item.dcs_flag
+                existing.setuju_standar = item.setuju_standar
                 existing.catatan = item.catatan
                 results.append(existing)
             else:
@@ -90,6 +92,7 @@ class SqlTiDetailService:
                     ai_mode=item.ai_mode,
                     va_type=item.va_type,
                     dcs_flag=item.dcs_flag,
+                    setuju_standar=item.setuju_standar,
                     catatan=item.catatan,
                 )
                 self._s.add(rec)

@@ -7,6 +7,57 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-07-12
+
+### Ditambahkan
+
+- **Nilai standar CalHR di master catalog Task Inventory.** `ti_uraian_tugas`
+  mendapat 9 kolom `std_*` (`std_sumber_bukti`, `std_kondisi`,
+  `std_frekuensi_teks`, `std_durasi_per_kali`, `std_jam_per_minggu`,
+  `std_peak4w_hours`, `std_ai_mode`, `std_va_type`, `std_dcs_flag`) — dipakai
+  untuk mem-prefill isian partisipan di Tahap 3 sehingga cukup menyatakan
+  setuju alih-alih mengisi dari nol. `ti_detail` mendapat `setuju_standar`
+  (boolean, default `true`) yang merekam apakah partisipan menerima nilai
+  standar apa adanya. Literal `SumberBukti`/`Kondisi`/`AiMode`/`VaType`
+  dipindah ke modul bersama `taskinv/schemas/calhr.py`.
+- **Master catalog Task Inventory diganti total dari Task Bank v2_19**
+  (`Task_Bank_Complete_AllRoles_v2_19.xlsx`, sheet `05_Raw_Task_Migration`,
+  1.140 baris setelah baris `Final_Decision=Retire` dibuang) — menggantikan
+  katalog lama 2.738 baris (hasil FGD, tanpa nilai standar CalHR). Katalog
+  baru membawa nilai standar CalHR penuh untuk kelima komponen yang punya
+  sumber di Excel. `unit` diisi konstanta `"ALL"` (kolom `Jenjang` sumber
+  92% bernilai `ALL` dan tidak dipakai alur mana pun). Skrip ekstraksi
+  (`extract_task_bank.py`, di repo induk) merekonstruksi 265 baris kolom
+  `Baseline_Peak` yang terkontaminasi nilai frekuensi (validasi silang
+  5-fold 85%) dan menyalin 2 baris `Perlu Validasi` dari induk kanonik yang
+  ditunjuk eksplisit oleh `Reviewer_Notes`.
+- `scripts/purge_task_catalog.py` — hapus seluruh master catalog Task
+  Inventory (`ti_uraian_tugas`, `ti_detil_tugas`, `ti_tugas_pokok` + baris
+  link M2M via `ON DELETE CASCADE`) sebelum re-seed dari `task_catalog.json`
+  baru. Seeder bersifat insert-if-absent — ganti-total katalog butuh purge
+  eksplisit, tidak otomatis membackfill/menghapus baris lama.
+
+### Diubah
+
+- **BREAKING**: `std_durasi_per_kali` (master) berubah tipe dari `Integer`
+  ke `String(100)` — nilai standar durasi di Task Bank v2_19 berupa teks
+  bebas (mis. `"Bervariasi"`, `"<2 jam"`), bukan angka menit. Kolom jawaban
+  responden `ti_detail.durasi_per_kali` (Integer, dipakai hitung beban
+  kerja ABK) **tidak berubah**.
+- `VaType` diperluas dari 3 jadi 5 nilai: tambah `Context-Dependent` dan
+  `Needs Validation` (26% baris Task Bank v2_19 berstatus kurasi belum
+  diputuskan, bukan nilai yang bisa ditebak — SME yang memutuskan kategori
+  VA finalnya di Tahap 3). Dipakai bersama oleh nilai standar master dan
+  jawaban responden; konsekuensinya responden kini bisa memilih kedua nilai
+  itu sebagai jawaban akhir.
+
+### Diperbaiki
+
+- **Bug seeder tak terlaporkan**: `seed_catalog_models` tidak pernah
+  meneruskan field `std_*` dari `task_catalog.json` ke `UraianTugasCreate` —
+  kolom `std_*` di DB selalu `NULL` walau JSON sumbernya berisi. Ditambal +
+  unit test penjaga regresi.
+
 ## [0.26.0] - 2026-07-12
 
 ### Ditambahkan

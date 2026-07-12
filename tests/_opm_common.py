@@ -16,7 +16,7 @@ TI_BASE = "/api/v1/task-inventory"
 TI_SESI = f"{TI_BASE}/sesi"
 SME_BASE = "/api/v1/sme-panel"
 PAR_BASE = "/api/v1/partisipan"
-UNIT = "TK"
+UNIT = "ALL"
 
 _periode_counter = itertools.count(3000)
 

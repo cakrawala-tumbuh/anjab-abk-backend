@@ -26,6 +26,7 @@ class _Record:
     ai_mode: str
     va_type: str
     dcs_flag: bool
+    setuju_standar: bool = True
     catatan: str | None = None
 
 
@@ -84,6 +85,7 @@ class InMemoryTiDetailService:
                     existing.ai_mode = item.ai_mode
                     existing.va_type = item.va_type
                     existing.dcs_flag = item.dcs_flag
+                    existing.setuju_standar = item.setuju_standar
                     existing.catatan = item.catatan
                     results.append(existing)
                 else:
@@ -101,6 +103,7 @@ class InMemoryTiDetailService:
                         ai_mode=item.ai_mode,
                         va_type=item.va_type,
                         dcs_flag=item.dcs_flag,
+                        setuju_standar=item.setuju_standar,
                         catatan=item.catatan,
                     )
                     self._data[rec.id] = rec

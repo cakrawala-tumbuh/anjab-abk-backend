@@ -15,6 +15,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .calhr import AiMode, Kondisi, SumberBukti, VaType
+
 
 class UraianTugasCreate(BaseModel):
     """Payload pembuatan uraian tugas."""
@@ -61,6 +63,27 @@ class UraianTugasCreate(BaseModel):
         description="ID tugas pokok induk (M2O).",
         examples=["tp_a1b2c3d4"],
     )
+    std_sumber_bukti: SumberBukti | None = Field(
+        default=None, description="Nilai standar sumber bukti (prefill Tahap 3)."
+    )
+    std_kondisi: Kondisi | None = Field(default=None, description="Nilai standar kondisi.")
+    std_frekuensi_teks: str | None = Field(
+        default=None, max_length=100, description="Nilai standar frekuensi."
+    )
+    std_durasi_per_kali: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Nilai standar durasi per pelaksanaan (teks bebas).",
+    )
+    std_jam_per_minggu: float | None = Field(
+        default=None, ge=0, description="Nilai standar jam per minggu."
+    )
+    std_peak4w_hours: float | None = Field(
+        default=None, ge=0, description="Nilai standar jam pada 4 minggu peak."
+    )
+    std_ai_mode: AiMode | None = Field(default=None, description="Nilai standar AI mode.")
+    std_va_type: VaType | None = Field(default=None, description="Nilai standar VA type.")
+    std_dcs_flag: bool | None = Field(default=None, description="Nilai standar flag risiko DCS.")
 
 
 class UraianTugasUpdate(BaseModel):
@@ -77,6 +100,27 @@ class UraianTugasUpdate(BaseModel):
     jabatan_id: str | None = Field(default=None, min_length=1, description="ID jabatan baru.")
     detil_tugas_id: str | None = Field(default=None, description="ID detil tugas induk baru.")
     tugas_pokok_id: str | None = Field(default=None, description="ID tugas pokok induk baru.")
+    std_sumber_bukti: SumberBukti | None = Field(
+        default=None, description="Nilai standar sumber bukti (prefill Tahap 3)."
+    )
+    std_kondisi: Kondisi | None = Field(default=None, description="Nilai standar kondisi.")
+    std_frekuensi_teks: str | None = Field(
+        default=None, max_length=100, description="Nilai standar frekuensi."
+    )
+    std_durasi_per_kali: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Nilai standar durasi per pelaksanaan (teks bebas).",
+    )
+    std_jam_per_minggu: float | None = Field(
+        default=None, ge=0, description="Nilai standar jam per minggu."
+    )
+    std_peak4w_hours: float | None = Field(
+        default=None, ge=0, description="Nilai standar jam pada 4 minggu peak."
+    )
+    std_ai_mode: AiMode | None = Field(default=None, description="Nilai standar AI mode.")
+    std_va_type: VaType | None = Field(default=None, description="Nilai standar VA type.")
+    std_dcs_flag: bool | None = Field(default=None, description="Nilai standar flag risiko DCS.")
 
 
 class UraianTugasRead(BaseModel):
@@ -99,4 +143,25 @@ class UraianTugasRead(BaseModel):
         default=None, description="ID detil tugas induk.", examples=["dt_a1b2c3d4"]
     )
     tugas_pokok_id: str = Field(description="ID tugas pokok induk.", examples=["tp_a1b2c3d4"])
+    std_sumber_bukti: SumberBukti | None = Field(
+        default=None, description="Nilai standar sumber bukti (prefill Tahap 3)."
+    )
+    std_kondisi: Kondisi | None = Field(default=None, description="Nilai standar kondisi.")
+    std_frekuensi_teks: str | None = Field(
+        default=None, max_length=100, description="Nilai standar frekuensi."
+    )
+    std_durasi_per_kali: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Nilai standar durasi per pelaksanaan (teks bebas).",
+    )
+    std_jam_per_minggu: float | None = Field(
+        default=None, ge=0, description="Nilai standar jam per minggu."
+    )
+    std_peak4w_hours: float | None = Field(
+        default=None, ge=0, description="Nilai standar jam pada 4 minggu peak."
+    )
+    std_ai_mode: AiMode | None = Field(default=None, description="Nilai standar AI mode.")
+    std_va_type: VaType | None = Field(default=None, description="Nilai standar VA type.")
+    std_dcs_flag: bool | None = Field(default=None, description="Nilai standar flag risiko DCS.")
     created_at: datetime = Field(description="Waktu pembuatan (UTC, ISO-8601).")

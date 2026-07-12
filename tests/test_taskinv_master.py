@@ -322,7 +322,7 @@ def test_ut_list_ok(anon_client: TestClient) -> None:
     assert r.status_code == 200
     body = r.json()
     assert "items" in body
-    assert body["total"] >= 2738  # seeded from task_catalog.json
+    assert body["total"] >= 1140  # seeded from task_catalog.json (Task Bank v2_19)
 
 
 def test_ut_create_and_get(client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]) -> None:
@@ -497,19 +497,41 @@ def test_ut_seeded_data_via_catalog_endpoint(anon_client: TestClient) -> None:
     assert all(it["jabatan_id"] == jabatan_id for it in items)
 
 
-def test_catalog_with_null_detil_tugas(anon_client: TestClient) -> None:
-    """Catalog untuk kombinasi yang punya task tanpa detil_tugas (detil_tugas_id=None) harus 200."""
+def test_seeded_catalog_membawa_nilai_standar_calhr(anon_client: TestClient) -> None:
+    """Regresi: seed_catalog_models sempat tidak meneruskan field std_* ke DB sama
+    sekali (CatalogItem/UraianTugasCreate tanpa std_*) walau task_catalog.json
+    berisi nilainya — kolom std_* jadi NULL untuk semua baris seed meski JSON
+    sumbernya lengkap. Pastikan item catalog hasil seed benar-benar membawa
+    nilai standar, bukan hanya item yang dibuat langsung lewat API.
+    """
     kombis = anon_client.get(CATALOG_BASE + "/kombinasi").json()
-    sma_kombis = [x for x in kombis if x["unit"] == "SMA"]
-    if not sma_kombis:
-        pytest.skip("Tidak ada kombinasi SMA dalam catalog")
-    jabatan_id = sma_kombis[0]["jabatan_id"]
-    unit = "SMA"
-
-    r = anon_client.get(CATALOG_BASE, params={"unit": unit, "jabatan_id": jabatan_id})
+    assert len(kombis) > 0
+    first = kombis[0]
+    r = anon_client.get(
+        CATALOG_BASE, params={"unit": first["unit"], "jabatan_id": first["jabatan_id"]}
+    )
     assert r.status_code == 200
     items = r.json()
     assert len(items) > 0
+    assert any(it["std_va_type"] is not None for it in items)
+    assert any(it["std_sumber_bukti"] is not None for it in items)
+    assert any(it["std_kondisi"] is not None for it in items)
+    assert any(it["std_frekuensi_teks"] is not None for it in items)
+    assert any(it["std_durasi_per_kali"] is not None for it in items)
+
+
+def test_catalog_with_null_detil_tugas(anon_client: TestClient) -> None:
+    """Catalog untuk kombinasi yang punya task tanpa detil_tugas (detil_tugas_id=None) harus 200."""
+    kombis = anon_client.get(CATALOG_BASE + "/kombinasi").json()
+    for kombi in kombis:
+        r = anon_client.get(
+            CATALOG_BASE, params={"unit": kombi["unit"], "jabatan_id": kombi["jabatan_id"]}
+        )
+        assert r.status_code == 200
+        items = r.json()
+        if any(it["detil_tugas_id"] is None for it in items):
+            return
+    pytest.skip("Tidak ada task dengan detil_tugas_id=None dalam catalog")
 
 
 def test_tp_list_large_limit(anon_client: TestClient) -> None:
@@ -526,3 +548,90 @@ def test_ut_list_large_limit(anon_client: TestClient) -> None:
     assert r.status_code == 200
     body = r.json()
     assert "items" in body
+
+
+# --------------------------------------------------------------------------- #
+# UraianTugas — nilai standar CalHR (std_*)
+# --------------------------------------------------------------------------- #
+
+_STD_PAYLOAD = {
+    "std_sumber_bukti": "Aktual",
+    "std_kondisi": "Baseline",
+    "std_frekuensi_teks": "Mingguan",
+    "std_durasi_per_kali": "60 menit",
+    "std_jam_per_minggu": 2.5,
+    "std_peak4w_hours": 4.0,
+    "std_ai_mode": "Human-led",
+    "std_va_type": "VA-Core",
+    "std_dcs_flag": False,
+}
+
+
+def test_create_uraian_tugas_dengan_std(
+    client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]
+) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    kode = f"TI{_uniq()}"
+    payload = {
+        "kode": kode,
+        "uraian": f"Uraian tugas {kode}",
+        "unit": "TK",
+        "urutan": 1,
+        "detil_tugas_id": dt["id"],
+        "tugas_pokok_id": tp["id"],
+        "jabatan_id": jbt_id,
+        **_STD_PAYLOAD,
+    }
+    r = client.post(UT_BASE, json=payload)
+    assert r.status_code == 201, r.text
+    body = r.json()
+    for key, value in _STD_PAYLOAD.items():
+        assert body[key] == value
+
+    r2 = client.get(f"{UT_BASE}/{body['id']}")
+    assert r2.status_code == 200
+    for key, value in _STD_PAYLOAD.items():
+        assert r2.json()[key] == value
+
+
+def test_create_uraian_tugas_tanpa_std(
+    client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]
+) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
+    for key in _STD_PAYLOAD:
+        assert ut[key] is None
+
+
+def test_update_uraian_tugas_std(
+    client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]
+) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
+    r = client.patch(f"{UT_BASE}/{ut['id']}", json={"std_jam_per_minggu": 3.0})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["std_jam_per_minggu"] == 3.0
+    # Field lain tidak berubah.
+    assert body["std_sumber_bukti"] is None
+    assert body["uraian"] == ut["uraian"]
+    assert body["kode"] == ut["kode"]
+
+
+def test_uraian_tugas_std_invalid_enum(
+    client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]
+) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    kode = f"TI{_uniq()}"
+    payload = {
+        "kode": kode,
+        "uraian": f"Uraian tugas {kode}",
+        "unit": "TK",
+        "urutan": 1,
+        "detil_tugas_id": dt["id"],
+        "tugas_pokok_id": tp["id"],
+        "jabatan_id": jbt_id,
+        "std_ai_mode": "Ngawur",
+    }
+    r = client.post(UT_BASE, json=payload)
+    assert r.status_code == 422

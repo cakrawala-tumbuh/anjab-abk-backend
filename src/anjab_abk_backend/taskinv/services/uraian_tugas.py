@@ -71,6 +71,15 @@ class _Record:
     tugas_pokok_id: str
     created_at: datetime
     detil_tugas_id: str | None = None
+    std_sumber_bukti: str | None = None
+    std_kondisi: str | None = None
+    std_frekuensi_teks: str | None = None
+    std_durasi_per_kali: str | None = None
+    std_jam_per_minggu: float | None = None
+    std_peak4w_hours: float | None = None
+    std_ai_mode: str | None = None
+    std_va_type: str | None = None
+    std_dcs_flag: bool | None = None
 
 
 class InMemoryUraianTugasService:
@@ -133,6 +142,15 @@ class InMemoryUraianTugasService:
                 detil_tugas_id=data.detil_tugas_id,
                 tugas_pokok_id=data.tugas_pokok_id,
                 created_at=datetime.now(UTC),
+                std_sumber_bukti=data.std_sumber_bukti,
+                std_kondisi=data.std_kondisi,
+                std_frekuensi_teks=data.std_frekuensi_teks,
+                std_durasi_per_kali=data.std_durasi_per_kali,
+                std_jam_per_minggu=data.std_jam_per_minggu,
+                std_peak4w_hours=data.std_peak4w_hours,
+                std_ai_mode=data.std_ai_mode,
+                std_va_type=data.std_va_type,
+                std_dcs_flag=data.std_dcs_flag,
             )
             self._data[rec.id] = rec
             return self._to_read(rec)

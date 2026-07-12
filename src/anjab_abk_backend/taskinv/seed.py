@@ -1,9 +1,9 @@
 """Data master catalog Task Inventory.
 
-Sumber: `Rekap Data FGD dan Analisis Beban Kerja.csv` (hasil FGD YPII), di-dedup per
-identitas (Unit, Kategori Jabatan, Tugas Pokok, Detil Tugas, Uraian Tugas) lalu disimpan
+Sumber: sheet `05_Raw_Task_Migration` dari Task_Bank_Complete_AllRoles_v2_19.xlsx,
+diekstrak lewat `data/task-inventory/extract_task_bank.py` (di repo induk) lalu disimpan
 sebagai `data/task_catalog.json`. Data di-load sekali saat startup (read-only, tidak
-diubah lewat API). Lihat sheet `02_Task_Inventory` (standar CalHR 5-komponen).
+diubah lewat API). Termasuk 5 nilai standar CalHR (`std_*`) per task.
 
 Fungsi `seed_catalog_models` memigrasikan data JSON ke tiga model terpisah:
 TugasPokok, DetilTugas, dan UraianTugas — yang menjadi sumber tunggal data catalog.
@@ -43,6 +43,11 @@ class CatalogItem(TypedDict):
     detil_tugas: str
     uraian_tugas: str
     urutan: int
+    std_va_type: str | None
+    std_sumber_bukti: str | None
+    std_kondisi: str | None
+    std_frekuensi_teks: str | None
+    std_durasi_per_kali: str | None
 
 
 @lru_cache
@@ -227,6 +232,11 @@ def seed_catalog_models(
                     jabatan_id=jabatan_id,
                     detil_tugas_id=dt_id or None,
                     tugas_pokok_id=tp_id,
+                    std_va_type=item.get("std_va_type"),
+                    std_sumber_bukti=item.get("std_sumber_bukti"),
+                    std_kondisi=item.get("std_kondisi"),
+                    std_frekuensi_teks=item.get("std_frekuensi_teks"),
+                    std_durasi_per_kali=item.get("std_durasi_per_kali"),
                 )
             )
         except ConflictError:

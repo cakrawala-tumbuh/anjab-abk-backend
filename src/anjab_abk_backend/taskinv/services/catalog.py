@@ -157,6 +157,15 @@ class UraianTugasBackedCatalogService:
             detil_tugas=dt.nama if dt else None,
             uraian_tugas=ut.uraian,
             urutan=ut.urutan,
+            std_sumber_bukti=ut.std_sumber_bukti,
+            std_kondisi=ut.std_kondisi,
+            std_frekuensi_teks=ut.std_frekuensi_teks,
+            std_durasi_per_kali=ut.std_durasi_per_kali,
+            std_jam_per_minggu=ut.std_jam_per_minggu,
+            std_peak4w_hours=ut.std_peak4w_hours,
+            std_ai_mode=ut.std_ai_mode,
+            std_va_type=ut.std_va_type,
+            std_dcs_flag=ut.std_dcs_flag,
         )
 
     def list_kombinasi(self) -> list[TiKombinasiRead]:

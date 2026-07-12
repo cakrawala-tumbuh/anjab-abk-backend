@@ -33,6 +33,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -413,6 +414,17 @@ class TiUraianTugasModel(Base):
     urutan: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     tugas_pokok_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     detil_tugas_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    # Nilai standar CalHR — prefill isian Tahap 3. Semua nullable: master lama
+    # tanpa nilai standar tetap valid, dan partisipan mengisi dari nol seperti sebelumnya.
+    std_sumber_bukti: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    std_kondisi: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    std_frekuensi_teks: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    std_durasi_per_kali: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    std_jam_per_minggu: Mapped[float | None] = mapped_column(Float, nullable=True)
+    std_peak4w_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
+    std_ai_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    std_va_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    std_dcs_flag: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     created_at: Mapped[datetime] = _ts(index=True)
 
 
@@ -523,6 +535,12 @@ class TiDetailModel(Base):
     ai_mode: Mapped[str] = mapped_column(String(20), nullable=False)
     va_type: Mapped[str] = mapped_column(String(20), nullable=False)
     dcs_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # True = partisipan menerima nilai standar master apa adanya.
+    # False = ia mengubah minimal satu komponen. Task yang masternya tidak punya
+    # nilai standar tetap True (tidak ada standar untuk dibantah).
+    setuju_standar: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
     catatan: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = _ts(index=True)
 
