@@ -14,7 +14,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ...errors import ConflictError, NotFoundError, ValidationAppError
-from ...models import OpmRespondenModel, SMEPanelModel
+from ...models import JabatanModel, OpmRespondenModel, PartisipanModel, SMEPanelModel
+from ...schemas.common import BulkAssignResult, BulkSkipped
 from ..schemas.responden import OpmRespondenCreate, OpmRespondenRead
 
 
@@ -118,6 +119,81 @@ class SqlOpmRespondenService:
         self._s.add(rec)
         self._s.flush()
         return _to_read(rec)
+
+    def assign_banyak(
+        self,
+        sesi_id: str,
+        partisipan_ids: list[str],
+        *,
+        max_responden: int,
+        jabatan_id: str,
+    ) -> BulkAssignResult[OpmRespondenRead]:
+        skipped: list[BulkSkipped] = []
+        seen: set[str] = set()
+        candidates: list[str] = []
+        for partisipan_id in partisipan_ids:
+            if partisipan_id in seen:
+                skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="duplikat_input"))
+                continue
+            seen.add(partisipan_id)
+            candidates.append(partisipan_id)
+
+        panel = self._s.scalar(select(SMEPanelModel).where(SMEPanelModel.jabatan_id == jabatan_id))
+        anggota_ids = set(panel.partisipan_ids) if panel is not None else set()
+
+        anggota_valid: list[str] = []
+        for partisipan_id in candidates:
+            if partisipan_id not in anggota_ids:
+                skipped.append(
+                    BulkSkipped(partisipan_id=partisipan_id, alasan="bukan_anggota_sme_panel")
+                )
+                continue
+            anggota_valid.append(partisipan_id)
+
+        existing_ids: set[str] = set()
+        if anggota_valid:
+            existing_ids = set(
+                self._s.scalars(
+                    select(OpmRespondenModel.partisipan_id).where(
+                        OpmRespondenModel.sesi_id == sesi_id,
+                        OpmRespondenModel.partisipan_id.in_(anggota_valid),
+                    )
+                ).all()
+            )
+
+        current_count = self.count_by_sesi(sesi_id)
+        jabatan = self._s.get(JabatanModel, jabatan_id)
+        par_map: dict[str, PartisipanModel] = {}
+        to_create = [pid for pid in anggota_valid if pid not in existing_ids]
+        if to_create:
+            par_rows = self._s.scalars(
+                select(PartisipanModel).where(PartisipanModel.id.in_(to_create))
+            ).all()
+            par_map = {p.id: p for p in par_rows}
+
+        created: list[OpmRespondenRead] = []
+        for partisipan_id in anggota_valid:
+            if partisipan_id in existing_ids:
+                skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="sudah_terdaftar"))
+                continue
+            if current_count >= max_responden:
+                skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="kapasitas_penuh"))
+                continue
+            par = par_map.get(partisipan_id)
+            rec = OpmRespondenModel(
+                id=f"oprs_{uuid.uuid4().hex[:8]}",
+                sesi_id=sesi_id,
+                nama=par.nama if par else None,
+                jabatan_label=jabatan.nama if jabatan else "",
+                partisipan_id=partisipan_id,
+                sudah_submit=False,
+            )
+            self._s.add(rec)
+            self._s.flush()
+            current_count += 1
+            created.append(_to_read(rec))
+
+        return BulkAssignResult(created=created, skipped=skipped)
 
     def mark_submitted(self, responden_id: str) -> OpmRespondenRead:
         rec = self._get_model(responden_id)

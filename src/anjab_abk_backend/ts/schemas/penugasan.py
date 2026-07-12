@@ -24,6 +24,24 @@ class TsPenugasanCreate(BaseModel):
     )
 
 
+class TsPenugasanBulkCreate(BaseModel):
+    """Payload penugasan Time Study massal (bulk) ke banyak partisipan sekaligus."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    partisipan_ids: list[str] = Field(
+        min_length=1,
+        description="Daftar ID partisipan yang ditugaskan mencatat Time Study.",
+        examples=[["par_a1b2c3d4", "par_e5f6g7h8"]],
+    )
+    aktif: bool = Field(default=True, description="Status aktif penugasan.")
+    catatan: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Catatan opsional, diterapkan ke seluruh baris dalam batch ini.",
+    )
+
+
 class TsPenugasanUpdate(BaseModel):
     """Payload pembaruan penugasan Time Study (mis. toggle aktif)."""
 

@@ -1029,6 +1029,154 @@ def test_responden_tanpa_jabatan_id_bebas(
 
 
 # --------------------------------------------------------------------------- #
+# Bulk assign (item 005): auto-populate SME panel saat sesi dibuat + endpoint
+# bulk manual (idempoten, bukan atomik).
+# --------------------------------------------------------------------------- #
+
+SME_BASE = "/api/v1/sme-panel"
+PAR_BASE = "/api/v1/partisipan"
+
+
+def _setup_panel(client: TestClient, jabatan_id: str, n: int) -> list[str]:
+    """Buat panel SME untuk `jabatan_id` dengan `n` anggota baru; kembalikan partisipan_ids."""
+    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id})
+    assert r.status_code == 201, r.text
+    panel_id = r.json()["id"]
+    ids = []
+    for _ in range(n):
+        rp = client.post(
+            PAR_BASE,
+            json={
+                "nama": f"TI Bulk {uuid.uuid4().hex[:4]}",
+                "email": f"ti.bulk.{uuid.uuid4().hex[:6]}@test.id",
+                "sekolah_id": "skl_ti_bulk_test",
+                "jabatan_utama_id": jabatan_id,
+                "masa_kerja_tahun": 1,
+            },
+        )
+        assert rp.status_code == 201, rp.text
+        par_id = rp.json()["id"]
+        r2 = client.post(f"{SME_BASE}/{panel_id}/anggota", json={"partisipan_id": par_id})
+        assert r2.status_code == 200, r2.text
+        ids.append(par_id)
+    return ids
+
+
+def test_create_sesi_auto_populate_dari_panel(client: TestClient, jabatan_id_tk: str) -> None:
+    anggota = _setup_panel(client, jabatan_id_tk, 2)
+    sesi = _create_sesi(client, jabatan_id_tk)
+    r = client.get(f"{SESI}/{sesi['id']}/responden")
+    assert r.status_code == 200, r.text
+    responden = r.json()
+    assert len(responden) == 2
+    assert {row["partisipan_id"] for row in responden} == set(anggota)
+    # nama diresolusi dari data partisipan (bukan anonim) — dipakai UI untuk
+    # menampilkan nama responden alih-alih "Anonim".
+    assert all(row["nama"] for row in responden)
+
+
+def test_create_sesi_tanpa_panel_tetap_kosong(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    r = client.get(f"{SESI}/{sesi['id']}/responden")
+    assert r.status_code == 200, r.text
+    assert r.json() == []
+
+
+def test_create_sesi_panel_tanpa_anggota_tetap_kosong(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id_tk})
+    assert r.status_code == 201, r.text
+    sesi = _create_sesi(client, jabatan_id_tk)
+    r = client.get(f"{SESI}/{sesi['id']}/responden")
+    assert r.status_code == 200, r.text
+    assert r.json() == []
+
+
+def test_responden_bulk_happy_path(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    anggota = _setup_panel(client, jabatan_id_tk, 2)
+    r = client.post(f"{SESI}/{sesi['id']}/responden/bulk", json={"partisipan_ids": anggota})
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert {c["partisipan_id"] for c in data["created"]} == set(anggota)
+    assert data["skipped"] == []
+    assert all(c["nama"] for c in data["created"])
+
+
+def test_responden_bulk_skip_sudah_terdaftar(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    anggota = _setup_panel(client, jabatan_id_tk, 1)
+    r1 = client.post(f"{SESI}/{sesi['id']}/responden/bulk", json={"partisipan_ids": anggota})
+    assert r1.status_code == 201, r1.text
+    r2 = client.post(f"{SESI}/{sesi['id']}/responden/bulk", json={"partisipan_ids": anggota})
+    assert r2.status_code == 201, r2.text
+    data = r2.json()
+    assert data["created"] == []
+    assert data["skipped"] == [{"partisipan_id": anggota[0], "alasan": "sudah_terdaftar"}]
+
+
+def test_responden_bulk_skip_bukan_anggota_sme_panel(
+    client: TestClient, jabatan_id_tk: str, partisipan_factory
+) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    bukan_anggota = partisipan_factory("ti-bulk-bukan-anggota")
+    r = client.post(f"{SESI}/{sesi['id']}/responden/bulk", json={"partisipan_ids": [bukan_anggota]})
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["created"] == []
+    assert data["skipped"] == [
+        {"partisipan_id": bukan_anggota, "alasan": "bukan_anggota_sme_panel"}
+    ]
+
+
+def test_responden_bulk_skip_kapasitas_penuh(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk, max_responden=1)
+    anggota = _setup_panel(client, jabatan_id_tk, 2)
+    r = client.post(f"{SESI}/{sesi['id']}/responden/bulk", json={"partisipan_ids": anggota})
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert len(data["created"]) == 1
+    assert len(data["skipped"]) == 1
+    assert data["skipped"][0]["alasan"] == "kapasitas_penuh"
+
+
+def test_responden_bulk_skip_duplikat_input(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    anggota = _setup_panel(client, jabatan_id_tk, 1)
+    dup_id = anggota[0]
+    r = client.post(
+        f"{SESI}/{sesi['id']}/responden/bulk", json={"partisipan_ids": [dup_id, dup_id]}
+    )
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert len(data["created"]) == 1
+    assert data["skipped"] == [{"partisipan_id": dup_id, "alasan": "duplikat_input"}]
+
+
+def test_responden_bulk_requires_admin(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    as_partisipan = client_as("ti-bulk-nonadmin")
+    r = as_partisipan.post(
+        f"{SESI}/{sesi['id']}/responden/bulk", json={"partisipan_ids": ["par_x"]}
+    )
+    assert r.status_code == 403
+
+
+def test_responden_bulk_requires_auth(anon_client: TestClient, jabatan_id_tk: str) -> None:
+    r = anon_client.post(
+        f"{SESI}/tises_tidakada/responden/bulk", json={"partisipan_ids": ["par_x"]}
+    )
+    assert r.status_code == 401
+
+
+def test_responden_bulk_payload_kosong_ditolak(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    r = client.post(f"{SESI}/{sesi['id']}/responden/bulk", json={"partisipan_ids": []})
+    assert r.status_code == 422
+
+
+# --------------------------------------------------------------------------- #
 # Otorisasi object-level (BOLA/IDOR): partisipan tidak boleh akses responden
 # Task Inventory milik partisipan lain lewat penebakan responden_id.
 # --------------------------------------------------------------------------- #

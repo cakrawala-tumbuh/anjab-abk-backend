@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from ...errors import ConflictError, NotFoundError, ValidationAppError
+from ...schemas.common import BulkAssignResult
 from ..schemas.responden import OpmRespondenCreate, OpmRespondenRead
 
 
@@ -37,6 +38,14 @@ class OpmRespondenService(Protocol):
         max_responden: int,
         jabatan_id: str,
     ) -> OpmRespondenRead: ...
+    def assign_banyak(
+        self,
+        sesi_id: str,
+        partisipan_ids: list[str],
+        *,
+        max_responden: int,
+        jabatan_id: str,
+    ) -> BulkAssignResult[OpmRespondenRead]: ...
     def mark_submitted(self, responden_id: str) -> OpmRespondenRead: ...
     def delete(self, responden_id: str) -> None: ...
 

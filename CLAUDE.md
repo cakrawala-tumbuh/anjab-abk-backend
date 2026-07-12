@@ -72,6 +72,78 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-13] Penugasan massal (bulk) TS/TI/OPM + auto-populate SME panel di TI
+
+Sebelumnya hanya WCP/DCS punya penugasan bulk (dari revisi `2026-07-12` di
+bawah); TS dan TI hanya single, dan meski TI punya jabatan+SME-panel seperti
+OPM, anggotanya tidak otomatis jadi responden (beda dari OPM yang sudah
+begitu sejak awal). Perubahan:
+
+- **Endpoint bulk baru, berdampingan dengan endpoint single (tidak diganti)**:
+  `POST /time-study/penugasan/bulk`, `POST .../task-inventory/sesi/{id}/responden/bulk`,
+  `POST .../opm/sesi/{id}/responden/bulk`. Response `BulkAssignResult[T]`
+  (`schemas/common.py`, generic mengikuti pola `Page[T]`):
+  `{created: T[], skipped: [{partisipan_id, alasan}]}`.
+- **Bulk bersifat idempoten (skip-on-conflict), BUKAN atomik** seperti
+  WCP/DCS — tiap `partisipan_id` yang gagal (sudah terdaftar/duplikat
+  input/bukan anggota panel/kapasitas penuh) dilewati & dilaporkan di
+  `skipped`, sisanya tetap dibuat. Urutan pengecekan tetap: dedup input →
+  (TI/OPM) keanggotaan SME panel → sudah terdaftar → (TI/OPM) kapasitas
+  `max_responden` (dihitung termasuk baris baru dalam batch yang sama).
+  String alasan (`sudah_terdaftar`, `duplikat_input`,
+  `bukan_anggota_sme_panel`, `kapasitas_penuh`) identik lintas TS/TI/OPM.
+- **TS**: `sudah_terdaftar` dideteksi via pre-check SELECT (bukan
+  `begin_nested()` per baris + tangkap `IntegrityError` dalam loop) —
+  pola savepoint-per-item terbukti TIDAK aman dipakai berulang: satu
+  `IntegrityError` tertangkap memaksa `Session` di-`rollback()` penuh
+  sebelum bisa dipakai lagi, dan `rollback()` itu ikut membuang baris lain
+  yang sudah berhasil di-flush pada iterasi sebelumnya (belum `commit`).
+  Lihat komentar di `ts/services/penugasan_sql.py::create_banyak`.
+- **TI: sesi baru otomatis mendapat responden dari SME panel jabatannya**
+  (`SqlTiSesiService.create()`, meniru pola auto-populate yang sudah ada di
+  OPM) — bila panel ada & punya ≥1 anggota; panel tidak ada/kosong → sesi
+  tetap dibuat kosong (tidak error, tidak berubah dari perilaku sebelumnya).
+  Logika insert-banyak-responden TI ada di **satu** fungsi level-modul,
+  `assign_ti_responden_banyak()` (`taskinv/services/responden_sql.py`),
+  dipakai baik oleh auto-populate maupun endpoint bulk manual — fungsi ini
+  sendiri **tidak** memvalidasi keanggotaan panel (pemanggil yang menyaring).
+  `nama` responden auto-populate/bulk **diresolusi dari `PartisipanModel`**
+  (bukan `None`) — konsisten dengan pola OPM yang sudah lebih dulu melakukan
+  ini; ditemukan lewat E2E `opm.spec.ts` (`anjab-abk-web-app`) yang gagal
+  karena responden auto-populate tampil sebagai "Anonim" di tabel (frontend
+  hanya menampilkan `r.nama`, tidak melakukan lookup terpisah ke partisipan),
+  membuat guard idempoten E2E berbasis nama tidak mendeteksinya dan
+  menambahkan responden duplikat.
+- **OPM**: `nama`/`jabatan_label` payload bulk diresolusi otomatis dari
+  `PartisipanModel`/`JabatanModel` (beda dari endpoint single yang mewajibkan
+  `jabatan_label` manual) — mengikuti pola auto-populate OPM yang sudah ada.
+- Duplikat `TiRespondenModel`/`OpmRespondenModel` untuk `(sesi_id,
+  partisipan_id)` yang sama tetap mungkin terjadi bila endpoint single
+  (tidak disentuh) dipanggil untuk partisipan yang sudah di-auto-
+  populate/bulk-assign — tidak ada `UNIQUE` constraint DB untuk ini, celah
+  pre-existing, di luar lingkup revisi ini.
+- **Bug nyata ditemukan lewat E2E langsung** (bukan unit test — lihat Gotcha
+  di bawah): `SqlTiSesiService.create()` WAJIB men-`flush()` `rec` (baris
+  `TiSesiModel`) SENDIRI, segera setelah `self._s.add(rec)`, **sebelum**
+  memanggil `assign_ti_responden_banyak()`. Tanpa flush eksplisit ini,
+  urutan `INSERT` saat flush gabungan (sesi + responden dalam satu
+  `session.flush()`) TIDAK terjamin oleh SQLAlchemy — unit-of-work
+  mengurutkan INSERT berdasarkan `relationship()` ORM yang dikonfigurasi
+  antar model, **bukan** sekadar `ForeignKey` kolom mentah.
+  `TiRespondenModel.sesi_id` adalah FK murni tanpa `relationship()` balik ke
+  `TiSesiModel` (beda dari `TiSesiTaskTerpilihModel` yang punya
+  `relationship(back_populates=...)`), jadi tanpa flush eksplisit, flush
+  gabungan bisa mencoba INSERT `ti_responden` sebelum baris `ti_sesi` ada →
+  `psycopg.errors.ForeignKeyViolation`. **Bug ini SELALU lolos test unit**
+  (harness test pakai `Session(..., join_transaction_mode="create_savepoint")`
+  yang mem-flush dengan urutan berbeda dari `get_sessionmaker()` produksi)
+  — hanya kelihatan lewat E2E nyata (browser + uvicorn + PostgreSQL asli).
+  **OPM's `SqlOpmSesiService.create()` punya pola bare-FK yang identik**
+  untuk `OpmRespondenModel` (auto-responden dari panel) — berpotensi bug
+  yang sama, TAPI di luar lingkup revisi ini untuk diperbaiki (kebetulan
+  belum pernah termanifestasi di test yang ada); catat sebagai risiko bila
+  disentuh di masa depan.
+
 ### [2026-07-12] DCS & WCP: hapus entitas sesi, ganti pola singleton + penugasan langsung
 
 DCS dan WCP tidak lagi memakai sesi — meniru pola yang sudah dipakai Time Study
@@ -264,6 +336,7 @@ DCS dan WCP beralih dari **enrollment otomatis** ke **sistem assignment**:
 - `make test` menjalankan linter + unit di dalam Docker — tidak ada artefak di folder project setelah selesai.
 - Authentik JWKS di-cache; perubahan kunci di Authentik membutuhkan restart service atau cache TTL habis.
 - Endpoint OAuth2 Swagger (`/docs/oauth2-redirect`) wajib didaftarkan di Authentik sebagai Redirect URI.
+- **Membuat parent + child ORM baru dalam satu `create()` (mis. sesi + auto-populate anak)**: bila kolom FK anak (`ForeignKey(...)`) TIDAK punya `relationship()` ORM balik ke parent, `session.flush()` gabungan TIDAK menjamin urutan INSERT parent-dulu — flush parent SENDIRI (`self._s.add(parent); self._s.flush()`) sebelum menambah anak, jangan andalkan urutan otomatis. Bug ini lolos test unit (harness pakai `join_transaction_mode="create_savepoint")`, beda perilaku dari `get_sessionmaker()` produksi) — hanya kelihatan lewat E2E/produksi nyata. Lihat entri `[2026-07-13]` di Revisi Desain untuk kasus nyata (`SqlTiSesiService.create()`).
 
 ## Alur Kerja & Definition of Done
 

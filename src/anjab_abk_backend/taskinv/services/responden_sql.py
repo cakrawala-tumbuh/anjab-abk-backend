@@ -12,7 +12,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ...errors import NotFoundError, ValidationAppError
-from ...models import TiRespondenModel
+from ...models import PartisipanModel, TiRespondenModel
+from ...schemas.common import BulkAssignResult, BulkSkipped
 from ..schemas.responden import TiRespondenCreate, TiRespondenRead
 
 
@@ -37,6 +38,82 @@ def _to_read(rec: TiRespondenModel) -> TiRespondenRead:
         tahap3_submitted_at=t3,
         created_at=created,
     )
+
+
+def assign_ti_responden_banyak(
+    session: Session,
+    sesi_id: str,
+    partisipan_ids: list[str],
+    *,
+    max_responden: int,
+) -> BulkAssignResult[TiRespondenRead]:
+    """Assign banyak partisipan sekaligus sebagai responden Task Inventory.
+
+    Dipakai baik oleh auto-populate saat sesi dibuat (`SqlTiSesiService.create()`)
+    maupun endpoint bulk manual — **tidak** memvalidasi keanggotaan SME panel;
+    pemanggil wajib menyaring `partisipan_ids` sebelum memanggil fungsi ini.
+    """
+    skipped: list[BulkSkipped] = []
+    seen: set[str] = set()
+    candidates: list[str] = []
+    for partisipan_id in partisipan_ids:
+        if partisipan_id in seen:
+            skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="duplikat_input"))
+            continue
+        seen.add(partisipan_id)
+        candidates.append(partisipan_id)
+
+    existing_ids: set[str] = set()
+    if candidates:
+        existing_ids = set(
+            session.scalars(
+                select(TiRespondenModel.partisipan_id).where(
+                    TiRespondenModel.sesi_id == sesi_id,
+                    TiRespondenModel.partisipan_id.in_(candidates),
+                )
+            ).all()
+        )
+
+    current = (
+        session.scalar(
+            select(func.count())
+            .select_from(TiRespondenModel)
+            .where(TiRespondenModel.sesi_id == sesi_id)
+        )
+        or 0
+    )
+
+    to_create = [pid for pid in candidates if pid not in existing_ids]
+    par_map: dict[str, PartisipanModel] = {}
+    if to_create:
+        par_rows = session.scalars(
+            select(PartisipanModel).where(PartisipanModel.id.in_(to_create))
+        ).all()
+        par_map = {p.id: p for p in par_rows}
+
+    created: list[TiRespondenRead] = []
+    for partisipan_id in candidates:
+        if partisipan_id in existing_ids:
+            skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="sudah_terdaftar"))
+            continue
+        if current >= max_responden:
+            skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="kapasitas_penuh"))
+            continue
+        par = par_map.get(partisipan_id)
+        rec = TiRespondenModel(
+            id=f"trsp_{uuid.uuid4().hex[:8]}",
+            sesi_id=sesi_id,
+            nama=par.nama if par else None,
+            partisipan_id=partisipan_id,
+            tahap1_submit=False,
+            tahap3_submit=False,
+        )
+        session.add(rec)
+        session.flush()
+        current += 1
+        created.append(_to_read(rec))
+
+    return BulkAssignResult(created=created, skipped=skipped)
 
 
 class SqlTiRespondenService:
@@ -138,6 +215,13 @@ class SqlTiRespondenService:
         self._s.add(rec)
         self._s.flush()
         return _to_read(rec)
+
+    def assign_banyak(
+        self, sesi_id: str, partisipan_ids: list[str], *, max_responden: int
+    ) -> BulkAssignResult[TiRespondenRead]:
+        return assign_ti_responden_banyak(
+            self._s, sesi_id, partisipan_ids, max_responden=max_responden
+        )
 
     def mark_tahap1(self, responden_id: str) -> TiRespondenRead:
         rec = self._get_model(responden_id)

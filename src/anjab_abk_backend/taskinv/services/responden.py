@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from ...errors import NotFoundError, ValidationAppError
+from ...schemas.common import BulkAssignResult, BulkSkipped
 from ..schemas.responden import TiRespondenCreate, TiRespondenRead
 
 
@@ -39,6 +40,9 @@ class TiRespondenService(Protocol):
     def ensure_for_partisipan(
         self, sesi_id: str, *, partisipan_id: str, nama: str | None
     ) -> TiRespondenRead: ...
+    def assign_banyak(
+        self, sesi_id: str, partisipan_ids: list[str], *, max_responden: int
+    ) -> BulkAssignResult[TiRespondenRead]: ...
     def mark_tahap1(self, responden_id: str) -> TiRespondenRead: ...
     def mark_tahap3(self, responden_id: str) -> TiRespondenRead: ...
     def delete(self, responden_id: str) -> None: ...
@@ -126,6 +130,52 @@ class InMemoryTiRespondenService:
             )
             self._data[rec.id] = rec
             return self._to_read(rec)
+
+    def assign_banyak(
+        self, sesi_id: str, partisipan_ids: list[str], *, max_responden: int
+    ) -> BulkAssignResult[TiRespondenRead]:
+        """Delegasi ke `create()`/dedup lokal — TIDAK memvalidasi keanggotaan SME
+        panel (sama seperti `SqlTiRespondenService`, pemanggil yang menyaring).
+        """
+        skipped: list[BulkSkipped] = []
+        created: list[TiRespondenRead] = []
+        seen: set[str] = set()
+        with self._lock:
+            current = sum(1 for r in self._data.values() if r.sesi_id == sesi_id)
+            for partisipan_id in partisipan_ids:
+                if partisipan_id in seen:
+                    skipped.append(
+                        BulkSkipped(partisipan_id=partisipan_id, alasan="duplikat_input")
+                    )
+                    continue
+                seen.add(partisipan_id)
+                already = any(
+                    r.sesi_id == sesi_id and r.partisipan_id == partisipan_id
+                    for r in self._data.values()
+                )
+                if already:
+                    skipped.append(
+                        BulkSkipped(partisipan_id=partisipan_id, alasan="sudah_terdaftar")
+                    )
+                    continue
+                if current >= max_responden:
+                    skipped.append(
+                        BulkSkipped(partisipan_id=partisipan_id, alasan="kapasitas_penuh")
+                    )
+                    continue
+                rec = _Record(
+                    id=f"trsp_{uuid.uuid4().hex[:8]}",
+                    sesi_id=sesi_id,
+                    nama=None,
+                    partisipan_id=partisipan_id,
+                    tahap1_submit=False,
+                    tahap3_submit=False,
+                    created_at=datetime.now(UTC),
+                )
+                self._data[rec.id] = rec
+                current += 1
+                created.append(self._to_read(rec))
+        return BulkAssignResult(created=created, skipped=skipped)
 
     def mark_tahap1(self, responden_id: str) -> TiRespondenRead:
         with self._lock:

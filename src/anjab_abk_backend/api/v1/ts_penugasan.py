@@ -17,9 +17,14 @@ from ...dependencies import (
     rate_limit,
     require_admin,
 )
-from ...schemas.common import ErrorResponse, Page
+from ...schemas.common import BulkAssignResult, ErrorResponse, Page
 from ...security import Principal
-from ...ts.schemas.penugasan import TsPenugasanCreate, TsPenugasanRead, TsPenugasanUpdate
+from ...ts.schemas.penugasan import (
+    TsPenugasanBulkCreate,
+    TsPenugasanCreate,
+    TsPenugasanRead,
+    TsPenugasanUpdate,
+)
 from ...ts.services.penugasan import TsPenugasanService
 
 router = APIRouter()
@@ -71,6 +76,24 @@ def create_penugasan(
     service: Annotated[TsPenugasanService, Depends(get_ts_penugasan_service)],
 ) -> TsPenugasanRead:
     return service.create(payload)
+
+
+@router.post(
+    "/bulk",
+    response_model=BulkAssignResult[TsPenugasanRead],
+    status_code=status.HTTP_201_CREATED,
+    summary="Tugaskan banyak partisipan sekaligus ke Time Study (admin, idempoten)",
+    operation_id="ts_penugasan_create_banyak",
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN},
+)
+def create_penugasan_banyak(
+    payload: TsPenugasanBulkCreate,
+    service: Annotated[TsPenugasanService, Depends(get_ts_penugasan_service)],
+) -> BulkAssignResult[TsPenugasanRead]:
+    return service.create_banyak(
+        payload.partisipan_ids, aktif=payload.aktif, catatan=payload.catatan
+    )
 
 
 @router.get(

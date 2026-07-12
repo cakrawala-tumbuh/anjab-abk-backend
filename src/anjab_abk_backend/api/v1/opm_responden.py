@@ -19,11 +19,11 @@ from ...dependencies import (
 )
 from ...errors import ValidationAppError
 from ...opm.schemas.jawaban import OpmJawabanRead, OpmJawabanUpsert
-from ...opm.schemas.responden import OpmRespondenCreate, OpmRespondenRead
+from ...opm.schemas.responden import OpmRespondenBulkCreate, OpmRespondenCreate, OpmRespondenRead
 from ...opm.services.jawaban import OpmJawabanService
 from ...opm.services.responden import OpmRespondenService
 from ...opm.services.sesi import OpmSesiService
-from ...schemas.common import ErrorResponse
+from ...schemas.common import BulkAssignResult, ErrorResponse
 from ...security import Principal
 
 router = APIRouter()
@@ -90,6 +90,43 @@ def create_responden(
             f"Responden hanya dapat ditambahkan saat sesi DRAFT/OPEN (saat ini: {sesi.status})."
         )
     return rsp_service.create(sesi_id, payload, sesi.max_responden, sesi.jabatan_id)
+
+
+@router.post(
+    "/{sesi_id}/responden/bulk",
+    response_model=BulkAssignResult[OpmRespondenRead],
+    status_code=status.HTTP_201_CREATED,
+    summary="Tugaskan banyak partisipan sekaligus sebagai responden OPM (admin, idempoten)",
+    operation_id="opm_responden_create_banyak",
+    dependencies=_ADMIN_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOT_FOUND_SESI,
+        422: {
+            "model": ErrorResponse,
+            "description": "Sesi bukan DRAFT/OPEN.",
+        },
+    },
+)
+def create_responden_banyak(
+    sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
+    payload: OpmRespondenBulkCreate,
+    sesi_service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
+    rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+) -> BulkAssignResult[OpmRespondenRead]:
+    sesi = sesi_service.get(sesi_id)
+    if sesi.status not in ("DRAFT", "OPEN"):
+        raise ValidationAppError(
+            f"Responden hanya dapat ditambahkan saat sesi DRAFT/OPEN (saat ini: {sesi.status})."
+        )
+    return rsp_service.assign_banyak(
+        sesi_id,
+        payload.partisipan_ids,
+        max_responden=sesi.max_responden,
+        jabatan_id=sesi.jabatan_id,
+    )
 
 
 @router.get(

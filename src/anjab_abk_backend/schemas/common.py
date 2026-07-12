@@ -25,6 +25,22 @@ class Page(BaseModel, Generic[T]):
     offset: int = Field(description="Jumlah item yang dilewati.", examples=[0])
 
 
+class BulkSkipped(BaseModel):
+    partisipan_id: str = Field(description="ID partisipan yang dilewati.")
+    alasan: str = Field(
+        description=(
+            "Kode alasan dilewati: 'sudah_terdaftar' | 'duplikat_input' |"
+            " 'bukan_anggota_sme_panel' | 'kapasitas_penuh'."
+        ),
+        examples=["sudah_terdaftar"],
+    )
+
+
+class BulkAssignResult(BaseModel, Generic[T]):
+    created: list[T] = Field(description="Baris yang berhasil dibuat.")
+    skipped: list[BulkSkipped] = Field(description="Partisipan yang dilewati beserta alasannya.")
+
+
 class ErrorDetail(BaseModel):
     loc: list[str] | None = Field(default=None, description="Lokasi field penyebab.")
     msg: str = Field(description="Penjelasan singkat.")

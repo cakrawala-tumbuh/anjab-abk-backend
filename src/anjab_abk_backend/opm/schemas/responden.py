@@ -34,6 +34,23 @@ class OpmRespondenCreate(BaseModel):
     )
 
 
+class OpmRespondenBulkCreate(BaseModel):
+    """Payload penugasan (assign) responden OPM massal (bulk).
+
+    `nama`/`jabatan_label` diresolusi otomatis dari `PartisipanModel`/`JabatanModel`
+    (mengikuti pola auto-populate OPM saat sesi dibuat) — beda dari payload single
+    yang mewajibkan `jabatan_label` diisi manual.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    partisipan_ids: list[str] = Field(
+        min_length=1,
+        description="Daftar ID partisipan (wajib anggota SME panel jabatan sesi ini).",
+        examples=[["par_a1b2c3d4", "par_e5f6g7h8"]],
+    )
+
+
 class OpmRespondenRead(BaseModel):
     """Representasi responden yang dikembalikan API."""
 

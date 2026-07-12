@@ -20,11 +20,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ...errors import ConflictError, NotFoundError, ValidationAppError
-from ...models import JabatanModel, TiSesiModel, TiSesiTaskTerpilihModel
+from ...models import JabatanModel, SMEPanelModel, TiSesiModel, TiSesiTaskTerpilihModel
 from ...schemas.search import Domain, Order
 from ...services.domain import validate_searchable_fields
 from ...services.domain_sql import FieldMap, FieldSpec, compile_domain, order_by_columns
 from ..schemas.sesi import StatusSesi, TiSesiCreate, TiSesiRead, TiSesiUpdate
+from .responden_sql import assign_ti_responden_banyak
 
 # Sumber tunggal whitelist & state machine.
 from .sesi import _ERR_NON_DRAFT, _VALID_TRANSITIONS, SEARCHABLE_FIELDS
@@ -115,7 +116,25 @@ class SqlTiSesiService:
             catatan=data.catatan,
         )
         self._s.add(rec)
+        # Flush sesi TERLEBIH DAHULU, sebelum insert responden auto-populate di
+        # bawah. `TiRespondenModel.sesi_id` adalah FK murni tanpa `relationship()`
+        # ORM ke `TiSesiModel` — tanpa flush eksplisit ini, urutan INSERT saat
+        # flush gabungan TIDAK terjamin (unit-of-work SQLAlchemy mengurutkan
+        # INSERT berdasar `relationship()` yang dikonfigurasi, bukan sekadar FK
+        # kolom mentah), sehingga bisa mencoba INSERT responden sebelum sesi ada
+        # → `ForeignKeyViolation`. Diverifikasi lewat E2E yang mereproduksi
+        # persis kegagalan ini (lihat CHANGELOG).
         self._s.flush()
+
+        # Auto-populate best-effort: anggota SME panel jabatan ini langsung jadi
+        # responden. Panel tidak ada/kosong → sesi tetap dibuat kosong (tidak error).
+        panel = self._s.scalar(
+            select(SMEPanelModel).where(SMEPanelModel.jabatan_id == data.jabatan_id)
+        )
+        if panel is not None and panel.anggota:
+            assign_ti_responden_banyak(
+                self._s, rec.id, panel.partisipan_ids, max_responden=data.max_responden
+            )
         jab = self._s.get(JabatanModel, rec.jabatan_id)
         return _to_read(rec, jab.nama if jab else None)
 

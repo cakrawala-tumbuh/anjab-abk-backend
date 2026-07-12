@@ -7,6 +7,43 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Ditambahkan
+
+- **Penugasan massal (bulk) untuk TS, TI, OPM + auto-populate SME panel di TI.**
+  Menyusul pola bulk yang sudah ada di WCP/DCS, tapi bersifat **idempoten**
+  (skip-on-conflict), bukan atomik all-or-nothing — cocok untuk TS/TI/OPM
+  yang tidak seperti WCP/DCS punya endpoint single yang tetap dipertahankan.
+  - `POST /api/v1/time-study/penugasan/bulk` — body `partisipan_ids: list[str]`
+    (min 1), `aktif`, `catatan`. Skip `sudah_terdaftar`/`duplikat_input`.
+  - `POST /api/v1/task-inventory/sesi/{sesi_id}/responden/bulk` — body
+    `partisipan_ids: list[str]`. Skip `sudah_terdaftar`/`duplikat_input`/
+    `bukan_anggota_sme_panel`/`kapasitas_penuh`. `nama` responden bulk/
+    auto-populate diresolusi dari `PartisipanModel` (bukan anonim).
+  - `POST /api/v1/opm/sesi/{sesi_id}/responden/bulk` — sama seperti TI;
+    `nama`/`jabatan_label` diresolusi otomatis dari `PartisipanModel`/
+    `JabatanModel` (tidak perlu dikirim di payload, beda dari endpoint single).
+  - Response envelope baru `BulkAssignResult[T]` (`schemas/common.py`):
+    `{created: T[], skipped: [{partisipan_id, alasan}]}`.
+  - **TI: sesi baru otomatis mendapat responden dari SME panel jabatannya**
+    (bila panel ada & punya anggota) — meniru pola auto-populate yang sudah
+    ada di OPM. Sesi untuk jabatan tanpa panel/panel kosong tetap dibuat
+    kosong seperti sebelumnya.
+  - Endpoint single (manual) yang sudah ada — `POST /time-study/penugasan`,
+    `POST .../task-inventory/sesi/{id}/responden`,
+    `POST .../opm/sesi/{id}/responden` — **tidak berubah** kontraknya.
+
+### Diperbaiki
+
+- **`SqlTiSesiService.create()`: urutan flush sesi vs. auto-populate responden.**
+  Ditemukan lewat E2E langsung (bukan unit test — lolos begitu saja di harness
+  test karena beda perilaku sesi transaksi), lalu direproduksi manual: baris
+  sesi Task Inventory harus di-`flush()` sendiri sebelum insert responden
+  auto-populate, karena `TiRespondenModel.sesi_id` adalah FK murni tanpa
+  `relationship()` ORM balik ke `TiSesiModel` — tanpa flush eksplisit,
+  SQLAlchemy tidak menjamin urutan INSERT saat flush gabungan, sehingga bisa
+  mencoba insert responden sebelum baris sesi ada (`ForeignKeyViolation`,
+  gagal 500). Lihat catatan lengkap di `CLAUDE.md` (Revisi Desain & Gotcha).
+
 ## [0.29.0] - 2026-07-13
 
 ### Diubah (BREAKING)

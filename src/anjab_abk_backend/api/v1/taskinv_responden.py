@@ -19,9 +19,9 @@ from ...dependencies import (
     require_admin,
 )
 from ...errors import ValidationAppError
-from ...schemas.common import ErrorResponse
+from ...schemas.common import BulkAssignResult, BulkSkipped, ErrorResponse
 from ...security import Principal
-from ...taskinv.schemas.responden import TiRespondenCreate, TiRespondenRead
+from ...taskinv.schemas.responden import TiRespondenBulkCreate, TiRespondenCreate, TiRespondenRead
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.sesi import TiSesiService
 
@@ -101,6 +101,68 @@ def create_responden(
                 " belum tergabung dalam SME panel jabatan ini."
             )
     return rsp_service.create(sesi_id, payload, sesi.max_responden)
+
+
+@router.post(
+    "/{sesi_id}/responden/bulk",
+    response_model=BulkAssignResult[TiRespondenRead],
+    status_code=status.HTTP_201_CREATED,
+    summary="Tugaskan banyak partisipan sekaligus sebagai responden (admin; saat DRAFT/TAHAP1)",
+    operation_id="taskinv_responden_create_banyak",
+    dependencies=_ADMIN_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOT_FOUND_SESI,
+        422: {
+            "model": ErrorResponse,
+            "description": "Sesi bukan DRAFT/TAHAP1.",
+        },
+    },
+)
+def create_responden_banyak(
+    sesi_id: Annotated[str, Path(description="ID sesi.")],
+    payload: TiRespondenBulkCreate,
+    sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
+    sme_panel_service: Annotated[SMEPanelService, Depends(get_sme_panel_service)],
+) -> BulkAssignResult[TiRespondenRead]:
+    sesi = sesi_service.get(sesi_id)
+    if sesi.status not in ("DRAFT", "TAHAP1"):
+        raise ValidationAppError(
+            "Responden hanya dapat ditambahkan saat sesi berstatus DRAFT atau TAHAP1"
+            f" (saat ini: {sesi.status})."
+        )
+    anggota_ids: set[str] = set()
+    if sesi.jabatan_id:
+        panels, _ = sme_panel_service.search(
+            domain=[["jabatan_id", "=", sesi.jabatan_id]],
+            order=[],
+            limit=1,
+            offset=0,
+        )
+        if panels:
+            anggota_ids = set(panels[0].partisipan_ids)
+
+    skipped: list[BulkSkipped] = []
+    seen: set[str] = set()
+    anggota_valid: list[str] = []
+    for partisipan_id in payload.partisipan_ids:
+        if partisipan_id in seen:
+            skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="duplikat_input"))
+            continue
+        seen.add(partisipan_id)
+        if partisipan_id not in anggota_ids:
+            skipped.append(
+                BulkSkipped(partisipan_id=partisipan_id, alasan="bukan_anggota_sme_panel")
+            )
+            continue
+        anggota_valid.append(partisipan_id)
+
+    result = rsp_service.assign_banyak(sesi_id, anggota_valid, max_responden=sesi.max_responden)
+    result.skipped = skipped + result.skipped
+    return result
 
 
 @router.get(

@@ -49,14 +49,6 @@ def _setup_jabatan_panel_ti(client: TestClient, jabatan_id: str) -> dict:
     par1 = _buat_partisipan(client, jabatan_id, "A")
     par2 = _buat_partisipan(client, jabatan_id, "B")
 
-    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id})
-    assert r.status_code == 201, r.text
-    panel = r.json()
-    panel_id = panel["id"]
-    for pid in (par1, par2):
-        r = client.post(f"{SME_BASE}/{panel_id}/anggota", json={"partisipan_id": pid})
-        assert r.status_code == 200, r.text
-
     r = client.get(TI_BASE + "/catalog", params={"unit": UNIT, "jabatan_id": jabatan_id})
     assert r.status_code == 200, r.text
     catalog_items = r.json()
@@ -96,6 +88,18 @@ def _setup_jabatan_panel_ti(client: TestClient, jabatan_id: str) -> dict:
     r = client.post(f"{TI_SESI}/{ti_sesi_id}/mulai-tahap3")
     assert r.status_code == 200, r.text
     assert r.json()["jumlah_task_terpilih"] == 2
+
+    # SME panel dibuat SETELAH sesi TI dibekukan — auto-populate TI (item 005) hanya
+    # berjalan saat sesi DIBUAT; membuat panel di sini menghindari 2 responden
+    # tambahan (anggota panel) yang belum submit seleksi ikut menghambat
+    # mulai-tahap2 di atas.
+    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id})
+    assert r.status_code == 201, r.text
+    panel = r.json()
+    panel_id = panel["id"]
+    for pid in (par1, par2):
+        r = client.post(f"{SME_BASE}/{panel_id}/anggota", json={"partisipan_id": pid})
+        assert r.status_code == 200, r.text
 
     return {
         "jabatan_id": jabatan_id,

@@ -102,6 +102,91 @@ def test_tambah_melebihi_max_422(client: TestClient, jabatan_id_tk: str) -> None
     assert r.status_code == 422, r.text
 
 
+# --------------------------------------------------------------------------- #
+# Bulk assign (item 005): endpoint bulk manual — idempoten, bukan atomik.
+# --------------------------------------------------------------------------- #
+
+
+def test_responden_bulk_happy_path(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    par3 = _buat_partisipan(client, ctx["jabatan_id"], "H")
+    par4 = _buat_partisipan(client, ctx["jabatan_id"], "I")
+    for pid in (par3, par4):
+        client.post(f"{SME_BASE}/{ctx['panel_id']}/anggota", json={"partisipan_id": pid})
+
+    r = client.post(
+        f"{SESI_BASE}/{sesi['id']}/responden/bulk", json={"partisipan_ids": [par3, par4]}
+    )
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert {c["partisipan_id"] for c in data["created"]} == {par3, par4}
+    assert data["skipped"] == []
+
+
+def test_responden_bulk_skip_sudah_terdaftar(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    r = client.post(
+        f"{SESI_BASE}/{sesi['id']}/responden/bulk",
+        json={"partisipan_ids": ctx["partisipan_ids"]},
+    )
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["created"] == []
+    assert {s["partisipan_id"] for s in data["skipped"]} == set(ctx["partisipan_ids"])
+    assert all(s["alasan"] == "sudah_terdaftar" for s in data["skipped"])
+
+
+def test_responden_bulk_skip_bukan_anggota_sme_panel(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    luar = _buat_partisipan(client, ctx["jabatan_id"], "J")
+    r = client.post(f"{SESI_BASE}/{sesi['id']}/responden/bulk", json={"partisipan_ids": [luar]})
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["created"] == []
+    assert data["skipped"] == [{"partisipan_id": luar, "alasan": "bukan_anggota_sme_panel"}]
+
+
+def test_responden_bulk_skip_kapasitas_penuh(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk, max_responden=2)
+    par3 = _buat_partisipan(client, ctx["jabatan_id"], "K")
+    client.post(f"{SME_BASE}/{ctx['panel_id']}/anggota", json={"partisipan_id": par3})
+    r = client.post(f"{SESI_BASE}/{sesi['id']}/responden/bulk", json={"partisipan_ids": [par3]})
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["created"] == []
+    assert data["skipped"] == [{"partisipan_id": par3, "alasan": "kapasitas_penuh"}]
+
+
+def test_responden_bulk_skip_duplikat_input(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    par3 = _buat_partisipan(client, ctx["jabatan_id"], "L")
+    client.post(f"{SME_BASE}/{ctx['panel_id']}/anggota", json={"partisipan_id": par3})
+    r = client.post(
+        f"{SESI_BASE}/{sesi['id']}/responden/bulk", json={"partisipan_ids": [par3, par3]}
+    )
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert len(data["created"]) == 1
+    assert data["skipped"] == [{"partisipan_id": par3, "alasan": "duplikat_input"}]
+
+
+def test_responden_bulk_requires_admin(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    as_partisipan = client_as("opm-bulk-nonadmin")
+    r = as_partisipan.post(
+        f"{SESI_BASE}/{sesi['id']}/responden/bulk", json={"partisipan_ids": ["par_x"]}
+    )
+    assert r.status_code == 403
+
+
+def test_responden_bulk_payload_kosong_ditolak(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    r = client.post(f"{SESI_BASE}/{sesi['id']}/responden/bulk", json={"partisipan_ids": []})
+    assert r.status_code == 422
+
+
 def test_hapus_belum_submit_204(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk)
     responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
@@ -249,10 +334,6 @@ def test_kuesioner_saya_hanya_open(client: TestClient, jabatan_id_tk: str, db_se
         authentik_user_id="test-user",
     )
 
-    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id_tk})
-    panel_id = r.json()["id"]
-    client.post(f"{SME_BASE}/{panel_id}/anggota", json={"partisipan_id": par.id})
-
     r_catalog = client.get(
         "/api/v1/task-inventory/catalog", params={"unit": "ALL", "jabatan_id": jabatan_id_tk}
     )
@@ -270,6 +351,13 @@ def test_kuesioner_saya_hanya_open(client: TestClient, jabatan_id_tk: str, db_se
     client.post(f"{TI_SESI}/responden/{r_rsp_id}/seleksi/submit")
     client.post(f"{TI_SESI}/{ti_sesi_id}/mulai-tahap2")
     client.post(f"{TI_SESI}/{ti_sesi_id}/mulai-tahap3")
+
+    # Panel dibuat SETELAH sesi TI dibekukan (menghindari auto-populate TI dari
+    # item 005 menambah responden yang belum submit seleksi) — OPM tetap butuh
+    # panel ada saat sesi OPM dibuat di bawah ini.
+    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id_tk})
+    panel_id = r.json()["id"]
+    client.post(f"{SME_BASE}/{panel_id}/anggota", json={"partisipan_id": par.id})
 
     r_sesi = client.post(
         SESI_BASE,

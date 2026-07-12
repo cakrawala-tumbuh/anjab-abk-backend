@@ -25,6 +25,18 @@ class TiRespondenCreate(BaseModel):
     )
 
 
+class TiRespondenBulkCreate(BaseModel):
+    """Payload penugasan (assign) responden Task Inventory massal (bulk)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    partisipan_ids: list[str] = Field(
+        min_length=1,
+        description="Daftar ID partisipan (wajib anggota SME panel jabatan sesi ini).",
+        examples=[["par_a1b2c3d4", "par_e5f6g7h8"]],
+    )
+
+
 class TiRespondenRead(BaseModel):
     """Representasi responden yang dikembalikan API."""
 

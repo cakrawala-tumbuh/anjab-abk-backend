@@ -58,6 +58,52 @@ def test_create_duplicate_partisipan_rejected(client: TestClient) -> None:
     assert r2.status_code == 409
 
 
+# --------------------------------------------------------------------------- #
+# Bulk assign (item 005): idempoten, bukan atomik all-or-nothing.
+# --------------------------------------------------------------------------- #
+
+BULK = f"{BASE}/bulk"
+
+
+def test_create_banyak_campuran_baru_dan_sudah_ada(client: TestClient) -> None:
+    sudah_ada = client.post(BASE, json=_payload()).json()["partisipan_id"]
+    baru1 = f"par_{uuid.uuid4().hex[:8]}"
+    baru2 = f"par_{uuid.uuid4().hex[:8]}"
+
+    r = client.post(BULK, json={"partisipan_ids": [sudah_ada, baru1, baru2]})
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert {c["partisipan_id"] for c in data["created"]} == {baru1, baru2}
+    assert len(data["skipped"]) == 1
+    assert data["skipped"][0] == {"partisipan_id": sudah_ada, "alasan": "sudah_terdaftar"}
+
+
+def test_create_banyak_duplikat_input(client: TestClient) -> None:
+    dup = f"par_{uuid.uuid4().hex[:8]}"
+    r = client.post(BULK, json={"partisipan_ids": [dup, dup]})
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert len(data["created"]) == 1
+    assert data["created"][0]["partisipan_id"] == dup
+    assert data["skipped"] == [{"partisipan_id": dup, "alasan": "duplikat_input"}]
+
+
+def test_create_banyak_payload_kosong_ditolak(client: TestClient) -> None:
+    r = client.post(BULK, json={"partisipan_ids": []})
+    assert r.status_code == 422
+
+
+def test_create_banyak_requires_admin(client_as) -> None:
+    as_partisipan = client_as("ts-bulk-a")
+    r = as_partisipan.post(BULK, json={"partisipan_ids": [f"par_{uuid.uuid4().hex[:8]}"]})
+    assert r.status_code == 403
+
+
+def test_create_banyak_requires_auth(anon_client: TestClient) -> None:
+    r = anon_client.post(BULK, json={"partisipan_ids": [f"par_{uuid.uuid4().hex[:8]}"]})
+    assert r.status_code == 401
+
+
 def test_not_found(client: TestClient) -> None:
     r = client.get(f"{BASE}/tpn_tidakada")
     assert r.status_code == 404
