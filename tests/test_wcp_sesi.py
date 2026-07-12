@@ -98,6 +98,23 @@ def test_delete_non_draft_rejected(client: TestClient) -> None:
     client.post(f"{BASE}/{sesi['id']}/buka")
     r = client.delete(f"{BASE}/{sesi['id']}")
     assert r.status_code in (400, 422)
+    assert "paksa=true" in r.json()["message"]
+
+
+def test_delete_non_draft_dengan_paksa_ok(client: TestClient) -> None:
+    sesi = client.post(BASE, json=_payload()).json()
+    client.post(f"{BASE}/{sesi['id']}/buka")
+    r = client.delete(f"{BASE}/{sesi['id']}", params={"paksa": True})
+    assert r.status_code == 204
+    assert client.get(f"{BASE}/{sesi['id']}").status_code == 404
+
+
+def test_delete_paksa_forbidden_non_admin(client: TestClient, client_as) -> None:
+    sesi = client.post(BASE, json=_payload()).json()
+    client.post(f"{BASE}/{sesi['id']}/buka")
+    non_admin = client_as("partisipan-1", groups=["partisipan"])
+    r = non_admin.delete(f"{BASE}/{sesi['id']}", params={"paksa": True})
+    assert r.status_code == 403
 
 
 def test_search_by_periode(client: TestClient, created: dict) -> None:

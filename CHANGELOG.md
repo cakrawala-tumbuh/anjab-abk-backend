@@ -7,6 +7,23 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-07-12
+
+### Ditambahkan
+
+- **Force-delete sesi admin via `?paksa=true`.** `DELETE .../{dcs|wcp|opm|taskinv}
+  /sesi/{sesi_id}` kini menerima query param opsional `paksa` — admin dapat
+  menghapus sesi non-DRAFT beserta seluruh responden & jawabannya (permanen).
+  Tanpa `paksa`, perilaku lama tetap berlaku (422, hanya DRAFT yang bisa dihapus).
+
+### Diperbaiki
+
+- **FK `ON DELETE CASCADE` di 12 kolom `sesi_id`/`responden_id`** (DCS, WCP, OPM,
+  Task Inventory) — dulu `String(40)` tanpa constraint, sehingga menghapus sesi
+  atau responden meninggalkan baris anak yatim yang tak terjangkau API mana pun.
+  Migrasi membersihkan baris yatim yang sudah ada sebelum membuat FK. Menambal
+  bug tak terlaporkan: menghapus responden dulu tidak ikut menghapus jawabannya.
+
 ## [0.25.1] - 2026-07-12
 
 ### Diperbaiki

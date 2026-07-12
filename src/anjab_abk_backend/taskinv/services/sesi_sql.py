@@ -27,7 +27,7 @@ from ...services.domain_sql import FieldMap, FieldSpec, compile_domain, order_by
 from ..schemas.sesi import StatusSesi, TiSesiCreate, TiSesiRead, TiSesiUpdate
 
 # Sumber tunggal whitelist & state machine.
-from .sesi import _VALID_TRANSITIONS, SEARCHABLE_FIELDS
+from .sesi import _ERR_NON_DRAFT, _VALID_TRANSITIONS, SEARCHABLE_FIELDS
 
 
 def _sesi_field_map() -> FieldMap:
@@ -134,12 +134,13 @@ class SqlTiSesiService:
         jab = self._s.get(JabatanModel, rec.jabatan_id)
         return _to_read(rec, jab.nama if jab else None)
 
-    def delete(self, sesi_id: str) -> None:
+    def delete(self, sesi_id: str, *, paksa: bool = False) -> None:
         rec = self._get_model(sesi_id)
-        if rec.status != "DRAFT":
-            raise ValidationAppError("Sesi hanya dapat dihapus saat berstatus DRAFT.")
+        if rec.status != "DRAFT" and not paksa:
+            raise ValidationAppError(_ERR_NON_DRAFT)
         self._s.delete(rec)
         self._s.flush()
+        self._s.expire_all()
 
     def freeze_task_terpilih(self, sesi_id: str, kodes: list[str]) -> TiSesiRead:
         """Bekukan himpunan task terpilih saat transisi TAHAP2 → TAHAP3."""

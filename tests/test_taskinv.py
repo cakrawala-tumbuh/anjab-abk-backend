@@ -164,6 +164,32 @@ def test_sesi_delete_draft(client: TestClient, jabatan_id_tk: str) -> None:
     assert client.get(f"{SESI}/{sesi['id']}").status_code == 404
 
 
+def test_sesi_delete_non_draft_rejected(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    client.post(f"{SESI}/{sesi['id']}/mulai-tahap1")
+    r = client.delete(f"{SESI}/{sesi['id']}")
+    assert r.status_code in (400, 422)
+    assert "paksa=true" in r.json()["message"]
+
+
+def test_sesi_delete_non_draft_dengan_paksa_ok(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    client.post(f"{SESI}/{sesi['id']}/mulai-tahap1")
+    r = client.delete(f"{SESI}/{sesi['id']}", params={"paksa": True})
+    assert r.status_code == 204
+    assert client.get(f"{SESI}/{sesi['id']}").status_code == 404
+
+
+def test_sesi_delete_paksa_forbidden_non_admin(
+    client: TestClient, client_as, jabatan_id_tk: str
+) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    client.post(f"{SESI}/{sesi['id']}/mulai-tahap1")
+    non_admin = client_as("partisipan-1", groups=["partisipan"])
+    r = non_admin.delete(f"{SESI}/{sesi['id']}", params={"paksa": True})
+    assert r.status_code == 403
+
+
 def test_sesi_not_found(anon_client: TestClient) -> None:
     assert anon_client.get(f"{SESI}/tises_xxx").status_code == 404
 

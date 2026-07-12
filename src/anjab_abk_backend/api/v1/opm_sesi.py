@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Path, Response, status
+from fastapi import APIRouter, Body, Depends, Path, Query, Response, status
 
 from ...dependencies import (
     Idempotency,
@@ -21,11 +22,13 @@ from ...opm.schemas.sesi import OpmSesiCreate, OpmSesiRead, OpmSesiTaskRead, Opm
 from ...opm.services.sesi import OpmSesiService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ...security import Principal
 
 router = APIRouter()
 
+logger = logging.getLogger("anjab_abk_backend.api.v1.opm_sesi")
+
 _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
-_ADMIN_GUARDS = [Depends(require_admin), Depends(rate_limit)]
 _NOT_FOUND = {404: {"model": ErrorResponse, "description": "Sesi OPM tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
@@ -152,16 +155,39 @@ def update_sesi(
 @router.delete(
     "/{sesi_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Hapus sesi OPM (hanya saat DRAFT)",
+    summary="Hapus sesi OPM (DRAFT bebas; status lain wajib paksa=true)",
     operation_id="opm_sesi_delete",
-    dependencies=_ADMIN_GUARDS,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
+    dependencies=[Depends(rate_limit)],
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOT_FOUND,
+        422: {
+            "model": ErrorResponse,
+            "description": "Sesi bukan DRAFT dan paksa tidak di-set.",
+        },
+    },
 )
 def delete_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
     service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
+    principal: Annotated[Principal, Depends(require_admin)],
+    paksa: Annotated[
+        bool,
+        Query(
+            description=(
+                "Paksa hapus sesi non-DRAFT beserta SELURUH responden & jawabannya (permanen)."
+            )
+        ),
+    ] = False,
 ) -> Response:
-    service.delete(sesi_id)
+    if paksa:
+        logger.warning(
+            "force_delete_sesi",
+            extra={"modul": "opm", "sesi_id": sesi_id, "actor": principal.subject},
+        )
+    service.delete(sesi_id, paksa=paksa)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

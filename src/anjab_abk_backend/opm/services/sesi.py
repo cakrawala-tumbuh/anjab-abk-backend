@@ -21,6 +21,11 @@ _VALID_TRANSITIONS: dict[StatusSesi, StatusSesi] = {
     "CLOSED": "ANALYZED",
 }
 
+_ERR_NON_DRAFT = (
+    "Sesi hanya dapat dihapus saat berstatus DRAFT."
+    " Gunakan paksa=true untuk menghapus sesi beserta SELURUH responden & jawabannya."
+)
+
 
 @dataclass
 class _Record:
@@ -43,7 +48,7 @@ class OpmSesiService(Protocol):
     def get(self, sesi_id: str) -> OpmSesiRead: ...
     def create(self, data: OpmSesiCreate) -> OpmSesiRead: ...
     def update(self, sesi_id: str, data: OpmSesiUpdate) -> OpmSesiRead: ...
-    def delete(self, sesi_id: str) -> None: ...
+    def delete(self, sesi_id: str, *, paksa: bool = False) -> None: ...
     def transition(self, sesi_id: str, target: StatusSesi) -> OpmSesiRead: ...
     def list_task(self, sesi_id: str) -> list[OpmSesiTaskRead]: ...
     def get_task_kodes(self, sesi_id: str) -> set[str]: ...
@@ -129,13 +134,13 @@ class InMemoryOpmSesiService:
                 setattr(rec, key, value)
             return self._to_read(rec)
 
-    def delete(self, sesi_id: str) -> None:
+    def delete(self, sesi_id: str, *, paksa: bool = False) -> None:
         with self._lock:
             rec = self._data.get(sesi_id)
             if rec is None:
                 raise NotFoundError(f"Sesi OPM '{sesi_id}' tidak ditemukan.")
-            if rec.status != "DRAFT":
-                raise ValidationAppError("Sesi hanya dapat dihapus saat berstatus DRAFT.")
+            if rec.status != "DRAFT" and not paksa:
+                raise ValidationAppError(_ERR_NON_DRAFT)
             del self._data[sesi_id]
 
     def transition(self, sesi_id: str, target: StatusSesi) -> OpmSesiRead:

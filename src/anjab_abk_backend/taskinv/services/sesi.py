@@ -23,6 +23,11 @@ _VALID_TRANSITIONS: dict[StatusSesi, StatusSesi] = {
     "CLOSED": "ANALYZED",
 }
 
+_ERR_NON_DRAFT = (
+    "Sesi hanya dapat dihapus saat berstatus DRAFT."
+    " Gunakan paksa=true untuk menghapus sesi beserta SELURUH responden & jawabannya."
+)
+
 
 @dataclass
 class _Record:
@@ -45,7 +50,7 @@ class TiSesiService(Protocol):
     def get(self, sesi_id: str) -> TiSesiRead: ...
     def create(self, data: TiSesiCreate) -> TiSesiRead: ...
     def update(self, sesi_id: str, data: TiSesiUpdate) -> TiSesiRead: ...
-    def delete(self, sesi_id: str) -> None: ...
+    def delete(self, sesi_id: str, *, paksa: bool = False) -> None: ...
     def transition(self, sesi_id: str, target: StatusSesi) -> TiSesiRead: ...
     def freeze_task_terpilih(self, sesi_id: str, kodes: list[str]) -> TiSesiRead: ...
     def get_task_terpilih(self, sesi_id: str) -> list[str]: ...
@@ -135,13 +140,13 @@ class InMemoryTiSesiService:
                 setattr(rec, key, value)
             return self._to_read(rec)
 
-    def delete(self, sesi_id: str) -> None:
+    def delete(self, sesi_id: str, *, paksa: bool = False) -> None:
         with self._lock:
             rec = self._data.get(sesi_id)
             if rec is None:
                 raise NotFoundError(f"Sesi Task Inventory '{sesi_id}' tidak ditemukan.")
-            if rec.status != "DRAFT":
-                raise ValidationAppError("Sesi hanya dapat dihapus saat berstatus DRAFT.")
+            if rec.status != "DRAFT" and not paksa:
+                raise ValidationAppError(_ERR_NON_DRAFT)
             del self._data[sesi_id]
 
     def transition(self, sesi_id: str, target: StatusSesi) -> TiSesiRead:

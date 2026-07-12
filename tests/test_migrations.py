@@ -114,9 +114,9 @@ def test_schema_matches_models(fresh_db_url: str) -> None:
             diff = compare_metadata(context, Base.metadata)
     finally:
         engine.dispose()
-    assert diff == [], (
-        "Model ORM tidak sinkron dengan migrasi (perlu revisi baru). " f"Selisih terdeteksi: {diff}"
-    )
+    assert (
+        diff == []
+    ), f"Model ORM tidak sinkron dengan migrasi (perlu revisi baru). Selisih terdeteksi: {diff}"
 
 
 def test_upgrade_downgrade_roundtrip(fresh_db_url: str) -> None:
@@ -204,5 +204,88 @@ def test_backfill_authentik_user_id_ke_email(fresh_db_url: str) -> None:
         assert rows, "baris uji harus tetap ada setelah migrasi"
         for email, auth in rows:
             assert auth == email, f"authentik_user_id harus = email, dapat {auth!r} vs {email!r}"
+    finally:
+        engine.dispose()
+
+
+def test_fk_cascade_membersihkan_baris_yatim(fresh_db_url: str) -> None:
+    """Revisi FK cascade (`a4aeb5bcbe81`) membersihkan baris yatim SEBELUM membuat FK.
+
+    Menyisipkan tiga jenis baris yatim pada revisi tepat sebelumnya (`0a58616358f4`):
+    responden yatim (sesi induk hilang), jawaban yatim MURNI (responden induk tak
+    pernah ada), dan `ti_seleksi` yatim lewat `sesi_id` (responden induk masih valid,
+    tapi sesi-nya hilang) — menjaring jalur pembersihan langkah 1 & 2 sekaligus kasus
+    dua-parent Task Inventory. `upgrade(head)` TIDAK BOLEH raise (yang berarti FK
+    berhasil dibuat) dan seluruh baris yatim harus lenyap.
+    """
+    upgrade(fresh_db_url, "0a58616358f4")  # revisi tepat sebelum FK cascade
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            # Responden DCS yatim (sesi_id menunjuk sesi yang tidak pernah ada).
+            conn.execute(
+                text(
+                    "INSERT INTO dcs_responden"
+                    " (id, sesi_id, jabatan_label, sudah_submit, created_at) "
+                    "VALUES ('drsp_yatim01', 'dses_tidakada', 'Guru', false, now())"
+                )
+            )
+            # Jawaban DCS anak dari responden yatim di atas (harus ikut lenyap di langkah 2).
+            conn.execute(
+                text(
+                    "INSERT INTO dcs_jawaban (id, responden_id, item_id, skor_raw) "
+                    "VALUES ('djwb_yatim01', 'drsp_yatim01', 'D01', 3)"
+                )
+            )
+            # Jawaban DCS yatim MURNI (responden induk tak pernah ada sama sekali).
+            conn.execute(
+                text(
+                    "INSERT INTO dcs_jawaban (id, responden_id, item_id, skor_raw) "
+                    "VALUES ('djwb_yatim02', 'drsp_tidakada', 'D02', 4)"
+                )
+            )
+            # ti_seleksi yatim lewat sesi_id: responden induk VALID, sesi induk hilang.
+            conn.execute(
+                text(
+                    "INSERT INTO ti_sesi (id, jabatan_id, periode, status, min_responden, "
+                    " max_responden, task_frozen, created_at) "
+                    "VALUES ('tises_valid01', 'jbt_x', '2026-01', 'DRAFT', 1, 10, false, now())"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO ti_responden"
+                    " (id, sesi_id, tahap1_submit, tahap3_submit, created_at) "
+                    "VALUES ('tirs_valid01', 'tises_valid01', false, false, now())"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO ti_seleksi (id, responden_id, sesi_id, task_kode, created_at) "
+                    "VALUES ('tisl_yatim01', 'tirs_valid01', 'tises_tidakada', 'TI001', now())"
+                )
+            )
+
+        upgrade(fresh_db_url, "head")  # jalankan revisi FK cascade — tidak boleh raise
+
+        with engine.connect() as conn:
+            sisa_responden = conn.execute(
+                text("SELECT count(*) FROM dcs_responden WHERE id = 'drsp_yatim01'")
+            ).scalar_one()
+            sisa_jawaban = conn.execute(
+                text(
+                    "SELECT count(*) FROM dcs_jawaban WHERE id IN ('djwb_yatim01', 'djwb_yatim02')"
+                )
+            ).scalar_one()
+            sisa_seleksi = conn.execute(
+                text("SELECT count(*) FROM ti_seleksi WHERE id = 'tisl_yatim01'")
+            ).scalar_one()
+            responden_valid_tetap_ada = conn.execute(
+                text("SELECT count(*) FROM ti_responden WHERE id = 'tirs_valid01'")
+            ).scalar_one()
+        assert sisa_responden == 0, "responden yatim harus terhapus sebelum FK dibuat"
+        assert sisa_jawaban == 0, "jawaban yatim (langsung & turunan) harus terhapus"
+        assert sisa_seleksi == 0, "ti_seleksi yatim lewat sesi_id harus terhapus"
+        assert responden_valid_tetap_ada == 1, "responden VALID tidak boleh ikut terhapus"
     finally:
         engine.dispose()

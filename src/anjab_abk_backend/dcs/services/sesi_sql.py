@@ -24,7 +24,7 @@ from ...services.domain_sql import FieldMap, FieldSpec, compile_domain, order_by
 from ..schemas.sesi import DcsSesiCreate, DcsSesiRead, DcsSesiUpdate, StatusSesiDcs
 
 # Sumber tunggal whitelist & state machine.
-from .sesi import _VALID_TRANSITIONS, SEARCHABLE_FIELDS
+from .sesi import _ERR_NON_DRAFT, _VALID_TRANSITIONS, SEARCHABLE_FIELDS
 
 
 def _sesi_field_map() -> FieldMap:
@@ -107,12 +107,13 @@ class SqlDcsSesiService:
         self._s.flush()
         return _to_read(rec)
 
-    def delete(self, sesi_id: str) -> None:
+    def delete(self, sesi_id: str, *, paksa: bool = False) -> None:
         rec = self._get_model(sesi_id)
-        if rec.status != "DRAFT":
-            raise ValidationAppError("Sesi hanya dapat dihapus saat berstatus DRAFT.")
+        if rec.status != "DRAFT" and not paksa:
+            raise ValidationAppError(_ERR_NON_DRAFT)
         self._s.delete(rec)
         self._s.flush()
+        self._s.expire_all()
 
     def transition(self, sesi_id: str, target: StatusSesiDcs) -> DcsSesiRead:
         rec = self._get_model(sesi_id)

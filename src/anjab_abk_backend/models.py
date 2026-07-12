@@ -248,7 +248,9 @@ class DcsRespondenModel(Base):
     __tablename__ = "dcs_responden"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    sesi_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    sesi_id: Mapped[str] = mapped_column(
+        ForeignKey("dcs_sesi.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     nama: Mapped[str | None] = mapped_column(String(200), nullable=True)
     jabatan_label: Mapped[str] = mapped_column(String(200), nullable=False)
     partisipan_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
@@ -262,7 +264,9 @@ class DcsJawabanModel(Base):
     __table_args__ = (UniqueConstraint("responden_id", "item_id"),)
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    responden_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    responden_id: Mapped[str] = mapped_column(
+        ForeignKey("dcs_responden.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     item_id: Mapped[str] = mapped_column(String(20), nullable=False)
     skor_raw: Mapped[int] = mapped_column(Integer, nullable=False)
 
@@ -311,7 +315,9 @@ class WcpRespondenModel(Base):
     __tablename__ = "wcp_responden"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    sesi_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    sesi_id: Mapped[str] = mapped_column(
+        ForeignKey("wcp_sesi.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     nama: Mapped[str | None] = mapped_column(String(200), nullable=True)
     jabatan_label: Mapped[str] = mapped_column(String(200), nullable=False)
     partisipan_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
@@ -325,7 +331,9 @@ class WcpJawabanModel(Base):
     __table_args__ = (UniqueConstraint("responden_id", "item_id"),)
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    responden_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    responden_id: Mapped[str] = mapped_column(
+        ForeignKey("wcp_responden.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     item_id: Mapped[str] = mapped_column(String(20), nullable=False)
     skor_raw: Mapped[int] = mapped_column(Integer, nullable=False)
 
@@ -452,7 +460,9 @@ class TiRespondenModel(Base):
     __tablename__ = "ti_responden"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    sesi_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    sesi_id: Mapped[str] = mapped_column(
+        ForeignKey("ti_sesi.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     nama: Mapped[str | None] = mapped_column(String(200), nullable=True)
     partisipan_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
     tahap1_submit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -470,8 +480,12 @@ class TiSeleksiModel(Base):
     __tablename__ = "ti_seleksi"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    responden_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
-    sesi_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    responden_id: Mapped[str] = mapped_column(
+        ForeignKey("ti_responden.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    sesi_id: Mapped[str] = mapped_column(
+        ForeignKey("ti_sesi.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     task_kode: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at: Mapped[datetime] = _ts()
 
@@ -481,7 +495,9 @@ class TiTahap2Model(Base):
     __table_args__ = (UniqueConstraint("sesi_id", "task_kode"),)
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    sesi_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    sesi_id: Mapped[str] = mapped_column(
+        ForeignKey("ti_sesi.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     task_kode: Mapped[str] = mapped_column(String(20), nullable=False)
     disetujui: Mapped[bool] = mapped_column(Boolean, nullable=False)
     submitted_at: Mapped[datetime] = _ts()
@@ -491,8 +507,12 @@ class TiDetailModel(Base):
     __tablename__ = "ti_detail"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    responden_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
-    sesi_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    responden_id: Mapped[str] = mapped_column(
+        ForeignKey("ti_responden.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    sesi_id: Mapped[str] = mapped_column(
+        ForeignKey("ti_sesi.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     task_kode: Mapped[str] = mapped_column(String(20), nullable=False)
     sumber_bukti: Mapped[str] = mapped_column(String(20), nullable=False)
     kondisi: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -591,7 +611,9 @@ class OpmRespondenModel(Base):
     __tablename__ = "opm_responden"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    sesi_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    sesi_id: Mapped[str] = mapped_column(
+        ForeignKey("opm_sesi.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     nama: Mapped[str | None] = mapped_column(String(200), nullable=True)
     jabatan_label: Mapped[str] = mapped_column(String(200), nullable=False)
     partisipan_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
@@ -605,7 +627,9 @@ class OpmJawabanModel(Base):
     __table_args__ = (UniqueConstraint("responden_id", "task_kode"),)
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    responden_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    responden_id: Mapped[str] = mapped_column(
+        ForeignKey("opm_responden.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     task_kode: Mapped[str] = mapped_column(String(20), nullable=False)
     importance: Mapped[int] = mapped_column(Integer, nullable=False)
     frequency: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, Query, Response, status
@@ -23,6 +24,7 @@ from ...dependencies import (
 from ...errors import ConflictError, ValidationAppError
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ...security import Principal
 from ...taskinv.schemas.sesi import TiSesiCreate, TiSesiRead, TiSesiUpdate
 from ...taskinv.services.catalog import TiCatalogService
 from ...taskinv.services.responden import TiRespondenService
@@ -32,8 +34,9 @@ from ...taskinv.services.tahap2 import TiTahap2Service
 
 router = APIRouter()
 
+logger = logging.getLogger("anjab_abk_backend.api.v1.taskinv_sesi")
+
 _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
-_ADMIN_GUARDS = [Depends(require_admin), Depends(rate_limit)]
 _NOT_FOUND = {404: {"model": ErrorResponse, "description": "Sesi Task Inventory tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
@@ -156,16 +159,39 @@ def update_sesi(
 @router.delete(
     "/{sesi_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Hapus sesi Task Inventory (hanya saat DRAFT)",
+    summary="Hapus sesi Task Inventory (DRAFT bebas; status lain wajib paksa=true)",
     operation_id="taskinv_sesi_delete",
-    dependencies=_ADMIN_GUARDS,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
+    dependencies=[Depends(rate_limit)],
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOT_FOUND,
+        422: {
+            "model": ErrorResponse,
+            "description": "Sesi bukan DRAFT dan paksa tidak di-set.",
+        },
+    },
 )
 def delete_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
     service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    principal: Annotated[Principal, Depends(require_admin)],
+    paksa: Annotated[
+        bool,
+        Query(
+            description=(
+                "Paksa hapus sesi non-DRAFT beserta SELURUH responden & jawabannya (permanen)."
+            )
+        ),
+    ] = False,
 ) -> Response:
-    service.delete(sesi_id)
+    if paksa:
+        logger.warning(
+            "force_delete_sesi",
+            extra={"modul": "taskinv", "sesi_id": sesi_id, "actor": principal.subject},
+        )
+    service.delete(sesi_id, paksa=paksa)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

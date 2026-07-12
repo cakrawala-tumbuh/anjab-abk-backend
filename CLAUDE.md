@@ -72,6 +72,33 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-12] Force-delete sesi admin (`paksa=true`) + FK `ON DELETE CASCADE`
+
+Dua perbaikan terkait DELETE sesi (DCS/WCP/OPM/Task Inventory):
+
+- **`DELETE .../sesi/{sesi_id}?paksa=true`.** Sebelumnya sesi non-DRAFT MUSTAHIL
+  dihapus (`status != "DRAFT"` selalu ditolak), padahal `status` tidak dapat
+  di-`PATCH` dan transisi hanya maju-satu-arah — admin tidak punya jalan keluar.
+  Endpoint sudah admin-only; ditambah query param opsional `paksa: bool = False`
+  mengikuti preseden `mulai-tahap2`/`mulai-tahap3` (`taskinv_sesi.py`). Tanpa
+  `paksa`, sesi non-DRAFT tetap ditolak (422, pesan menyebut `paksa=true`); dengan
+  `paksa=true`, sesi dihapus di status apa pun. Kontrak tetap `204 No Content`
+  (tidak ada body konfirmasi tambahan). `logger.warning` mencatat aktor tiap kali
+  `paksa=True` dipakai.
+- **FK `ON DELETE CASCADE` di 12 kolom `sesi_id`/`responden_id`.** Kolom-kolom ini
+  sebelumnya `String(40)` tanpa constraint — menghapus sesi/responden lewat API
+  meninggalkan baris responden & jawaban YATIM yang tak terjangkau API mana pun.
+  Migrasi `a4aeb5bcbe81` membersihkan baris yatim yang sudah ada (urutan: responden
+  yatim dulu, baru jawaban/seleksi/detail/tahap2 yatim — turunan langkah pertama)
+  sebelum membuat FK. `SqlXSesiService.delete()` memanggil `session.expire_all()`
+  setelah hapus (anak sudah lenyap di DB via CASCADE, identity map jadi basi).
+  Sengaja **tidak** dipakai `relationship(cascade="all, delete-orphan")` — akan
+  memaksa ORM memuat ribuan baris jawaban ke memori; cascade DB-level saja cukup
+  dan otomatis berlaku juga untuk `responden.delete()` yang sudah ada (menambal bug
+  tak terlaporkan: dulu jawaban tidak ikut terhapus saat responden dihapus).
+  `opm_sesi.ti_sesi_id` **sengaja tidak** diberi FK (di luar revisi ini — akan
+  bertabrakan dengan force-delete sesi TI, perlu keputusan RESTRICT vs lainnya).
+
 ### [2026-07-08] DCS/WCP/OPM/Task Inventory Tahap1&3: pisah draft-save dari submit final
 
 Semua instrumen yang tadinya "submit sekali jadi" (satu `POST` bulk yang wajib

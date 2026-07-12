@@ -162,6 +162,29 @@ def test_update_delete_hanya_draft(client: TestClient, jabatan_id_tk: str) -> No
 
     r_del = client.delete(f"{BASE}/{sid}")
     assert r_del.status_code == 422
+    assert "paksa=true" in r_del.json()["message"]
+
+
+def test_delete_non_draft_dengan_paksa_ok(client: TestClient, jabatan_id_tk: str) -> None:
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    sesi = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"])).json()
+    sid = sesi["id"]
+    client.post(f"{BASE}/{sid}/buka")
+    r = client.delete(f"{BASE}/{sid}", params={"paksa": True})
+    assert r.status_code == 204
+    assert client.get(f"{BASE}/{sid}").status_code == 404
+
+
+def test_delete_paksa_forbidden_non_admin(
+    client: TestClient, client_as, jabatan_id_tk: str
+) -> None:
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    sesi = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"])).json()
+    sid = sesi["id"]
+    client.post(f"{BASE}/{sid}/buka")
+    non_admin = client_as("partisipan-1", groups=["partisipan"])
+    r = non_admin.delete(f"{BASE}/{sid}", params={"paksa": True})
+    assert r.status_code == 403
 
 
 def test_delete_draft_ok(client: TestClient, jabatan_id_tk: str) -> None:
