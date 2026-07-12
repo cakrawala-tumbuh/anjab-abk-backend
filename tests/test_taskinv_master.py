@@ -635,3 +635,58 @@ def test_uraian_tugas_std_invalid_enum(
     }
     r = client.post(UT_BASE, json=payload)
     assert r.status_code == 422
+
+
+# --------------------------------------------------------------------------- #
+# Purge & reseed katalog master (admin)
+# --------------------------------------------------------------------------- #
+
+SESI_BASE = "/api/v1/task-inventory/sesi"
+
+
+def test_purge_forbidden_non_admin(client_as) -> None:
+    non_admin = client_as("bukan-admin", groups=["partisipan"])
+    r = non_admin.post(f"{CATALOG_BASE}/purge")
+    assert r.status_code == 403
+
+
+def test_purge_blocked_when_sesi_exists(client: TestClient) -> None:
+    kombis = client.get(f"{CATALOG_BASE}/kombinasi").json()
+    assert kombis, "Katalog kosong — tidak dapat menyiapkan sesi untuk test ini"
+    jabatan_id = kombis[0]["jabatan_id"]
+    r = client.post(
+        SESI_BASE,
+        json={
+            "jabatan_id": jabatan_id,
+            "periode": "2099-01",
+            "min_responden": 1,
+            "max_responden": 10,
+        },
+    )
+    assert r.status_code == 201, r.text
+
+    r2 = client.post(f"{CATALOG_BASE}/purge")
+    assert r2.status_code == 409
+
+
+def test_purge_reseed_round_trip(client: TestClient) -> None:
+    r = client.get(UT_BASE, params={"limit": 1})
+    assert r.status_code == 200
+    total_awal = r.json()["total"]
+    assert total_awal > 0
+
+    r_purge = client.post(f"{CATALOG_BASE}/purge")
+    assert r_purge.status_code == 200, r_purge.text
+    deleted = r_purge.json()["deleted"]
+    assert deleted["uraian_tugas"] == total_awal
+
+    r_after_purge = client.get(UT_BASE, params={"limit": 1})
+    assert r_after_purge.json()["total"] == 0
+
+    r_reseed = client.post(f"{CATALOG_BASE}/reseed")
+    assert r_reseed.status_code == 200, r_reseed.text
+    created = r_reseed.json()["created"]
+    assert created["uraian_tugas"] == total_awal
+
+    r_after_reseed = client.get(UT_BASE, params={"limit": 1})
+    assert r_after_reseed.json()["total"] == total_awal

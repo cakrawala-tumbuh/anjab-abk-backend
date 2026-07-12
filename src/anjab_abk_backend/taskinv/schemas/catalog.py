@@ -58,3 +58,32 @@ class TiKombinasiRead(BaseModel):
     jabatan_id: str = Field(description="ID jabatan.", examples=["jbt_a1b2c3d4"])
     jabatan_nama: str = Field(description="Nama jabatan.", examples=["Kepala Sekolah"])
     jumlah_task: int = Field(description="Jumlah task pada kombinasi ini.", examples=[42])
+
+
+class TiCatalogPurgeCounts(BaseModel):
+    """Jumlah baris yang dihapus per tabel katalog."""
+
+    uraian_tugas: int
+    detil_tugas: int
+    tugas_pokok: int
+
+
+class TiCatalogPurgeResult(BaseModel):
+    """Hasil `POST /catalog/purge`."""
+
+    deleted: TiCatalogPurgeCounts
+
+
+class TiCatalogReseedCounts(BaseModel):
+    """Jumlah baris yang di-seed per tabel katalog."""
+
+    jabatan: int
+    tugas_pokok: int
+    detil_tugas: int
+    uraian_tugas: int
+
+
+class TiCatalogReseedResult(BaseModel):
+    """Hasil `POST /catalog/reseed`."""
+
+    created: TiCatalogReseedCounts

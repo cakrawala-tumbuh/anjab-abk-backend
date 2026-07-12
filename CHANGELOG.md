@@ -7,6 +7,22 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-07-12
+
+### Ditambahkan
+
+- **Endpoint admin purge & reseed katalog master Task Inventory** —
+  `POST /task-inventory/catalog/purge` dan `POST /task-inventory/catalog/reseed`.
+  Menjadikan purge+reseed katalog (`ti_uraian_tugas`/`ti_tugas_pokok`/
+  `ti_detil_tugas`) sebagai fitur admin resmi via API, menggantikan
+  ketergantungan pada `scripts/purge_task_catalog.py` yang butuh akses
+  `DATABASE_URL` produksi langsung. `purge` ditolak (409, hard-blocked tanpa
+  flag override) bila masih ada ≥1 sesi Task Inventory — `ti_seleksi`/
+  `ti_tahap2`/`ti_detail` merujuk katalog lewat `task_kode` string (bukan FK),
+  sehingga purge saat ada sesi berjalan akan merusak data transaksi.
+  `seed_catalog_models` kini mengembalikan `SeedSummary` (jumlah baris
+  jabatan/tugas_pokok/detil_tugas/uraian_tugas yang di-seed) alih-alih `None`.
+
 ## [0.27.0] - 2026-07-12
 
 ### Ditambahkan

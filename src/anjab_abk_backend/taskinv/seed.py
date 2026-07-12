@@ -33,6 +33,15 @@ _DATA_FILE = Path(__file__).parent / "data" / "task_catalog.json"
 _logger = logging.getLogger(__name__)
 
 
+class SeedSummary(TypedDict):
+    """Ringkasan jumlah baris yang dibuat (bukan di-skip) per tabel oleh `seed_catalog_models`."""
+
+    jabatan: int
+    tugas_pokok: int
+    detil_tugas: int
+    uraian_tugas: int
+
+
 class CatalogItem(TypedDict):
     """Satu item catalog task (hasil load JSON)."""
 
@@ -69,7 +78,7 @@ def seed_catalog_models(
     dt_svc: DetilTugasService,
     ut_svc: UraianTugasService,
     jabatan_svc: JabatanService,
-) -> None:
+) -> SeedSummary:
     """Seed Jabatan, TugasPokok, DetilTugas, UraianTugas dari task_catalog.json.
 
     Fungsi ini idempoten: data yang sudah ada (duplikat) di-skip tanpa error.
@@ -242,10 +251,11 @@ def seed_catalog_models(
         except ConflictError:
             pass  # kode sudah ada, skip
 
-    _logger.info(
-        "seed_catalog_models: %d jabatan, %d TP, %d DT, %d UT di-seed dari task_catalog.json",
-        len(jabatan_id_by_nama),
-        len(tp_by_nama),
-        len(dt_by_key),
-        len(catalog),
+    summary = SeedSummary(
+        jabatan=len(jabatan_id_by_nama),
+        tugas_pokok=len(tp_by_nama),
+        detil_tugas=len(dt_by_key),
+        uraian_tugas=len(catalog),
     )
+    _logger.info("seed_catalog_models: %s", summary)
+    return summary
