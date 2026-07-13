@@ -37,9 +37,6 @@ class TiRespondenService(Protocol):
     def create(
         self, sesi_id: str, data: TiRespondenCreate, max_responden: int
     ) -> TiRespondenRead: ...
-    def ensure_for_partisipan(
-        self, sesi_id: str, *, partisipan_id: str, nama: str | None
-    ) -> TiRespondenRead: ...
     def assign_banyak(
         self, sesi_id: str, partisipan_ids: list[str], *, max_responden: int
     ) -> BulkAssignResult[TiRespondenRead]: ...
@@ -102,28 +99,6 @@ class InMemoryTiRespondenService:
                 sesi_id=sesi_id,
                 nama=data.nama,
                 partisipan_id=data.partisipan_id,
-                tahap1_submit=False,
-                tahap3_submit=False,
-                created_at=datetime.now(UTC),
-            )
-            self._data[rec.id] = rec
-            return self._to_read(rec)
-
-    def ensure_for_partisipan(
-        self, sesi_id: str, *, partisipan_id: str, nama: str | None
-    ) -> TiRespondenRead:
-        """Idempoten: kembalikan responden untuk (sesi_id, partisipan_id) bila sudah ada,
-        selain itu buat baru. Tidak menerapkan batas max_responden.
-        """
-        with self._lock:
-            for r in self._data.values():
-                if r.sesi_id == sesi_id and r.partisipan_id == partisipan_id:
-                    return self._to_read(r)
-            rec = _Record(
-                id=f"trsp_{uuid.uuid4().hex[:8]}",
-                sesi_id=sesi_id,
-                nama=nama,
-                partisipan_id=partisipan_id,
                 tahap1_submit=False,
                 tahap3_submit=False,
                 created_at=datetime.now(UTC),

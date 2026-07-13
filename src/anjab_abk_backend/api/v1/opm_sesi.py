@@ -7,11 +7,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, Query, Response, status
 
+from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     Idempotency,
     Pagination,
+    authorize_opm_sesi_access,
     get_current_principal,
+    get_opm_responden_service,
     get_opm_sesi_service,
+    get_partisipan_service,
     idempotency,
     pagination_params,
     rate_limit,
@@ -19,6 +23,7 @@ from ...dependencies import (
 )
 from ...errors import ConflictError
 from ...opm.schemas.sesi import OpmSesiCreate, OpmSesiRead, OpmSesiTaskRead, OpmSesiUpdate
+from ...opm.services.responden import OpmRespondenService
 from ...opm.services.sesi import OpmSesiService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
@@ -28,18 +33,23 @@ router = APIRouter()
 
 logger = logging.getLogger("anjab_abk_backend.api.v1.opm_sesi")
 
-_WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
+_ADMIN_GUARDS = [Depends(require_admin), Depends(rate_limit)]
 _NOT_FOUND = {404: {"model": ErrorResponse, "description": "Sesi OPM tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 _FORBIDDEN = {403: {"model": ErrorResponse, "description": "Bukan admin."}}
+_FORBIDDEN_PESERTA = {
+    403: {"model": ErrorResponse, "description": "Bukan admin atau responden sesi OPM ini."}
+}
 
 
 @router.get(
     "",
     response_model=Page[OpmSesiRead],
-    summary="Daftar sesi OPM",
+    summary="Daftar sesi OPM (admin)",
     operation_id="opm_sesi_list",
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN},
 )
 def list_sesi(
     page: Annotated[Pagination, Depends(pagination_params)],
@@ -53,12 +63,13 @@ def list_sesi(
     "",
     response_model=OpmSesiRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Buat sesi OPM (snapshot task dari sesi Task Inventory yang sudah frozen)",
+    summary="Buat sesi OPM (snapshot task dari sesi Task Inventory yang sudah frozen) (admin)",
     operation_id="opm_sesi_create",
-    dependencies=_WRITE_GUARDS,
+    dependencies=_ADMIN_GUARDS,
     responses={
         **_AUTH,
         **_RATE,
+        **_FORBIDDEN,
         409: {"model": ErrorResponse, "description": "Jabatan sudah punya sesi OPM."},
         422: {
             "model": ErrorResponse,
@@ -108,9 +119,15 @@ def create_sesi(
 @router.post(
     "/search",
     response_model=Page[OpmSesiRead],
-    summary="Cari sesi OPM (domain ala Odoo)",
+    summary="Cari sesi OPM (domain ala Odoo) (admin)",
     operation_id="opm_sesi_search",
-    responses={422: {"model": ErrorResponse, "description": "Domain/field tidak valid."}},
+    dependencies=_ADMIN_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        422: {"model": ErrorResponse, "description": "Domain/field tidak valid."},
+    },
 )
 def search_sesi(
     req: SearchRequest,
@@ -125,9 +142,10 @@ def search_sesi(
 @router.get(
     "/{sesi_id}",
     response_model=OpmSesiRead,
-    summary="Ambil sesi OPM",
+    summary="Ambil sesi OPM (admin)",
     operation_id="opm_sesi_get",
-    responses=_NOT_FOUND,
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
 )
 def get_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
@@ -139,10 +157,10 @@ def get_sesi(
 @router.patch(
     "/{sesi_id}",
     response_model=OpmSesiRead,
-    summary="Perbarui sesi OPM (hanya saat DRAFT)",
+    summary="Perbarui sesi OPM (hanya saat DRAFT) (admin)",
     operation_id="opm_sesi_update",
-    dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND},
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
 )
 def update_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
@@ -194,10 +212,10 @@ def delete_sesi(
 @router.post(
     "/{sesi_id}/buka",
     response_model=OpmSesiRead,
-    summary="Buka sesi OPM (DRAFT → OPEN)",
+    summary="Buka sesi OPM (DRAFT → OPEN) (admin)",
     operation_id="opm_sesi_buka",
-    dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND},
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
 )
 def buka_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
@@ -209,10 +227,10 @@ def buka_sesi(
 @router.post(
     "/{sesi_id}/tutup",
     response_model=OpmSesiRead,
-    summary="Tutup sesi OPM (OPEN → CLOSED)",
+    summary="Tutup sesi OPM (OPEN → CLOSED) (admin)",
     operation_id="opm_sesi_tutup",
-    dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND},
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
 )
 def tutup_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
@@ -224,13 +242,17 @@ def tutup_sesi(
 @router.get(
     "/{sesi_id}/task",
     response_model=list[OpmSesiTaskRead],
-    summary="Daftar snapshot task dalam sesi OPM",
+    summary="Daftar snapshot task dalam sesi OPM (admin atau responden sesi)",
     operation_id="opm_sesi_task_list",
-    responses=_NOT_FOUND,
+    responses={**_AUTH, **_FORBIDDEN_PESERTA, **_NOT_FOUND},
 )
 def list_task(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
+    principal: Annotated[Principal, Depends(get_current_principal)],
     service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
 ) -> list[OpmSesiTaskRead]:
+    authorize_opm_sesi_access(principal, sesi_id, par_service, rsp_service)
     service.get(sesi_id)
     return service.list_task(sesi_id)

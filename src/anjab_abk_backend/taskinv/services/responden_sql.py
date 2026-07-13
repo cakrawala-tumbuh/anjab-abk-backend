@@ -188,34 +188,6 @@ class SqlTiRespondenService:
         self._s.flush()
         return _to_read(rec)
 
-    def ensure_for_partisipan(
-        self, sesi_id: str, *, partisipan_id: str, nama: str | None
-    ) -> TiRespondenRead:
-        """Idempoten: kembalikan responden untuk (sesi_id, partisipan_id) bila sudah ada,
-        selain itu buat baru. Tidak menerapkan batas max_responden.
-        """
-        existing = self._s.scalar(
-            select(TiRespondenModel)
-            .where(
-                TiRespondenModel.sesi_id == sesi_id,
-                TiRespondenModel.partisipan_id == partisipan_id,
-            )
-            .order_by(TiRespondenModel.created_at.asc())
-        )
-        if existing is not None:
-            return _to_read(existing)
-        rec = TiRespondenModel(
-            id=f"trsp_{uuid.uuid4().hex[:8]}",
-            sesi_id=sesi_id,
-            nama=nama,
-            partisipan_id=partisipan_id,
-            tahap1_submit=False,
-            tahap3_submit=False,
-        )
-        self._s.add(rec)
-        self._s.flush()
-        return _to_read(rec)
-
     def assign_banyak(
         self, sesi_id: str, partisipan_ids: list[str], *, max_responden: int
     ) -> BulkAssignResult[TiRespondenRead]:

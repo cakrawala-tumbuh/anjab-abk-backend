@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Path
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    authorize_sesi_access,
     get_current_principal,
     get_partisipan_service,
     get_ti_catalog_service,
@@ -33,23 +34,34 @@ _RATE_GUARD = [Depends(rate_limit)]
 _NOT_FOUND_SESI = {404: {"model": ErrorResponse, "description": "Sesi tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
+_FORBIDDEN_PESERTA = {
+    403: {"model": ErrorResponse, "description": "Bukan admin atau peserta sesi."}
+}
 
 
 @router.get(
     "/{sesi_id}/tahap2",
     response_model=TiTahap2ReviewRead,
-    summary="Lihat task yang perlu diputuskan koordinator di Tahap 2",
+    summary="Lihat task yang perlu diputuskan koordinator di Tahap 2 (admin atau peserta sesi)",
     operation_id="taskinv_tahap2_get",
-    responses={**_NOT_FOUND_SESI, 422: {"model": ErrorResponse}},
+    responses={
+        **_AUTH,
+        **_FORBIDDEN_PESERTA,
+        **_NOT_FOUND_SESI,
+        422: {"model": ErrorResponse},
+    },
 )
 def get_tahap2_review(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
+    principal: Annotated[Principal, Depends(get_current_principal)],
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     tahap2_service: Annotated[TiTahap2Service, Depends(get_ti_tahap2_service)],
 ) -> TiTahap2ReviewRead:
     sesi = sesi_service.get(sesi_id)
+    authorize_sesi_access(principal, sesi, par_service, rsp_service)
     if sesi.status not in ("TAHAP2", "TAHAP3", "CLOSED", "ANALYZED"):
         raise ValidationAppError(
             f"Review Tahap 2 hanya tersedia setelah TAHAP2 (saat ini: {sesi.status})."

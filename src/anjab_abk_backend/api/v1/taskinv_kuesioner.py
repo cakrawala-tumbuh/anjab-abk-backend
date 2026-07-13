@@ -42,28 +42,22 @@ def kuesioner_saya(
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     jabatan_service: Annotated[JabatanService, Depends(get_jabatan_service)],
 ) -> list[TiKuesionerItemRead]:
-    """Enrollment otomatis: Task Inventory bersifat universal — tiap partisipan
-    mengisi SEMUA sesi aktif (TAHAP1/TAHAP2/TAHAP3), sambil membuat record
-    responden bila belum ada.
+    """Kembalikan sesi Task Inventory yang partisipannya sudah terdaftar sebagai
+    responden, bila sesi aktif.
+
+    Partisipan hanya melihat sesi tempat ia terdaftar sebagai responden —
+    pendaftaran terjadi saat sesi dibuat, dari anggota SME panel jabatan
+    tersebut. Tidak ada enrollment otomatis di endpoint ini.
     """
     par = par_service.get_by_subject(principal.subject)
     if par is None:
         return []
 
-    sesi_list, _ = sesi_service.search(
-        domain=[("status", "in", _ACTIVE_STATUSES)],
-        order=[("created_at", "desc")],
-        limit=100,
-        offset=0,
-    )
-
     result = []
-    for sesi in sesi_list:
-        rsp = rsp_service.ensure_for_partisipan(
-            sesi.id,
-            partisipan_id=par.id,
-            nama=par.nama,
-        )
+    for rsp in rsp_service.list_by_partisipan(par.id):
+        sesi = sesi_service.get(rsp.sesi_id)
+        if sesi.status not in _ACTIVE_STATUSES:
+            continue
         try:
             jabatan = jabatan_service.get(sesi.jabatan_id)
             jabatan_nama = jabatan.nama

@@ -59,6 +59,7 @@ from .services.idempotency_sql import SqlIdempotencyStore
 from .services.ratelimit import AllowAllRateLimiter, RateLimiter
 from .services.readiness import ReadinessCheck
 from .services.readiness_db import DatabaseReadinessCheck
+from .taskinv.schemas.sesi import TiSesiRead
 from .taskinv.services.catalog import TiCatalogService, UraianTugasBackedCatalogService
 from .taskinv.services.detail import TiDetailService
 from .taskinv.services.detail_sql import SqlTiDetailService
@@ -357,6 +358,50 @@ def authorize_responden_access(
     par = par_service.get_by_subject(principal.subject)
     if par is None or partisipan_id is None or par.id != partisipan_id:
         raise ForbiddenError("Akses ditolak: Anda bukan pemilik data responden ini.")
+
+
+def authorize_sesi_access(
+    principal: Principal,
+    sesi: TiSesiRead,
+    par_service: PartisipanService,
+    rsp_service: TiRespondenService,
+) -> None:
+    """Guard otorisasi object-level sesi TI: admin ATAU peserta sesi ini.
+
+    Peserta = koordinator sesi, atau partisipan yang terdaftar sebagai responden di sesi
+    ini. Dipakai di endpoint baca sesi/tahap2/task-terpilih agar partisipan tidak dapat
+    membaca sesi jabatan lain lewat penebakan ID (BOLA/IDOR).
+    """
+    if "admin" in principal.groups:
+        return
+    par = par_service.get_by_subject(principal.subject)
+    if par is None:
+        raise ForbiddenError("Akses ditolak: Anda bukan peserta sesi ini.")
+    if par.id == sesi.koordinator_id:
+        return
+    if any(r.sesi_id == sesi.id for r in rsp_service.list_by_partisipan(par.id)):
+        return
+    raise ForbiddenError("Akses ditolak: Anda bukan peserta sesi ini.")
+
+
+def authorize_opm_sesi_access(
+    principal: Principal,
+    sesi_id: str,
+    par_service: PartisipanService,
+    rsp_service: OpmRespondenService,
+) -> None:
+    """Guard otorisasi object-level sesi OPM: admin ATAU responden sesi ini.
+
+    OPM tidak punya koordinator (beda dari Task Inventory), jadi peserta = partisipan
+    yang terdaftar sebagai responden di sesi ini. Dipakai di `GET /sesi/{id}/task` agar
+    partisipan tidak dapat membaca snapshot task sesi jabatan lain lewat penebakan ID
+    (BOLA/IDOR).
+    """
+    if "admin" in principal.groups:
+        return
+    par = par_service.get_by_subject(principal.subject)
+    if par is None or not any(r.sesi_id == sesi_id for r in rsp_service.list_by_partisipan(par.id)):
+        raise ForbiddenError("Akses ditolak: Anda bukan peserta sesi OPM ini.")
 
 
 # --- Rate limiting ---

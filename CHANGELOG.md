@@ -7,6 +7,86 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diperbaiki
+
+- **Otorisasi endpoint sesi/hasil/tahap2 Task Inventory kini ditegakkan di backend**
+  (sebelumnya murni kosmetik — hanya digating di frontend, backend meloloskan siapa
+  pun yang bisa menjangkau API). Dua lapis guard baru:
+  - **Lapis 1 — admin murni** (`Depends(require_admin)`): `GET /sesi`,
+    `POST /sesi/search`, `POST /sesi` (create), `PATCH /sesi/{id}`, keempat transisi
+    (`mulai-tahap1|2|3`, `tutup`), `POST /sesi/{id}/analisis`, `GET /sesi/{id}/hasil`.
+    Sebelumnya sebagian besar endpoint ini **tanpa guard sama sekali** (dapat dibaca
+    tanpa token), dan yang lain hanya mensyaratkan token sah tanpa cek peran — artinya
+    partisipan biasa bisa menjalankan seluruh state machine sesi milik siapa pun,
+    termasuk membekukan himpunan task Tahap 3 (`mulai-tahap3` — **tidak reversibel**).
+  - **Lapis 2 — admin ATAU peserta sesi**, lewat helper baru `authorize_sesi_access()`
+    (`dependencies.py`, sejajar `authorize_responden_access()`): `GET /sesi/{id}`,
+    `GET /sesi/{id}/tahap2`, `GET /sesi/{id}/task-terpilih`. Peserta = koordinator
+    sesi atau partisipan yang punya baris `TiRespondenModel` di sesi itu — mencegah
+    partisipan membaca sesi jabatan lain lewat penebakan ID (BOLA/IDOR), sambil tetap
+    mengizinkan alur pengisian Tahap 1/2/3 partisipan yang sah.
+  - **`GET /sesi/{id}/responden`** (`taskinv_responden.py`) direlaksasi dari
+    `require_admin` murni menjadi `authorize_sesi_access` (admin/peserta) —
+    sebelumnya endpoint ini secara diam-diam mem-403-kan koordinator SME panel
+    non-admin yang memuat halaman review Tahap 2 web app
+    (`tahap2/[sesi_id]/page.tsx`), yang justru memerlukan daftar responden untuk
+    menentukan apakah pengunjung adalah anggota panel.
+  - `POST /sesi/{id}/tahap2` **tidak disentuh** — sudah benar (cek koordinator
+    sendiri sejak awal).
+  - Berlaku efektif hanya setelah perbaikan enrollment TI (entri di atas): sebelum
+    itu, "punya baris responden di sesi ini" bernilai benar untuk semua partisipan
+    (auto-enroll universal), sehingga guard lapis 2 tidak menyaring apa pun.
+  - Tidak ada perubahan skema/model/migrasi — murni pemasangan guard.
+    `openapi.json` bertambah blok `security` + respons `401`/`403` per operasi
+    (bentuk request/response tidak berubah).
+
+- **Otorisasi endpoint sesi/hasil OPM kini ditegakkan di backend** (lubang yang
+  sama persis dengan Task Inventory di atas, ditemukan di audit lanjutan; OPM
+  tidak punya konsep koordinator sehingga lapis 2 lebih sempit). Dua lapis guard
+  baru:
+  - **Lapis 1 — admin murni** (`_ADMIN_GUARDS`, pola sudah ada di
+    `opm_responden.py`): `GET /opm/sesi`, `POST /opm/sesi/search`,
+    `GET /opm/sesi/{id}`, `POST /opm/sesi` (create), `PATCH /opm/sesi/{id}`,
+    `POST /sesi/{id}/buka`, `POST /sesi/{id}/tutup`, `POST /sesi/{id}/analisis`,
+    `GET /sesi/{id}/hasil`. Sebagian tanpa guard sama sekali, sebagian lain
+    hanya token sah tanpa cek peran — partisipan biasa bisa membuka/menutup
+    sesi OPM milik siapa pun dan menjalankan analisisnya.
+  - **Lapis 2 — admin ATAU responden sesi ini**, lewat helper baru
+    `authorize_opm_sesi_access()` (`dependencies.py`) — **hanya**
+    `GET /sesi/{id}/task`, satu-satunya endpoint sesi-level yang dipanggil
+    halaman pengisian partisipan (`opm/isi/[responden_id]`). Peserta = partisipan
+    yang punya baris `OpmRespondenModel` di sesi itu (tanpa cabang koordinator —
+    `OpmSesiModel` tidak punya kolom itu).
+  - Endpoint responden OPM (`opm_responden.py`) dan `GET /opm/kuesioner/saya`
+    **tidak disentuh** — sudah benar sejak awal (assignment-based, tidak ada
+    auto-enroll universal seperti bug TI di atas).
+  - Tidak ada perubahan skema/model/migrasi — murni pemasangan guard.
+    `openapi.json` bertambah blok `security` + respons `401`/`403` per operasi
+    (bentuk request/response tidak berubah).
+
+- **`GET /task-inventory/kuesioner/saya` kini murni pembacaan — tidak lagi
+  mendaftarkan partisipan sebagai responden ke SEMUA sesi Task Inventory
+  aktif.** Bug lama: endpoint ini mencari seluruh sesi TAHAP1/TAHAP2/TAHAP3
+  tanpa filter partisipan, lalu memanggil `ensure_for_partisipan()` yang
+  meng-INSERT baris `TiRespondenModel` untuk tiap sesi — membuat partisipan
+  bisa "terdaftar" ke sesi jabatan yang bukan urusannya, dan membatalkan
+  penyaringan SME panel yang sudah berjalan di jalur enrollment `create()`
+  sesi (item `0.31.0`). Endpoint sekarang memakai `list_by_partisipan()`,
+  pola yang sama dengan OPM — hanya menampilkan sesi tempat partisipan
+  memang sudah terdaftar sebagai responden.
+  - `ensure_for_partisipan()` **dihapus total** dari `TiRespondenService`
+    (Protocol, impl in-memory, impl SQL) — tidak ada pemanggil lain.
+  - Kontrak `TiKuesionerItemRead` **tidak berubah**; `openapi.json` tidak
+    berubah bentuk skema (hanya deskripsi endpoint).
+  - **Tidak membersihkan data lama** — partisipan yang sudah terlanjur
+    ter-enroll ke sesi yang bukan haknya (lewat bug ini) tetap punya baris
+    `ti_responden` sampai dibersihkan lewat langkah terpisah (butuh
+    konfirmasi eksplisit, di luar lingkup perbaikan ini).
+  - Koreksi dokumentasi: revisi `[2026-06-21]` di `CLAUDE.md` sempat
+    menyatakan Task Inventory "tetap menggunakan flow yang sama (assignment
+    manual via tambah-responden)" — klaim itu **tidak pernah benar di kode**;
+    ditandai sebagai keliru di `CLAUDE.md`.
+
 ## [0.31.0] - 2026-07-13
 
 ### Ditambahkan

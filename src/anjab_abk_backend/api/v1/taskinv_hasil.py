@@ -6,17 +6,22 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path
 
+from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    authorize_sesi_access,
     get_current_principal,
+    get_partisipan_service,
     get_ti_catalog_service,
     get_ti_detail_service,
     get_ti_responden_service,
     get_ti_seleksi_service,
     get_ti_sesi_service,
     rate_limit,
+    require_admin,
 )
 from ...errors import ValidationAppError
 from ...schemas.common import ErrorResponse
+from ...security import Principal
 from ...taskinv.schemas.catalog import TiCatalogRead
 from ...taskinv.schemas.hasil import TiHasilSesiRead, TiTaskTerpilihRead
 from ...taskinv.services.analisis import compute_hasil_sesi, compute_task_terpilih
@@ -28,10 +33,14 @@ from ...taskinv.services.sesi import TiSesiService
 
 router = APIRouter()
 
-_WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
+_ADMIN_GUARDS = [Depends(require_admin), Depends(rate_limit)]
 _NOT_FOUND_SESI = {404: {"model": ErrorResponse, "description": "Sesi tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
+_FORBIDDEN = {403: {"model": ErrorResponse, "description": "Bukan admin."}}
+_FORBIDDEN_PESERTA = {
+    403: {"model": ErrorResponse, "description": "Bukan admin atau peserta sesi."}
+}
 
 
 def _catalog_map(catalog: TiCatalogService, kodes: list[str]) -> dict[str, TiCatalogRead]:
@@ -47,18 +56,26 @@ def _catalog_map(catalog: TiCatalogService, kodes: list[str]) -> dict[str, TiCat
 @router.get(
     "/{sesi_id}/task-terpilih",
     response_model=list[TiTaskTerpilihRead],
-    summary="Himpunan task relevan yang dibekukan (tersedia setelah TAHAP2)",
+    summary="Himpunan task relevan yang dibekukan (tersedia setelah TAHAP2) (admin/peserta)",
     operation_id="taskinv_task_terpilih",
-    responses={**_NOT_FOUND_SESI, 422: {"model": ErrorResponse}},
+    responses={
+        **_AUTH,
+        **_FORBIDDEN_PESERTA,
+        **_NOT_FOUND_SESI,
+        422: {"model": ErrorResponse},
+    },
 )
 def get_task_terpilih(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
+    principal: Annotated[Principal, Depends(get_current_principal)],
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
     catalog: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
 ) -> list[TiTaskTerpilihRead]:
     sesi = sesi_service.get(sesi_id)
+    authorize_sesi_access(principal, sesi, par_service, rsp_service)
     if sesi.status not in ("TAHAP3", "CLOSED", "ANALYZED"):
         raise ValidationAppError(
             f"Himpunan task terpilih baru tersedia setelah TAHAP3 (saat ini: {sesi.status})."
@@ -72,10 +89,16 @@ def get_task_terpilih(
 @router.post(
     "/{sesi_id}/analisis",
     response_model=TiHasilSesiRead,
-    summary="Jalankan analisis Task Inventory (CLOSED → ANALYZED)",
+    summary="Jalankan analisis Task Inventory (CLOSED → ANALYZED) (admin)",
     operation_id="taskinv_analisis_run",
-    dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND_SESI, 422: {"model": ErrorResponse}},
+    dependencies=_ADMIN_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOT_FOUND_SESI,
+        422: {"model": ErrorResponse},
+    },
 )
 def run_analisis(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
@@ -106,9 +129,16 @@ def run_analisis(
 @router.get(
     "/{sesi_id}/hasil",
     response_model=TiHasilSesiRead,
-    summary="Lihat hasil analisis sesi Task Inventory",
+    summary="Lihat hasil analisis sesi Task Inventory (admin)",
     operation_id="taskinv_hasil_get",
-    responses={**_NOT_FOUND_SESI, 422: {"model": ErrorResponse}},
+    dependencies=_ADMIN_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOT_FOUND_SESI,
+        422: {"model": ErrorResponse},
+    },
 )
 def get_hasil(
     sesi_id: Annotated[str, Path(description="ID sesi.")],

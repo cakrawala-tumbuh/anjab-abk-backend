@@ -10,6 +10,7 @@ from ...anjab.services.sme_panel import SMEPanelService
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     authorize_responden_access,
+    authorize_sesi_access,
     get_current_principal,
     get_partisipan_service,
     get_sme_panel_service,
@@ -36,22 +37,27 @@ _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan
 _FORBIDDEN = {
     403: {"model": ErrorResponse, "description": "Bukan admin atau bukan pemilik responden."}
 }
+_FORBIDDEN_PESERTA = {
+    403: {"model": ErrorResponse, "description": "Bukan admin atau peserta sesi."}
+}
 
 
 @router.get(
     "/{sesi_id}/responden",
     response_model=list[TiRespondenRead],
-    summary="Daftar responden dalam sesi (admin)",
+    summary="Daftar responden dalam sesi (admin atau peserta sesi)",
     operation_id="taskinv_responden_list",
-    dependencies=[Depends(require_admin)],
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_SESI},
+    responses={**_AUTH, **_FORBIDDEN_PESERTA, **_NOT_FOUND_SESI},
 )
 def list_responden(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
+    principal: Annotated[Principal, Depends(get_current_principal)],
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
 ) -> list[TiRespondenRead]:
-    sesi_service.get(sesi_id)
+    sesi = sesi_service.get(sesi_id)
+    authorize_sesi_access(principal, sesi, par_service, rsp_service)
     return rsp_service.list_by_sesi(sesi_id)
 
 

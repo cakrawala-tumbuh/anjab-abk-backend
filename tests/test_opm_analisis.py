@@ -172,3 +172,52 @@ def test_compute_hasil_sesi_boundary_mean_criticality_399_false() -> None:
     hasil = compute_hasil_sesi(sesi, tasks, responden_raw)
     assert hasil.tasks[0].mean_criticality < 4.0
     assert hasil.tasks[0].selection_essential is False
+
+
+# --------------------------------------------------------------------------- #
+# Otorisasi (item 015): lapis 1 (admin murni) — `/analisis` dan `/hasil`.
+#
+# Guard berjalan sebagai dependency FastAPI sebelum badan endpoint dieksekusi,
+# jadi ID sesi dummy cukup untuk menguji 401/403 (lihat pola serupa di
+# `test_opm_sesi.py`).
+# --------------------------------------------------------------------------- #
+
+_DUMMY_SESI_ID = "opses_dummy"
+
+
+def test_opm_analisis_tanpa_token_401(anon_client: TestClient) -> None:
+    assert anon_client.post(f"{SESI_BASE}/{_DUMMY_SESI_ID}/analisis").status_code == 401
+
+
+def test_opm_analisis_partisipan_403(client_as) -> None:
+    as_partisipan = client_as("opm-guard-analisis")
+    assert as_partisipan.post(f"{SESI_BASE}/{_DUMMY_SESI_ID}/analisis").status_code == 403
+
+
+def test_opm_hasil_tanpa_token_401(anon_client: TestClient) -> None:
+    assert anon_client.get(f"{SESI_BASE}/{_DUMMY_SESI_ID}/hasil").status_code == 401
+
+
+def test_opm_hasil_partisipan_403(client_as) -> None:
+    as_partisipan = client_as("opm-guard-hasil")
+    assert as_partisipan.get(f"{SESI_BASE}/{_DUMMY_SESI_ID}/hasil").status_code == 403
+
+
+def test_opm_admin_semua_endpoint_boleh(client: TestClient, jabatan_id_tk: str) -> None:
+    """Admin tidak terhalang guard baru (item 015) di endpoint sesi/hasil OPM manapun."""
+    sesi, ctx = _build_sesi(client, jabatan_id_tk, min_responden=1)
+    sid = sesi["id"]
+
+    assert client.get(SESI_BASE).status_code == 200
+    r_search = client.post(f"{SESI_BASE}/search", json={"domain": [], "limit": 10, "offset": 0})
+    assert r_search.status_code == 200
+    assert client.get(f"{SESI_BASE}/{sid}").status_code == 200
+    assert client.patch(f"{SESI_BASE}/{sid}", json={"catatan": "ok"}).status_code == 200
+    assert client.get(f"{SESI_BASE}/{sid}/task").status_code == 200
+
+    assert client.post(f"{SESI_BASE}/{sid}/buka").status_code == 200
+    responden = client.get(f"{SESI_BASE}/{sid}/responden").json()
+    _submit(client, responden[0]["id"], ctx["kodes"], 4, 3, 5)
+    assert client.post(f"{SESI_BASE}/{sid}/tutup").status_code == 200
+    assert client.post(f"{SESI_BASE}/{sid}/analisis").status_code == 200
+    assert client.get(f"{SESI_BASE}/{sid}/hasil").status_code == 200

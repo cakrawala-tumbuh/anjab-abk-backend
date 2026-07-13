@@ -72,6 +72,156 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-13] Task Inventory: otorisasi endpoint sesi/hasil/tahap2 ditegakkan di backend
+
+Sebelum revisi ini, otorisasi level-sesi Task Inventory murni kosmetik — hanya
+digating di frontend (`anjab-abk-web-app`); backend tidak menegakkan apa pun.
+Sebagian endpoint **tanpa guard sama sekali** (dapat dibaca tanpa token), yang
+lain hanya mensyaratkan token sah tanpa cek peran (`_WRITE_GUARDS`) — partisipan
+biasa bisa membaca sesi siapa pun DAN menjalankan seluruh state machine sesi
+(termasuk `mulai-tahap3`, yang membekukan himpunan task — **tidak reversibel**).
+Bermakna efektif hanya setelah entri `/kuesioner/saya` di bawah (013): sebelum
+itu, "punya baris responden di sesi ini" bernilai benar untuk semua partisipan
+(auto-enroll universal), sehingga guard lapis 2 tidak menyaring apa pun.
+
+Dua lapis guard baru:
+
+- **Lapis 1 — admin murni** (`dependencies=[Depends(require_admin), Depends(rate_limit)]`,
+  konstanta `_ADMIN_GUARDS`, pola persis `taskinv_responden.py`).
+- **Lapis 2 — admin ATAU peserta sesi**, lewat helper baru `authorize_sesi_access()`
+  (`dependencies.py`, sejajar `authorize_responden_access()`) — dipanggil manual di
+  badan endpoint (bukan `dependencies=`) karena butuh objek `sesi` yang sudah di-`get()`.
+  Peserta = koordinator sesi (`partisipan.id == sesi.koordinator_id`) **atau**
+  partisipan yang punya baris `TiRespondenModel` di sesi itu.
+
+Matriks guard (siapa boleh apa):
+
+| Endpoint | Admin | Koordinator sesi | Anggota panel (responden) | Partisipan lain |
+|---|---|---|---|---|
+| `GET /sesi`, `POST /sesi/search` | ✅ | ❌ | ❌ | ❌ |
+| `POST /sesi` (create), `PATCH /sesi/{id}` | ✅ | ❌ | ❌ | ❌ |
+| `POST /sesi/{id}/mulai-tahap1\|2\|3`, `/tutup` | ✅ | ❌ | ❌ | ❌ |
+| `POST /sesi/{id}/analisis`, `GET /sesi/{id}/hasil` | ✅ | ❌ | ❌ | ❌ |
+| `DELETE /sesi/{id}` (tidak disentuh revisi ini) | ✅ | ❌ | ❌ | ❌ |
+| `GET /sesi/{id}` | ✅ | ✅ | ✅ | ❌ |
+| `GET /sesi/{id}/tahap2` | ✅ | ✅ | ✅ | ❌ |
+| `GET /sesi/{id}/task-terpilih` | ✅ | ✅ | ✅ | ❌ |
+| `GET /sesi/{id}/responden` | ✅ | ✅ | ✅ | ❌ |
+| `POST /sesi/{id}/tahap2` (submit keputusan, tidak disentuh) | ✅ | ✅ | ❌ | ❌ |
+
+Detail per keputusan:
+
+- **`GET /sesi/{id}/responden`** (`taskinv_responden.py`) direlaksasi dari
+  `require_admin` murni menjadi `authorize_sesi_access` — **satu-satunya keputusan
+  yang tidak terkunci di spesifikasi backlog, dieksekusi sebagai opsi (a)**.
+  Alasan: halaman koordinator web app (`tahap2/[sesi_id]/page.tsx`) memanggil
+  endpoint ini untuk menentukan apakah pengunjung adalah anggota panel
+  (`isAnggota`); dengan `require_admin` murni, koordinator/anggota non-admin
+  SELALU menerima 403 di sana — fitur read-only untuk anggota panel yang
+  dimaksud kode itu (`!canEdit` → tampil hanya-baca) sudah lama tidak berfungsi
+  secara diam-diam, tanpa laporan. Opsi (b) (biarkan `require_admin`, ubah
+  halaman agar tidak memanggilnya) ditolak karena akan menghapus fitur yang
+  memang dimaksud ada, bukan memperbaikinya.
+- **`POST /sesi/{id}/tahap2` tidak disentuh** — sudah benar (cek koordinator
+  eksplisit sejak awal, `taskinv_tahap2.py`).
+- Guard 401 dicek **sebelum** 404 pada endpoint lapis 2 (`get_current_principal`
+  adalah dependency FastAPI, dievaluasi sebelum badan fungsi) — memanggil
+  `GET /sesi/{id}` tanpa token pada ID yang tidak ada mengembalikan 401, bukan 404
+  (tidak membocorkan keberadaan sesi ke pemanggil tanpa identitas).
+- Tidak ada migrasi/perubahan skema Pydantic — murni pemasangan guard.
+  `openapi.json`: hanya penambahan `security`, respons `401`/`403`, dan teks
+  `summary`/`description` — bentuk request/response (skema 200) tidak berubah.
+
+### [2026-07-13] OPM: otorisasi endpoint sesi/hasil ditegakkan di backend
+
+Lubang yang sama persis dengan Task Inventory (entri di atas), ditemukan lewat
+audit lanjutan atas modul OPM. Berbeda dari TI, OPM **tidak punya konsep
+koordinator** (`OpmSesiModel` tidak punya kolom `koordinator_id`, dan tidak ada
+satu pun kemunculan kata "koordinator" di `src/anjab_abk_backend/opm/`), jadi
+lapis 2 jauh lebih sempit — hanya menyentuh satu endpoint.
+
+Dua lapis guard baru:
+
+- **Lapis 1 — admin murni** (`_ADMIN_GUARDS`, pola sudah ada persis di
+  `opm_responden.py`), dipasang di `opm_sesi.py` (baru ditambahkan di modul ini)
+  dan dipakai ulang di `opm_hasil.py`.
+- **Lapis 2 — admin ATAU responden sesi ini**, lewat helper baru
+  `authorize_opm_sesi_access()` (`dependencies.py`, sejajar
+  `authorize_sesi_access()` milik TI) — **hanya** `GET /sesi/{id}/task`, satu-
+  satunya endpoint sesi-level yang dipanggil halaman pengisian partisipan
+  (`opm/isi/[responden_id]`). Peserta = partisipan yang punya baris
+  `OpmRespondenModel` di sesi itu — **tidak ada cabang koordinator** (beda dari
+  `authorize_sesi_access` TI yang mengecek `sesi.koordinator_id`).
+
+Matriks guard (siapa boleh apa):
+
+| Endpoint | Admin | Responden sesi (anggota panel) | Partisipan lain |
+|---|---|---|---|
+| `GET /opm/sesi`, `POST /opm/sesi/search` | ✅ | ❌ | ❌ |
+| `POST /opm/sesi` (create), `PATCH /opm/sesi/{id}` | ✅ | ❌ | ❌ |
+| `GET /opm/sesi/{id}` | ✅ | ❌ | ❌ |
+| `POST /sesi/{id}/buka`, `/tutup` | ✅ | ❌ | ❌ |
+| `POST /sesi/{id}/analisis`, `GET /sesi/{id}/hasil` | ✅ | ❌ | ❌ |
+| `DELETE /sesi/{id}` (tidak disentuh revisi ini — sudah admin-only) | ✅ | ❌ | ❌ |
+| `GET /sesi/{id}/task` | ✅ | ✅ | ❌ |
+| `GET /sesi/{id}/responden`, `/responden/{id}`, `/responden/{id}/jawaban*` (tidak disentuh — sudah benar) | ✅ | ✅ (pemilik) | ❌ |
+
+Detail per keputusan:
+
+- **`GET /opm/sesi/{id}` (bukan `/task`) sengaja admin-only murni**, berbeda
+  dari `GET /task-inventory/sesi/{id}` TI yang memakai lapis 2. Halaman
+  partisipan OPM (`opm/isi/[responden_id]`) **tidak pernah memanggil**
+  `GET /opm/sesi/{id}` — hanya `/task` — jadi tidak perlu direlaksasi
+  (✓ diverifikasi: grep web app).
+- Endpoint responden OPM (`opm_responden.py`: list/create/bulk/delete,
+  `authorize_responden_access` di get/jawaban) dan `GET /opm/kuesioner/saya`
+  **tidak disentuh sama sekali** — sudah benar sejak sebelum revisi ini
+  (assignment-based, tidak ada auto-enroll universal seperti bug TI yang
+  melahirkan item 013 di atas).
+- Guard 401 dicek **sebelum** 404 pada `GET /sesi/{id}/task` (pola sama
+  dengan TI) — memanggil endpoint ini tanpa token pada `sesi_id` yang tidak
+  ada mengembalikan 401, bukan 404.
+- Tidak ada migrasi/perubahan skema Pydantic — murni pemasangan guard.
+  `openapi.json`: hanya penambahan `security`, respons `401`/`403`, dan teks
+  `summary` — bentuk request/response (skema 200/201/204) tidak berubah.
+
+### [2026-07-13] Task Inventory: `/kuesioner/saya` jadi murni pembacaan (hapus auto-enroll universal)
+
+`GET /task-inventory/kuesioner/saya` sebelumnya mencari **seluruh** sesi
+TAHAP1/TAHAP2/TAHAP3 tanpa filter partisipan, lalu memanggil
+`ensure_for_partisipan()` yang meng-INSERT baris `TiRespondenModel` per sesi
+— membuat endpoint ini bersifat menulis (bukan read-only) dan partisipan bisa
+"terdaftar" ke sesi jabatan yang bukan urusannya. Ini sisa desain lama yang
+tidak ikut dimigrasikan saat entri `[2026-07-13]` di bawah (auto-populate SME
+panel di `SqlTiSesiService.create()`) menambahkan jalur enrollment yang benar
+— auto-enroll universal di `/kuesioner/saya` justru **membatalkan**
+penyaringan SME panel itu.
+
+- Endpoint diubah jadi murni baca: `list_by_partisipan(par.id)` (pola yang
+  sama dengan OPM, `opm_kuesioner.py`) → ambil sesi tiap responden → saring
+  status aktif (`TAHAP1|TAHAP2|TAHAP3`). Tidak ada lagi enrollment di waktu
+  baca.
+- `ensure_for_partisipan()` **dihapus total** dari `TiRespondenService`
+  (Protocol, impl in-memory `responden.py`, impl SQL `responden_sql.py`) —
+  hanya dipanggil dari satu tempat (`taskinv_kuesioner.py`), tidak ada
+  pemakai lain.
+- Kontrak `TiKuesionerItemRead` tidak berubah; `openapi.json` tidak berubah
+  bentuk skema (hanya deskripsi endpoint).
+- Tidak ada migrasi Alembic — `models.py` tidak disentuh.
+- **Data lama TIDAK dibersihkan di revisi ini.** Partisipan yang pernah
+  membuka halaman kuesioner sejak sesi TI pertama dibuat kemungkinan besar
+  punya baris `ti_responden` untuk sesi yang bukan haknya (efek samping bug
+  lama). Perubahan ini menghentikan pendarahan, bukan membersihkan data —
+  pembersihan butuh konfirmasi eksplisit sebelum dieksekusi (kandidat: baris
+  `ti_responden` dengan `tahap1_submit=false` DAN `tahap3_submit=false` DAN
+  `partisipan_id` bukan anggota `sme_panel` jabatan sesi tersebut; baris yang
+  sudah submit tidak boleh disentuh karena mengubah penyebut unanimity Tahap 2).
+- **Koreksi klaim keliru di revisi `[2026-06-21]` di bawah**: baris terakhir
+  entri itu menyatakan *"Task Inventory tetap menggunakan flow yang sama
+  (assignment manual via tambah-responden)"* — klaim itu **tidak pernah
+  benar di kode**. TI baru benar-benar jadi assignment-based lewat revisi ini
+  ([2026-07-13], di atas), bukan sejak `[2026-06-21]`.
+
 ### [2026-07-13] Penugasan massal (bulk) TS/TI/OPM + auto-populate SME panel di TI
 
 Sebelumnya hanya WCP/DCS punya penugasan bulk (dari revisi `2026-07-12` di
@@ -337,7 +487,12 @@ DCS dan WCP beralih dari **enrollment otomatis** ke **sistem assignment**:
 - Method `ensure_for_partisipan()` telah dihapus dari `DcsRespondenService` dan
   `WcpRespondenService` (Protocol + InMemory impl).
 - Setiap alat ukur (DCS, WCP) dapat di-assign secara mandiri ke partisipan berbeda.
-- Task Inventory tetap menggunakan flow yang sama (assignment manual via `tambah-responden`).
+- ~~Task Inventory tetap menggunakan flow yang sama (assignment manual via `tambah-responden`).~~
+  **KELIRU — koreksi lihat entri `[2026-07-13]` di atas.** Klaim ini tidak pernah benar di
+  kode: `GET /task-inventory/kuesioner/saya` sampai revisi `[2026-07-13]` masih memakai
+  auto-enroll universal (mendaftarkan partisipan ke SEMUA sesi aktif tanpa filter), bukan
+  assignment-based seperti DCS/WCP/OPM. TI baru benar-benar assignment-based sejak revisi
+  `[2026-07-13]`.
 
 ## Jangan Sentuh
 

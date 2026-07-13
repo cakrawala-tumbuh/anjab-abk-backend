@@ -7,10 +7,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, Query, Response, status
 
+from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     Idempotency,
     Pagination,
+    authorize_sesi_access,
     get_current_principal,
+    get_partisipan_service,
     get_ti_catalog_service,
     get_ti_responden_service,
     get_ti_seleksi_service,
@@ -36,18 +39,23 @@ router = APIRouter()
 
 logger = logging.getLogger("anjab_abk_backend.api.v1.taskinv_sesi")
 
-_WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
+_ADMIN_GUARDS = [Depends(require_admin), Depends(rate_limit)]
 _NOT_FOUND = {404: {"model": ErrorResponse, "description": "Sesi Task Inventory tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 _FORBIDDEN = {403: {"model": ErrorResponse, "description": "Bukan admin."}}
+_FORBIDDEN_PESERTA = {
+    403: {"model": ErrorResponse, "description": "Bukan admin atau peserta sesi."}
+}
 
 
 @router.get(
     "",
     response_model=Page[TiSesiRead],
-    summary="Daftar sesi Task Inventory",
+    summary="Daftar sesi Task Inventory (admin)",
     operation_id="taskinv_sesi_list",
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN},
 )
 def list_sesi(
     page: Annotated[Pagination, Depends(pagination_params)],
@@ -61,12 +69,13 @@ def list_sesi(
     "",
     response_model=TiSesiRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Buat sesi Task Inventory",
+    summary="Buat sesi Task Inventory (admin)",
     operation_id="taskinv_sesi_create",
-    dependencies=_WRITE_GUARDS,
+    dependencies=_ADMIN_GUARDS,
     responses={
         **_AUTH,
         **_RATE,
+        **_FORBIDDEN,
         409: {"model": ErrorResponse, "description": "Sesi untuk jabatan+periode sudah ada."},
     },
 )
@@ -112,9 +121,15 @@ def create_sesi(
 @router.post(
     "/search",
     response_model=Page[TiSesiRead],
-    summary="Cari sesi Task Inventory (domain ala Odoo)",
+    summary="Cari sesi Task Inventory (domain ala Odoo) (admin)",
     operation_id="taskinv_sesi_search",
-    responses={422: {"model": ErrorResponse, "description": "Domain/field tidak valid."}},
+    dependencies=_ADMIN_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        422: {"model": ErrorResponse, "description": "Domain/field tidak valid."},
+    },
 )
 def search_sesi(
     req: SearchRequest,
@@ -129,24 +144,29 @@ def search_sesi(
 @router.get(
     "/{sesi_id}",
     response_model=TiSesiRead,
-    summary="Ambil sesi Task Inventory",
+    summary="Ambil sesi Task Inventory (admin atau peserta sesi)",
     operation_id="taskinv_sesi_get",
-    responses=_NOT_FOUND,
+    responses={**_AUTH, **_FORBIDDEN_PESERTA, **_NOT_FOUND},
 )
 def get_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
+    principal: Annotated[Principal, Depends(get_current_principal)],
     service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
 ) -> TiSesiRead:
-    return service.get(sesi_id)
+    sesi = service.get(sesi_id)
+    authorize_sesi_access(principal, sesi, par_service, rsp_service)
+    return sesi
 
 
 @router.patch(
     "/{sesi_id}",
     response_model=TiSesiRead,
-    summary="Perbarui sesi Task Inventory (hanya saat DRAFT)",
+    summary="Perbarui sesi Task Inventory (hanya saat DRAFT) (admin)",
     operation_id="taskinv_sesi_update",
-    dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND},
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
 )
 def update_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
@@ -198,10 +218,10 @@ def delete_sesi(
 @router.post(
     "/{sesi_id}/mulai-tahap1",
     response_model=TiSesiRead,
-    summary="Mulai Tahap 1 — Seleksi Relevansi (DRAFT → TAHAP1)",
+    summary="Mulai Tahap 1 — Seleksi Relevansi (DRAFT → TAHAP1) (admin)",
     operation_id="taskinv_sesi_mulai_tahap1",
-    dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND},
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
 )
 def mulai_tahap1(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
@@ -213,12 +233,13 @@ def mulai_tahap1(
 @router.post(
     "/{sesi_id}/mulai-tahap2",
     response_model=TiSesiRead,
-    summary="Mulai Tahap 2 — Review Koordinator (TAHAP1 → TAHAP2)",
+    summary="Mulai Tahap 2 — Review Koordinator (TAHAP1 → TAHAP2) (admin)",
     operation_id="taskinv_sesi_mulai_tahap2",
-    dependencies=_WRITE_GUARDS,
+    dependencies=_ADMIN_GUARDS,
     responses={
         **_AUTH,
         **_RATE,
+        **_FORBIDDEN,
         **_NOT_FOUND,
         422: {
             "model": ErrorResponse,
@@ -255,12 +276,13 @@ def mulai_tahap2(
 @router.post(
     "/{sesi_id}/mulai-tahap3",
     response_model=TiSesiRead,
-    summary="Mulai Tahap 3 — Detailing (TAHAP2 → TAHAP3), bekukan task relevan",
+    summary="Mulai Tahap 3 — Detailing (TAHAP2 → TAHAP3), bekukan task relevan (admin)",
     operation_id="taskinv_sesi_mulai_tahap3",
-    dependencies=_WRITE_GUARDS,
+    dependencies=_ADMIN_GUARDS,
     responses={
         **_AUTH,
         **_RATE,
+        **_FORBIDDEN,
         **_NOT_FOUND,
         422: {
             "model": ErrorResponse,
@@ -311,10 +333,10 @@ def mulai_tahap3(
 @router.post(
     "/{sesi_id}/tutup",
     response_model=TiSesiRead,
-    summary="Tutup sesi (TAHAP3 → CLOSED)",
+    summary="Tutup sesi (TAHAP3 → CLOSED) (admin)",
     operation_id="taskinv_sesi_tutup",
-    dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE, **_NOT_FOUND},
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
 )
 def tutup_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi.")],

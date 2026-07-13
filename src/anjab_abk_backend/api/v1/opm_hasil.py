@@ -7,11 +7,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path
 
 from ...dependencies import (
-    get_current_principal,
     get_opm_jawaban_service,
     get_opm_responden_service,
     get_opm_sesi_service,
     rate_limit,
+    require_admin,
 )
 from ...errors import ValidationAppError
 from ...opm.schemas.hasil import OpmHasilSesiRead
@@ -23,21 +23,23 @@ from ...schemas.common import ErrorResponse
 
 router = APIRouter()
 
-_WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
+_ADMIN_GUARDS = [Depends(require_admin), Depends(rate_limit)]
 _NOT_FOUND_SESI = {404: {"model": ErrorResponse, "description": "Sesi OPM tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
+_FORBIDDEN = {403: {"model": ErrorResponse, "description": "Bukan admin."}}
 
 
 @router.post(
     "/{sesi_id}/analisis",
     response_model=OpmHasilSesiRead,
-    summary="Jalankan analisis OPM (CLOSED → ANALYZED)",
+    summary="Jalankan analisis OPM (CLOSED → ANALYZED) (admin)",
     operation_id="opm_analisis_run",
-    dependencies=_WRITE_GUARDS,
+    dependencies=_ADMIN_GUARDS,
     responses={
         **_AUTH,
         **_RATE,
+        **_FORBIDDEN,
         **_NOT_FOUND_SESI,
         422: {
             "model": ErrorResponse,
@@ -79,9 +81,13 @@ def run_analisis(
 @router.get(
     "/{sesi_id}/hasil",
     response_model=OpmHasilSesiRead,
-    summary="Lihat hasil analisis sesi OPM",
+    summary="Lihat hasil analisis sesi OPM (admin)",
     operation_id="opm_hasil_sesi_get",
+    dependencies=_ADMIN_GUARDS,
     responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
         **_NOT_FOUND_SESI,
         422: {"model": ErrorResponse, "description": "Sesi belum ANALYZED."},
     },

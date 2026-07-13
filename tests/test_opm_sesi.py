@@ -231,3 +231,138 @@ def test_search_domain(client: TestClient, jabatan_id_tk: str) -> None:
 
 def test_get_sesi_not_found(client: TestClient) -> None:
     assert client.get(f"{BASE}/opses_tidakada").status_code == 404
+
+
+# --------------------------------------------------------------------------- #
+# Otorisasi (item 015): lapis 1 (admin murni) & lapis 2 (admin/responden sesi)
+#
+# Lapis 1 (`_ADMIN_GUARDS`) berjalan sebagai dependency FastAPI, sebelum badan
+# endpoint dieksekusi — non-admin ditolak 403 walau `sesi_id` tidak nyata (lihat
+# preseden serupa di `test_taskinv.py::test_sesi_get_tanpa_token_401`). Karena itu
+# test 401/403 di bawah memakai ID sesi dummy, kecuali test yang memang perlu
+# memverifikasi efek (mis. status sesi tidak berubah) atau lapis 2 (`/task`).
+# --------------------------------------------------------------------------- #
+
+_DUMMY_SESI_ID = "opses_dummy"
+
+
+def _sesi_admin(client: TestClient, jabatan_id: str) -> tuple[dict, dict]:
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id)
+    sesi = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"])).json()
+    return sesi, ctx
+
+
+def _link_authentik_user(db_session, partisipan_id: str, subject: str) -> None:
+    """Tautkan partisipan yang sudah ada ke `subject` login (test lapis 2 `/task`)."""
+    from anjab_abk_backend.models import PartisipanModel
+
+    obj = db_session.get(PartisipanModel, partisipan_id)
+    obj.authentik_user_id = subject
+    db_session.flush()
+
+
+def test_opm_sesi_list_tanpa_token_401(anon_client: TestClient) -> None:
+    assert anon_client.get(BASE).status_code == 401
+
+
+def test_opm_sesi_list_partisipan_403(client_as) -> None:
+    as_partisipan = client_as("opm-guard-list")
+    assert as_partisipan.get(BASE).status_code == 403
+
+
+def test_opm_sesi_search_tanpa_token_401(anon_client: TestClient) -> None:
+    r = anon_client.post(f"{BASE}/search", json={"domain": [], "limit": 10, "offset": 0})
+    assert r.status_code == 401
+
+
+def test_opm_sesi_search_partisipan_403(client_as) -> None:
+    as_partisipan = client_as("opm-guard-search")
+    r = as_partisipan.post(f"{BASE}/search", json={"domain": [], "limit": 10, "offset": 0})
+    assert r.status_code == 403
+
+
+def test_opm_sesi_create_tanpa_token_401(anon_client: TestClient) -> None:
+    r = anon_client.post(BASE, json=_payload(f"jbt_{uuid.uuid4().hex[:8]}", "tises_x"))
+    assert r.status_code == 401
+
+
+def test_opm_sesi_create_partisipan_403(client_as) -> None:
+    as_partisipan = client_as("opm-guard-create")
+    r = as_partisipan.post(BASE, json=_payload(f"jbt_{uuid.uuid4().hex[:8]}", "tises_x"))
+    assert r.status_code == 403
+
+
+def test_opm_sesi_get_tanpa_token_401(anon_client: TestClient) -> None:
+    assert anon_client.get(f"{BASE}/{_DUMMY_SESI_ID}").status_code == 401
+
+
+def test_opm_sesi_get_partisipan_403(client_as) -> None:
+    as_partisipan = client_as("opm-guard-get")
+    assert as_partisipan.get(f"{BASE}/{_DUMMY_SESI_ID}").status_code == 403
+
+
+def test_opm_sesi_patch_tanpa_token_401(anon_client: TestClient) -> None:
+    r = anon_client.patch(f"{BASE}/{_DUMMY_SESI_ID}", json={"catatan": "x"})
+    assert r.status_code == 401
+
+
+def test_opm_sesi_patch_partisipan_403(client_as) -> None:
+    as_partisipan = client_as("opm-guard-patch")
+    r = as_partisipan.patch(f"{BASE}/{_DUMMY_SESI_ID}", json={"catatan": "x"})
+    assert r.status_code == 403
+
+
+def test_opm_sesi_buka_tanpa_token_401(anon_client: TestClient) -> None:
+    assert anon_client.post(f"{BASE}/{_DUMMY_SESI_ID}/buka").status_code == 401
+
+
+def test_opm_buka_sesi_partisipan_403(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    """403 ditolak, dan status sesi TIDAK berubah (tetap DRAFT)."""
+    sesi, _ctx = _sesi_admin(client, jabatan_id_tk)
+    as_partisipan = client_as("opm-guard-buka-real")
+    r = as_partisipan.post(f"{BASE}/{sesi['id']}/buka")
+    assert r.status_code == 403
+    # `client_as` mengoverride verifier pada `app` — pakai client_as admin untuk
+    # verifikasi lanjutan, bukan fixture `client` (lihat docstring `client_as`).
+    as_admin = client_as("opm-guard-buka-admin", groups=["admin"])
+    r_get = as_admin.get(f"{BASE}/{sesi['id']}")
+    assert r_get.json()["status"] == "DRAFT"
+
+
+def test_opm_sesi_tutup_tanpa_token_401(anon_client: TestClient) -> None:
+    assert anon_client.post(f"{BASE}/{_DUMMY_SESI_ID}/tutup").status_code == 401
+
+
+def test_opm_sesi_tutup_partisipan_403(client_as) -> None:
+    as_partisipan = client_as("opm-guard-tutup")
+    assert as_partisipan.post(f"{BASE}/{_DUMMY_SESI_ID}/tutup").status_code == 403
+
+
+def test_opm_sesi_task_tanpa_token_401(anon_client: TestClient) -> None:
+    assert anon_client.get(f"{BASE}/{_DUMMY_SESI_ID}/task").status_code == 401
+
+
+def test_opm_task_responden_boleh(
+    client: TestClient, client_as, jabatan_id_tk: str, db_session
+) -> None:
+    """Regresi paling mungkin (item 015): satu-satunya endpoint sesi-level yang
+    dipakai halaman pengisian partisipan (`opm/isi/[responden_id]`) — TIDAK boleh
+    jadi admin-only, karena akan mematikan alur pengisian OPM partisipan."""
+    sesi, ctx = _sesi_admin(client, jabatan_id_tk)
+    par_a = ctx["partisipan_ids"][0]
+    _link_authentik_user(db_session, par_a, "opm-guard-task-boleh")
+    as_a = client_as("opm-guard-task-boleh")
+    r = as_a.get(f"{BASE}/{sesi['id']}/task")
+    assert r.status_code == 200, r.text
+    assert {t["task_kode"] for t in r.json()} == set(ctx["kodes"])
+
+
+def test_opm_task_bukan_responden_403(
+    client: TestClient, client_as, jabatan_id_tk: str, db_session
+) -> None:
+    sesi, ctx = _sesi_admin(client, jabatan_id_tk)
+    luar = _buat_partisipan(client, ctx["jabatan_id"], "LuarTask")
+    _link_authentik_user(db_session, luar, "opm-guard-task-luar")
+    as_luar = client_as("opm-guard-task-luar")
+    r = as_luar.get(f"{BASE}/{sesi['id']}/task")
+    assert r.status_code == 403

@@ -190,8 +190,13 @@ def test_sesi_delete_paksa_forbidden_non_admin(
     assert r.status_code == 403
 
 
-def test_sesi_not_found(anon_client: TestClient) -> None:
-    assert anon_client.get(f"{SESI}/tises_xxx").status_code == 404
+def test_sesi_not_found(client: TestClient) -> None:
+    assert client.get(f"{SESI}/tises_xxx").status_code == 404
+
+
+def test_sesi_get_tanpa_token_401(anon_client: TestClient) -> None:
+    """`GET /sesi/{id}` kini wajib token (lapis 2) — 401 diperiksa sebelum 404."""
+    assert anon_client.get(f"{SESI}/tises_xxx").status_code == 401
 
 
 def test_sesi_search(client: TestClient, jabatan_id_tk: str) -> None:
@@ -841,7 +846,12 @@ def test_tahap2_submit_keputusan_non_partial_ditolak(
 
 
 # --------------------------------------------------------------------------- #
-# GET /kuesioner/saya (Task Inventory — universal)
+# GET /kuesioner/saya (Task Inventory — assignment-based, item 013)
+#
+# Enrollment TI = anggota SME panel jabatan sesi, ditetapkan saat sesi dibuat
+# (`SqlTiSesiService.create()` → `assign_ti_responden_banyak()`). Endpoint ini
+# murni membaca `list_by_partisipan()` — TIDAK ADA lagi enrollment otomatis
+# universal di waktu baca (lihat item 013 & entri Revisi Desain terkait).
 # --------------------------------------------------------------------------- #
 
 KUESIONER = f"{BASE}/kuesioner"
@@ -850,49 +860,144 @@ KUESIONER = f"{BASE}/kuesioner"
 def test_kuesioner_saya_tanpa_partisipan_ti(client: TestClient) -> None:
     r = client.get(f"{KUESIONER}/saya")
     assert r.status_code == 200
+    assert r.json() == []
 
 
-def test_kuesioner_saya_universal_ti(client: TestClient, jabatan_id_tk: str, db_session) -> None:
-    """Task Inventory bersifat universal: partisipan melihat SEMUA sesi aktif
-    (TAHAP1/TAHAP2/TAHAP3), bukan hanya yang cocok jabatannya; pemanggilan idempoten."""
-    import uuid
+def test_kuesioner_saya_hanya_sesi_yang_terdaftar(
+    client: TestClient, client_as, partisipan_factory, jabatan_id_tk: str, db_session
+) -> None:
+    """Partisipan A anggota panel jabatan X; sesi dibuat untuk jabatan X **dan**
+    jabatan Y (panel berbeda, A bukan anggota) → `/kuesioner/saya` milik A hanya
+    memuat sesi X."""
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+    from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
+    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
-    from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
-    from anjab_abk_backend.core.services.partisipan_sql import SqlPartisipanService
+    jabatan_x = jabatan_id_tk
+    jabatan_y = f"jbt_{uuid.uuid4().hex[:8]}"
 
-    par_service = SqlPartisipanService(db_session)
+    par_a = partisipan_factory("ti-hanya-terdaftar-a", jabatan_utama_id=jabatan_x)
+    par_lain = partisipan_factory("ti-hanya-terdaftar-lain", jabatan_utama_id=jabatan_y)
 
-    par_service.create(
-        PartisipanCreate(
-            nama="Partisipan Kuesioner TI",
-            email=f"ksr_ti_{uuid.uuid4().hex[:4]}@test.id",
-            sekolah_id="skl_dummy",
-            jabatan_utama_id=f"jbt_{uuid.uuid4().hex[:8]}",
-            masa_kerja_tahun=2,
-        ),
-        authentik_user_id="test-user",
+    sme_svc = SqlSMEPanelService(db_session)
+    panel_x = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_x))
+    sme_svc.add_anggota(panel_x.id, par_a)
+    panel_y = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_y))
+    sme_svc.add_anggota(panel_y.id, par_lain)
+
+    sesi_svc = SqlTiSesiService(db_session)
+    sesi_x = sesi_svc.create(
+        TiSesiCreate(
+            jabatan_id=jabatan_x, periode=_uniq_periode(), min_responden=1, max_responden=10
+        )
     )
+    sesi_svc.transition(sesi_x.id, "TAHAP1")
+    sesi_y = sesi_svc.create(
+        TiSesiCreate(
+            jabatan_id=jabatan_y, periode=_uniq_periode(), min_responden=1, max_responden=10
+        )
+    )
+    sesi_svc.transition(sesi_y.id, "TAHAP1")
 
-    # Dua sesi aktif (TAHAP1) + satu sesi DRAFT (tidak boleh muncul).
-    aktif_ids = set()
-    for _ in range(2):
-        sesi = _create_sesi(client, jabatan_id_tk)
-        client.post(f"{SESI}/{sesi['id']}/mulai-tahap1")
-        aktif_ids.add(sesi["id"])
-    _create_sesi(client, jabatan_id_tk)  # DRAFT
-
-    r = client.get(f"{KUESIONER}/saya")
+    as_a = client_as("ti-hanya-terdaftar-a")
+    r = as_a.get(f"{KUESIONER}/saya")
     assert r.status_code == 200
     data = r.json()
-    assert {item["sesi_id"] for item in data} == aktif_ids
-    assert all(item["tahap1_submit"] is False for item in data)
-    assert all(item["sesi_status"] == "TAHAP1" for item in data)
-    # Response menggunakan sesi_jabatan_id (bukan sesi_kategori_jabatan)
+    assert {item["sesi_id"] for item in data} == {sesi_x.id}
     assert all("sesi_jabatan_id" in item for item in data)
 
-    # Idempoten: jumlah & id responden tetap.
-    r2 = client.get(f"{KUESIONER}/saya")
-    assert {i["id"] for i in r2.json()} == {i["id"] for i in data}
+
+def test_kuesioner_saya_tidak_membuat_responden(client_as, partisipan_factory, db_session) -> None:
+    """Partisipan yang bukan anggota panel mana pun memanggil `/kuesioner/saya` →
+    respons `[]` dan jumlah baris `TiRespondenModel` di DB tidak bertambah — ini
+    inti bug lama (endpoint dulu menulis lewat `ensure_for_partisipan()`)."""
+    from sqlalchemy import func, select
+
+    from anjab_abk_backend.models import TiRespondenModel
+
+    partisipan_factory("ti-tanpa-panel")
+    as_par = client_as("ti-tanpa-panel")
+
+    def _count() -> int:
+        return db_session.scalar(select(func.count()).select_from(TiRespondenModel)) or 0
+
+    before = _count()
+    r = as_par.get(f"{KUESIONER}/saya")
+    assert r.status_code == 200
+    assert r.json() == []
+    assert _count() == before
+
+    # Panggil berulang — tetap tidak menulis apa pun.
+    r2 = as_par.get(f"{KUESIONER}/saya")
+    assert r2.json() == []
+    assert _count() == before
+
+
+def test_kuesioner_saya_saring_status_nonaktif(
+    client: TestClient, client_as, partisipan_factory, jabatan_id_tk: str, db_session
+) -> None:
+    """Sesi tempat partisipan terdaftar berstatus DRAFT (belum TAHAP1/2/3) tidak
+    muncul di `/kuesioner/saya`."""
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+    from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
+    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
+
+    par_a = partisipan_factory("ti-status-nonaktif-a", jabatan_utama_id=jabatan_id_tk)
+
+    sme_svc = SqlSMEPanelService(db_session)
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_tk))
+    sme_svc.add_anggota(panel.id, par_a)
+
+    sesi_svc = SqlTiSesiService(db_session)
+    sesi_draft = sesi_svc.create(
+        TiSesiCreate(
+            jabatan_id=jabatan_id_tk, periode=_uniq_periode(), min_responden=1, max_responden=10
+        )
+    )
+    assert sesi_draft.status == "DRAFT"
+
+    as_a = client_as("ti-status-nonaktif-a")
+    r = as_a.get(f"{KUESIONER}/saya")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_kuesioner_saya_is_koordinator(
+    client: TestClient, client_as, partisipan_factory, jabatan_id_tk: str, db_session
+) -> None:
+    """Koordinator panel tetap melihat sesinya dengan `is_koordinator = true` setelah
+    pengetatan enrollment — ia otomatis ter-enroll sebagai anggota panel (bukan lewat
+    auto-enroll universal yang sudah dihapus)."""
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate, SMEPanelUpdate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+    from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
+    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
+
+    par_koord = partisipan_factory("ti-koordinator-saya", jabatan_utama_id=jabatan_id_tk)
+
+    sme_svc = SqlSMEPanelService(db_session)
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_tk))
+    sme_svc.add_anggota(panel.id, par_koord)
+    sme_svc.update(panel.id, SMEPanelUpdate(koordinator_id=par_koord))
+
+    sesi_svc = SqlTiSesiService(db_session)
+    sesi = sesi_svc.create(
+        TiSesiCreate(
+            jabatan_id=jabatan_id_tk, periode=_uniq_periode(), min_responden=1, max_responden=10
+        )
+    )
+    assert sesi.koordinator_id == par_koord
+    sesi_svc.transition(sesi.id, "TAHAP1")
+
+    as_koord = client_as("ti-koordinator-saya")
+    r = as_koord.get(f"{KUESIONER}/saya")
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 1
+    assert data[0]["sesi_id"] == sesi.id
+    assert data[0]["is_koordinator"] is True
 
 
 # --------------------------------------------------------------------------- #
@@ -1335,3 +1440,314 @@ def test_create_responden_forbidden_for_non_admin(
     as_partisipan = client_as("ti-bola-f")
     r = as_partisipan.post(f"{SESI}/{sesi['id']}/responden", json={"nama": "X"})
     assert r.status_code == 403
+
+
+# --------------------------------------------------------------------------- #
+# Item 014: otorisasi sesi — lapis 1 (admin-only) & lapis 2 (admin/peserta)
+# --------------------------------------------------------------------------- #
+
+
+def test_sesi_list_tanpa_token_401(anon_client: TestClient) -> None:
+    assert anon_client.get(SESI).status_code == 401
+
+
+def test_sesi_list_partisipan_403(client_as) -> None:
+    as_p = client_as("ti-guard-list")
+    assert as_p.get(SESI).status_code == 403
+
+
+def test_sesi_search_tanpa_token_401(anon_client: TestClient) -> None:
+    r = anon_client.post(
+        f"{SESI}/search", json={"domain": [], "order": [], "limit": 10, "offset": 0}
+    )
+    assert r.status_code == 401
+
+
+def test_sesi_search_partisipan_403(client_as) -> None:
+    as_p = client_as("ti-guard-search")
+    r = as_p.post(f"{SESI}/search", json={"domain": [], "order": [], "limit": 10, "offset": 0})
+    assert r.status_code == 403
+
+
+def test_sesi_create_partisipan_403(client_as, jabatan_id_tk: str) -> None:
+    as_p = client_as("ti-guard-create")
+    r = as_p.post(SESI, json=_sesi_payload(jabatan_id_tk))
+    assert r.status_code == 403
+
+
+def test_sesi_update_partisipan_403(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    as_p = client_as("ti-guard-update")
+    r = as_p.patch(f"{SESI}/{sesi['id']}", json={"min_responden": 2})
+    assert r.status_code == 403
+
+
+def test_sesi_tutup_partisipan_403(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    as_p = client_as("ti-guard-tutup")
+    r = as_p.post(f"{SESI}/{sesi['id']}/tutup")
+    assert r.status_code == 403
+
+
+def test_mulai_tahap1_partisipan_403(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    as_p = client_as("ti-guard-tahap1")
+    r = as_p.post(f"{SESI}/{sesi['id']}/mulai-tahap1")
+    assert r.status_code == 403
+
+
+def test_mulai_tahap2_partisipan_403(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    client.post(f"{SESI}/{sesi['id']}/mulai-tahap1")
+    as_p = client_as("ti-guard-tahap2")
+    r = as_p.post(f"{SESI}/{sesi['id']}/mulai-tahap2")
+    assert r.status_code == 403
+
+
+def test_mulai_tahap3_partisipan_403(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    """Paling penting: partisipan biasa tidak boleh membekukan task (freeze tidak reversibel),
+    dan sesi TIDAK berpindah status setelah panggilan ditolak."""
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    rsp = _add_responden(client, sid, "R1")
+    _seleksi_submit(client, rsp["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+
+    as_p = client_as("ti-guard-tahap3")
+    r = as_p.post(f"{SESI}/{sid}/mulai-tahap3")
+    assert r.status_code == 403
+
+    # `client_as` mengoverride verifier pada `app` (bukan hanya client yang
+    # dikembalikan) — pakai `client_as(..., groups=["admin"])` untuk cek status,
+    # BUKAN fixture `client` (lihat docstring fixture `client_as` di conftest.py).
+    as_admin = client_as("ti-guard-tahap3-admin", groups=["admin"])
+    masih = as_admin.get(f"{SESI}/{sid}")
+    assert masih.json()["status"] == "TAHAP2"
+
+
+def test_analisis_partisipan_403(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    as_p = client_as("ti-guard-analisis")
+    r = as_p.post(f"{SESI}/{sesi['id']}/analisis")
+    assert r.status_code == 403
+
+
+def test_hasil_partisipan_403(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    as_p = client_as("ti-guard-hasil")
+    r = as_p.get(f"{SESI}/{sesi['id']}/hasil")
+    assert r.status_code == 403
+
+
+def test_get_sesi_peserta_boleh(
+    client: TestClient, client_as, partisipan_factory, db_session
+) -> None:
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+    from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
+    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
+
+    jabatan_id = f"jbt_{uuid.uuid4().hex[:8]}"
+    par_a = partisipan_factory("ti-akses-peserta", jabatan_utama_id=jabatan_id)
+
+    sme_svc = SqlSMEPanelService(db_session)
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id))
+    sme_svc.add_anggota(panel.id, par_a)
+
+    sesi_svc = SqlTiSesiService(db_session)
+    sesi_obj = sesi_svc.create(
+        TiSesiCreate(
+            jabatan_id=jabatan_id, periode=_uniq_periode(), min_responden=1, max_responden=10
+        )
+    )
+    # auto-populate dari panel: par_a otomatis jadi responden sesi ini.
+
+    as_a = client_as("ti-akses-peserta")
+    r = as_a.get(f"{SESI}/{sesi_obj.id}")
+    assert r.status_code == 200
+
+
+def test_get_sesi_bukan_peserta_403(
+    client: TestClient, client_as, partisipan_factory, db_session
+) -> None:
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+    from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
+    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
+
+    jabatan_id_x = f"jbt_{uuid.uuid4().hex[:8]}"
+    jabatan_id_y = f"jbt_{uuid.uuid4().hex[:8]}"
+    partisipan_factory("ti-akses-x", jabatan_utama_id=jabatan_id_x)
+    par_y = partisipan_factory("ti-akses-y", jabatan_utama_id=jabatan_id_y)
+
+    sme_svc = SqlSMEPanelService(db_session)
+    panel_y = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_y))
+    sme_svc.add_anggota(panel_y.id, par_y)
+
+    sesi_svc = SqlTiSesiService(db_session)
+    sesi_x = sesi_svc.create(
+        TiSesiCreate(
+            jabatan_id=jabatan_id_x, periode=_uniq_periode(), min_responden=1, max_responden=10
+        )
+    )
+    sesi_svc.create(
+        TiSesiCreate(
+            jabatan_id=jabatan_id_y, periode=_uniq_periode(), min_responden=1, max_responden=10
+        )
+    )
+
+    # par_y adalah peserta sesi jabatan Y, TIDAK boleh membaca sesi jabatan X.
+    as_y = client_as("ti-akses-y")
+    r = as_y.get(f"{SESI}/{sesi_x.id}")
+    assert r.status_code == 403
+
+
+def test_get_tahap2_koordinator_boleh(
+    client: TestClient, client_as, partisipan_factory, jabatan_id_tk: str, db_session
+) -> None:
+    from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
+    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
+
+    koordinator_id = partisipan_factory("ti-koord-tahap2", jabatan_utama_id=jabatan_id_tk)
+
+    # Dibuat langsung lewat service (bukan endpoint create, yang kini admin-only dan
+    # tidak menerima `koordinator_id` tanpa SME panel) — `db_session` di sini adalah
+    # sesi TRANSAKSI YANG SAMA yang dipakai `client`/`client_as` (lihat fixture `app`
+    # di conftest.py, `get_session` di-override ke `db_session`).
+    sesi_obj = SqlTiSesiService(db_session).create(
+        TiSesiCreate(
+            jabatan_id=jabatan_id_tk,
+            periode=_uniq_periode(),
+            min_responden=1,
+            max_responden=10,
+            koordinator_id=koordinator_id,
+        )
+    )
+    sid = sesi_obj.id
+
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    rsp = _add_responden(client, sid, "A")
+    _seleksi_submit(client, rsp["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+
+    as_koord = client_as("ti-koord-tahap2")
+    r = as_koord.get(f"{SESI}/{sid}/tahap2")
+    assert r.status_code == 200
+
+
+def test_get_tahap2_bukan_peserta_403(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    rsp = _add_responden(client, sid, "A")
+    _seleksi_submit(client, rsp["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+
+    as_p = client_as("ti-guard-tahap2-get")
+    r = as_p.get(f"{SESI}/{sid}/tahap2")
+    assert r.status_code == 403
+
+
+def test_get_tahap2_tanpa_token_401(
+    anon_client: TestClient, client: TestClient, jabatan_id_tk: str
+) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    r = anon_client.get(f"{SESI}/{sesi['id']}/tahap2")
+    assert r.status_code == 401
+
+
+def test_get_task_terpilih_peserta_boleh(
+    client: TestClient, client_as, partisipan_factory, jabatan_id_tk: str
+) -> None:
+    """Regresi paling mungkin dari item 014: partisipan Tahap 3 tidak boleh ikut terblokir."""
+    par_a = partisipan_factory("ti-tt-peserta", jabatan_utama_id=jabatan_id_tk)
+    # `create_responden` menolak partisipan_id yang bukan anggota SME panel jabatan
+    # sesi — daftarkan par_a ke panel dulu (lihat taskinv_responden.py:create_responden).
+    r_panel = client.post(SME_BASE, json={"jabatan_id": jabatan_id_tk})
+    assert r_panel.status_code == 201, r_panel.text
+    panel_id = r_panel.json()["id"]
+    r_add = client.post(f"{SME_BASE}/{panel_id}/anggota", json={"partisipan_id": par_a})
+    assert r_add.status_code == 200, r_add.text
+
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    # par_a sudah otomatis jadi responden lewat auto-populate SME panel saat sesi
+    # dibuat — ambil id-nya, JANGAN POST responden lagi (akan jadi duplikat).
+    responden_list = client.get(f"{SESI}/{sid}/responden").json()
+    rsp = next(r for r in responden_list if r["partisipan_id"] == par_a)
+    _seleksi_submit(client, rsp["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    r3 = client.post(f"{SESI}/{sid}/mulai-tahap3")
+    assert r3.status_code == 200, r3.text
+
+    as_a = client_as("ti-tt-peserta")
+    r = as_a.get(f"{SESI}/{sid}/task-terpilih")
+    assert r.status_code == 200
+
+
+def test_get_task_terpilih_bukan_peserta_403(
+    client: TestClient, client_as, jabatan_id_tk: str
+) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    rsp = _add_responden(client, sid, "A")
+    _seleksi_submit(client, rsp["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    client.post(f"{SESI}/{sid}/mulai-tahap3")
+
+    as_p = client_as("ti-guard-tt")
+    r = as_p.get(f"{SESI}/{sid}/task-terpilih")
+    assert r.status_code == 403
+
+
+def test_get_responden_koordinator_boleh(
+    client: TestClient, client_as, partisipan_factory, jabatan_id_tk: str
+) -> None:
+    koordinator_id = partisipan_factory("ti-rsp-koord", jabatan_utama_id=jabatan_id_tk)
+    sesi = _create_sesi(client, jabatan_id_tk, koordinator_id=koordinator_id)
+
+    as_koord = client_as("ti-rsp-koord")
+    r = as_koord.get(f"{SESI}/{sesi['id']}/responden")
+    assert r.status_code == 200
+
+
+def test_admin_semua_endpoint_boleh(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    assert client.get(SESI).status_code == 200
+    assert (
+        client.post(
+            f"{SESI}/search", json={"domain": [], "order": [], "limit": 10, "offset": 0}
+        ).status_code
+        == 200
+    )
+    assert client.get(f"{SESI}/{sid}").status_code == 200
+    assert client.patch(f"{SESI}/{sid}", json={"min_responden": 1}).status_code == 200
+    assert client.post(f"{SESI}/{sid}/mulai-tahap1").status_code == 200
+
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    rsp = _add_responden(client, sid, "A")
+    _seleksi_submit(client, rsp["id"], kodes)
+
+    assert client.post(f"{SESI}/{sid}/mulai-tahap2").status_code == 200
+    assert client.get(f"{SESI}/{sid}/tahap2").status_code == 200
+    assert client.get(f"{SESI}/{sid}/responden").status_code == 200
+    assert client.post(f"{SESI}/{sid}/mulai-tahap3").status_code == 200
+    assert client.get(f"{SESI}/{sid}/task-terpilih").status_code == 200
+
+    # analisis butuh minimal 1 responden yang sudah submit detail Tahap 3.
+    r_detail = _detail_submit(client, rsp["id"], [_detail_item(kodes[0])])
+    assert r_detail
+
+    assert client.post(f"{SESI}/{sid}/tutup").status_code == 200
+    assert client.post(f"{SESI}/{sid}/analisis").status_code == 200
+    assert client.get(f"{SESI}/{sid}/hasil").status_code == 200
