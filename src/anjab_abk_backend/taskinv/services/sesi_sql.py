@@ -105,12 +105,26 @@ class SqlTiSesiService:
             raise ConflictError(
                 f"Sesi untuk jabatan '{data.jabatan_id}'" f" periode '{data.periode}' sudah ada."
             )
+        # Panel unik per jabatan (SMEPanelModel.jabatan_id unique) → satu lookup,
+        # dua keperluan: mewarisi koordinator (di bawah) + auto-assign anggota
+        # sebagai responden (setelah rec di-flush). Best-effort: panel tidak
+        # ada/kosong → sesi tetap dibuat (tidak error).
+        panel = self._s.scalar(
+            select(SMEPanelModel).where(SMEPanelModel.jabatan_id == data.jabatan_id)
+        )
+
+        # Payload menang atas panel; panel hanya dipakai bila pemanggil tidak
+        # menentukan koordinator secara eksplisit.
+        koordinator_id = data.koordinator_id
+        if koordinator_id is None and panel is not None:
+            koordinator_id = panel.koordinator_id
+
         rec = TiSesiModel(
             id=f"tises_{uuid.uuid4().hex[:8]}",
             jabatan_id=data.jabatan_id,
             periode=data.periode,
             status="DRAFT",
-            koordinator_id=data.koordinator_id,
+            koordinator_id=koordinator_id,
             min_responden=data.min_responden,
             max_responden=data.max_responden,
             catatan=data.catatan,
@@ -128,9 +142,6 @@ class SqlTiSesiService:
 
         # Auto-populate best-effort: anggota SME panel jabatan ini langsung jadi
         # responden. Panel tidak ada/kosong → sesi tetap dibuat kosong (tidak error).
-        panel = self._s.scalar(
-            select(SMEPanelModel).where(SMEPanelModel.jabatan_id == data.jabatan_id)
-        )
         if panel is not None and panel.anggota:
             assign_ti_responden_banyak(
                 self._s, rec.id, panel.partisipan_ids, max_responden=data.max_responden

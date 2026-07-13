@@ -1093,6 +1093,75 @@ def test_create_sesi_panel_tanpa_anggota_tetap_kosong(
     assert r.json() == []
 
 
+# --------------------------------------------------------------------------- #
+# Item 008: koordinator_id sesi diwarisi dari SmePanel.koordinator_id
+# --------------------------------------------------------------------------- #
+
+
+def _setup_panel_dengan_koordinator(client: TestClient, jabatan_id: str) -> tuple[str, str]:
+    """Buat panel SME utk `jabatan_id` dengan 1 anggota yang juga ditetapkan sebagai
+    koordinator panel; kembalikan `(panel_id, koordinator_id)`."""
+    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id})
+    assert r.status_code == 201, r.text
+    panel_id = r.json()["id"]
+    rp = client.post(
+        PAR_BASE,
+        json={
+            "nama": f"TI Koordinator {uuid.uuid4().hex[:4]}",
+            "email": f"ti.koord.{uuid.uuid4().hex[:6]}@test.id",
+            "sekolah_id": "skl_ti_koord_test",
+            "jabatan_utama_id": jabatan_id,
+            "masa_kerja_tahun": 1,
+        },
+    )
+    assert rp.status_code == 201, rp.text
+    par_id = rp.json()["id"]
+    r2 = client.post(f"{SME_BASE}/{panel_id}/anggota", json={"partisipan_id": par_id})
+    assert r2.status_code == 200, r2.text
+    r3 = client.patch(f"{SME_BASE}/{panel_id}", json={"koordinator_id": par_id})
+    assert r3.status_code == 200, r3.text
+    return panel_id, par_id
+
+
+def test_create_sesi_mewarisi_koordinator_dari_panel(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Panel punya koordinator; sesi dibuat tanpa `koordinator_id` di payload →
+    koordinator diwarisi dari panel."""
+    _panel_id, koordinator_id = _setup_panel_dengan_koordinator(client, jabatan_id_tk)
+    sesi = _create_sesi(client, jabatan_id_tk)
+    assert sesi["koordinator_id"] == koordinator_id
+
+
+def test_create_sesi_koordinator_payload_menang_atas_panel(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Payload mengirim `koordinator_id` eksplisit → nilai payload dipakai, TIDAK ditimpa
+    koordinator panel."""
+    _panel_id, koordinator_panel = _setup_panel_dengan_koordinator(client, jabatan_id_tk)
+    sesi = _create_sesi(client, jabatan_id_tk, koordinator_id="p_koordinator_lain")
+    assert sesi["koordinator_id"] == "p_koordinator_lain"
+    assert sesi["koordinator_id"] != koordinator_panel
+
+
+def test_create_sesi_panel_tanpa_koordinator_tetap_none(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Panel ada tapi belum punya koordinator → sesi tetap terbuat, `koordinator_id`
+    null, tidak error."""
+    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id_tk})
+    assert r.status_code == 201, r.text
+    sesi = _create_sesi(client, jabatan_id_tk)
+    assert sesi["koordinator_id"] is None
+
+
+def test_create_sesi_tanpa_panel_koordinator_none(client: TestClient, jabatan_id_tk: str) -> None:
+    """Jabatan tanpa panel sama sekali → sesi tetap terbuat, `koordinator_id` null,
+    tidak error."""
+    sesi = _create_sesi(client, jabatan_id_tk)
+    assert sesi["koordinator_id"] is None
+
+
 def test_responden_bulk_happy_path(client: TestClient, jabatan_id_tk: str) -> None:
     sesi = _create_sesi(client, jabatan_id_tk)
     anggota = _setup_panel(client, jabatan_id_tk, 2)

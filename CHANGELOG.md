@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-07-13
+
 ### Ditambahkan
 
 - **Penugasan massal (bulk) untuk TS, TI, OPM + auto-populate SME panel di TI.**
@@ -31,6 +33,20 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
   - Endpoint single (manual) yang sudah ada — `POST /time-study/penugasan`,
     `POST .../task-inventory/sesi/{id}/responden`,
     `POST .../opm/sesi/{id}/responden` — **tidak berubah** kontraknya.
+- **`koordinator_id` sesi Task Inventory diwarisi dari `SmePanel.koordinator_id`
+  jabatannya saat sesi dibuat** (`SqlTiSesiService.create()`), bila payload
+  `POST /api/v1/task-inventory/sesi` **tidak** mengirim `koordinator_id` secara
+  eksplisit — payload tetap menang bila dikirim. Best-effort seperti
+  auto-populate responden: panel tidak ada / panel tanpa koordinator → sesi
+  tetap dibuat dengan `koordinator_id = null`, tidak pernah error. Sebelumnya
+  admin harus menetapkan koordinator manual lewat `PATCH` setelah sesi dibuat;
+  ditemukan lewat simulasi E2E TI di deployment YPII — sesi baru selalu
+  menampilkan "Koordinator: Belum ditentukan" walau koordinator sudah
+  ditetapkan di Master Data → SME Panel. Panel di-query **satu kali** di
+  `create()` (dipakai untuk koordinator maupun auto-assign responden — tidak
+  ada query ganda). Tidak ada migrasi, tidak ada perubahan skema Pydantic —
+  murni perbaikan urutan logika. Seam in-memory (`InMemoryTiSesiService`)
+  sengaja tidak mengikuti perilaku ini (tidak punya akses ke data panel).
 
 ### Diperbaiki
 

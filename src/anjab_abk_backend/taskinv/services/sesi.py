@@ -97,6 +97,10 @@ class InMemoryTiSesiService:
         return self._to_read(rec)
 
     def create(self, data: TiSesiCreate) -> TiSesiRead:
+        # Seam in-memory ini TIDAK punya akses ke data SME panel (tidak ada store
+        # panel di sini) — berbeda dari `SqlTiSesiService.create()` yang mewarisi
+        # `koordinator_id` dari `SmePanel.koordinator_id` jabatan bila payload tidak
+        # mengirimnya. Perilaku itu sengaja TIDAK direplikasi di seam ini.
         if data.min_responden > data.max_responden:
             raise ValidationAppError("min_responden tidak boleh lebih besar dari max_responden.")
         with self._lock:

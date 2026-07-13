@@ -144,6 +144,21 @@ begitu sejak awal). Perubahan:
   belum pernah termanifestasi di test yang ada); catat sebagai risiko bila
   disentuh di masa depan.
 
+### [2026-07-13] Task Inventory: koordinator sesi diwarisi dari SME panel
+
+`SqlTiSesiService.create()` sekarang mewarisi `koordinator_id` dari
+`SmePanel.koordinator_id` jabatan yang sama (panel unik per `jabatan_id`) —
+**hanya bila** payload `TiSesiCreate` tidak mengirim `koordinator_id` (payload
+menang). Best-effort seperti auto-populate responden yang sudah ada di entri
+`[2026-07-13]` di bawah: panel tidak ada / panel tanpa koordinator → sesi tetap
+dibuat dengan `koordinator_id = None`, tidak pernah error. Lookup panel
+dipindah ke **sebelum** `TiSesiModel` dibuat dan dipakai ulang untuk auto-assign
+responden — **satu** query panel, dua keperluan (bukan dua query terpisah).
+`InMemoryTiSesiService` (seam in-memory) **tidak** meniru perilaku ini — seam
+itu tidak punya akses ke data panel sama sekali. Tidak ada migrasi maupun
+perubahan skema Pydantic (`koordinator_id` sudah ada di `TiSesiCreate`/
+`TiSesiRead`).
+
 ### [2026-07-12] DCS & WCP: hapus entitas sesi, ganti pola singleton + penugasan langsung
 
 DCS dan WCP tidak lagi memakai sesi — meniru pola yang sudah dipakai Time Study
