@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-07-13
+
 ### Diperbaiki
 
 - **Otorisasi endpoint sesi/hasil/tahap2 Task Inventory kini ditegakkan di backend**
