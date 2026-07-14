@@ -82,6 +82,39 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-14] OPM: create sesi tidak lagi 409 palsu (`ForeignKeyViolation` yang tersamar)
+
+Risiko yang dicatat sendiri di entri `[2026-07-13]` di bawah ("OPM punya pola bare-FK
+identik… catat sebagai risiko bila disentuh di masa depan") **sudah termanifestasi di
+produksi**: seluruh alur OPM terblokir total — `POST /api/v1/opm/sesi` untuk jabatan
+apa pun ditolak `409 "Sesi OPM untuk jabatan '…' sudah ada."` padahal tabel `opm_sesi`
+**kosong** (0 baris, diverifikasi; 2 jabatan berbeda, tetap 409). Pesan itu bohong.
+
+- **`SqlOpmSesiService.create()` kini mem-`flush()` parent lebih dulu** setelah
+  `add(rec)`, sebelum menambahkan `OpmRespondenModel` (FK telanjang tanpa
+  `relationship()`). Sama persis dengan `SqlTiSesiService.create()`. Flush itu tetap
+  lewat `_flush_checked()` — **bukan `self._s.flush()` telanjang seperti TI** — supaya
+  unique constraint `jabatan_id` tetap menjadi backstop 409 untuk race dua create
+  bersamaan (pre-check langkah 4 lolos di kedua request). `rec.task_links` tidak
+  terpengaruh: itu `relationship()`, urutannya memang dijamin.
+- **`_flush_checked()` hanya memetakan `UniqueViolation` → `ConflictError` (409).**
+  Sebelumnya **semua** `IntegrityError` dipetakan ke "… sudah ada" — dan
+  `ForeignKeyViolation` adalah subclass-nya, sehingga bug di atas menyamar jadi konflik
+  duplikat yang mustahil dan menyesatkan investigasi selama dua sesi pengujian.
+  Pelanggaran integritas lain kini naik apa adanya (500 + stack trace): lebih baik
+  gagal berisik daripada berbohong. Perubahan ini **lokal ke OPM** — `_flush_checked`
+  di 10 service lain (masing-masing punya salinan sendiri) tidak disentuh; menyeragamkan
+  semuanya di luar lingkup revisi ini, tapi patut dilakukan.
+- **Koreksi klaim di entri `[2026-07-13]`**: penyebab bug ini selalu lolos unit test
+  **bukan** `join_transaction_mode="create_savepoint"`, melainkan **`autoflush`** —
+  produksi `autoflush=False` (`db.py`), harness test `autoflush=True` (default). Lihat
+  Gotcha. Test regresi `test_create_sesi_tanpa_autoflush_seperti_produksi` memakai
+  `db_session.no_autoflush` untuk meniru produksi; diverifikasi **gagal**
+  (`ForeignKeyViolation`) bila perbaikan dicabut, sementara seluruh test OPM lain tetap
+  hijau — bukti langsung bahwa test biasa buta terhadap kelas bug ini.
+- Tidak ada migrasi / perubahan skema Pydantic; `openapi.json` tidak berubah (kontrak
+  409 sudah terdokumentasi) — murni perbaikan perilaku runtime.
+
 ### [2026-07-14] TI: create sesi menolak panel > `max_responden` (tidak lagi buang diam-diam)
 
 `SqlTiSesiService.create()` auto-populate anggota SME panel jadi responden lewat
@@ -621,7 +654,8 @@ DCS dan WCP beralih dari **enrollment otomatis** ke **sistem assignment**:
 - `make test` menjalankan linter + unit di dalam Docker — tidak ada artefak di folder project setelah selesai.
 - Authentik JWKS di-cache; perubahan kunci di Authentik membutuhkan restart service atau cache TTL habis.
 - Endpoint OAuth2 Swagger (`/docs/oauth2-redirect`) wajib didaftarkan di Authentik sebagai Redirect URI.
-- **Membuat parent + child ORM baru dalam satu `create()` (mis. sesi + auto-populate anak)**: bila kolom FK anak (`ForeignKey(...)`) TIDAK punya `relationship()` ORM balik ke parent, `session.flush()` gabungan TIDAK menjamin urutan INSERT parent-dulu — flush parent SENDIRI (`self._s.add(parent); self._s.flush()`) sebelum menambah anak, jangan andalkan urutan otomatis. Bug ini lolos test unit (harness pakai `join_transaction_mode="create_savepoint")`, beda perilaku dari `get_sessionmaker()` produksi) — hanya kelihatan lewat E2E/produksi nyata. Lihat entri `[2026-07-13]` di Revisi Desain untuk kasus nyata (`SqlTiSesiService.create()`).
+- **Membuat parent + child ORM baru dalam satu `create()` (mis. sesi + auto-populate anak)**: bila kolom FK anak (`ForeignKey(...)`) TIDAK punya `relationship()` ORM balik ke parent, `session.flush()` gabungan TIDAK menjamin urutan INSERT parent-dulu — flush parent SENDIRI (`self._s.add(parent); self._s.flush()`) sebelum menambah anak, jangan andalkan urutan otomatis. Kasus nyata: `SqlTiSesiService.create()` (entri `[2026-07-13]`) dan `SqlOpmSesiService.create()` (entri `[2026-07-14] OPM`).
+- **Kenapa kelas bug di atas lolos test unit: `autoflush`, BUKAN `create_savepoint`.** Produksi memakai `sessionmaker(autoflush=False)` (`db.py`); harness test memakai `Session(...)` dengan `autoflush=True` (default). Di test, autoflush diam-diam mem-flush parent begitu `create()` menjalankan SELECT apa pun setelahnya — parent kebetulan sudah ada saat anak di-INSERT, jadi urutan yang salah tak pernah terlihat. **Test yang menjaga urutan INSERT WAJIB membungkus pemanggilan service dengan `db_session.no_autoflush`** agar meniru produksi (contoh: `test_create_sesi_tanpa_autoflush_seperti_produksi`). Klaim lama bahwa `join_transaction_mode="create_savepoint"` penyebabnya (entri `[2026-07-13]`) **KELIRU** — savepoint bukan yang menyamarkan.
 
 ## Alur Kerja & Definition of Done
 

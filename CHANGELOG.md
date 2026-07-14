@@ -7,6 +7,43 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.34.1] - 2026-07-14
+
+### Diperbaiki
+
+- **`POST /api/v1/opm/sesi` tidak lagi selalu gagal dengan 409 "sesi sudah ada" palsu**
+  (backlog 023). Seluruh alur OPM **terblokir total** di produksi: membuat Analisis
+  Jabatan OPM untuk jabatan apa pun ditolak dengan `409 "Sesi OPM untuk jabatan '…'
+  sudah ada."` — padahal tabel `opm_sesi` **kosong** (diverifikasi: 0 baris, 2 jabatan
+  berbeda, tetap 409). Pesan itu **bohong**. Dua cacat yang saling menutupi:
+  - `SqlOpmSesiService.create()` menambahkan `OpmSesiModel` **tanpa `flush()`**, lalu
+    menambahkan `OpmRespondenModel` (auto-responden dari SME panel) yang `sesi_id`-nya
+    FK telanjang **tanpa `relationship()`** balik ke parent. Unit-of-work SQLAlchemy
+    mengurutkan INSERT berdasar `relationship()` yang dikonfigurasi, bukan kolom
+    `ForeignKey` mentah → INSERT `opm_responden` bisa mendahului `opm_sesi` →
+    `ForeignKeyViolation`. Kini parent di-`flush()` lebih dulu (pola yang sudah dipakai
+    `SqlTiSesiService.create()`), tetap lewat `_flush_checked` agar unique constraint
+    `jabatan_id` tetap jadi backstop 409 untuk race dua create bersamaan.
+  - `_flush_checked()` memetakan **semua** `IntegrityError` → `ConflictError("… sudah
+    ada")`. `ForeignKeyViolation` adalah subclass `IntegrityError`, jadi bug di atas
+    menyamar jadi konflik duplikat — menyesatkan investigasi selama dua sesi pengujian.
+    Kini **hanya** `UniqueViolation` yang dipetakan ke 409; pelanggaran integritas lain
+    naik apa adanya (500 + stack trace).
+
+### Catatan pengembang
+
+- **Kenapa bug di atas selalu lolos unit test — sebab yang sebenarnya.** Bukan karena
+  `join_transaction_mode="create_savepoint"` (dugaan yang tercatat di entri `[2026-07-13]`
+  dan Gotcha `CLAUDE.md`), melainkan karena **`autoflush`**: produksi memakai
+  `sessionmaker(autoflush=False)` (`db.py`), sedangkan harness test memakai `Session(...)`
+  dengan `autoflush=True` (default). Autoflush di test diam-diam mem-flush baris sesi saat
+  `create()` menjalankan SELECT snapshot task — sehingga parent kebetulan sudah ada ketika
+  anak di-INSERT, dan urutan yang salah tidak pernah terlihat. Test regresi baru
+  (`test_create_sesi_tanpa_autoflush_seperti_produksi`) menjalankan `create()` di dalam
+  `db_session.no_autoflush` untuk **meniru produksi**; diverifikasi gagal dengan
+  `ForeignKeyViolation` bila perbaikan dicabut, dan itu satu-satunya test yang gagal —
+  seluruh test OPM lain tetap hijau, membuktikan mereka buta terhadap kelas bug ini.
+
 ## [0.34.0] - 2026-07-14
 
 ### Diperbaiki

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
 from _opm_common import (
     SME_BASE,
     TI_SESI,
@@ -12,6 +13,12 @@ from _opm_common import (
     _uniq_periode,
 )
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+
+from anjab_abk_backend.models import OpmRespondenModel
+from anjab_abk_backend.opm.schemas.sesi import OpmSesiCreate
+from anjab_abk_backend.opm.services.sesi_sql import SqlOpmSesiService
 
 BASE = "/api/v1/opm/sesi"
 
@@ -131,6 +138,71 @@ def test_create_sesi_conflict_jabatan_sudah_punya_sesi(
     assert r1.status_code == 201, r1.text
     r2 = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"]))
     assert r2.status_code == 409, r2.text
+
+
+def test_create_sesi_tanpa_autoflush_seperti_produksi(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    """Regresi bug 023: `create()` harus jalan juga saat `autoflush` MATI.
+
+    Produksi memakai `sessionmaker(autoflush=False)` (`db.py`), sedangkan harness test
+    memakai `Session(...)` dengan `autoflush=True` (default) — dan autoflush itulah yang
+    diam-diam mem-flush baris sesi saat `create()` menjalankan SELECT snapshot task,
+    sehingga baris sesi kebetulan sudah ada ketika responden di-INSERT. Itu sebabnya bug
+    ini SELALU lolos test biasa: seluruh test lain di berkas ini tetap hijau meski
+    `flush()` eksplisit dicabut.
+
+    `OpmRespondenModel.sesi_id` adalah FK telanjang tanpa `relationship()` balik ke
+    `OpmSesiModel` → unit-of-work SQLAlchemy tidak menjamin INSERT sesi mendahului INSERT
+    responden. Tanpa autoflush & tanpa `flush()` eksplisit: `ForeignKeyViolation` (di
+    produksi tersamar jadi 409 "sesi sudah ada" — lihat test berikutnya).
+
+    `no_autoflush` di sini MENIRU kondisi produksi; jangan dihapus "karena test lain
+    tidak butuh" — justru test lain itulah yang buta terhadap bug ini.
+    """
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    svc = SqlOpmSesiService(db_session)
+
+    with db_session.no_autoflush:
+        sesi = svc.create(
+            OpmSesiCreate(
+                jabatan_id=ctx["jabatan_id"],
+                ti_sesi_id=ctx["ti_sesi_id"],
+                periode=_uniq_periode(),
+                min_responden=1,
+                max_responden=10,
+            )
+        )
+
+    assert sesi.id.startswith("opses_")
+    assert sesi.jumlah_task == 2
+    responden = db_session.scalars(
+        select(OpmRespondenModel).where(OpmRespondenModel.sesi_id == sesi.id)
+    ).all()
+    assert {r.partisipan_id for r in responden} == set(ctx["partisipan_ids"])
+
+
+def test_flush_checked_tidak_menyamarkan_fk_violation(db_session) -> None:
+    """`_flush_checked` hanya boleh memetakan UniqueViolation → 409 (ConflictError).
+
+    Pelanggaran integritas lain harus naik apa adanya. Memetakan SEMUA `IntegrityError`
+    jadi "sesi sudah ada" persis yang menyamarkan `ForeignKeyViolation` di `create()`
+    sebagai konflik duplikat palsu — dan menyembunyikannya selama dua sesi pengujian
+    produksi.
+    """
+    svc = SqlOpmSesiService(db_session)
+    db_session.add(
+        OpmRespondenModel(
+            id=f"oprs_{uuid.uuid4().hex[:8]}",
+            sesi_id="opses_tidak_pernah_ada",  # melanggar FK ke opm_sesi
+            nama="X",
+            jabatan_label="X",
+            partisipan_id=None,
+            sudah_submit=False,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        svc._flush_checked(on_conflict="pesan konflik ini TIDAK BOLEH dipakai")
 
 
 def test_create_sesi_idempotency_replay(client: TestClient, jabatan_id_tk: str) -> None:

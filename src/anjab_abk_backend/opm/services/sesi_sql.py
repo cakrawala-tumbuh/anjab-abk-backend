@@ -12,6 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC
 
+from psycopg.errors import UniqueViolation
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -99,12 +100,20 @@ class SqlOpmSesiService:
         return {j.id: j.nama for j in rows}
 
     def _flush_checked(self, *, on_conflict: str) -> None:
-        """Flush dalam SAVEPOINT; petakan `IntegrityError` (duplikat unik) → 409."""
+        """Flush dalam SAVEPOINT; petakan **hanya** `UniqueViolation` → 409.
+
+        Pelanggaran integritas lain (`ForeignKeyViolation`, NOT NULL, dst.) sengaja
+        dibiarkan naik apa adanya: memetakannya jadi "sudah ada" menyamarkan bug
+        nyata sebagai konflik duplikat yang mustahil. Persis itu yang menyembunyikan
+        `ForeignKeyViolation` di `create()` selama dua sesi pengujian produksi.
+        """
         try:
             with self._s.begin_nested():
                 self._s.flush()
         except IntegrityError as exc:
-            raise ConflictError(on_conflict) from exc
+            if isinstance(exc.orig, UniqueViolation):
+                raise ConflictError(on_conflict) from exc
+            raise
 
     def list(self, *, limit: int, offset: int) -> tuple[list[OpmSesiRead], int]:
         total = self._s.scalar(select(func.count()).select_from(OpmSesiModel)) or 0
@@ -171,6 +180,8 @@ class SqlOpmSesiService:
                 f" max_responden ({data.max_responden})."
             )
 
+        konflik = f"Sesi OPM untuk jabatan '{data.jabatan_id}' sudah ada."
+
         rec = OpmSesiModel(
             id=f"opses_{uuid.uuid4().hex[:8]}",
             jabatan_id=data.jabatan_id,
@@ -182,6 +193,18 @@ class SqlOpmSesiService:
             catatan=data.catatan,
         )
         self._s.add(rec)
+        # Flush sesi TERLEBIH DAHULU, sebelum insert responden auto-populate di
+        # langkah 7. `OpmRespondenModel.sesi_id` adalah FK murni tanpa
+        # `relationship()` ORM ke `OpmSesiModel` — tanpa flush eksplisit ini, urutan
+        # INSERT saat flush gabungan TIDAK terjamin (unit-of-work SQLAlchemy
+        # mengurutkan INSERT berdasar `relationship()` yang dikonfigurasi, bukan
+        # sekadar FK kolom mentah), sehingga bisa mencoba INSERT responden sebelum
+        # sesi ada → `ForeignKeyViolation`. Pola sama dengan `SqlTiSesiService.create()`.
+        # Tetap lewat `_flush_checked` agar unique constraint `jabatan_id` tetap jadi
+        # backstop 409 untuk race dua create bersamaan (pre-check langkah 4 lolos di
+        # keduanya). `rec.task_links` (langkah 6) TIDAK terpengaruh — itu relationship,
+        # urutannya memang dijamin.
+        self._flush_checked(on_conflict=konflik)
 
         # 6. Snapshot task terpilih TI → opm_sesi_task.
         ut_rows = self._s.scalars(
@@ -240,7 +263,7 @@ class SqlOpmSesiService:
                 )
             )
 
-        self._flush_checked(on_conflict=f"Sesi OPM untuk jabatan '{data.jabatan_id}' sudah ada.")
+        self._flush_checked(on_conflict=konflik)
         return _to_read(rec, jabatan.nama)
 
     def update(self, sesi_id: str, data: OpmSesiUpdate) -> OpmSesiRead:
