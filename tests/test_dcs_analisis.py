@@ -23,7 +23,7 @@ def _all_jawaban(skor: int = 3) -> list[dict]:
 def _assign(client: TestClient, partisipan_ids: list[str]) -> list[dict]:
     r = client.post(RSP_BASE, json={"partisipan_ids": partisipan_ids})
     assert r.status_code == 201, r.text
-    return r.json()
+    return r.json()["created"]
 
 
 def _submit(client: TestClient, responden_id: str, skor: int = 3) -> None:
@@ -132,7 +132,9 @@ def test_k_index_terisi_saat_wcp_punya_responden_submit(
         all_wcp_item_ids.extend(i["item_id"] for i in r2.json())
 
     wcp_par = partisipan_factory("dcs-kidx-wcp")
-    wcp_rsp = client.post(WCP_RSP_BASE, json={"partisipan_ids": [wcp_par]}).json()[0]
+    r_wcp = client.post(WCP_RSP_BASE, json={"partisipan_ids": [wcp_par]})
+    assert r_wcp.status_code == 201, r_wcp.text
+    wcp_rsp = r_wcp.json()["created"][0]
     client.put(
         f"{WCP_RSP_BASE}/{wcp_rsp['id']}/jawaban",
         json={"jawaban": [{"item_id": iid, "skor_raw": 4} for iid in all_wcp_item_ids]},

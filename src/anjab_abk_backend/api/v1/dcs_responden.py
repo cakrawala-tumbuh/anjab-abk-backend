@@ -23,7 +23,7 @@ from ...dependencies import (
     require_admin,
 )
 from ...errors import ValidationAppError
-from ...schemas.common import ErrorResponse
+from ...schemas.common import BulkAssignResult, ErrorResponse
 from ...security import Principal
 
 router = APIRouter()
@@ -54,9 +54,9 @@ def list_responden(
 
 @router.post(
     "",
-    response_model=list[DcsRespondenRead],
+    response_model=BulkAssignResult[DcsRespondenRead],
     status_code=status.HTTP_201_CREATED,
-    summary="Tugaskan (assign) responden DCS — bulk (admin)",
+    summary="Tugaskan (assign) responden DCS — bulk, idempoten (admin)",
     operation_id="dcs_responden_create",
     dependencies=_ADMIN_GUARDS,
     responses={
@@ -65,17 +65,14 @@ def list_responden(
         **_FORBIDDEN,
         409: {
             "model": ErrorResponse,
-            "description": (
-                "Instrumen DCS tidak OPEN, atau salah satu partisipan sudah terdaftar"
-                " sebagai responden DCS."
-            ),
+            "description": "Instrumen DCS tidak OPEN.",
         },
     },
 )
 def create_responden(
     payload: DcsRespondenCreate,
     rsp_service: Annotated[DcsRespondenService, Depends(get_dcs_responden_service)],
-) -> list[DcsRespondenRead]:
+) -> BulkAssignResult[DcsRespondenRead]:
     return rsp_service.create_banyak(payload.partisipan_ids)
 
 

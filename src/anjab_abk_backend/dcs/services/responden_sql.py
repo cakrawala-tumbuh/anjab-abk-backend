@@ -5,9 +5,11 @@ MENGGANTI `InMemoryDcsRespondenService` TANPA mengubah kontrak Protocol.
 `partisipan_id` unik lintas SELURUH responden (constraint DB `uq_dcs_responden_
 partisipan_id`); pre-cek dilakukan untuk pesan error ramah, dengan backstop
 `IntegrityError` → `ConflictError` (pola `anjab/services/sme_panel_sql.py`).
-`create_banyak` mengambil `nama`/`jabatan_utama_id` dari `PartisipanService` (seam
-`core`, akses lintas domain yang diizinkan) dan menyisipkan seluruh baris dalam
-SATU flush (atomik).
+
+`create_banyak` bersifat idempoten (skip-on-conflict), BUKAN atomik — meniru pola
+`SqlTsPenugasanService.create_banyak`/`SqlOpmRespondenService.assign_banyak`: tiap
+`partisipan_id` yang gagal (duplikat di input atau sudah terdaftar) dikumpulkan ke
+`BulkAssignResult.skipped`, sisanya tetap dibuat dalam satu batch.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from sqlalchemy.orm import Session
 from ...core.services.partisipan import PartisipanService
 from ...errors import ConflictError, NotFoundError, ValidationAppError
 from ...models import DcsInstrumenModel, DcsRespondenModel
+from ...schemas.common import BulkAssignResult, BulkSkipped
 from ..schemas.responden import DcsRespondenRead
 
 # Sumber tunggal id singleton instrumen.
@@ -120,16 +123,62 @@ class SqlDcsRespondenService:
         )
         return _to_read(rec)
 
-    def create_banyak(self, partisipan_ids: list[str]) -> list[DcsRespondenRead]:
+    def create_banyak(self, partisipan_ids: list[str]) -> BulkAssignResult[DcsRespondenRead]:
+        """Idempoten (skip-on-conflict), BUKAN atomik.
+
+        Urutan pengecekan: dedup input (`duplikat_input`) → sudah terdaftar
+        (`sudah_terdaftar`, dicek via pre-check SELECT — bukan `begin_nested()`
+        per baris, lihat catatan di `SqlTsPenugasanService.create_banyak`). Tidak
+        ada konsep keanggotaan panel/kapasitas untuk DCS (beda dari OPM/TI).
+        """
         self._require_instrumen_open()
-        recs: list[DcsRespondenModel] = []
+
+        skipped: list[BulkSkipped] = []
+        seen: set[str] = set()
+        candidates: list[str] = []
         for partisipan_id in partisipan_ids:
+            if partisipan_id in seen:
+                skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="duplikat_input"))
+                continue
+            seen.add(partisipan_id)
+            candidates.append(partisipan_id)
+
+        existing_ids: set[str] = set()
+        if candidates:
+            existing_ids = set(
+                self._s.scalars(
+                    select(DcsRespondenModel.partisipan_id).where(
+                        DcsRespondenModel.partisipan_id.in_(candidates)
+                    )
+                ).all()
+            )
+
+        recs: list[DcsRespondenModel] = []
+        for partisipan_id in candidates:
+            if partisipan_id in existing_ids:
+                skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="sudah_terdaftar"))
+                continue
             partisipan = self._par.get(partisipan_id)
-            recs.append(self._insert(partisipan_id, partisipan.nama, partisipan.jabatan_utama_id))
-        self._flush_checked(
-            on_conflict="Salah satu partisipan sudah terdaftar sebagai responden DCS."
-        )
-        return [_to_read(r) for r in recs]
+            rec = DcsRespondenModel(
+                id=f"drsp_{uuid.uuid4().hex[:8]}",
+                nama=partisipan.nama,
+                jabatan_label=partisipan.jabatan_utama_id,
+                partisipan_id=partisipan_id,
+                sudah_submit=False,
+            )
+            self._s.add(rec)
+            recs.append(rec)
+
+        if recs:
+            try:
+                with self._s.begin_nested():
+                    self._s.flush()
+            except IntegrityError as exc:
+                raise ConflictError(
+                    "Salah satu partisipan sudah terdaftar sebagai responden DCS."
+                ) from exc
+
+        return BulkAssignResult(created=[_to_read(r) for r in recs], skipped=skipped)
 
     def mark_submitted(self, responden_id: str) -> DcsRespondenRead:
         rec = self._get_model(responden_id)

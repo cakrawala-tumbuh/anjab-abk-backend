@@ -7,6 +7,40 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-07-14
+
+### Diubah (BREAKING)
+
+- **`POST /api/v1/dcs/responden` dan `POST /api/v1/wcp/responden`: response
+  bulk assign berubah dari array menjadi `BulkAssignResult`.** Sebelumnya
+  partisipan yang tidak memenuhi syarat (terutama "sudah terdaftar sebagai
+  responden") ditolak dengan **409 untuk SELURUH batch** (atomik) — assign 10
+  partisipan yang 1 di antaranya sudah terdaftar membuat 9 lainnya ikut gagal
+  tanpa jejak siapa yang bermasalah. Endpoint ini disamakan dengan pola bulk
+  TI/OPM/Time Study yang sudah lebih dulu benar.
+  - Status code tetap **201**, tapi body respons berubah dari
+    `DcsRespondenRead[]` / `WcpRespondenRead[]` menjadi
+    `{"created": [...], "skipped": [{"partisipan_id": ..., "alasan": ...}]}`.
+    Konsumen (`anjab-abk-web-app`, `anjab-abk-mcp`) yang mengasumsikan body
+    berupa array **wajib** disesuaikan (lihat item backlog anjab-abk `019`
+    untuk web app; MCP belum punya item tersendiri per rilis ini — lihat
+    catatan di bawah).
+  - Perilaku bulk berubah dari **atomik** menjadi **idempoten (skip-on-
+    conflict)**: partisipan duplikat di payload (`duplikat_input`) atau yang
+    sudah terdaftar (`sudah_terdaftar`) masuk ke `skipped` dengan alasannya;
+    sisanya tetap dibuat. Batch yang **seluruhnya** di-skip tetap mengembalikan
+    201 dengan `created: []` (bukan error) — nihil hasil bukan kegagalan.
+  - Precondition instrumen bukan `OPEN` **tetap** 409 untuk seluruh batch
+    (bukan skip per-partisipan) — tidak berubah dari perilaku sebelumnya.
+  - `DcsRespondenService.create_banyak` / `WcpRespondenService.create_banyak`
+    (Protocol) sekarang mengembalikan `BulkAssignResult[...]`, bukan
+    `list[...]`; `InMemoryDcsRespondenService`/`InMemoryWcpRespondenService`
+    tidak lagi mengimplementasikan `create_banyak` (pola yang sama dengan
+    `InMemoryTsPenugasanService`/`InMemoryOpmRespondenService` — bulk assign
+    butuh akses lintas-domain ke `PartisipanService` yang tidak dimiliki
+    placeholder in-memory; implementasi nyata tetap di `SqlDcsRespondenService`/
+    `SqlWcpRespondenService`, satu-satunya yang dipakai produksi).
+
 ## [0.32.0] - 2026-07-13
 
 ### Diperbaiki

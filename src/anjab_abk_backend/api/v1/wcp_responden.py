@@ -18,7 +18,7 @@ from ...dependencies import (
     require_admin,
 )
 from ...errors import ValidationAppError
-from ...schemas.common import ErrorResponse
+from ...schemas.common import BulkAssignResult, ErrorResponse
 from ...security import Principal
 from ...wcp.schemas.jawaban import WcpJawabanRead, WcpJawabanUpsert
 from ...wcp.schemas.responden import WcpRespondenCreate, WcpRespondenRead
@@ -54,9 +54,9 @@ def list_responden(
 
 @router.post(
     "",
-    response_model=list[WcpRespondenRead],
+    response_model=BulkAssignResult[WcpRespondenRead],
     status_code=status.HTTP_201_CREATED,
-    summary="Tugaskan (assign) responden WCP — bulk (admin)",
+    summary="Tugaskan (assign) responden WCP — bulk, idempoten (admin)",
     operation_id="wcp_responden_create",
     dependencies=_ADMIN_GUARDS,
     responses={
@@ -65,17 +65,14 @@ def list_responden(
         **_FORBIDDEN,
         409: {
             "model": ErrorResponse,
-            "description": (
-                "Instrumen WCP tidak OPEN, atau salah satu partisipan sudah terdaftar"
-                " sebagai responden WCP."
-            ),
+            "description": "Instrumen WCP tidak OPEN.",
         },
     },
 )
 def create_responden(
     payload: WcpRespondenCreate,
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
-) -> list[WcpRespondenRead]:
+) -> BulkAssignResult[WcpRespondenRead]:
     return rsp_service.create_banyak(payload.partisipan_ids)
 
 

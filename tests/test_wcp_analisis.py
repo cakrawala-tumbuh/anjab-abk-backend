@@ -27,7 +27,7 @@ def _get_all_item_ids(anon_client: TestClient) -> list[str]:
 def _assign(client: TestClient, partisipan_ids: list[str]) -> list[dict]:
     r = client.post(RSP_BASE, json={"partisipan_ids": partisipan_ids})
     assert r.status_code == 201, r.text
-    return r.json()
+    return r.json()["created"]
 
 
 def _submit(client: TestClient, anon_client: TestClient, responden_id: str, skor: int = 4) -> None:

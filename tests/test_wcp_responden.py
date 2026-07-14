@@ -23,10 +23,15 @@ def _get_all_item_ids(client: TestClient) -> list[str]:
     return _ALL_ITEM_IDS
 
 
-def _assign(client: TestClient, partisipan_ids: list[str]) -> list[dict]:
+def _assign_raw(client: TestClient, partisipan_ids: list[str]) -> dict:
     r = client.post(RSP_BASE, json={"partisipan_ids": partisipan_ids})
     assert r.status_code == 201, r.text
     return r.json()
+
+
+def _assign(client: TestClient, partisipan_ids: list[str]) -> list[dict]:
+    """Assign dan kembalikan hanya daftar `created` (kasus umum: semua sukses)."""
+    return _assign_raw(client, partisipan_ids)["created"]
 
 
 def _save_draft(client: TestClient, responden_id: str, jawaban: list[dict]) -> None:
@@ -70,16 +75,53 @@ def test_list_responden_requires_admin(anon_client: TestClient) -> None:
 
 def test_create_responden_bulk_5_dalam_satu_request(client: TestClient, partisipan_factory) -> None:
     ids = [partisipan_factory(f"wcp-bulk-{i}") for i in range(5)]
-    created = _assign(client, ids)
-    assert len(created) == 5
-    assert {c["partisipan_id"] for c in created} == set(ids)
+    data = _assign_raw(client, ids)
+    assert len(data["created"]) == 5
+    assert {c["partisipan_id"] for c in data["created"]} == set(ids)
+    assert data["skipped"] == []
 
 
-def test_create_responden_partisipan_duplikat_ditolak(client: TestClient, par_a: str) -> None:
-    """Partisipan yang sama tidak boleh menjadi responden WCP lebih dari satu kali."""
+def test_create_responden_partisipan_sudah_terdaftar_di_skip(
+    client: TestClient, par_a: str
+) -> None:
+    """Partisipan yang sama tidak boleh menjadi responden WCP lebih dari satu kali —
+    dilaporkan lewat `skipped`, bukan hilang/409."""
     _assign(client, [par_a])
-    r = client.post(RSP_BASE, json={"partisipan_ids": [par_a]})
-    assert r.status_code == 409
+    data = _assign_raw(client, [par_a])
+    assert data["created"] == []
+    assert data["skipped"] == [{"partisipan_id": par_a, "alasan": "sudah_terdaftar"}]
+
+
+def test_create_responden_partisipan_duplikat_dalam_satu_request_di_skip(
+    client: TestClient, par_a: str
+) -> None:
+    data = _assign_raw(client, [par_a, par_a])
+    assert len(data["created"]) == 1
+    assert data["created"][0]["partisipan_id"] == par_a
+    assert data["skipped"] == [{"partisipan_id": par_a, "alasan": "duplikat_input"}]
+
+
+def test_create_responden_bulk_sebagian_sudah_terdaftar(
+    client: TestClient, partisipan_factory
+) -> None:
+    ids = [partisipan_factory(f"wcp-partial-{i}") for i in range(3)]
+    _assign(client, ids[:2])
+    data = _assign_raw(client, ids)
+    assert {c["partisipan_id"] for c in data["created"]} == {ids[2]}
+    assert {s["partisipan_id"] for s in data["skipped"]} == set(ids[:2])
+    assert all(s["alasan"] == "sudah_terdaftar" for s in data["skipped"])
+
+
+def test_create_responden_bulk_semua_sudah_terdaftar_tetap_201(
+    client: TestClient, partisipan_factory
+) -> None:
+    ids = [partisipan_factory(f"wcp-allskip-{i}") for i in range(2)]
+    _assign(client, ids)
+    data = _assign_raw(client, ids)
+    assert data["created"] == []
+    assert len(data["skipped"]) == 2
+    assert {s["partisipan_id"] for s in data["skipped"]} == set(ids)
+    assert all(s["alasan"] == "sudah_terdaftar" for s in data["skipped"])
 
 
 def test_create_responden_saat_closed_ditolak(client: TestClient, par_a: str) -> None:
@@ -92,6 +134,7 @@ def test_tidak_ada_lagi_batas_atas_jumlah_responden(client: TestClient, partisip
     ids = [partisipan_factory(f"wcp-nomax-{i}") for i in range(12)]
     created = _assign(client, ids)
     assert len(created) == 12
+    assert {c["partisipan_id"] for c in created} == set(ids)
 
 
 # --- DELETE /wcp/responden/{id} ---

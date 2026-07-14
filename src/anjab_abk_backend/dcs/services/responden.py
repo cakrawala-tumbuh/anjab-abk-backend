@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from ...errors import ConflictError, NotFoundError, ValidationAppError
+from ...schemas.common import BulkAssignResult
 from ..schemas.responden import DcsRespondenRead
 
 
@@ -32,7 +33,7 @@ class DcsRespondenService(Protocol):
     def create(
         self, partisipan_id: str, nama: str | None, jabatan_label: str
     ) -> DcsRespondenRead: ...
-    def create_banyak(self, partisipan_ids: list[str]) -> list[DcsRespondenRead]: ...
+    def create_banyak(self, partisipan_ids: list[str]) -> BulkAssignResult[DcsRespondenRead]: ...
     def mark_submitted(self, responden_id: str) -> DcsRespondenRead: ...
     def delete(self, responden_id: str) -> None: ...
 
@@ -41,8 +42,10 @@ class InMemoryDcsRespondenService:
     """Placeholder in-memory thread-safe.
 
     Tidak punya akses ke `PartisipanService`/instrumen (murni scaffold Protocol) —
-    `create_banyak` memakai `nama=None` dan `jabatan_label` berupa placeholder yang
-    menyebut `partisipan_id`-nya.
+    dan tidak mengimplementasikan `create_banyak` (pola yang sama dengan
+    `InMemoryTsPenugasanService`/`InMemoryOpmRespondenService`: bulk assign butuh
+    akses lintas-domain yang tidak dimiliki placeholder ini). Implementasi nyata
+    ada di `SqlDcsRespondenService`.
     """
 
     def __init__(self) -> None:
@@ -94,11 +97,6 @@ class InMemoryDcsRespondenService:
         with self._lock:
             rec = self._insert(partisipan_id, nama, jabatan_label)
             return self._to_read(rec)
-
-    def create_banyak(self, partisipan_ids: list[str]) -> list[DcsRespondenRead]:
-        with self._lock:
-            recs = [self._insert(pid, None, f"(auto:{pid})") for pid in partisipan_ids]
-            return [self._to_read(r) for r in recs]
 
     def mark_submitted(self, responden_id: str) -> DcsRespondenRead:
         with self._lock:
