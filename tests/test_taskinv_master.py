@@ -92,8 +92,8 @@ def _create_ut(
 # --------------------------------------------------------------------------- #
 
 
-def test_tp_list_ok(anon_client: TestClient) -> None:
-    r = anon_client.get(TP_BASE)
+def test_tp_list_ok(client: TestClient) -> None:
+    r = client.get(TP_BASE)
     assert r.status_code == 200
     body = r.json()
     assert "items" in body
@@ -168,8 +168,8 @@ def test_tp_delete(client: TestClient) -> None:
     assert client.get(f"{TP_BASE}/{tp['id']}").status_code == 404
 
 
-def test_tp_not_found(anon_client: TestClient) -> None:
-    assert anon_client.get(f"{TP_BASE}/tp_tidakada").status_code == 404
+def test_tp_not_found(client: TestClient) -> None:
+    assert client.get(f"{TP_BASE}/tp_tidakada").status_code == 404
 
 
 def test_tp_search(client: TestClient) -> None:
@@ -210,8 +210,8 @@ def tp_jbt_for_dt(client: TestClient) -> tuple[dict, str]:
     return tp, jbt["id"]
 
 
-def test_dt_list_ok(anon_client: TestClient) -> None:
-    r = anon_client.get(DT_BASE)
+def test_dt_list_ok(client: TestClient) -> None:
+    r = client.get(DT_BASE)
     assert r.status_code == 200
     body = r.json()
     assert "items" in body
@@ -286,8 +286,8 @@ def test_dt_delete(client: TestClient, tp_jbt_for_dt: tuple[dict, str]) -> None:
     assert client.get(f"{DT_BASE}/{dt['id']}").status_code == 404
 
 
-def test_dt_not_found(anon_client: TestClient) -> None:
-    assert anon_client.get(f"{DT_BASE}/dt_tidakada").status_code == 404
+def test_dt_not_found(client: TestClient) -> None:
+    assert client.get(f"{DT_BASE}/dt_tidakada").status_code == 404
 
 
 def test_dt_search(client: TestClient, tp_jbt_for_dt: tuple[dict, str]) -> None:
@@ -317,8 +317,8 @@ def tp_dt_jbt_for_ut(client: TestClient) -> tuple[dict, dict, str]:
     return tp, dt, jbt["id"]
 
 
-def test_ut_list_ok(anon_client: TestClient) -> None:
-    r = anon_client.get(UT_BASE)
+def test_ut_list_ok(client: TestClient) -> None:
+    r = client.get(UT_BASE)
     assert r.status_code == 200
     body = r.json()
     assert "items" in body
@@ -420,8 +420,8 @@ def test_ut_delete(client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str])
     assert client.get(f"{UT_BASE}/{ut['id']}").status_code == 404
 
 
-def test_ut_not_found(anon_client: TestClient) -> None:
-    assert anon_client.get(f"{UT_BASE}/ut_tidakada").status_code == 404
+def test_ut_not_found(client: TestClient) -> None:
+    assert client.get(f"{UT_BASE}/ut_tidakada").status_code == 404
 
 
 def test_ut_search_by_tugas_pokok(
@@ -476,9 +476,9 @@ def test_ut_jabatan_id_eksplisit(
     assert ut["jabatan_id"] == jbt_id
 
 
-def test_ut_seeded_data_via_catalog_endpoint(anon_client: TestClient) -> None:
+def test_ut_seeded_data_via_catalog_endpoint(client: TestClient) -> None:
     """Pastikan catalog masih bisa diakses setelah seeding."""
-    kombis = anon_client.get(CATALOG_BASE + "/kombinasi").json()
+    kombis = client.get(CATALOG_BASE + "/kombinasi").json()
     assert len(kombis) > 0
     first = kombis[0]
     jabatan_id = first["jabatan_id"]
@@ -489,7 +489,7 @@ def test_ut_seeded_data_via_catalog_endpoint(anon_client: TestClient) -> None:
     assert len(first["jabatan_nama"]) > 0
     assert first["jabatan_nama"] != jabatan_id
 
-    r = anon_client.get(CATALOG_BASE, params={"unit": unit, "jabatan_id": jabatan_id})
+    r = client.get(CATALOG_BASE, params={"unit": unit, "jabatan_id": jabatan_id})
     assert r.status_code == 200
     items = r.json()
     assert len(items) > 0
@@ -497,19 +497,17 @@ def test_ut_seeded_data_via_catalog_endpoint(anon_client: TestClient) -> None:
     assert all(it["jabatan_id"] == jabatan_id for it in items)
 
 
-def test_seeded_catalog_membawa_nilai_standar_calhr(anon_client: TestClient) -> None:
+def test_seeded_catalog_membawa_nilai_standar_calhr(client: TestClient) -> None:
     """Regresi: seed_catalog_models sempat tidak meneruskan field std_* ke DB sama
     sekali (CatalogItem/UraianTugasCreate tanpa std_*) walau task_catalog.json
     berisi nilainya — kolom std_* jadi NULL untuk semua baris seed meski JSON
     sumbernya lengkap. Pastikan item catalog hasil seed benar-benar membawa
     nilai standar, bukan hanya item yang dibuat langsung lewat API.
     """
-    kombis = anon_client.get(CATALOG_BASE + "/kombinasi").json()
+    kombis = client.get(CATALOG_BASE + "/kombinasi").json()
     assert len(kombis) > 0
     first = kombis[0]
-    r = anon_client.get(
-        CATALOG_BASE, params={"unit": first["unit"], "jabatan_id": first["jabatan_id"]}
-    )
+    r = client.get(CATALOG_BASE, params={"unit": first["unit"], "jabatan_id": first["jabatan_id"]})
     assert r.status_code == 200
     items = r.json()
     assert len(items) > 0
@@ -520,11 +518,11 @@ def test_seeded_catalog_membawa_nilai_standar_calhr(anon_client: TestClient) -> 
     assert any(it["std_durasi_per_kali"] is not None for it in items)
 
 
-def test_catalog_with_null_detil_tugas(anon_client: TestClient) -> None:
+def test_catalog_with_null_detil_tugas(client: TestClient) -> None:
     """Catalog untuk kombinasi yang punya task tanpa detil_tugas (detil_tugas_id=None) harus 200."""
-    kombis = anon_client.get(CATALOG_BASE + "/kombinasi").json()
+    kombis = client.get(CATALOG_BASE + "/kombinasi").json()
     for kombi in kombis:
-        r = anon_client.get(
+        r = client.get(
             CATALOG_BASE, params={"unit": kombi["unit"], "jabatan_id": kombi["jabatan_id"]}
         )
         assert r.status_code == 200
@@ -534,17 +532,17 @@ def test_catalog_with_null_detil_tugas(anon_client: TestClient) -> None:
     pytest.skip("Tidak ada task dengan detil_tugas_id=None dalam catalog")
 
 
-def test_tp_list_large_limit(anon_client: TestClient) -> None:
+def test_tp_list_large_limit(client: TestClient) -> None:
     """Limit hingga 500 harus diterima (le=500 di pagination_params)."""
-    r = anon_client.get(TP_BASE, params={"limit": 200})
+    r = client.get(TP_BASE, params={"limit": 200})
     assert r.status_code == 200
     body = r.json()
     assert "items" in body
 
 
-def test_ut_list_large_limit(anon_client: TestClient) -> None:
+def test_ut_list_large_limit(client: TestClient) -> None:
     """Limit 500 harus diterima untuk uraian-tugas."""
-    r = anon_client.get(UT_BASE, params={"limit": 500})
+    r = client.get(UT_BASE, params={"limit": 500})
     assert r.status_code == 200
     body = r.json()
     assert "items" in body

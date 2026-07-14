@@ -6,7 +6,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from ...dependencies import get_current_principal, get_wcp_instrumen_service, rate_limit
+from ...dependencies import (
+    READ_GUARDS,
+    get_current_principal,
+    get_wcp_instrumen_service,
+    rate_limit,
+)
 from ...schemas.common import ErrorResponse
 from ...wcp.schemas.instrumen import WcpInstrumenRead, WcpInstrumenUpdate
 from ...wcp.services.instrumen import WcpInstrumenService
@@ -24,6 +29,8 @@ _TRANSISI_INVALID = {422: {"model": ErrorResponse, "description": "Transisi stat
     response_model=WcpInstrumenRead,
     summary="Ambil instrumen WCP (singleton)",
     operation_id="wcp_instrumen_get",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def get_instrumen(
     service: Annotated[WcpInstrumenService, Depends(get_wcp_instrumen_service)],

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Body, Depends, Header, Path, Request, Response, s
 
 from ...config import Settings, get_settings
 from ...dependencies import (
+    READ_GUARDS,
     Idempotency,
     Pagination,
     get_current_principal,
@@ -95,6 +96,8 @@ def _pagination_links(
     response_model=Page[UraianTugasRead],
     summary="Daftar uraian tugas",
     operation_id="uraian_tugas_list",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def list_uraian_tugas(
     request: Request,
@@ -167,7 +170,12 @@ def create_uraian_tugas(
     response_model=Page[UraianTugasRead],
     summary="Cari uraian tugas (domain ala Odoo)",
     operation_id="uraian_tugas_search",
-    responses={422: {"model": ErrorResponse, "description": "Domain/field tidak valid."}},
+    dependencies=READ_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        422: {"model": ErrorResponse, "description": "Domain/field tidak valid."},
+    },
 )
 def search_uraian_tugas(
     req: SearchRequest,
@@ -184,7 +192,8 @@ def search_uraian_tugas(
     response_model=UraianTugasRead,
     summary="Ambil uraian tugas",
     operation_id="uraian_tugas_get",
-    responses={**_NOT_FOUND, 304: {"description": "Not Modified."}},
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_NOT_FOUND, 304: {"description": "Not Modified."}},
 )
 def get_uraian_tugas(
     ut_id: Annotated[str, Path(description="ID uraian tugas.")],

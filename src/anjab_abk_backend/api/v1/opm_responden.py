@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Path, Response, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     authorize_responden_access,
     get_current_principal,
     get_opm_jawaban_service,
@@ -134,7 +135,8 @@ def create_responden_banyak(
     response_model=OpmRespondenRead,
     summary="Ambil detail responden OPM (admin atau pemilik)",
     operation_id="opm_responden_get",
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def get_responden(
     responden_id: Annotated[str, Path(description="ID responden.")],
@@ -250,7 +252,8 @@ def submit_jawaban(
     response_model=list[OpmJawabanRead],
     summary="Lihat jawaban responden (admin atau pemilik)",
     operation_id="opm_jawaban_list",
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def list_jawaban(
     responden_id: Annotated[str, Path(description="ID responden.")],

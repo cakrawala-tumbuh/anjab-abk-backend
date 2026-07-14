@@ -14,6 +14,7 @@ from ...core.schemas.jenjang_pendidikan import (
 )
 from ...core.services.jenjang_pendidikan import JenjangPendidikanService
 from ...dependencies import (
+    READ_GUARDS,
     Idempotency,
     Pagination,
     get_current_principal,
@@ -101,6 +102,8 @@ def _pagination_links(
     response_model=Page[JenjangPendidikanRead],
     summary="Daftar jenjang pendidikan",
     operation_id="jenjang_pendidikan_list",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def list_jenjang_pendidikan(
     request: Request,
@@ -171,7 +174,12 @@ def create_jenjang_pendidikan(
     response_model=Page[JenjangPendidikanRead],
     summary="Cari jenjang pendidikan (domain ala Odoo)",
     operation_id="jenjang_pendidikan_search",
-    responses={422: {"model": ErrorResponse, "description": "Domain/field tidak valid."}},
+    dependencies=READ_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        422: {"model": ErrorResponse, "description": "Domain/field tidak valid."},
+    },
 )
 def search_jenjang_pendidikan(
     req: SearchRequest,
@@ -188,7 +196,8 @@ def search_jenjang_pendidikan(
     response_model=JenjangPendidikanRead,
     summary="Ambil jenjang pendidikan",
     operation_id="jenjang_pendidikan_get",
-    responses={**_NOT_FOUND, 304: {"description": "Not Modified."}},
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_NOT_FOUND, 304: {"description": "Not Modified."}},
 )
 def get_jenjang_pendidikan(
     jp_id: Annotated[str, Path(description="ID jenjang pendidikan.")],

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends
 from ...anjab.services.jabatan import JabatanService
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     get_current_principal,
     get_jabatan_service,
     get_partisipan_service,
@@ -24,6 +25,7 @@ from ...taskinv.services.sesi import TiSesiService
 router = APIRouter()
 
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
+_RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 
 _ACTIVE_STATUSES = ["TAHAP1", "TAHAP2", "TAHAP3"]
 
@@ -33,7 +35,8 @@ _ACTIVE_STATUSES = ["TAHAP1", "TAHAP2", "TAHAP3"]
     response_model=list[TiKuesionerItemRead],
     summary="Daftar kuesioner Task Inventory milik pengguna yang sedang login",
     operation_id="taskinv_kuesioner_saya",
-    responses=_AUTH,
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH},
 )
 def kuesioner_saya(
     principal: Annotated[Principal, Depends(get_current_principal)],

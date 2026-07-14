@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends
 
 from ...dcs.schemas.instrumen import DcsInstrumenRead, DcsInstrumenUpdate
 from ...dcs.services.instrumen import DcsInstrumenService
-from ...dependencies import get_current_principal, get_dcs_instrumen_service, rate_limit
+from ...dependencies import (
+    READ_GUARDS,
+    get_current_principal,
+    get_dcs_instrumen_service,
+    rate_limit,
+)
 from ...schemas.common import ErrorResponse
 
 router = APIRouter()
@@ -24,6 +29,8 @@ _TRANSISI_INVALID = {422: {"model": ErrorResponse, "description": "Transisi stat
     response_model=DcsInstrumenRead,
     summary="Ambil instrumen DCS (singleton)",
     operation_id="dcs_instrumen_get",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def get_instrumen(
     service: Annotated[DcsInstrumenService, Depends(get_dcs_instrumen_service)],

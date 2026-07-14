@@ -7,6 +7,82 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-07-14
+
+### Diperbaiki
+
+- **`__version__` tidak lagi basi.** Nilainya di-hardcode `"0.26.0"` sejak lama dan
+  tidak pernah di-bump, sehingga `GET /openapi.json` (`info.version`), `/health`,
+  `/ready`, dan `/version` **semuanya melaporkan versi yang salah** di produksi.
+  Ini bukan sekadar kosmetik: angka itu sempat menyesatkan investigasi backlog 023
+  menjadi teori "deployment lag" (dikira produksi tertinggal jauh dari `master`,
+  padahal setara). Kini disamakan dengan tag rilis. **Jangan gunakan `info.version`
+  sebagai bukti deploy sudah naik** kecuali disiplin bump ini dipertahankan —
+  indikator yang sah adalah perilaku endpoint.
+
+### Diubah
+
+- **`POST /api/v1/task-inventory/sesi` kini MENOLAK (422) sesi yang panel SME-nya
+  lebih besar dari `max_responden`** — sebelumnya sesi tetap dibuat (201) dan
+  anggota yang berlebih **dibuang diam-diam**. Auto-populate responden dari SME
+  panel memanggil `assign_ti_responden_banyak(..., max_responden=...)`, yang
+  melewati anggota ke-(N+1) dengan alasan `kapasitas_penuh` — tapi
+  `SqlTiSesiService.create()` **membuang `BulkAssignResult`-nya**, sehingga info
+  itu tidak pernah sampai ke respons, log, maupun UI. Admin mengira seluruh panel
+  terdaftar lalu menjalankan Tahap 1 → 3 → analisis, padahal sebagian ahli tidak
+  pernah diundang mengisi (terjadi di produksi 2026-07-14: panel *Guru Kelas SD*
+  11 anggota, `max_responden` default 10 → 1 anggota hilang tanpa jejak).
+  - Pesan error **identik gaya & bentuknya dengan OPM** yang sejak awal sudah
+    menolak keras kondisi yang sama: `"Jumlah anggota SME panel (11) melebihi
+    max_responden (10)."` (`ValidationAppError` → 422). TI dan OPM kini konsisten.
+  - Admin yang memang ingin panel besar tapi responden sedikit: naikkan
+    `max_responden`, atau hapus responden setelah sesi dibuat (sudah didukung saat
+    DRAFT/TAHAP1).
+  - Jabatan **tanpa** panel / panel **tanpa anggota** → sesi tetap dibuat kosong
+    tanpa error (perilaku eksisting, tidak berubah).
+  - Tidak ada migrasi, tidak ada perubahan skema Pydantic. `openapi.json` tidak
+    berubah (422 sudah terdokumentasi untuk operasi ini).
+
+### Keamanan
+
+- **KEBOCORAN DATA: seluruh endpoint baca kini menuntut token.** Sebelum
+  perbaikan ini, **32 operasi GET** tidak memasang guard autentikasi apa pun
+  (hanya `Depends(rate_limit)`) — siapa pun di internet, **tanpa token sama
+  sekali**, dapat membacanya di instance produksi. Diverifikasi lewat `curl`
+  langsung ke produksi, bukan sekadar pembacaan kode:
+  - `GET /api/v1/partisipan` → 200 + `nama`, `email`, `authentik_user_id`
+    **seluruh pegawai** (data pribadi, bocor penuh tanpa perlu menebak ID).
+  - `GET /api/v1/{dcs,wcp}/hasil-responden/{id}` → 200 + hasil instrumen
+    psikososial (DCS) & beban kerja/burnout (WCP) **per individu** — kategori
+    data paling sensitif di aplikasi ini. Satu-satunya pelindung sebelumnya
+    adalah ketidakjelasan `responden_id` (*security through obscurity*).
+  - Juga `/jabatan`, `/sekolah`, `/sme-panel` (keanggotaan panel = siapa
+    menilai siapa), `/jenjang-pendidikan`, `/mata-pelajaran`, `/{dcs,wcp}/hasil`
+    (agregat), instrumen & katalog/master Task Inventory.
+- Perbaikan: konstanta guard baru `READ_GUARDS`
+  (`= [Depends(get_current_principal), Depends(rate_limit)]`, di
+  `dependencies.py`) dipasang di **setiap** operasi GET. Pengecualian tunggal:
+  `/health`, `/ready`, `/version` (`api/v1/system.py`) yang memang publik.
+- **`POST .../search` ikut ditutup (9 endpoint).** Ini operasi *baca* yang
+  mengembalikan data identik dengan `GET` pasangannya —
+  `POST /api/v1/partisipan/search` membocorkan PII yang sama persis, sehingga
+  menutup GET saja tidak menutup kebocorannya.
+- **Guard object-level untuk hasil per individu.**
+  `GET /api/v1/{dcs,wcp}/hasil-responden/{id}` kini menuntut **admin ATAU
+  partisipan pemilik responden** (`authorize_responden_access`, helper yang
+  sudah dipakai endpoint responden DCS/WCP/OPM/TS) — token yang sah saja tidak
+  cukup: partisipan tidak boleh membaca hasil psikososial rekan kerjanya hanya
+  karena dia login. Partisipan lain → **403**.
+- Penjaga regresi: `tests/test_auth_guards.py` **memindai skema OpenAPI**
+  (bukan daftar path tulis-tangan) dan menuntut setiap operasi baca → **401**
+  tanpa token; operasi GET baru yang lupa dipasangi `READ_GUARDS` otomatis
+  menggagalkan test. Ditambah test object-level (partisipan A → hasil milik B
+  → 403) di `tests/test_hasil_responden_otorisasi.py`.
+- Tidak ada migrasi maupun perubahan skema Pydantic — murni pemasangan guard.
+  `openapi.json`: hanya penambahan `security` + respons `401`/`403`/`429`;
+  bentuk request/response (skema 200) **tidak berubah**, sehingga klien
+  (`anjab-abk-web-app`, `anjab-abk-mcp`) tidak perlu perubahan tipe.
+
 ## [0.33.1] - 2026-07-14
 
 ### Diperbaiki

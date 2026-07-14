@@ -63,6 +63,16 @@ run test ikut memverifikasi migrasi.
 ## Konvensi & Invariants
 
 - Setiap endpoint wajib punya `response_model`, `summary`, `tags`, dan `responses` error.
+- **Setiap operasi GET wajib memasang `dependencies=READ_GUARDS`** (konstanta di
+  `dependencies.py`) — **kecuali `/health`, `/ready`, dan `/version`** (`api/v1/system.py`)
+  yang memang publik. Tidak ada endpoint baca yang boleh dijangkau tanpa token valid.
+  Berlaku juga untuk `POST .../search`: itu operasi *baca* yang mengembalikan data identik
+  dengan `GET` pasangannya. Endpoint yang mengembalikan data **per individu** wajib
+  menambah guard object-level (`authorize_responden_access` / `authorize_sesi_access` /
+  `authorize_opm_sesi_access`) di badan fungsi — token sah saja TIDAK cukup.
+  Ditegakkan `tests/test_auth_guards.py` (memindai skema OpenAPI, bukan daftar tulis-tangan):
+  operasi GET baru yang lupa diguard langsung menggagalkan test. Lihat entri
+  `[2026-07-14] KEAMANAN` di Revisi Desain untuk latar belakangnya.
 - ID selalu UUID v4; tidak pakai auto-increment integer.
 - Error **selalu** keluar via envelope `errors.py` — jangan `raise HTTPException` mentah.
 - Search memakai domain bergaya Odoo (`[field, operator, value]`) — validasi di `services/domain.py`.
@@ -71,6 +81,74 @@ run test ikut memverifikasi migrasi.
 - Autentikasi via JWT Authentik (RS256, JWKS); backend hanya memvalidasi token, tidak menerbitkan.
 
 ## Revisi Desain
+
+### [2026-07-14] TI: create sesi menolak panel > `max_responden` (tidak lagi buang diam-diam)
+
+`SqlTiSesiService.create()` auto-populate anggota SME panel jadi responden lewat
+`assign_ti_responden_banyak(..., max_responden=data.max_responden)`. Fungsi itu
+melewati anggota ke-(N+1) dengan alasan `kapasitas_penuh` dan melaporkannya di
+`BulkAssignResult.skipped` — tetapi `create()` **membuang nilai kembalian itu**:
+tidak di-log, tidak masuk `TiSesiRead`. Akibatnya sesi tampak sukses (201) padahal
+sebagian anggota panel tidak pernah terdaftar; admin lanjut ke Tahap 1→3→analisis
+dengan hasil yang bias tanpa jejak apa pun (terjadi di produksi 2026-07-14).
+
+- Kini `create()` **menolak keras** (`ValidationAppError` → 422) bila
+  `len(panel.partisipan_ids) > data.max_responden`, dengan pesan yang **sama persis
+  bentuknya dengan OPM** (`opm/services/sesi_sql.py::create`, yang sudah benar sejak
+  awal): `"Jumlah anggota SME panel (11) melebihi max_responden (10)."` TI & OPM
+  konsisten untuk kondisi input yang sama.
+- Pengecekan diletakkan **sebelum** `TiSesiModel` dibuat (setelah lookup panel yang
+  sudah ada untuk pewarisan koordinator) — tidak ada baris sesi yang terlanjur
+  ter-INSERT lalu di-rollback.
+- Opsi alternatif "tetap best-effort tapi laporkan `skipped[]` di respons" (menambah
+  field ke `TiSesiRead`) **ditolak** — menyisakan ruang salah paham dan mengubah
+  kontrak API; "panel besar, responden sedikit" bukan kebutuhan yang pernah diminta.
+- Jabatan tanpa panel / panel tanpa anggota → sesi **tetap** dibuat kosong tanpa
+  error (perilaku eksisting, sengaja tidak diubah).
+- Perubahan **perilaku yang breaking bagi admin**: sesi yang selama ini "berhasil"
+  dibuat dari panel >10 anggota kini error. Itu memang tujuannya. Konsekuensi
+  lanjutan: sesi TI produksi yang dibuat dari panel besar sebelum revisi ini patut
+  dicek ulang (bandingkan jumlah responden vs jumlah anggota panel).
+- Tidak ada migrasi / perubahan skema Pydantic; `openapi.json` tidak berubah (422
+  sudah terdokumentasi untuk operasi ini).
+
+### [2026-07-14] KEAMANAN: seluruh endpoint baca menuntut token (`READ_GUARDS`)
+
+**32 operasi GET tidak memasang guard autentikasi sama sekali** (hanya
+`Depends(rate_limit)`) — dapat dibaca siapa pun **tanpa token**, di produksi.
+Diverifikasi lewat `curl` ke produksi, bukan hanya pembacaan kode: `GET /partisipan`
+→ 200 + nama/email seluruh pegawai; `GET /{dcs,wcp}/hasil-responden/{id}` → 200 +
+hasil psikososial **satu individu**. Pola guard yang benar sebenarnya sudah ada di repo
+(`_ADMIN_GUARDS`/`_WRITE_GUARDS`) — hanya tidak pernah diterapkan merata ke operasi baca,
+karena otorisasi dipasang **per-operasi di dekorator** dan tidak ada satu pun
+`include_router(..., dependencies=...)` di seluruh `src/` yang bisa menjadi jaring pengaman.
+
+- Konstanta baru **`READ_GUARDS`** di `dependencies.py` (bukan per modul router seperti
+  `_WRITE_GUARDS`/`_ADMIN_GUARDS`, yang akan terduplikasi di 16 berkas). Dipasang di
+  **setiap** GET; `system.py` (`/health`, `/ready`, `/version`) **tidak disentuh**.
+- **`POST .../search` (9 endpoint) ikut diguard**, meski secara literal bukan GET:
+  `POST /partisipan/search` mengembalikan PII yang sama persis dengan `GET /partisipan`,
+  jadi menutup GET saja **tidak** menutup kebocorannya.
+- **`GET /{dcs,wcp}/hasil-responden/{id}` mendapat guard object-level** (admin ATAU
+  pemilik), memakai ulang `authorize_responden_access()` yang sudah ada — **tidak** dibuat
+  helper baru: helper itu sudah persis "admin ATAU partisipan pemilik responden" dan sudah
+  dipakai endpoint responden DCS/WCP/OPM/TS. Partisipan tidak boleh membaca hasil
+  psikososial rekan kerjanya hanya karena dia login.
+- Penjaga: `tests/test_auth_guards.py` memindai **skema OpenAPI** (`app.openapi()["paths"]`),
+  BUKAN `app.routes` — router disertakan sebagai `_IncludedRouter` bersarang sehingga
+  `app.routes` tidak datar dan filter `isinstance(r, APIRoute)` menghasilkan daftar KOSONG
+  (test akan "lulus" secara vakum). Ada test penjaga-bagi-penjaga yang menuntut jumlah rute
+  terpindai ≥ 40.
+- Guard 401 dievaluasi **sebelum** 404 (dependency FastAPI berjalan sebelum badan fungsi):
+  GET tanpa token pada ID yang tidak ada → 401, bukan 404 — keberadaan resource tidak bocor
+  ke pemanggil tanpa identitas.
+- Tidak ada migrasi / perubahan skema Pydantic. `openapi.json`: hanya `security` + respons
+  `401`/`403`/`429`; bentuk request/response tidak berubah → klien (web app, MCP) tidak perlu
+  perubahan tipe.
+- **Dampak ke test yang sudah ada**: banyak test memakai fixture `anon_client` untuk operasi
+  baca (mis. fixture `jabatan_id_tk` di `conftest.py`, katalog TI, sub-skala DCS, dimensi WCP).
+  Semuanya dipindahkan ke fixture `client` (ber-token). `anon_client` kini hanya untuk test
+  yang memang menegaskan 401/403.
 
 ### [2026-07-14] DCS & WCP: `jabatan_label` diresolusi ke nama jabatan (bukan lagi ID mentah)
 

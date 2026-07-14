@@ -113,6 +113,19 @@ class SqlTiSesiService:
             select(SMEPanelModel).where(SMEPanelModel.jabatan_id == data.jabatan_id)
         )
 
+        # Tolak keras bila panel lebih besar dari kapasitas sesi — konsisten dengan
+        # OPM (`opm/services/sesi_sql.py::create`). Sebelumnya auto-populate di bawah
+        # membuang anggota berlebih secara DIAM-DIAM (alasan `kapasitas_penuh` yang
+        # tidak pernah sampai ke pemanggil), sehingga sebagian ahli tidak pernah
+        # diundang mengisi tanpa siapa pun tahu.
+        if panel is not None and panel.anggota:
+            anggota_ids = panel.partisipan_ids
+            if len(anggota_ids) > data.max_responden:
+                raise ValidationAppError(
+                    f"Jumlah anggota SME panel ({len(anggota_ids)}) melebihi"
+                    f" max_responden ({data.max_responden})."
+                )
+
         # Payload menang atas panel; panel hanya dipakai bila pemanggil tidak
         # menentukan koordinator secara eksplisit.
         koordinator_id = data.koordinator_id

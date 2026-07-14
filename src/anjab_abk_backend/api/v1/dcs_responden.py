@@ -13,6 +13,7 @@ from ...dcs.services.jawaban import DcsJawabanService
 from ...dcs.services.responden import DcsRespondenService
 from ...dcs.services.subskala import DcsSubSkalaService
 from ...dependencies import (
+    READ_GUARDS,
     authorize_responden_access,
     get_current_principal,
     get_dcs_jawaban_service,
@@ -81,7 +82,8 @@ def create_responden(
     response_model=DcsRespondenRead,
     summary="Ambil detail responden DCS (admin atau pemilik)",
     operation_id="dcs_responden_get",
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def get_responden(
     responden_id: Annotated[str, Path(description="ID responden.")],
@@ -191,7 +193,8 @@ def submit_jawaban(
     response_model=list[DcsJawabanRead],
     summary="Lihat jawaban responden DCS (admin atau pemilik)",
     operation_id="dcs_jawaban_list",
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def list_jawaban(
     responden_id: Annotated[str, Path(description="ID responden.")],

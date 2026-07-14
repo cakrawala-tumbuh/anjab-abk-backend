@@ -10,6 +10,7 @@ from ...config import Settings, get_settings
 from ...core.schemas.partisipan import PartisipanCreate, PartisipanRead, PartisipanUpdate
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     Idempotency,
     Pagination,
     get_authentik_provisioner,
@@ -103,6 +104,8 @@ def _pagination_links(
     response_model=Page[PartisipanRead],
     summary="Daftar partisipan",
     operation_id="partisipan_list",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def list_partisipan(
     request: Request,
@@ -188,7 +191,12 @@ def create_partisipan(
     response_model=Page[PartisipanRead],
     summary="Cari partisipan (domain ala Odoo)",
     operation_id="partisipan_search",
-    responses={422: {"model": ErrorResponse, "description": "Domain/field tidak valid."}},
+    dependencies=READ_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        422: {"model": ErrorResponse, "description": "Domain/field tidak valid."},
+    },
 )
 def search_partisipan(
     req: SearchRequest,
@@ -205,7 +213,8 @@ def search_partisipan(
     response_model=PartisipanRead,
     summary="Partisipan saat ini (berdasarkan token Bearer)",
     operation_id="partisipan_saya",
-    responses={**_AUTH, **_NOT_FOUND},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_NOT_FOUND},
 )
 def get_partisipan_saya(
     principal: Annotated[Principal, Depends(get_current_principal)],
@@ -222,7 +231,8 @@ def get_partisipan_saya(
     response_model=PartisipanRead,
     summary="Ambil partisipan",
     operation_id="partisipan_get",
-    responses={**_NOT_FOUND, 304: {"description": "Not Modified."}},
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_NOT_FOUND, 304: {"description": "Not Modified."}},
 )
 def get_partisipan(
     partisipan_id: Annotated[str, Path(description="ID partisipan.")],

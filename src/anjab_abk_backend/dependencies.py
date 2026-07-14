@@ -431,6 +431,23 @@ def rate_limit(
         )
 
 
+# --- Guard konstan untuk operasi baca ---
+
+READ_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
+"""Guard baku untuk SETIAP operasi baca (GET) di `api/v1/`.
+
+INVARIANT: setiap operasi GET wajib memasang `dependencies=READ_GUARDS` — kecuali
+`/health`, `/ready`, dan `/version` (`api/v1/system.py`) yang memang publik. Tidak ada
+endpoint baca yang boleh dijangkau tanpa token valid; endpoint yang membaca data per
+individu WAJIB menambah guard object-level (`authorize_*_access`) di badan fungsinya.
+Ditegakkan otomatis oleh `tests/test_auth_guards.py` (memindai `app.routes`, bukan daftar
+manual — endpoint GET baru yang lupa diguard langsung gagal test).
+
+Didefinisikan di sini (bukan per modul router seperti `_WRITE_GUARDS`/`_ADMIN_GUARDS`)
+agar tidak terduplikasi di 16 berkas router.
+"""
+
+
 # --- Readiness ---
 
 

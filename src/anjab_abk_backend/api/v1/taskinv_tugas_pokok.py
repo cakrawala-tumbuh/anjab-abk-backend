@@ -8,6 +8,7 @@ from fastapi import APIRouter, Body, Depends, Header, Path, Request, Response, s
 
 from ...config import Settings, get_settings
 from ...dependencies import (
+    READ_GUARDS,
     Idempotency,
     Pagination,
     get_current_principal,
@@ -95,6 +96,8 @@ def _pagination_links(
     response_model=Page[TugasPokokRead],
     summary="Daftar tugas pokok",
     operation_id="tugas_pokok_list",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def list_tugas_pokok(
     request: Request,
@@ -162,7 +165,12 @@ def create_tugas_pokok(
     response_model=Page[TugasPokokRead],
     summary="Cari tugas pokok (domain ala Odoo)",
     operation_id="tugas_pokok_search",
-    responses={422: {"model": ErrorResponse, "description": "Domain/field tidak valid."}},
+    dependencies=READ_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        422: {"model": ErrorResponse, "description": "Domain/field tidak valid."},
+    },
 )
 def search_tugas_pokok(
     req: SearchRequest,
@@ -179,7 +187,8 @@ def search_tugas_pokok(
     response_model=TugasPokokRead,
     summary="Ambil tugas pokok",
     operation_id="tugas_pokok_get",
-    responses={**_NOT_FOUND, 304: {"description": "Not Modified."}},
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_NOT_FOUND, 304: {"description": "Not Modified."}},
 )
 def get_tugas_pokok(
     tp_id: Annotated[str, Path(description="ID tugas pokok.")],

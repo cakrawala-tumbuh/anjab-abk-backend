@@ -1,3 +1,3 @@
 """Backend ANJAB & ABK — Analisis Jabatan dan Analisis Beban Kerja yayasan pendidikan."""
 
-__version__ = "0.26.0"
+__version__ = "0.34.0"

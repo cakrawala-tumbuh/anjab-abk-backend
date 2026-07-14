@@ -14,6 +14,7 @@ from ...core.schemas.mata_pelajaran import (
 )
 from ...core.services.mata_pelajaran import MataPelajaranService
 from ...dependencies import (
+    READ_GUARDS,
     Idempotency,
     Pagination,
     get_current_principal,
@@ -99,6 +100,8 @@ def _pagination_links(
     response_model=Page[MataPelajaranRead],
     summary="Daftar mata pelajaran",
     operation_id="mata_pelajaran_list",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def list_mata_pelajaran(
     request: Request,
@@ -171,7 +174,12 @@ def create_mata_pelajaran(
     response_model=Page[MataPelajaranRead],
     summary="Cari mata pelajaran (domain ala Odoo)",
     operation_id="mata_pelajaran_search",
-    responses={422: {"model": ErrorResponse, "description": "Domain/field tidak valid."}},
+    dependencies=READ_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        422: {"model": ErrorResponse, "description": "Domain/field tidak valid."},
+    },
 )
 def search_mata_pelajaran(
     req: SearchRequest,
@@ -188,7 +196,8 @@ def search_mata_pelajaran(
     response_model=MataPelajaranRead,
     summary="Ambil mata pelajaran",
     operation_id="mata_pelajaran_get",
-    responses={**_NOT_FOUND, 304: {"description": "Not Modified."}},
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_NOT_FOUND, 304: {"description": "Not Modified."}},
 )
 def get_mata_pelajaran(
     mp_id: Annotated[str, Path(description="ID mata pelajaran.")],

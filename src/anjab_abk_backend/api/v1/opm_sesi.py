@@ -9,6 +9,7 @@ from fastapi import APIRouter, Body, Depends, Path, Query, Response, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     Idempotency,
     Pagination,
     authorize_opm_sesi_access,
@@ -244,7 +245,8 @@ def tutup_sesi(
     response_model=list[OpmSesiTaskRead],
     summary="Daftar snapshot task dalam sesi OPM (admin atau responden sesi)",
     operation_id="opm_sesi_task_list",
-    responses={**_AUTH, **_FORBIDDEN_PESERTA, **_NOT_FOUND},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN_PESERTA, **_NOT_FOUND},
 )
 def list_task(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],

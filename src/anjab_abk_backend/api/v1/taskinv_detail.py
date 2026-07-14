@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Path, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     authorize_responden_access,
     get_current_principal,
     get_partisipan_service,
@@ -126,7 +127,8 @@ def submit_detail(
     response_model=list[TiDetailRead],
     summary="Lihat detail Tahap 3 satu responden (admin atau pemilik)",
     operation_id="taskinv_detail_list",
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def list_detail(
     responden_id: Annotated[str, Path(description="ID responden.")],

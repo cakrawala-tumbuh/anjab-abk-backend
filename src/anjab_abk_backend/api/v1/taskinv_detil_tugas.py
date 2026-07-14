@@ -8,6 +8,7 @@ from fastapi import APIRouter, Body, Depends, Header, Path, Request, Response, s
 
 from ...config import Settings, get_settings
 from ...dependencies import (
+    READ_GUARDS,
     Idempotency,
     Pagination,
     get_current_principal,
@@ -95,6 +96,8 @@ def _pagination_links(
     response_model=Page[DetilTugasRead],
     summary="Daftar detil tugas",
     operation_id="detil_tugas_list",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def list_detil_tugas(
     request: Request,
@@ -163,7 +166,12 @@ def create_detil_tugas(
     response_model=Page[DetilTugasRead],
     summary="Cari detil tugas (domain ala Odoo)",
     operation_id="detil_tugas_search",
-    responses={422: {"model": ErrorResponse, "description": "Domain/field tidak valid."}},
+    dependencies=READ_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        422: {"model": ErrorResponse, "description": "Domain/field tidak valid."},
+    },
 )
 def search_detil_tugas(
     req: SearchRequest,
@@ -180,7 +188,8 @@ def search_detil_tugas(
     response_model=DetilTugasRead,
     summary="Ambil detil tugas",
     operation_id="detil_tugas_get",
-    responses={**_NOT_FOUND, 304: {"description": "Not Modified."}},
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_NOT_FOUND, 304: {"description": "Not Modified."}},
 )
 def get_detil_tugas(
     dt_id: Annotated[str, Path(description="ID detil tugas.")],

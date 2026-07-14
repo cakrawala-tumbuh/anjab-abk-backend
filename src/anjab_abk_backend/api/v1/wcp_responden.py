@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Path, Response, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     authorize_responden_access,
     get_current_principal,
     get_partisipan_service,
@@ -81,7 +82,8 @@ def create_responden(
     response_model=WcpRespondenRead,
     summary="Ambil detail responden WCP (admin atau pemilik)",
     operation_id="wcp_responden_get",
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def get_responden(
     responden_id: Annotated[str, Path(description="ID responden.")],
@@ -191,7 +193,8 @@ def submit_jawaban(
     response_model=list[WcpJawabanRead],
     summary="Lihat jawaban responden (admin atau pemilik)",
     operation_id="wcp_jawaban_list",
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def list_jawaban(
     responden_id: Annotated[str, Path(description="ID responden.")],

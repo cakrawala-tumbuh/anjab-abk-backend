@@ -21,9 +21,9 @@ def _uniq_periode() -> str:
 
 
 @pytest.fixture
-def jabatan_id_tk(anon_client: TestClient) -> str:
+def jabatan_id_tk(client: TestClient) -> str:
     """Jabatan_id dari catalog kombinasi yang cocok dengan unit TK."""
-    kombis = anon_client.get(BASE + "/catalog/kombinasi").json()
+    kombis = client.get(BASE + "/catalog/kombinasi").json()
     match = next((x for x in kombis if x["unit"] == UNIT), None)
     assert match is not None, f"Tidak ada kombinasi dalam catalog untuk unit '{UNIT}'"
     return match["jabatan_id"]
@@ -81,8 +81,8 @@ def _detail_submit(client: TestClient, responden_id: str, detail: list[dict]) ->
 # --------------------------------------------------------------------------- #
 
 
-def test_catalog_kombinasi(anon_client: TestClient) -> None:
-    r = anon_client.get(BASE + "/catalog/kombinasi")
+def test_catalog_kombinasi(client: TestClient) -> None:
+    r = client.get(BASE + "/catalog/kombinasi")
     assert r.status_code == 200
     rows = r.json()
     assert len(rows) == 24  # 24 jabatan × unit "ALL" (bukan lagi × jenjang)
@@ -93,8 +93,8 @@ def test_catalog_kombinasi(anon_client: TestClient) -> None:
     assert target["jumlah_task"] > 0
 
 
-def test_catalog_list_by_kombinasi(anon_client: TestClient, jabatan_id_tk: str) -> None:
-    r = anon_client.get(BASE + "/catalog", params={"unit": UNIT, "jabatan_id": jabatan_id_tk})
+def test_catalog_list_by_kombinasi(client: TestClient, jabatan_id_tk: str) -> None:
+    r = client.get(BASE + "/catalog", params={"unit": UNIT, "jabatan_id": jabatan_id_tk})
     assert r.status_code == 200
     items = r.json()
     assert len(items) > 0
@@ -107,8 +107,8 @@ def test_catalog_list_by_kombinasi(anon_client: TestClient, jabatan_id_tk: str) 
     assert all((it["detil_tugas_id"] is None) == (it["detil_tugas"] is None) for it in items)
 
 
-def test_catalog_unknown_kombinasi_empty(anon_client: TestClient) -> None:
-    r = anon_client.get(BASE + "/catalog", params={"unit": "ZZ", "jabatan_id": "jbt_tidakada"})
+def test_catalog_unknown_kombinasi_empty(client: TestClient) -> None:
+    r = client.get(BASE + "/catalog", params={"unit": "ZZ", "jabatan_id": "jbt_tidakada"})
     assert r.status_code == 200
     assert r.json() == []
 
@@ -1178,6 +1178,30 @@ def test_create_sesi_auto_populate_dari_panel(client: TestClient, jabatan_id_tk:
     # nama diresolusi dari data partisipan (bukan anonim) — dipakai UI untuk
     # menampilkan nama responden alih-alih "Anonim".
     assert all(row["nama"] for row in responden)
+
+
+def test_create_sesi_panel_melebihi_max_responden_ditolak(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Panel lebih besar dari `max_responden` → sesi DITOLAK (422), bukan dibuat
+    dengan sebagian anggota dibuang diam-diam. Konsisten dengan OPM (item 028)."""
+    _setup_panel(client, jabatan_id_tk, 11)
+    r = client.post(SESI, json=_sesi_payload(jabatan_id_tk, max_responden=10))
+    assert r.status_code == 422, r.text
+    assert "Jumlah anggota SME panel (11) melebihi max_responden (10)." in r.text
+    # Sesi benar-benar tidak dibuat.
+    assert client.get(SESI).json()["items"] == []
+
+
+def test_create_sesi_panel_muat_semua_anggota(client: TestClient, jabatan_id_tk: str) -> None:
+    """Panel ≤ `max_responden` → sesi tetap dibuat, seluruh anggota jadi responden."""
+    anggota = _setup_panel(client, jabatan_id_tk, 3)
+    sesi = _create_sesi(client, jabatan_id_tk, max_responden=10)
+    r = client.get(f"{SESI}/{sesi['id']}/responden")
+    assert r.status_code == 200, r.text
+    responden = r.json()
+    assert len(responden) == 3
+    assert {row["partisipan_id"] for row in responden} == set(anggota)
 
 
 def test_create_sesi_tanpa_panel_tetap_kosong(client: TestClient, jabatan_id_tk: str) -> None:

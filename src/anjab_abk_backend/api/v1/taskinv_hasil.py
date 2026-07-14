@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Path
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     authorize_sesi_access,
     get_current_principal,
     get_partisipan_service,
@@ -58,7 +59,9 @@ def _catalog_map(catalog: TiCatalogService, kodes: list[str]) -> dict[str, TiCat
     response_model=list[TiTaskTerpilihRead],
     summary="Himpunan task relevan yang dibekukan (tersedia setelah TAHAP2) (admin/peserta)",
     operation_id="taskinv_task_terpilih",
+    dependencies=READ_GUARDS,
     responses={
+        **_RATE,
         **_AUTH,
         **_FORBIDDEN_PESERTA,
         **_NOT_FOUND_SESI,

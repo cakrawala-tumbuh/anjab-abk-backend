@@ -13,13 +13,13 @@ DIM_BASE = "/api/v1/wcp/dimensi"
 ALL_ITEM_IDS: list[str] = []
 
 
-def _get_all_item_ids(anon_client: TestClient) -> list[str]:
+def _get_all_item_ids(client: TestClient) -> list[str]:
     global ALL_ITEM_IDS
     if ALL_ITEM_IDS:
         return ALL_ITEM_IDS
-    r = anon_client.get(DIM_BASE)
+    r = client.get(DIM_BASE)
     for dim in r.json():
-        r2 = anon_client.get(f"{DIM_BASE}/{dim['kode']}/items")
+        r2 = client.get(f"{DIM_BASE}/{dim['kode']}/items")
         ALL_ITEM_IDS.extend(i["item_id"] for i in r2.json())
     return ALL_ITEM_IDS
 
@@ -30,8 +30,8 @@ def _assign(client: TestClient, partisipan_ids: list[str]) -> list[dict]:
     return r.json()["created"]
 
 
-def _submit(client: TestClient, anon_client: TestClient, responden_id: str, skor: int = 4) -> None:
-    item_ids = _get_all_item_ids(anon_client)
+def _submit(client: TestClient, responden_id: str, skor: int = 4) -> None:
+    item_ids = _get_all_item_ids(client)
     r = client.put(
         f"{RSP_BASE}/{responden_id}/jawaban",
         json={"jawaban": [{"item_id": iid, "skor_raw": skor} for iid in item_ids]},
@@ -41,12 +41,10 @@ def _submit(client: TestClient, anon_client: TestClient, responden_id: str, skor
     assert r2.status_code == 201
 
 
-def test_hasil_responden_scoring(
-    client: TestClient, anon_client: TestClient, partisipan_factory
-) -> None:
+def test_hasil_responden_scoring(client: TestClient, partisipan_factory) -> None:
     par_id = partisipan_factory("wcp-anls-hr")
     rsp = _assign(client, [par_id])[0]
-    _submit(client, anon_client, rsp["id"], skor=4)
+    _submit(client, rsp["id"], skor=4)
 
     r = client.get(f"/api/v1/wcp/hasil-responden/{rsp['id']}")
     assert r.status_code == 200
@@ -65,27 +63,23 @@ def test_hasil_responden_belum_submit_ditolak(client: TestClient, partisipan_fac
     assert r.status_code == 422
 
 
-def test_analisis_fails_below_min_responden(
-    client: TestClient, anon_client: TestClient, partisipan_factory
-) -> None:
+def test_analisis_fails_below_min_responden(client: TestClient, partisipan_factory) -> None:
     client.patch(INSTRUMEN_BASE, json={"min_responden": 2})
     par_id = partisipan_factory("wcp-anls-min")
     rsp = _assign(client, [par_id])[0]
-    _submit(client, anon_client, rsp["id"])
+    _submit(client, rsp["id"])
     client.post(f"{INSTRUMEN_BASE}/tutup")
 
     r = client.post(ANALISIS_URL)
     assert r.status_code == 422
 
 
-def test_analisis_run_after_closed(
-    client: TestClient, anon_client: TestClient, partisipan_factory
-) -> None:
+def test_analisis_run_after_closed(client: TestClient, partisipan_factory) -> None:
     client.patch(INSTRUMEN_BASE, json={"min_responden": 2})
     ids = [partisipan_factory(f"wcp-anls-run-{i}") for i in range(2)]
     rsps = _assign(client, ids)
     for i, rsp in enumerate(rsps):
-        _submit(client, anon_client, rsp["id"], skor=4 if i == 0 else 3)
+        _submit(client, rsp["id"], skor=4 if i == 0 else 3)
 
     client.post(f"{INSTRUMEN_BASE}/tutup")
     r = client.post(ANALISIS_URL)
@@ -95,14 +89,12 @@ def test_analisis_run_after_closed(
     assert len(hasil["dimensi"]) == 12
 
 
-def test_analisis_transisi_ke_analyzed(
-    client: TestClient, anon_client: TestClient, partisipan_factory
-) -> None:
+def test_analisis_transisi_ke_analyzed(client: TestClient, partisipan_factory) -> None:
     client.patch(INSTRUMEN_BASE, json={"min_responden": 2})
     ids = [partisipan_factory(f"wcp-anls-tr-{i}") for i in range(2)]
     rsps = _assign(client, ids)
     for rsp in rsps:
-        _submit(client, anon_client, rsp["id"], skor=5)
+        _submit(client, rsp["id"], skor=5)
 
     client.post(f"{INSTRUMEN_BASE}/tutup")
     client.post(ANALISIS_URL)
@@ -115,7 +107,7 @@ def test_hasil_requires_analyzed(client: TestClient) -> None:
 
 
 def test_analisis_regresi_angka_identik_dengan_formula_lama(
-    client: TestClient, anon_client: TestClient, partisipan_factory
+    client: TestClient, partisipan_factory
 ) -> None:
     """TEST TERPENTING: regresi angka — nilai HARDCODE dihitung tangan dari formula
     (tidak berubah oleh refactor ini). Skor 3 di semua item non-reverse tetap 3.0;
@@ -127,7 +119,7 @@ def test_analisis_regresi_angka_identik_dengan_formula_lama(
     ids = [partisipan_factory(f"wcp-anls-regresi-{i}") for i in range(2)]
     rsps = _assign(client, ids)
     for rsp in rsps:
-        _submit(client, anon_client, rsp["id"], skor=3)
+        _submit(client, rsp["id"], skor=3)
 
     client.post(f"{INSTRUMEN_BASE}/tutup")
     r = client.post(ANALISIS_URL)

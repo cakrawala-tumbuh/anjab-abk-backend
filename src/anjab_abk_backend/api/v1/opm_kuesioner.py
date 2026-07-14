@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     get_current_principal,
     get_opm_responden_service,
     get_opm_sesi_service,
@@ -23,6 +24,7 @@ from ...security import Principal
 router = APIRouter()
 
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
+_RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 
 
 @router.get(
@@ -30,7 +32,8 @@ _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."
     response_model=list[OpmKuesionerItemRead],
     summary="Daftar kuesioner OPM milik pengguna yang sedang login",
     operation_id="opm_kuesioner_saya",
-    responses=_AUTH,
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH},
 )
 def kuesioner_saya(
     principal: Annotated[Principal, Depends(get_current_principal)],

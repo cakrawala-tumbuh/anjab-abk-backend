@@ -6,22 +6,27 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path
 
+from ...core.services.partisipan import PartisipanService
 from ...dcs.schemas.hasil import DcsHasilRead, DcsHasilRespondenRead
 from ...dcs.services.analisis import compute_hasil, compute_hasil_responden
 from ...dcs.services.instrumen import DcsInstrumenService
 from ...dcs.services.jawaban import DcsJawabanService
 from ...dcs.services.responden import DcsRespondenService
 from ...dependencies import (
+    READ_GUARDS,
+    authorize_responden_access,
     get_current_principal,
     get_dcs_instrumen_service,
     get_dcs_jawaban_service,
     get_dcs_responden_service,
+    get_partisipan_service,
     get_wcp_jawaban_service,
     get_wcp_responden_service,
     rate_limit,
 )
 from ...errors import ValidationAppError
 from ...schemas.common import ErrorResponse
+from ...security import Principal
 from ...wcp.seed import DIMENSI
 from ...wcp.services.analisis import compute_hasil_responden as wcp_compute_responden
 from ...wcp.services.jawaban import WcpJawabanService
@@ -33,6 +38,9 @@ _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 _NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
+_FORBIDDEN = {
+    403: {"model": ErrorResponse, "description": "Bukan admin atau bukan pemilik responden."}
+}
 
 # Kode dimensi risiko WCP (is_risk=True): CH, SD, PI
 _WCP_RISK_KODES = frozenset(kode for kode, _, _, is_risk in DIMENSI if is_risk)
@@ -107,6 +115,8 @@ def run_analisis(
     response_model=DcsHasilRead,
     summary="Lihat hasil analisis instrumen DCS",
     operation_id="dcs_hasil",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def get_hasil(
     instrumen_service: Annotated[DcsInstrumenService, Depends(get_dcs_instrumen_service)],
@@ -135,16 +145,20 @@ def get_hasil(
 @router.get(
     "/hasil-responden/{responden_id}",
     response_model=DcsHasilRespondenRead,
-    summary="Lihat hasil analisis per responden DCS",
+    summary="Lihat hasil analisis per responden DCS (admin atau pemilik)",
     operation_id="dcs_hasil_responden_get",
-    responses=_NOT_FOUND_RSP,
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def get_hasil_responden(
     responden_id: Annotated[str, Path(description="ID responden.")],
+    principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[DcsRespondenService, Depends(get_dcs_responden_service)],
     jwb_service: Annotated[DcsJawabanService, Depends(get_dcs_jawaban_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
 ) -> DcsHasilRespondenRead:
     responden = rsp_service.get(responden_id)
+    authorize_responden_access(principal, responden.partisipan_id, par_service)
     if not responden.sudah_submit:
         raise ValidationAppError("Responden belum mengirimkan jawaban.")
     raw = jwb_service.get_raw_by_responden(responden_id)

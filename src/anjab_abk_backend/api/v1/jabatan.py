@@ -10,6 +10,7 @@ from ...anjab.schemas.jabatan import JabatanCreate, JabatanRead, JabatanUpdate
 from ...anjab.services.jabatan import JabatanService
 from ...config import Settings, get_settings
 from ...dependencies import (
+    READ_GUARDS,
     Idempotency,
     Pagination,
     get_current_principal,
@@ -95,6 +96,8 @@ def _pagination_links(
     response_model=Page[JabatanRead],
     summary="Daftar jabatan",
     operation_id="jabatan_list",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def list_jabatan(
     request: Request,
@@ -172,7 +175,12 @@ def create_jabatan(
     response_model=Page[JabatanRead],
     summary="Cari jabatan (domain ala Odoo)",
     operation_id="jabatan_search",
-    responses={422: {"model": ErrorResponse, "description": "Domain/field tidak valid."}},
+    dependencies=READ_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        422: {"model": ErrorResponse, "description": "Domain/field tidak valid."},
+    },
 )
 def search_jabatan(
     req: SearchRequest,
@@ -189,7 +197,8 @@ def search_jabatan(
     response_model=JabatanRead,
     summary="Ambil jabatan",
     operation_id="jabatan_get",
-    responses={**_NOT_FOUND, 304: {"description": "Not Modified."}},
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_NOT_FOUND, 304: {"description": "Not Modified."}},
 )
 def get_jabatan(
     jabatan_id: Annotated[str, Path(description="ID jabatan.")],

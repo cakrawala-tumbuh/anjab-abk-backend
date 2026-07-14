@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Path, Response, status
 from ...anjab.services.sme_panel import SMEPanelService
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     authorize_responden_access,
     authorize_sesi_access,
     get_current_principal,
@@ -47,7 +48,8 @@ _FORBIDDEN_PESERTA = {
     response_model=list[TiRespondenRead],
     summary="Daftar responden dalam sesi (admin atau peserta sesi)",
     operation_id="taskinv_responden_list",
-    responses={**_AUTH, **_FORBIDDEN_PESERTA, **_NOT_FOUND_SESI},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN_PESERTA, **_NOT_FOUND_SESI},
 )
 def list_responden(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
@@ -176,7 +178,8 @@ def create_responden_banyak(
     response_model=TiRespondenRead,
     summary="Ambil detail responden (admin atau pemilik)",
     operation_id="taskinv_responden_get",
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def get_responden(
     responden_id: Annotated[str, Path(description="ID responden.")],

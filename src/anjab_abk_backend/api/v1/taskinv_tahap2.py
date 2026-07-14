@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Path
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     authorize_sesi_access,
     get_current_principal,
     get_partisipan_service,
@@ -44,7 +45,9 @@ _FORBIDDEN_PESERTA = {
     response_model=TiTahap2ReviewRead,
     summary="Lihat task yang perlu diputuskan koordinator di Tahap 2 (admin atau peserta sesi)",
     operation_id="taskinv_tahap2_get",
+    dependencies=READ_GUARDS,
     responses={
+        **_RATE,
         **_AUTH,
         **_FORBIDDEN_PESERTA,
         **_NOT_FOUND_SESI,

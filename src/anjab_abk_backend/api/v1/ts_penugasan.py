@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Path, Response, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     Pagination,
     authorize_responden_access,
     get_current_principal,
@@ -101,7 +102,8 @@ def create_penugasan_banyak(
     response_model=TsPenugasanRead,
     summary="Ambil penugasan Time Study (admin atau pemilik)",
     operation_id="ts_penugasan_get",
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN, **_NOT_FOUND},
 )
 def get_penugasan(
     penugasan_id: Annotated[str, Path(description="ID penugasan Time Study.")],

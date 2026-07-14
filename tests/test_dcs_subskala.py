@@ -17,8 +17,8 @@ class _NonAdminVerifier:
         return Principal(subject="u", username="u", groups=["partisipan"])
 
 
-def test_list_sub_skala(anon_client: TestClient) -> None:
-    r = anon_client.get(BASE)
+def test_list_sub_skala(client: TestClient) -> None:
+    r = client.get(BASE)
     assert r.status_code == 200
     data = r.json()
     assert len(data) == 3
@@ -26,8 +26,8 @@ def test_list_sub_skala(anon_client: TestClient) -> None:
     assert kode_list == ["DEMAND", "CONTROL", "SUPPORT"]
 
 
-def test_get_sub_skala_with_items(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{BASE}/DEMAND")
+def test_get_sub_skala_with_items(client: TestClient) -> None:
+    r = client.get(f"{BASE}/DEMAND")
     assert r.status_code == 200
     data = r.json()
     assert data["kode"] == "DEMAND"
@@ -37,26 +37,26 @@ def test_get_sub_skala_with_items(anon_client: TestClient) -> None:
     assert "D8" in item_ids
 
 
-def test_get_sub_skala_case_insensitive(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{BASE}/demand")
+def test_get_sub_skala_case_insensitive(client: TestClient) -> None:
+    r = client.get(f"{BASE}/demand")
     assert r.status_code == 200
     assert r.json()["kode"] == "DEMAND"
 
 
-def test_get_sub_skala_not_found(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{BASE}/TIDAKADA")
+def test_get_sub_skala_not_found(client: TestClient) -> None:
+    r = client.get(f"{BASE}/TIDAKADA")
     assert r.status_code == 404
 
 
-def test_sub_skala_items_endpoint(anon_client: TestClient) -> None:
+def test_sub_skala_items_endpoint(client: TestClient) -> None:
     for kode in ("DEMAND", "CONTROL", "SUPPORT"):
-        r = anon_client.get(f"{BASE}/{kode}/items")
+        r = client.get(f"{BASE}/{kode}/items")
         assert r.status_code == 200
         assert len(r.json()) == 14
 
 
-def test_items_have_correct_fields(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{BASE}/DEMAND/items")
+def test_items_have_correct_fields(client: TestClient) -> None:
+    r = client.get(f"{BASE}/DEMAND/items")
     item = r.json()[0]
     assert "item_id" in item
     assert "sub_dimensi" in item
@@ -64,9 +64,9 @@ def test_items_have_correct_fields(anon_client: TestClient) -> None:
     assert item["arah"] in ("F", "UF")
 
 
-def test_total_items_42(anon_client: TestClient) -> None:
+def test_total_items_42(client: TestClient) -> None:
     total = sum(
-        len(anon_client.get(f"{BASE}/{k}/items").json()) for k in ("DEMAND", "CONTROL", "SUPPORT")
+        len(client.get(f"{BASE}/{k}/items").json()) for k in ("DEMAND", "CONTROL", "SUPPORT")
     )
     assert total == 42
 

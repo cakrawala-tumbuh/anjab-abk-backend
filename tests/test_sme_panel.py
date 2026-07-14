@@ -42,8 +42,8 @@ def _buat_partisipan(
     return r.json()["id"]
 
 
-def test_list_ok(anon_client: TestClient) -> None:
-    r = anon_client.get(BASE)
+def test_list_ok(client: TestClient) -> None:
+    r = client.get(BASE)
     assert r.status_code == 200
     assert "items" in r.json()
 
@@ -90,8 +90,8 @@ def test_delete(client: TestClient) -> None:
     assert client.get(f"{BASE}/{pid}").status_code == 404
 
 
-def test_not_found(anon_client: TestClient) -> None:
-    assert anon_client.get(f"{BASE}/sme_tidakada").status_code == 404
+def test_not_found(client: TestClient) -> None:
+    assert client.get(f"{BASE}/sme_tidakada").status_code == 404
 
 
 def test_search(client: TestClient, panel: dict) -> None:

@@ -7,9 +7,9 @@ from fastapi.testclient import TestClient
 BASE = "/api/v1/wcp/instrumen"
 
 
-def test_get_instrumen_default_open_tanpa_admin_melakukan_apa_pun(anon_client: TestClient) -> None:
+def test_get_instrumen_default_open_tanpa_admin_melakukan_apa_pun(client: TestClient) -> None:
     """DB yang baru dimigrasi harus sudah punya baris instrumen OPEN, tanpa setup apa pun."""
-    r = anon_client.get(BASE)
+    r = client.get(BASE)
     assert r.status_code == 200
     data = r.json()
     assert data["id"] == "wcp"

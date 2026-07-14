@@ -13,7 +13,11 @@ from ...dcs.schemas.subskala import (
     DcsSubSkalaWithItemsRead,
 )
 from ...dcs.services.subskala import DcsSubSkalaService
-from ...dependencies import get_dcs_subskala_service, require_admin
+from ...dependencies import (
+    READ_GUARDS,
+    get_dcs_subskala_service,
+    require_admin,
+)
 from ...schemas.common import ErrorResponse
 
 router = APIRouter()
@@ -24,6 +28,7 @@ _AUTH = {
     401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."},
     403: {"model": ErrorResponse, "description": "Hanya admin yang diizinkan."},
 }
+_RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 
 
 @router.get(
@@ -31,6 +36,8 @@ _AUTH = {
     response_model=list[DcsSubSkalaRead],
     summary="Daftar 3 sub-skala DCS",
     operation_id="dcs_subskala_list",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def list_sub_skala(
     service: Annotated[DcsSubSkalaService, Depends(get_dcs_subskala_service)],
@@ -43,7 +50,8 @@ def list_sub_skala(
     response_model=DcsSubSkalaWithItemsRead,
     summary="Ambil sub-skala DCS beserta 14 item-nya",
     operation_id="dcs_subskala_get",
-    responses=_NOT_FOUND,
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_NOT_FOUND},
 )
 def get_sub_skala(
     kode: Annotated[str, Path(description="Kode sub-skala (DEMAND/CONTROL/SUPPORT).")],
@@ -57,7 +65,8 @@ def get_sub_skala(
     response_model=list[DcsItemRead],
     summary="Daftar item untuk satu sub-skala DCS",
     operation_id="dcs_subskala_items",
-    responses=_NOT_FOUND,
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_NOT_FOUND},
 )
 def list_items_by_sub_skala(
     kode: Annotated[str, Path(description="Kode sub-skala.")],

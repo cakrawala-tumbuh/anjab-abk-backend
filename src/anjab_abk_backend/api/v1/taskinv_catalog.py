@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query
 
 from ...anjab.services.jabatan import JabatanService
 from ...dependencies import (
+    READ_GUARDS,
     SessionDep,
     get_detil_tugas_service,
     get_jabatan_service,
@@ -51,6 +52,8 @@ _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan
     response_model=list[TiKombinasiRead],
     summary="Daftar kombinasi unit × jabatan beserta jumlah task",
     operation_id="taskinv_catalog_kombinasi",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def list_kombinasi(
     service: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
@@ -63,6 +66,8 @@ def list_kombinasi(
     response_model=list[TiCatalogRead],
     summary="Daftar task catalog untuk kombinasi unit × jabatan",
     operation_id="taskinv_catalog_list",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def list_catalog(
     service: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],

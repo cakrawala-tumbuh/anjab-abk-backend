@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Path, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     authorize_responden_access,
     get_current_principal,
     get_partisipan_service,
@@ -68,6 +69,7 @@ def _require_active(
     response_model=list[TsLogRead],
     summary="Daftar log harian penugasan Time Study (admin atau pemilik)",
     operation_id="ts_log_list",
+    dependencies=READ_GUARDS,
     responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND_PNG},
 )
 def list_log(
@@ -114,6 +116,7 @@ def create_log(
     response_model=TsLogRead,
     summary="Ambil detail log harian Time Study (admin atau pemilik)",
     operation_id="ts_log_get",
+    dependencies=READ_GUARDS,
     responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND_LOG},
 )
 def get_log(

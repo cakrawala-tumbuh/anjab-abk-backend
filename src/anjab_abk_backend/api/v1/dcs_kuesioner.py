@@ -11,6 +11,7 @@ from ...dcs.schemas.kuesioner import DcsKuesionerItemRead
 from ...dcs.services.instrumen import DcsInstrumenService
 from ...dcs.services.responden import DcsRespondenService
 from ...dependencies import (
+    READ_GUARDS,
     get_current_principal,
     get_dcs_instrumen_service,
     get_dcs_responden_service,
@@ -22,6 +23,7 @@ from ...security import Principal
 router = APIRouter()
 
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
+_RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 
 
 @router.get(
@@ -29,7 +31,8 @@ _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."
     response_model=list[DcsKuesionerItemRead],
     summary="Daftar kuesioner DCS milik pengguna yang sedang login",
     operation_id="dcs_kuesioner_saya",
-    responses=_AUTH,
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH},
 )
 def kuesioner_saya(
     principal: Annotated[Principal, Depends(get_current_principal)],

@@ -10,6 +10,7 @@ from ...config import Settings, get_settings
 from ...core.schemas.sekolah import SekolahCreate, SekolahRead, SekolahUpdate
 from ...core.services.sekolah import SekolahService
 from ...dependencies import (
+    READ_GUARDS,
     Idempotency,
     Pagination,
     get_current_principal,
@@ -95,6 +96,8 @@ def _pagination_links(
     response_model=Page[SekolahRead],
     summary="Daftar sekolah",
     operation_id="sekolah_list",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def list_sekolah(
     request: Request,
@@ -165,7 +168,12 @@ def create_sekolah(
     response_model=Page[SekolahRead],
     summary="Cari sekolah (domain ala Odoo)",
     operation_id="sekolah_search",
-    responses={422: {"model": ErrorResponse, "description": "Domain/field tidak valid."}},
+    dependencies=READ_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        422: {"model": ErrorResponse, "description": "Domain/field tidak valid."},
+    },
 )
 def search_sekolah(
     req: SearchRequest,
@@ -182,7 +190,8 @@ def search_sekolah(
     response_model=SekolahRead,
     summary="Ambil sekolah",
     operation_id="sekolah_get",
-    responses={**_NOT_FOUND, 304: {"description": "Not Modified."}},
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_NOT_FOUND, 304: {"description": "Not Modified."}},
 )
 def get_sekolah(
     sekolah_id: Annotated[str, Path(description="ID sekolah.")],

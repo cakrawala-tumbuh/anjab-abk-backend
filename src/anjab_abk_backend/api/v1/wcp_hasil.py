@@ -6,8 +6,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path
 
+from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
+    authorize_responden_access,
     get_current_principal,
+    get_partisipan_service,
     get_wcp_instrumen_service,
     get_wcp_jawaban_service,
     get_wcp_responden_service,
@@ -15,6 +19,7 @@ from ...dependencies import (
 )
 from ...errors import ValidationAppError
 from ...schemas.common import ErrorResponse
+from ...security import Principal
 from ...wcp.schemas.hasil import WcpHasilRead, WcpHasilRespondenRead
 from ...wcp.services.analisis import compute_hasil, compute_hasil_responden
 from ...wcp.services.instrumen import WcpInstrumenService
@@ -27,6 +32,9 @@ _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 _NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
+_FORBIDDEN = {
+    403: {"model": ErrorResponse, "description": "Bukan admin atau bukan pemilik responden."}
+}
 
 
 @router.post(
@@ -73,6 +81,8 @@ def run_analisis(
     response_model=WcpHasilRead,
     summary="Lihat hasil analisis instrumen WCP",
     operation_id="wcp_hasil",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE},
 )
 def get_hasil(
     instrumen_service: Annotated[WcpInstrumenService, Depends(get_wcp_instrumen_service)],
@@ -96,16 +106,20 @@ def get_hasil(
 @router.get(
     "/hasil-responden/{responden_id}",
     response_model=WcpHasilRespondenRead,
-    summary="Lihat hasil analisis per responden",
+    summary="Lihat hasil analisis per responden (admin atau pemilik)",
     operation_id="wcp_hasil_responden_get",
-    responses=_NOT_FOUND_RSP,
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def get_hasil_responden(
     responden_id: Annotated[str, Path(description="ID responden.")],
+    principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
 ) -> WcpHasilRespondenRead:
     responden = rsp_service.get(responden_id)
+    authorize_responden_access(principal, responden.partisipan_id, par_service)
     if not responden.sudah_submit:
         raise ValidationAppError("Responden belum mengirimkan jawaban.")
     raw = jwb_service.get_raw_by_responden(responden_id)

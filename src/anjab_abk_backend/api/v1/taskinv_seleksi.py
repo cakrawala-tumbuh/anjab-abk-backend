@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Path, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     authorize_responden_access,
     get_current_principal,
     get_partisipan_service,
@@ -128,7 +129,8 @@ def submit_seleksi(
     response_model=TiSeleksiRead,
     summary="Lihat seleksi Tahap 1 satu responden (admin atau pemilik)",
     operation_id="taskinv_seleksi_get",
-    responses={**_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN, **_NOT_FOUND_RSP},
 )
 def get_seleksi(
     responden_id: Annotated[str, Path(description="ID responden.")],

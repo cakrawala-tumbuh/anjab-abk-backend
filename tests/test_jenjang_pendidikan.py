@@ -19,8 +19,8 @@ def created(client: TestClient) -> dict:
     return r.json()
 
 
-def test_list_empty_ok(anon_client: TestClient) -> None:
-    r = anon_client.get(BASE)
+def test_list_empty_ok(client: TestClient) -> None:
+    r = client.get(BASE)
     assert r.status_code == 200
     data = r.json()
     assert "items" in data and "total" in data
@@ -70,8 +70,8 @@ def test_delete(client: TestClient) -> None:
     assert r3.status_code == 404
 
 
-def test_get_not_found(anon_client: TestClient) -> None:
-    r = anon_client.get(f"{BASE}/jp_tidakada")
+def test_get_not_found(client: TestClient) -> None:
+    r = client.get(f"{BASE}/jp_tidakada")
     assert r.status_code == 404
 
 

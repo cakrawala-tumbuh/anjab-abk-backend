@@ -9,6 +9,7 @@ from fastapi import APIRouter, Body, Depends, Path, Query, Response, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
+    READ_GUARDS,
     Idempotency,
     Pagination,
     authorize_sesi_access,
@@ -146,7 +147,8 @@ def search_sesi(
     response_model=TiSesiRead,
     summary="Ambil sesi Task Inventory (admin atau peserta sesi)",
     operation_id="taskinv_sesi_get",
-    responses={**_AUTH, **_FORBIDDEN_PESERTA, **_NOT_FOUND},
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN_PESERTA, **_NOT_FOUND},
 )
 def get_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
