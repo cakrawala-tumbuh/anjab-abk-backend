@@ -7,6 +7,31 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-07-14
+
+### Diperbaiki
+
+- **`jabatan_label` DCS & WCP kini diresolusi ke nama jabatan, bukan lagi
+  disalin mentah dari `jabatan_utama_id`.** Kolom "Jabatan" di tabel Daftar
+  Responden `/dcs` dan `/wcp`, serta subtext header
+  `/dcs/hasil-responden/{id}`/`/wcp/hasil-responden/{id}`, sebelumnya
+  menampilkan ID internal (mis. `jbt_4c034eef`) alih-alih nama jabatan yang
+  bisa dibaca — celah yang sengaja ditunda sejak entri `[2026-07-12]` di
+  bawah.
+  - `SqlDcsRespondenService`/`SqlWcpRespondenService` kini menerima
+    `JabatanService` via DI (pola sama dengan `PartisipanService` yang sudah
+    disuntik ke kelas yang sama), dipakai di `create_banyak()`:
+    `jabatan_label = jabatan_service.get(partisipan.jabatan_utama_id).nama`.
+    Fallback ke ID mentah + `logger.warning` bila jabatan tidak ditemukan
+    (`NotFoundError`) — tidak menggagalkan assign.
+  - `create()` (single-assign, tidak dipanggil endpoint manapun untuk
+    DCS/WCP) **tidak disentuh**.
+  - Skema tidak berubah — `jabatan_label` tetap kolom teks bebas
+    `String(200)`, tidak ada migrasi Alembic. `openapi.json` tidak berubah
+    bentuk (diverifikasi diff kosong).
+  - Data existing (`dcs_responden`/`wcp_responden`) tidak dibackfill oleh
+    rilis ini.
+
 ## [0.33.0] - 2026-07-14
 
 ### Diubah (BREAKING)

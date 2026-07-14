@@ -158,9 +158,10 @@ def get_wcp_instrumen_service(session: SessionDep) -> WcpInstrumenService:
 def get_wcp_responden_service(
     session: SessionDep,
     partisipan_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    jabatan_service: Annotated[JabatanService, Depends(get_jabatan_service)],
 ) -> WcpRespondenService:
     """SEAM: implementasi `WcpRespondenService` berbasis PostgreSQL."""
-    return SqlWcpRespondenService(session, partisipan_service)
+    return SqlWcpRespondenService(session, partisipan_service, jabatan_service)
 
 
 def get_wcp_jawaban_service(session: SessionDep) -> WcpJawabanService:
@@ -184,9 +185,10 @@ def get_dcs_instrumen_service(session: SessionDep) -> DcsInstrumenService:
 def get_dcs_responden_service(
     session: SessionDep,
     partisipan_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    jabatan_service: Annotated[JabatanService, Depends(get_jabatan_service)],
 ) -> DcsRespondenService:
     """SEAM: implementasi `DcsRespondenService` berbasis PostgreSQL."""
-    return SqlDcsRespondenService(session, partisipan_service)
+    return SqlDcsRespondenService(session, partisipan_service, jabatan_service)
 
 
 def get_dcs_jawaban_service(session: SessionDep) -> DcsJawabanService:

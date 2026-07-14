@@ -72,6 +72,41 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-14] DCS & WCP: `jabatan_label` diresolusi ke nama jabatan (bukan lagi ID mentah)
+
+Ditemukan lewat testing manual di instance produksi YPII: kolom "Jabatan" di
+tabel Daftar Responden `/dcs` dan `/wcp`, serta subtext header
+`/dcs/hasil-responden/{id}`/`/wcp/hasil-responden/{id}`, menampilkan **ID
+internal mentah** (mis. `jbt_4c034eef`) alih-alih nama jabatan. Ini
+menyelesaikan catatan "di luar lingkup" yang sengaja ditunda di entri
+`[2026-07-12]` di bawah.
+
+- `SqlDcsRespondenService`/`SqlWcpRespondenService` (`{dcs,wcp}/services/
+  responden_sql.py`) kini menerima `JabatanService` via DI (pola yang sama
+  persis dengan `PartisipanService` yang sudah disuntik ke kelas yang sama) —
+  **bukan** query ORM lintas domain langsung seperti pola `OpmRespondenService.
+  assign_banyak` (`self._s.get(JabatanModel, ...)` tanpa lewat seam), yang
+  tetap dianggap tech debt, bukan preseden.
+- Resolusi hanya terjadi di `create_banyak()` (satu-satunya jalur yang dipanggil
+  endpoint `POST /api/v1/{dcs,wcp}/responden`): `jabatan_label =
+  self._jab.get(partisipan.jabatan_utama_id).nama`. Bila `JabatanService.get()`
+  melempar `NotFoundError` (jabatan tidak ditemukan), fallback ke ID mentah +
+  `logger.warning` — tidak menggagalkan assign.
+- `create()` (single-assign) **sengaja tidak disentuh** — sudah terverifikasi
+  tidak dipanggil endpoint apa pun untuk DCS/WCP (kode Protocol yang tidak
+  terpakai, peninggalan sebelum revisi `[2026-07-12]`). Bila di masa depan ada
+  endpoint baru yang menghidupkan jalur ini, resolusi jabatan perlu ditambahkan
+  di titik itu juga.
+- Skema TIDAK berubah: `jabatan_label` tetap kolom teks bebas `String(200)`
+  (bukan FK) di `DcsRespondenModel`/`WcpRespondenModel` — tidak ada migrasi
+  Alembic. `openapi.json` tidak berubah (diverifikasi: diff kosong antara
+  sebelum & sesudah perubahan) — murni perubahan nilai runtime + DI internal.
+- **Data existing TIDAK dimigrasi otomatis** oleh revisi ini — baris
+  `dcs_responden`/`wcp_responden` yang sudah ada (termasuk baris uji coba dari
+  sesi testing 2026-07-14 di produksi YPII) tetap menampilkan ID mentah sampai
+  ada keputusan eksplisit soal backfill (butuh konfirmasi user sebelum UPDATE
+  massal di DB produksi).
+
 ### [2026-07-13] Task Inventory: otorisasi endpoint sesi/hasil/tahap2 ditegakkan di backend
 
 Sebelum revisi ini, otorisasi level-sesi Task Inventory murni kosmetik — hanya
@@ -337,8 +372,10 @@ jabatan) **tidak disentuh**. Perubahan:
   menerima `nama`/`jabatan_label` per baris, sehingga responden ANONIM (tanpa
   `partisipan_id`) tidak lagi bisa dibuat lewat endpoint publik manapun untuk
   DCS/WCP. `jabatan_label` tetap kolom teks bebas (bukan FK) — nilainya
-  sekadar disalin dari `jabatan_utama_id`, bukan diresolusi ke nama jabatan
-  (di luar lingkup revisi ini).
+  ~~sekadar disalin dari `jabatan_utama_id`, bukan diresolusi ke nama jabatan
+  (di luar lingkup revisi ini)~~ **diselesaikan di entri `[2026-07-14]` di
+  atas** — kini diresolusi ke nama jabatan via `JabatanService`, dengan
+  fallback ke ID mentah bila jabatan tidak ditemukan.
 - Endpoint peta baru: `GET/PATCH /dcs/instrumen`, `POST /dcs/instrumen/tutup`,
   `POST /dcs/instrumen/buka-ulang`, `GET/POST /dcs/responden`, `GET/DELETE
   /dcs/responden/{id}`, `PUT/POST/GET /dcs/responden/{id}/jawaban*`,

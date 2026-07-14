@@ -78,6 +78,25 @@ def test_create_responden_derives_nama_dan_jabatan_label(client: TestClient, par
     assert created["sudah_submit"] is False
 
 
+def test_create_responden_resolve_jabatan_label_dari_jabatan_nyata(
+    client: TestClient, partisipan_factory, jabatan_id_tk: str
+) -> None:
+    par_id = partisipan_factory("dcs-rsp-jabatan-nyata", jabatan_utama_id=jabatan_id_tk)
+    created = _assign(client, [par_id])[0]
+
+    jab = client.get(f"/api/v1/jabatan/{jabatan_id_tk}").json()
+    assert created["jabatan_label"] == jab["nama"]
+    assert created["jabatan_label"] != jabatan_id_tk
+
+
+def test_create_responden_fallback_jabatan_label_saat_jabatan_tidak_ada(
+    client: TestClient, par_a: str
+) -> None:
+    created = _assign(client, [par_a])[0]
+    # par_a dari partisipan_factory: jabatan_utama_id acak, tidak ada di DB.
+    assert created["jabatan_label"]  # tidak error, tetap terisi (fallback ke ID)
+
+
 def test_list_responden_requires_admin(client_as) -> None:
     as_partisipan = client_as("dcs-rsp-nonadmin")
     r = as_partisipan.get(RSP_BASE)

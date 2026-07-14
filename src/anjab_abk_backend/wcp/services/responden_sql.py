@@ -14,6 +14,7 @@ partisipan_id`); pre-cek dilakukan untuk pesan error ramah, dengan backstop
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime
 
@@ -21,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ...anjab.services.jabatan import JabatanService
 from ...core.services.partisipan import PartisipanService
 from ...errors import ConflictError, NotFoundError, ValidationAppError
 from ...models import WcpInstrumenModel, WcpRespondenModel
@@ -29,6 +31,8 @@ from ..schemas.responden import WcpRespondenRead
 
 # Sumber tunggal id singleton instrumen.
 from .instrumen import INSTRUMEN_ID
+
+logger = logging.getLogger(__name__)
 
 
 def _to_read(rec: WcpRespondenModel) -> WcpRespondenRead:
@@ -52,9 +56,15 @@ def _to_read(rec: WcpRespondenModel) -> WcpRespondenRead:
 class SqlWcpRespondenService:
     """`WcpRespondenService` berbasis PostgreSQL. Terikat pada satu `Session` per request."""
 
-    def __init__(self, session: Session, partisipan_service: PartisipanService) -> None:
+    def __init__(
+        self,
+        session: Session,
+        partisipan_service: PartisipanService,
+        jabatan_service: JabatanService,
+    ) -> None:
         self._s = session
         self._par = partisipan_service
+        self._jab = jabatan_service
 
     def _get_model(self, responden_id: str) -> WcpRespondenModel:
         rec = self._s.get(WcpRespondenModel, responden_id)
@@ -159,10 +169,20 @@ class SqlWcpRespondenService:
                 skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="sudah_terdaftar"))
                 continue
             partisipan = self._par.get(partisipan_id)
+            try:
+                jabatan_label = self._jab.get(partisipan.jabatan_utama_id).nama
+            except NotFoundError:
+                jabatan_label = partisipan.jabatan_utama_id
+                logger.warning(
+                    "Jabatan '%s' tidak ditemukan untuk partisipan '%s' — jabatan_label WCP"
+                    " fallback ke ID mentah.",
+                    partisipan.jabatan_utama_id,
+                    partisipan_id,
+                )
             rec = WcpRespondenModel(
                 id=f"wrsp_{uuid.uuid4().hex[:8]}",
                 nama=partisipan.nama,
-                jabatan_label=partisipan.jabatan_utama_id,
+                jabatan_label=jabatan_label,
                 partisipan_id=partisipan_id,
                 sudah_submit=False,
             )
