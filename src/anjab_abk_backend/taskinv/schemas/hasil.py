@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .calhr import AiMode, Kondisi, SumberBukti, VaType
+from .calhr import Kondisi, SumberBukti, VaType
+from .sesi import CabangSesi
 
 
 class TiTaskTerpilihRead(BaseModel):
@@ -24,9 +25,7 @@ class TiTaskTerpilihRead(BaseModel):
     std_durasi_per_kali: str | None = None
     std_jam_per_minggu: float | None = None
     std_peak4w_hours: float | None = None
-    std_ai_mode: AiMode | None = None
     std_va_type: VaType | None = None
-    std_dcs_flag: bool | None = None
 
 
 class TiHasilTaskRead(BaseModel):
@@ -45,9 +44,7 @@ class TiHasilTaskRead(BaseModel):
     jam_per_tahun_mean: float = Field(description="Rata-rata jam/tahun (jam/minggu × 45).")
     durasi_per_kali_mean: float = Field(description="Rata-rata durasi per pelaksanaan (menit).")
     peak4w_hours_mean: float = Field(description="Rata-rata jam pada 4 minggu peak.")
-    ai_mode_dist: dict[str, int] = Field(description="Distribusi AI_Mode.")
     va_type_dist: dict[str, int] = Field(description="Distribusi VA_Type.")
-    dcs_flag_count: int = Field(description="Jumlah responden yang menandai risiko DCS.")
     n_setuju_standar: int = Field(description="Jumlah responden yang menerima nilai standar.")
     n_ubah_standar: int = Field(description="Jumlah responden yang mengubah dari nilai standar.")
 
@@ -59,7 +56,9 @@ class TiHasilSesiRead(BaseModel):
 
     sesi_id: str = Field(description="ID sesi.")
     jabatan_id: str = Field(description="ID jabatan yang dikaji.")
-    periode: str = Field(description="Periode.")
+    cabang: CabangSesi | None = Field(
+        default=None, description="Cabang lokasi kajian (bisa null untuk sesi lama)."
+    )
     n_responden_tahap1: int = Field(description="Jumlah responden yang submit Tahap 1.")
     n_responden_tahap3: int = Field(description="Jumlah responden yang submit Tahap 3 (detail).")
     jumlah_task_terpilih: int = Field(description="Jumlah task pada himpunan terpilih.")

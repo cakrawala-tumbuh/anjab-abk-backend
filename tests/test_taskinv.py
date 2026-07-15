@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import itertools
 import uuid
 
 import pytest
@@ -11,13 +10,6 @@ from fastapi.testclient import TestClient
 BASE = "/api/v1/task-inventory"
 SESI = f"{BASE}/sesi"
 UNIT = "ALL"
-
-_year_counter = itertools.count(2000)
-
-
-def _uniq_periode() -> str:
-    """Periode YYYY-MM unik per pemanggilan (hindari konflik jabatan+periode)."""
-    return f"{next(_year_counter)}-01"
 
 
 @pytest.fixture
@@ -29,12 +21,10 @@ def jabatan_id_tk(client: TestClient) -> str:
     return match["jabatan_id"]
 
 
-def _sesi_payload(jabatan_id: str, periode: str | None = None, **over) -> dict:
+def _sesi_payload(jabatan_id: str, cabang: str = "Bandung", **over) -> dict:
     payload = {
         "jabatan_id": jabatan_id,
-        "periode": periode or _uniq_periode(),
-        "min_responden": 1,
-        "max_responden": 10,
+        "cabang": cabang,
     }
     payload.update(over)
     return payload
@@ -141,13 +131,28 @@ def test_sesi_create_invalid_kombinasi(client: TestClient) -> None:
 
 def test_sesi_duplicate_conflict(client: TestClient, jabatan_id_tk: str) -> None:
     sesi = _create_sesi(client, jabatan_id_tk)
-    r = client.post(SESI, json=_sesi_payload(jabatan_id_tk, periode=sesi["periode"]))
+    r = client.post(SESI, json=_sesi_payload(jabatan_id_tk, cabang=sesi["cabang"]))
     assert r.status_code == 409
 
 
-def test_sesi_min_gt_max_rejected(client: TestClient, jabatan_id_tk: str) -> None:
-    r = client.post(SESI, json=_sesi_payload(jabatan_id_tk, min_responden=5, max_responden=2))
-    assert r.status_code in (400, 422)
+def test_sesi_cabang_invalid_rejected(client: TestClient, jabatan_id_tk: str) -> None:
+    r = client.post(SESI, json=_sesi_payload(jabatan_id_tk, cabang="Jakarta"))
+    assert r.status_code == 422
+
+
+def test_sesi_create_payload_lama_ditolak(client: TestClient, jabatan_id_tk: str) -> None:
+    """Item 037: payload lama yang masih mengirim `periode`/`min_responden`/
+    `max_responden` ditolak `extra="forbid"` — kontrak baru mewajibkan `cabang`."""
+    r = client.post(
+        SESI,
+        json={
+            "jabatan_id": jabatan_id_tk,
+            "periode": "2026-06",
+            "min_responden": 3,
+            "max_responden": 10,
+        },
+    )
+    assert r.status_code == 422
 
 
 def test_sesi_update_draft(client: TestClient, jabatan_id_tk: str) -> None:
@@ -206,6 +211,32 @@ def test_sesi_search(client: TestClient, jabatan_id_tk: str) -> None:
     )
     assert r.status_code == 200
     assert r.json()["total"] >= 1
+
+
+def test_sesi_search_by_cabang(client: TestClient, jabatan_id_tk: str) -> None:
+    """Item 037: `cabang` menggantikan `periode` sebagai field yang bisa dicari."""
+    sesi = _create_sesi(client, jabatan_id_tk, cabang="Semarang")
+    r = client.post(
+        f"{SESI}/search",
+        json={
+            "domain": [["id", "=", sesi["id"]], ["cabang", "=", "Semarang"]],
+            "limit": 10,
+            "offset": 0,
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["total"] == 1
+
+
+def test_sesi_read_memuat_cabang(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk, cabang="Semarang")
+    assert sesi["cabang"] == "Semarang"
+    r = client.get(f"{SESI}/{sesi['id']}")
+    assert r.status_code == 200
+    assert r.json()["cabang"] == "Semarang"
+    assert "periode" not in r.json()
+    assert "min_responden" not in r.json()
+    assert "max_responden" not in r.json()
 
 
 def test_sesi_koordinator_id(client: TestClient, jabatan_id_tk: str) -> None:
@@ -493,9 +524,7 @@ def test_full_three_phase_flow(client: TestClient, jabatan_id_tk: str) -> None:
             "durasi_per_kali": 60,
             "jam_per_minggu": jpm,
             "peak4w_hours": 0,
-            "ai_mode": "Human-led",
             "va_type": "VA-Core",
-            "dcs_flag": False,
         }
 
     _detail_submit(client, ra["id"], [_ditem(kodes[0], 2.0), _ditem(kodes[1], 4.0)])
@@ -537,9 +566,7 @@ _STD_MASTER = {
     "std_durasi_per_kali": "60 menit",
     "std_jam_per_minggu": 2.0,
     "std_peak4w_hours": 0.0,
-    "std_ai_mode": "Human-led",
     "std_va_type": "VA-Core",
-    "std_dcs_flag": False,
 }
 
 # durasi_per_kali jawaban responden (ti_detail) tetap Integer — beda dari
@@ -560,9 +587,7 @@ def _detail_item_dari_standar(
             jam_per_minggu if jam_per_minggu is not None else _STD_MASTER["std_jam_per_minggu"]
         ),
         "peak4w_hours": _STD_MASTER["std_peak4w_hours"],
-        "ai_mode": _STD_MASTER["std_ai_mode"],
         "va_type": _STD_MASTER["std_va_type"],
-        "dcs_flag": _STD_MASTER["std_dcs_flag"],
         "setuju_standar": setuju,
     }
 
@@ -662,7 +687,6 @@ def test_detail_kode_diluar_terpilih_ditolak(client: TestClient, jabatan_id_tk: 
                     "frekuensi_teks": "Harian",
                     "durasi_per_kali": 30,
                     "jam_per_minggu": 1.0,
-                    "ai_mode": "Co-Pilot",
                     "va_type": "VA-Enable",
                 }
             ]
@@ -692,7 +716,6 @@ def test_detail_requires_tahap3(client: TestClient, jabatan_id_tk: str) -> None:
                     "frekuensi_teks": "Harian",
                     "durasi_per_kali": 30,
                     "jam_per_minggu": 1.0,
-                    "ai_mode": "Human-led",
                     "va_type": "VA-Core",
                 }
             ]
@@ -718,7 +741,7 @@ def test_responden_delete_setelah_submit_ditolak(client: TestClient, jabatan_id_
     assert r.status_code in (400, 422)
 
 
-@pytest.mark.parametrize("field", ["sumber_bukti", "ai_mode", "va_type"])
+@pytest.mark.parametrize("field", ["sumber_bukti", "va_type"])
 def test_detail_enum_invalid(client: TestClient, jabatan_id_tk: str, field: str) -> None:
     sesi = _create_sesi(client, jabatan_id_tk)
     sid = sesi["id"]
@@ -735,10 +758,37 @@ def test_detail_enum_invalid(client: TestClient, jabatan_id_tk: str, field: str)
         "frekuensi_teks": "Harian",
         "durasi_per_kali": 30,
         "jam_per_minggu": 1.0,
-        "ai_mode": "Human-led",
         "va_type": "VA-Core",
     }
     item[field] = "NILAI_SALAH"
+    res = client.put(f"{SESI}/responden/{ra['id']}/detail", json={"detail": [item]})
+    assert res.status_code == 422
+
+
+@pytest.mark.parametrize("field", ["ai_mode", "dcs_flag"])
+def test_detail_ai_mode_dcs_flag_ditolak_sebagai_field_asing(
+    client: TestClient, jabatan_id_tk: str, field: str
+) -> None:
+    """`ai_mode`/`dcs_flag` dihapus tuntas dari kontrak — payload yang masih
+    menyertakannya harus ditolak (422, `extra="forbid"`), bukan diam-diam diabaikan."""
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    _seleksi_submit(client, ra["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    client.post(f"{SESI}/{sid}/mulai-tahap3")
+    item = {
+        "task_kode": kodes[0],
+        "sumber_bukti": "Aktual",
+        "kondisi": "Baseline",
+        "frekuensi_teks": "Harian",
+        "durasi_per_kali": 30,
+        "jam_per_minggu": 1.0,
+        "va_type": "VA-Core",
+        field: "Human-led" if field == "ai_mode" else False,
+    }
     res = client.put(f"{SESI}/responden/{ra['id']}/detail", json={"detail": [item]})
     assert res.status_code == 422
 
@@ -751,7 +801,6 @@ def _detail_item(kode: str, jpm: float = 1.0) -> dict:
         "frekuensi_teks": "Harian",
         "durasi_per_kali": 30,
         "jam_per_minggu": jpm,
-        "ai_mode": "Human-led",
         "va_type": "VA-Core",
     }
 
@@ -887,17 +936,9 @@ def test_kuesioner_saya_hanya_sesi_yang_terdaftar(
     sme_svc.add_anggota(panel_y.id, par_lain)
 
     sesi_svc = SqlTiSesiService(db_session)
-    sesi_x = sesi_svc.create(
-        TiSesiCreate(
-            jabatan_id=jabatan_x, periode=_uniq_periode(), min_responden=1, max_responden=10
-        )
-    )
+    sesi_x = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_x, cabang="Bandung"))
     sesi_svc.transition(sesi_x.id, "TAHAP1")
-    sesi_y = sesi_svc.create(
-        TiSesiCreate(
-            jabatan_id=jabatan_y, periode=_uniq_periode(), min_responden=1, max_responden=10
-        )
-    )
+    sesi_y = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_y, cabang="Bandung"))
     sesi_svc.transition(sesi_y.id, "TAHAP1")
 
     as_a = client_as("ti-hanya-terdaftar-a")
@@ -951,11 +992,7 @@ def test_kuesioner_saya_saring_status_nonaktif(
     sme_svc.add_anggota(panel.id, par_a)
 
     sesi_svc = SqlTiSesiService(db_session)
-    sesi_draft = sesi_svc.create(
-        TiSesiCreate(
-            jabatan_id=jabatan_id_tk, periode=_uniq_periode(), min_responden=1, max_responden=10
-        )
-    )
+    sesi_draft = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id_tk, cabang="Bandung"))
     assert sesi_draft.status == "DRAFT"
 
     as_a = client_as("ti-status-nonaktif-a")
@@ -983,11 +1020,7 @@ def test_kuesioner_saya_is_koordinator(
     sme_svc.update(panel.id, SMEPanelUpdate(koordinator_id=par_koord))
 
     sesi_svc = SqlTiSesiService(db_session)
-    sesi = sesi_svc.create(
-        TiSesiCreate(
-            jabatan_id=jabatan_id_tk, periode=_uniq_periode(), min_responden=1, max_responden=10
-        )
-    )
+    sesi = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id_tk, cabang="Bandung"))
     assert sesi.koordinator_id == par_koord
     sesi_svc.transition(sesi.id, "TAHAP1")
 
@@ -1011,9 +1044,7 @@ def test_sesi_create_jabatan_valid(client: TestClient, jabatan_id_tk: str) -> No
         SESI,
         json={
             "jabatan_id": jabatan_id_tk,
-            "periode": _uniq_periode(),
-            "min_responden": 1,
-            "max_responden": 10,
+            "cabang": "Bandung",
         },
     )
     assert r.status_code == 201, r.text
@@ -1027,7 +1058,7 @@ def test_sesi_create_jabatan_invalid(client: TestClient) -> None:
         SESI,
         json={
             "jabatan_id": "jbt_tidakada_samasekali",
-            "periode": _uniq_periode(),
+            "cabang": "Bandung",
         },
     )
     assert r.status_code in (400, 422)
@@ -1085,9 +1116,7 @@ def test_responden_sme_panel_check(client: TestClient, db_session) -> None:
     sesi_obj = sesi_svc.create(
         TiSesiCreate(
             jabatan_id=jabatan_id,
-            periode=_uniq_periode(),
-            min_responden=1,
-            max_responden=10,
+            cabang="Bandung",
         )
     )
     sid = sesi_obj.id
@@ -1123,9 +1152,7 @@ def test_responden_tanpa_jabatan_id_bebas(
     sesi_obj = sesi_svc.create(
         TiSesiCreate(
             jabatan_id=jabatan_baru_id,
-            periode=_uniq_periode(),
-            min_responden=1,
-            max_responden=10,
+            cabang="Bandung",
         )
     )
     assert sesi_obj.jabatan_id == jabatan_baru_id
@@ -1180,23 +1207,26 @@ def test_create_sesi_auto_populate_dari_panel(client: TestClient, jabatan_id_tk:
     assert all(row["nama"] for row in responden)
 
 
-def test_create_sesi_panel_melebihi_max_responden_ditolak(
+def test_create_sesi_panel_besar_semua_jadi_responden(
     client: TestClient, jabatan_id_tk: str
 ) -> None:
-    """Panel lebih besar dari `max_responden` → sesi DITOLAK (422), bukan dibuat
-    dengan sebagian anggota dibuang diam-diam. Konsisten dengan OPM (item 028)."""
-    _setup_panel(client, jabatan_id_tk, 11)
-    r = client.post(SESI, json=_sesi_payload(jabatan_id_tk, max_responden=10))
-    assert r.status_code == 422, r.text
-    assert "Jumlah anggota SME panel (11) melebihi max_responden (10)." in r.text
-    # Sesi benar-benar tidak dibuat.
-    assert client.get(SESI).json()["items"] == []
+    """Item 037: batas atas `max_responden` sudah dihapus dari TI — panel dengan
+    >10 anggota (batas lama) kini tetap membuat sesi & SELURUH anggota jadi
+    responden, tanpa ada yang dibuang diam-diam (regresi positif, kebalikan dari
+    perilaku sebelum revisi ini)."""
+    anggota = _setup_panel(client, jabatan_id_tk, 11)
+    sesi = _create_sesi(client, jabatan_id_tk)
+    r = client.get(f"{SESI}/{sesi['id']}/responden")
+    assert r.status_code == 200, r.text
+    responden = r.json()
+    assert len(responden) == 11
+    assert {row["partisipan_id"] for row in responden} == set(anggota)
 
 
 def test_create_sesi_panel_muat_semua_anggota(client: TestClient, jabatan_id_tk: str) -> None:
-    """Panel ≤ `max_responden` → sesi tetap dibuat, seluruh anggota jadi responden."""
+    """Panel kecil → sesi tetap dibuat, seluruh anggota jadi responden."""
     anggota = _setup_panel(client, jabatan_id_tk, 3)
-    sesi = _create_sesi(client, jabatan_id_tk, max_responden=10)
+    sesi = _create_sesi(client, jabatan_id_tk)
     r = client.get(f"{SESI}/{sesi['id']}/responden")
     assert r.status_code == 200, r.text
     responden = r.json()
@@ -1328,17 +1358,6 @@ def test_responden_bulk_skip_bukan_anggota_sme_panel(
     ]
 
 
-def test_responden_bulk_skip_kapasitas_penuh(client: TestClient, jabatan_id_tk: str) -> None:
-    sesi = _create_sesi(client, jabatan_id_tk, max_responden=1)
-    anggota = _setup_panel(client, jabatan_id_tk, 2)
-    r = client.post(f"{SESI}/{sesi['id']}/responden/bulk", json={"partisipan_ids": anggota})
-    assert r.status_code == 201, r.text
-    data = r.json()
-    assert len(data["created"]) == 1
-    assert len(data["skipped"]) == 1
-    assert data["skipped"][0]["alasan"] == "kapasitas_penuh"
-
-
 def test_responden_bulk_skip_duplikat_input(client: TestClient, jabatan_id_tk: str) -> None:
     sesi = _create_sesi(client, jabatan_id_tk)
     anggota = _setup_panel(client, jabatan_id_tk, 1)
@@ -1398,11 +1417,7 @@ def test_get_responden_forbidden_for_non_owner(
     sme_svc.add_anggota(panel.id, par_b)
 
     sesi_svc = SqlTiSesiService(db_session)
-    sesi_obj = sesi_svc.create(
-        TiSesiCreate(
-            jabatan_id=jabatan_id, periode=_uniq_periode(), min_responden=1, max_responden=10
-        )
-    )
+    sesi_obj = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id, cabang="Bandung"))
     rsp = client.post(
         f"{SESI}/{sesi_obj.id}/responden",
         json={"partisipan_id": par_a, "nama": "A"},
@@ -1502,7 +1517,7 @@ def test_sesi_create_partisipan_403(client_as, jabatan_id_tk: str) -> None:
 def test_sesi_update_partisipan_403(client: TestClient, client_as, jabatan_id_tk: str) -> None:
     sesi = _create_sesi(client, jabatan_id_tk)
     as_p = client_as("ti-guard-update")
-    r = as_p.patch(f"{SESI}/{sesi['id']}", json={"min_responden": 2})
+    r = as_p.patch(f"{SESI}/{sesi['id']}", json={"catatan": "coba ubah"})
     assert r.status_code == 403
 
 
@@ -1581,11 +1596,7 @@ def test_get_sesi_peserta_boleh(
     sme_svc.add_anggota(panel.id, par_a)
 
     sesi_svc = SqlTiSesiService(db_session)
-    sesi_obj = sesi_svc.create(
-        TiSesiCreate(
-            jabatan_id=jabatan_id, periode=_uniq_periode(), min_responden=1, max_responden=10
-        )
-    )
+    sesi_obj = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id, cabang="Bandung"))
     # auto-populate dari panel: par_a otomatis jadi responden sesi ini.
 
     as_a = client_as("ti-akses-peserta")
@@ -1611,16 +1622,8 @@ def test_get_sesi_bukan_peserta_403(
     sme_svc.add_anggota(panel_y.id, par_y)
 
     sesi_svc = SqlTiSesiService(db_session)
-    sesi_x = sesi_svc.create(
-        TiSesiCreate(
-            jabatan_id=jabatan_id_x, periode=_uniq_periode(), min_responden=1, max_responden=10
-        )
-    )
-    sesi_svc.create(
-        TiSesiCreate(
-            jabatan_id=jabatan_id_y, periode=_uniq_periode(), min_responden=1, max_responden=10
-        )
-    )
+    sesi_x = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id_x, cabang="Bandung"))
+    sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id_y, cabang="Bandung"))
 
     # par_y adalah peserta sesi jabatan Y, TIDAK boleh membaca sesi jabatan X.
     as_y = client_as("ti-akses-y")
@@ -1643,9 +1646,7 @@ def test_get_tahap2_koordinator_boleh(
     sesi_obj = SqlTiSesiService(db_session).create(
         TiSesiCreate(
             jabatan_id=jabatan_id_tk,
-            periode=_uniq_periode(),
-            min_responden=1,
-            max_responden=10,
+            cabang="Bandung",
             koordinator_id=koordinator_id,
         )
     )
@@ -1755,7 +1756,7 @@ def test_admin_semua_endpoint_boleh(client: TestClient, jabatan_id_tk: str) -> N
         == 200
     )
     assert client.get(f"{SESI}/{sid}").status_code == 200
-    assert client.patch(f"{SESI}/{sid}", json={"min_responden": 1}).status_code == 200
+    assert client.patch(f"{SESI}/{sid}", json={"catatan": "ok"}).status_code == 200
     assert client.post(f"{SESI}/{sid}/mulai-tahap1").status_code == 200
 
     kodes = _catalog_kodes(client, jabatan_id_tk, 1)

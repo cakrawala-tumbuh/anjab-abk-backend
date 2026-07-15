@@ -32,9 +32,7 @@ def _to_read(rec: TiDetailModel) -> TiDetailRead:
         durasi_per_kali=rec.durasi_per_kali,
         jam_per_minggu=rec.jam_per_minggu,
         peak4w_hours=rec.peak4w_hours,
-        ai_mode=rec.ai_mode,  # type: ignore[arg-type]
         va_type=rec.va_type,  # type: ignore[arg-type]
-        dcs_flag=rec.dcs_flag,
         setuju_standar=rec.setuju_standar,
         catatan=rec.catatan,
     )
@@ -71,9 +69,7 @@ class SqlTiDetailService:
                 existing.durasi_per_kali = item.durasi_per_kali
                 existing.jam_per_minggu = item.jam_per_minggu
                 existing.peak4w_hours = item.peak4w_hours
-                existing.ai_mode = item.ai_mode
                 existing.va_type = item.va_type
-                existing.dcs_flag = item.dcs_flag
                 existing.setuju_standar = item.setuju_standar
                 existing.catatan = item.catatan
                 results.append(existing)
@@ -89,9 +85,7 @@ class SqlTiDetailService:
                     durasi_per_kali=item.durasi_per_kali,
                     jam_per_minggu=item.jam_per_minggu,
                     peak4w_hours=item.peak4w_hours,
-                    ai_mode=item.ai_mode,
                     va_type=item.va_type,
-                    dcs_flag=item.dcs_flag,
                     setuju_standar=item.setuju_standar,
                     catatan=item.catatan,
                 )

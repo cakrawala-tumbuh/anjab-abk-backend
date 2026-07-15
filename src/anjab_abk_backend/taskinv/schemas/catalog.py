@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .calhr import AiMode, Kondisi, SumberBukti, VaType
+from .calhr import Kondisi, SumberBukti, VaType
 
 
 class TiCatalogRead(BaseModel):
@@ -44,9 +44,7 @@ class TiCatalogRead(BaseModel):
     std_durasi_per_kali: str | None = None
     std_jam_per_minggu: float | None = None
     std_peak4w_hours: float | None = None
-    std_ai_mode: AiMode | None = None
     std_va_type: VaType | None = None
-    std_dcs_flag: bool | None = None
 
 
 class TiKombinasiRead(BaseModel):

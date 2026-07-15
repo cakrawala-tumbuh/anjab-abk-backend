@@ -341,7 +341,7 @@ def test_kuesioner_saya_hanya_open(client: TestClient, jabatan_id_tk: str, db_se
 
     r_ti = client.post(
         TI_SESI,
-        json={"jabatan_id": jabatan_id_tk, "periode": _uniq_periode(), "min_responden": 1},
+        json={"jabatan_id": jabatan_id_tk, "cabang": "Bandung"},
     )
     ti_sesi_id = r_ti.json()["id"]
     r_rsp = client.post(f"{TI_SESI}/{ti_sesi_id}/responden", json={"nama": "R1"})

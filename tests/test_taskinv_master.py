@@ -559,9 +559,7 @@ _STD_PAYLOAD = {
     "std_durasi_per_kali": "60 menit",
     "std_jam_per_minggu": 2.5,
     "std_peak4w_hours": 4.0,
-    "std_ai_mode": "Human-led",
     "std_va_type": "VA-Core",
-    "std_dcs_flag": False,
 }
 
 
@@ -629,7 +627,7 @@ def test_uraian_tugas_std_invalid_enum(
         "detil_tugas_id": dt["id"],
         "tugas_pokok_id": tp["id"],
         "jabatan_id": jbt_id,
-        "std_ai_mode": "Ngawur",
+        "std_va_type": "Ngawur",
     }
     r = client.post(UT_BASE, json=payload)
     assert r.status_code == 422
@@ -656,9 +654,7 @@ def test_purge_blocked_when_sesi_exists(client: TestClient) -> None:
         SESI_BASE,
         json={
             "jabatan_id": jabatan_id,
-            "periode": "2099-01",
-            "min_responden": 1,
-            "max_responden": 10,
+            "cabang": "Bandung",
         },
     )
     assert r.status_code == 201, r.text

@@ -2,7 +2,7 @@
 
 Agregasi ini menjadi masukan ABK: untuk tiap task terpilih dihitung tingkat relevansi
 (berapa partisipan menandai relevan) dan rata-rata beban (jam/minggu, jam/tahun, durasi,
-peak), distribusi AI_Mode/VA_Type, serta jumlah penanda risiko DCS.
+peak), serta distribusi VA_Type.
 """
 
 from __future__ import annotations
@@ -46,9 +46,7 @@ def compute_task_terpilih(
                 std_durasi_per_kali=cat.std_durasi_per_kali if cat else None,
                 std_jam_per_minggu=cat.std_jam_per_minggu if cat else None,
                 std_peak4w_hours=cat.std_peak4w_hours if cat else None,
-                std_ai_mode=cat.std_ai_mode if cat else None,
                 std_va_type=cat.std_va_type if cat else None,
-                std_dcs_flag=cat.std_dcs_flag if cat else None,
             )
         )
     rows.sort(key=lambda r: (-r.n_relevan, r.kode))
@@ -83,14 +81,9 @@ def compute_hasil_sesi(
         else:
             jpm_mean = durasi_mean = peak_mean = 0.0
 
-        ai_dist: dict[str, int] = {}
         va_dist: dict[str, int] = {}
-        dcs_count = 0
         for d in entries:
-            ai_dist[d.ai_mode] = ai_dist.get(d.ai_mode, 0) + 1
             va_dist[d.va_type] = va_dist.get(d.va_type, 0) + 1
-            if d.dcs_flag:
-                dcs_count += 1
 
         n_setuju = sum(1 for d in entries if d.setuju_standar)
         n_ubah = len(entries) - n_setuju
@@ -109,9 +102,7 @@ def compute_hasil_sesi(
                 jam_per_tahun_mean=round(jpm_mean * MINGGU_EFEKTIF, 2),
                 durasi_per_kali_mean=durasi_mean,
                 peak4w_hours_mean=peak_mean,
-                ai_mode_dist=ai_dist,
                 va_type_dist=va_dist,
-                dcs_flag_count=dcs_count,
                 n_setuju_standar=n_setuju,
                 n_ubah_standar=n_ubah,
             )
@@ -121,7 +112,7 @@ def compute_hasil_sesi(
     return TiHasilSesiRead(
         sesi_id=sesi.id,
         jabatan_id=sesi.jabatan_id,
-        periode=sesi.periode,
+        cabang=sesi.cabang,
         n_responden_tahap1=n_tahap1,
         n_responden_tahap3=n_tahap3,
         jumlah_task_terpilih=len(kodes),

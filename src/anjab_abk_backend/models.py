@@ -420,9 +420,7 @@ class TiUraianTugasModel(Base):
     std_durasi_per_kali: Mapped[str | None] = mapped_column(String(100), nullable=True)
     std_jam_per_minggu: Mapped[float | None] = mapped_column(Float, nullable=True)
     std_peak4w_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
-    std_ai_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
     std_va_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    std_dcs_flag: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     created_at: Mapped[datetime] = _ts(index=True)
 
 
@@ -431,11 +429,9 @@ class TiSesiModel(Base):
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
     jabatan_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
-    periode: Mapped[str] = mapped_column(String(7), nullable=False)
+    cabang: Mapped[str | None] = mapped_column(String(20), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
     koordinator_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
-    min_responden: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
-    max_responden: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     catatan: Mapped[str | None] = mapped_column(Text, nullable=True)
     # task_terpilih: None sampai di-freeze (TAHAP2→TAHAP3). `task_frozen` membedakan
     # "belum di-freeze" (None) vs "di-freeze tapi kosong" ([]).
@@ -530,9 +526,7 @@ class TiDetailModel(Base):
     durasi_per_kali: Mapped[int] = mapped_column(Integer, nullable=False)
     jam_per_minggu: Mapped[float] = mapped_column(Float, nullable=False)
     peak4w_hours: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    ai_mode: Mapped[str] = mapped_column(String(20), nullable=False)
     va_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    dcs_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # True = partisipan menerima nilai standar master apa adanya.
     # False = ia mengubah minimal satu komponen. Task yang masternya tidak punya
     # nilai standar tetap True (tidak ada standar untuk dibantah).

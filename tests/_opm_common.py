@@ -59,9 +59,7 @@ def _setup_jabatan_panel_ti(client: TestClient, jabatan_id: str) -> dict:
         TI_SESI,
         json={
             "jabatan_id": jabatan_id,
-            "periode": _uniq_periode(),
-            "min_responden": 1,
-            "max_responden": 10,
+            "cabang": "Bandung",
         },
     )
     assert r.status_code == 201, r.text

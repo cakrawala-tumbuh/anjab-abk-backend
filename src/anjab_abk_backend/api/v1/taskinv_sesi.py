@@ -77,7 +77,7 @@ def list_sesi(
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
-        409: {"model": ErrorResponse, "description": "Sesi untuk jabatan+periode sudah ada."},
+        409: {"model": ErrorResponse, "description": "Sesi untuk jabatan+cabang sudah ada."},
     },
 )
 def create_sesi(
@@ -89,9 +89,7 @@ def create_sesi(
                     "summary": "Sesi TI Kepala Sekolah",
                     "value": {
                         "jabatan_id": "jbt_a1b2c3d4",
-                        "periode": "2026-06",
-                        "min_responden": 3,
-                        "max_responden": 10,
+                        "cabang": "Bandung",
                     },
                 }
             }

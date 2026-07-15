@@ -6,5 +6,4 @@ from typing import Literal
 
 SumberBukti = Literal["Formal", "Aktual", "Keduanya"]
 Kondisi = Literal["Baseline", "Peak", "Both"]
-AiMode = Literal["Human-led", "Co-Pilot", "AI-assisted"]
 VaType = Literal["VA-Core", "VA-Enable", "NVA-Residual", "Context-Dependent", "Needs Validation"]

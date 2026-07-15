@@ -84,7 +84,7 @@ def test_hapus_ti_sesi_cascade_responden_seleksi_detail_tahap2(
     rsp_id = f"tirs_{uuid.uuid4().hex[:8]}"
     db_session.add(
         TiSesiModel(
-            id=sesi_id, jabatan_id=f"jbt_{uuid.uuid4().hex[:8]}", periode="2026-01", status="DRAFT"
+            id=sesi_id, jabatan_id=f"jbt_{uuid.uuid4().hex[:8]}", cabang="Bandung", status="DRAFT"
         )
     )
     db_session.flush()
@@ -109,7 +109,6 @@ def test_hapus_ti_sesi_cascade_responden_seleksi_detail_tahap2(
             frekuensi_teks="setiap hari",
             durasi_per_kali=30,
             jam_per_minggu=2.5,
-            ai_mode="MANDIRI",
             va_type="VA",
         )
     )

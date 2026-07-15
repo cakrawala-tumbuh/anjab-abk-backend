@@ -2,9 +2,8 @@
 
 MENGGANTI `InMemoryTiSesiService` TANPA mengubah kontrak Protocol.
 
-Uniqueness sesi diperiksa di aplikasi (sama dengan InMemory): (unit, jabatan_id,
-periode) bila `unit` diisi, atau (jabatan_id, periode) bila `unit` None. State
-machine `_VALID_TRANSITIONS` & whitelist search dipakai ULANG dari modul InMemory.
+Uniqueness sesi diperiksa di aplikasi (sama dengan InMemory): (jabatan_id, cabang).
+State machine `_VALID_TRANSITIONS` & whitelist search dipakai ULANG dari modul InMemory.
 
 `task_terpilih` model bernilai None sampai di-freeze (`task_frozen=True`);
 `freeze_task_terpilih` mengisi tabel anak `ti_sesi_task_terpilih`. `get_task_terpilih`
@@ -35,7 +34,7 @@ def _sesi_field_map() -> FieldMap:
     return {
         "id": FieldSpec(column=TiSesiModel.id),
         "jabatan_id": FieldSpec(column=TiSesiModel.jabatan_id),
-        "periode": FieldSpec(column=TiSesiModel.periode),
+        "cabang": FieldSpec(column=TiSesiModel.cabang),
         "status": FieldSpec(column=TiSesiModel.status),
         "created_at": FieldSpec(column=TiSesiModel.created_at, order_column=TiSesiModel.created_at),
     }
@@ -50,11 +49,9 @@ def _to_read(rec: TiSesiModel, jabatan_nama: str | None = None) -> TiSesiRead:
         id=rec.id,
         jabatan_id=rec.jabatan_id,
         jabatan_nama=jabatan_nama,
-        periode=rec.periode,
+        cabang=rec.cabang,  # type: ignore[arg-type]
         status=rec.status,  # type: ignore[arg-type]
         koordinator_id=rec.koordinator_id,
-        min_responden=rec.min_responden,
-        max_responden=rec.max_responden,
         jumlah_task_terpilih=(len(terpilih) if terpilih is not None else None),
         catatan=rec.catatan,
         created_at=created,
@@ -93,17 +90,15 @@ class SqlTiSesiService:
         return _to_read(rec, jab.nama if jab else None)
 
     def create(self, data: TiSesiCreate) -> TiSesiRead:
-        if data.min_responden > data.max_responden:
-            raise ValidationAppError("min_responden tidak boleh lebih besar dari max_responden.")
         dup = self._s.scalar(
             select(TiSesiModel.id).where(
                 TiSesiModel.jabatan_id == data.jabatan_id,
-                TiSesiModel.periode == data.periode,
+                TiSesiModel.cabang == data.cabang,
             )
         )
         if dup is not None:
             raise ConflictError(
-                f"Sesi untuk jabatan '{data.jabatan_id}'" f" periode '{data.periode}' sudah ada."
+                f"Sesi untuk jabatan '{data.jabatan_id}' cabang '{data.cabang}' sudah ada."
             )
         # Panel unik per jabatan (SMEPanelModel.jabatan_id unique) → satu lookup,
         # dua keperluan: mewarisi koordinator (di bawah) + auto-assign anggota
@@ -112,19 +107,6 @@ class SqlTiSesiService:
         panel = self._s.scalar(
             select(SMEPanelModel).where(SMEPanelModel.jabatan_id == data.jabatan_id)
         )
-
-        # Tolak keras bila panel lebih besar dari kapasitas sesi — konsisten dengan
-        # OPM (`opm/services/sesi_sql.py::create`). Sebelumnya auto-populate di bawah
-        # membuang anggota berlebih secara DIAM-DIAM (alasan `kapasitas_penuh` yang
-        # tidak pernah sampai ke pemanggil), sehingga sebagian ahli tidak pernah
-        # diundang mengisi tanpa siapa pun tahu.
-        if panel is not None and panel.anggota:
-            anggota_ids = panel.partisipan_ids
-            if len(anggota_ids) > data.max_responden:
-                raise ValidationAppError(
-                    f"Jumlah anggota SME panel ({len(anggota_ids)}) melebihi"
-                    f" max_responden ({data.max_responden})."
-                )
 
         # Payload menang atas panel; panel hanya dipakai bila pemanggil tidak
         # menentukan koordinator secara eksplisit.
@@ -135,11 +117,9 @@ class SqlTiSesiService:
         rec = TiSesiModel(
             id=f"tises_{uuid.uuid4().hex[:8]}",
             jabatan_id=data.jabatan_id,
-            periode=data.periode,
+            cabang=data.cabang,
             status="DRAFT",
             koordinator_id=koordinator_id,
-            min_responden=data.min_responden,
-            max_responden=data.max_responden,
             catatan=data.catatan,
         )
         self._s.add(rec)
@@ -154,11 +134,10 @@ class SqlTiSesiService:
         self._s.flush()
 
         # Auto-populate best-effort: anggota SME panel jabatan ini langsung jadi
-        # responden. Panel tidak ada/kosong → sesi tetap dibuat kosong (tidak error).
+        # responden, tanpa batas atas. Panel tidak ada/kosong → sesi tetap dibuat
+        # kosong (tidak error).
         if panel is not None and panel.anggota:
-            assign_ti_responden_banyak(
-                self._s, rec.id, panel.partisipan_ids, max_responden=data.max_responden
-            )
+            assign_ti_responden_banyak(self._s, rec.id, panel.partisipan_ids)
         jab = self._s.get(JabatanModel, rec.jabatan_id)
         return _to_read(rec, jab.nama if jab else None)
 
@@ -167,10 +146,6 @@ class SqlTiSesiService:
         changes = data.model_dump(exclude_unset=True)
         if rec.status != "DRAFT" and any(k != "koordinator_id" for k in changes):
             raise ValidationAppError("Sesi hanya dapat diperbarui saat berstatus DRAFT.")
-        new_min = changes.get("min_responden", rec.min_responden)
-        new_max = changes.get("max_responden", rec.max_responden)
-        if new_min > new_max:
-            raise ValidationAppError("min_responden tidak boleh lebih besar dari max_responden.")
         for key, value in changes.items():
             setattr(rec, key, value)
         self._s.flush()

@@ -7,6 +7,72 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-07-15
+
+### Diubah (breaking change)
+
+- **Task Inventory: hapus tuntas `ai_mode` (enum `AiMode`) & `dcs_flag` dari kontrak
+  CalHR** (backlog 039). Feedback user (foto, 2026-07-14) pada halaman Tahap 3: dua
+  isian "AI mode" dan "Resiko DCS" dihapus dari produk, bukan sekadar disembunyikan
+  di UI.
+  - **Isian per-entri Tahap 3**: `TiDetailItem.ai_mode`/`.dcs_flag` dan
+    `TiDetailRead.ai_mode`/`.dcs_flag` dihapus. `POST/PUT .../detail` kini menolak
+    (`422`, `extra="forbid"`) payload yang masih menyertakan salah satu field ini.
+  - **Nilai standar master (prefill Tahap 3)**: `std_ai_mode`/`std_dcs_flag` dihapus
+    dari `TiCatalogRead`, `UraianTugasCreate`/`Update`/`Read`.
+  - **Agregasi hasil analisis**: `ai_mode_dist`/`dcs_flag_count` dihapus dari
+    `TiHasilTaskRead`; `std_ai_mode`/`std_dcs_flag` dihapus dari `TiTaskTerpilihRead`.
+    `va_type`/`va_type_dist`/`std_va_type` **tidak disentuh**.
+  - Enum `AiMode` (`schemas/calhr.py`) **dihapus total** — dipastikan 0 pemakai
+    tersisa sebelum dihapus (`grep -rn AiMode src/` → nihil).
+  - Model ORM: `TiDetailModel.ai_mode`/`.dcs_flag`, `TiUraianTugasModel.std_ai_mode`/
+    `.std_dcs_flag` dihapus. Migrasi Alembic `fd3dd550aa99` (setelah `08b6b999ee05`
+    dari backlog 037) men-`DROP COLUMN` keempatnya di `ti_detail` dan
+    `ti_uraian_tugas`. **Data lama pada kolom ini hilang permanen** saat migrasi
+    dijalankan — baris uji coba TI Teranalisis di produksi YPII kemungkinan
+    terdampak; backup DB (`make backup`) wajib sebelum `alembic upgrade head` di
+    produksi. `downgrade()` best-effort: kolom `ti_detail.ai_mode`/`dcs_flag`
+    (semula `NOT NULL` tanpa default) diberi `server_default` sementara agar
+    `ADD COLUMN` tidak gagal di tabel berisi, lalu default dilepas.
+  - Klien (web-app, MCP) menyusul di item 040 (blocked-by 039) meregenerasi tipe
+    dari `openapi.json` yang berubah.
+
+- **Task Inventory (`TiSesi`): `periode` diganti `cabang`; `min_responden`/
+  `max_responden` dihapus total** (backlog 037). Feedback user: sesi TI harus
+  terikat ke cabang lokasi (Bandung/Semarang) alih-alih periode bebas teks, dan
+  konsep batas atas jumlah responden dicabut — mengikuti keputusan yang sama
+  yang sudah diambil untuk DCS/WCP (`[2026-07-12]` di bawah).
+  - `TiSesiCreate`/`TiSesiUpdate`/`TiSesiRead`: field `periode` (string bebas
+    `YYYY-MM`) diganti `cabang` (`Literal["Bandung", "Semarang"]`, tipe baru
+    `CabangSesi`). `TiSesiCreate.cabang` **wajib** (sesi baru selalu punya
+    cabang); `TiSesiRead.cabang`/`TiSesiUpdate.cabang` **Optional** — baris
+    `ti_sesi` lama (dibuat sebelum revisi ini) punya `cabang = NULL` (TIDAK
+    ada backfill otomatis, lihat migrasi).
+  - `min_responden`/`max_responden` dihapus dari `TiSesiCreate`/`Update`/`Read`,
+    `TiSesiModel`, dan seluruh lapisan responden TI
+    (`assign_ti_responden_banyak`, `SqlTiRespondenService.create`/
+    `assign_banyak`, endpoint `POST .../responden` & `.../responden/bulk`).
+    Aturan 422 "panel SME > max_responden" (backlog 028, entri `[2026-07-14]`
+    di bawah) ikut **dibuang** — panel besar kini selalu berhasil membuat
+    sesi dengan SELURUH anggota jadi responden, tanpa batas atas.
+  - Uniqueness sesi berubah dari `(jabatan_id, periode)` menjadi
+    `(jabatan_id, cabang)`.
+  - Downstream yang sebelumnya mengekspos `periode` ikut diganti `cabang`:
+    `TiHasilSesiRead.periode` → `cabang`, `TiKuesionerItemRead.sesi_periode`
+    → `sesi_cabang`.
+  - Payload lama yang masih mengirim `periode`/`min_responden`/
+    `max_responden` ditolak `422` (`extra="forbid"`) — klien (web-app, MCP)
+    perlu menyesuaikan (menyusul: item 038 + audit MCP `buat_ti_sesi`/
+    `ti_tambah_responden*`).
+  - Migrasi Alembic `08b6b999ee05`: kolom `cabang` ditambahkan
+    `nullable=True` **tanpa backfill** (baris produksi lama tetap `NULL`
+    sampai admin mengisinya manual — di luar cakupan migrasi ini, data
+    transaksi produksi sengaja tidak disentuh). `downgrade()` best-effort
+    (mengikuti konvensi `3b10e24fa970`).
+  - **`OpmSesi` sengaja tidak disentuh** — field `periode`/`min_responden`/
+    `max_responden` paralel di `opm/schemas/sesi.py` tetap ada (item terpisah
+    bila diinginkan).
+
 ## [0.34.1] - 2026-07-14
 
 ### Diperbaiki

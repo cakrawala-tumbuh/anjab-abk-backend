@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 StatusSesi = Literal["DRAFT", "TAHAP1", "TAHAP2", "TAHAP3", "CLOSED", "ANALYZED"]
+CabangSesi = Literal["Bandung", "Semarang"]
 
 
 class TiSesiCreate(BaseModel):
@@ -20,19 +21,7 @@ class TiSesiCreate(BaseModel):
         description="ID jabatan yang dikaji (FK ke Jabatan).",
         examples=["jbt_a1b2c3d4"],
     )
-    periode: str = Field(
-        min_length=7,
-        max_length=7,
-        pattern=r"^\d{4}-\d{2}$",
-        description="Periode kajian format YYYY-MM.",
-        examples=["2026-06"],
-    )
-    min_responden: int = Field(
-        default=3, ge=1, description="Jumlah minimum responden.", examples=[3]
-    )
-    max_responden: int = Field(
-        default=10, ge=1, description="Jumlah maksimum responden.", examples=[10]
-    )
+    cabang: CabangSesi = Field(description="Cabang lokasi kajian.", examples=["Bandung"])
     koordinator_id: str | None = Field(
         default=None,
         description="ID partisipan yang menjadi koordinator SME panel (Tahap 2).",
@@ -48,10 +37,10 @@ class TiSesiUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    periode: str | None = Field(default=None, min_length=7, max_length=7, pattern=r"^\d{4}-\d{2}$")
+    cabang: CabangSesi | None = Field(
+        default=None, description="Cabang lokasi kajian.", examples=["Bandung"]
+    )
     koordinator_id: str | None = Field(default=None, description="ID koordinator SME panel.")
-    min_responden: int | None = Field(default=None, ge=1)
-    max_responden: int | None = Field(default=None, ge=1)
     catatan: str | None = Field(default=None, max_length=500)
 
 
@@ -63,10 +52,12 @@ class TiSesiRead(BaseModel):
     id: str = Field(description="ID sesi.", examples=["tises_a1b2c3d4"])
     jabatan_id: str = Field(description="ID jabatan yang dikaji.", examples=["jbt_a1b2c3d4"])
     jabatan_nama: str | None = Field(default=None, description="Nama jabatan yang dikaji.")
-    periode: str = Field(description="Periode kajian (YYYY-MM).", examples=["2026-06"])
+    cabang: CabangSesi | None = Field(
+        default=None,
+        description="Cabang lokasi kajian (bisa null untuk sesi lama sebelum field ini ada).",
+        examples=["Bandung"],
+    )
     status: StatusSesi = Field(description="Status sesi.", examples=["DRAFT"])
-    min_responden: int = Field(description="Minimum responden.")
-    max_responden: int = Field(description="Maksimum responden.")
     koordinator_id: str | None = Field(
         default=None, description="ID koordinator SME panel yang bertanggung jawab Tahap 2."
     )

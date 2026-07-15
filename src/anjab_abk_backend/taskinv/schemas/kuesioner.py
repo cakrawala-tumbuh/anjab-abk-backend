@@ -6,6 +6,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .sesi import CabangSesi
+
 
 class TiKuesionerItemRead(BaseModel):
     """Responden Task Inventory diperkaya info sesi — dipakai /kuesioner/saya."""
@@ -31,7 +33,9 @@ class TiKuesionerItemRead(BaseModel):
         description="Nama jabatan yang dikaji dalam sesi.",
         examples=["Kepala Sekolah"],
     )
-    sesi_periode: str = Field(description="Periode sesi (YYYY-MM).", examples=["2026-06"])
+    sesi_cabang: CabangSesi | None = Field(
+        default=None, description="Cabang lokasi kajian sesi (bisa null untuk sesi lama)."
+    )
     is_koordinator: bool = Field(
         default=False,
         description="True jika pengguna ini adalah koordinator SME panel untuk sesi ini.",

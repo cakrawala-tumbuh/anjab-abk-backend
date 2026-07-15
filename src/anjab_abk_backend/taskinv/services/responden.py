@@ -34,11 +34,9 @@ class TiRespondenService(Protocol):
     def count_by_sesi(self, sesi_id: str) -> int: ...
     def count_tahap1_submitted(self, sesi_id: str) -> int: ...
     def get(self, responden_id: str) -> TiRespondenRead: ...
-    def create(
-        self, sesi_id: str, data: TiRespondenCreate, max_responden: int
-    ) -> TiRespondenRead: ...
+    def create(self, sesi_id: str, data: TiRespondenCreate) -> TiRespondenRead: ...
     def assign_banyak(
-        self, sesi_id: str, partisipan_ids: list[str], *, max_responden: int
+        self, sesi_id: str, partisipan_ids: list[str]
     ) -> BulkAssignResult[TiRespondenRead]: ...
     def mark_tahap1(self, responden_id: str) -> TiRespondenRead: ...
     def mark_tahap3(self, responden_id: str) -> TiRespondenRead: ...
@@ -87,13 +85,8 @@ class InMemoryTiRespondenService:
             raise NotFoundError(f"Responden Task Inventory '{responden_id}' tidak ditemukan.")
         return self._to_read(rec)
 
-    def create(self, sesi_id: str, data: TiRespondenCreate, max_responden: int) -> TiRespondenRead:
+    def create(self, sesi_id: str, data: TiRespondenCreate) -> TiRespondenRead:
         with self._lock:
-            current = sum(1 for r in self._data.values() if r.sesi_id == sesi_id)
-            if current >= max_responden:
-                raise ValidationAppError(
-                    f"Sesi sudah mencapai batas maksimum {max_responden} responden."
-                )
             rec = _Record(
                 id=f"trsp_{uuid.uuid4().hex[:8]}",
                 sesi_id=sesi_id,
@@ -107,7 +100,7 @@ class InMemoryTiRespondenService:
             return self._to_read(rec)
 
     def assign_banyak(
-        self, sesi_id: str, partisipan_ids: list[str], *, max_responden: int
+        self, sesi_id: str, partisipan_ids: list[str]
     ) -> BulkAssignResult[TiRespondenRead]:
         """Delegasi ke `create()`/dedup lokal — TIDAK memvalidasi keanggotaan SME
         panel (sama seperti `SqlTiRespondenService`, pemanggil yang menyaring).
@@ -116,7 +109,6 @@ class InMemoryTiRespondenService:
         created: list[TiRespondenRead] = []
         seen: set[str] = set()
         with self._lock:
-            current = sum(1 for r in self._data.values() if r.sesi_id == sesi_id)
             for partisipan_id in partisipan_ids:
                 if partisipan_id in seen:
                     skipped.append(
@@ -133,11 +125,6 @@ class InMemoryTiRespondenService:
                         BulkSkipped(partisipan_id=partisipan_id, alasan="sudah_terdaftar")
                     )
                     continue
-                if current >= max_responden:
-                    skipped.append(
-                        BulkSkipped(partisipan_id=partisipan_id, alasan="kapasitas_penuh")
-                    )
-                    continue
                 rec = _Record(
                     id=f"trsp_{uuid.uuid4().hex[:8]}",
                     sesi_id=sesi_id,
@@ -148,7 +135,6 @@ class InMemoryTiRespondenService:
                     created_at=datetime.now(UTC),
                 )
                 self._data[rec.id] = rec
-                current += 1
                 created.append(self._to_read(rec))
         return BulkAssignResult(created=created, skipped=skipped)
 

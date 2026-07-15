@@ -15,7 +15,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .calhr import AiMode, Kondisi, SumberBukti, VaType
+from .calhr import Kondisi, SumberBukti, VaType
 
 
 class UraianTugasCreate(BaseModel):
@@ -81,9 +81,7 @@ class UraianTugasCreate(BaseModel):
     std_peak4w_hours: float | None = Field(
         default=None, ge=0, description="Nilai standar jam pada 4 minggu peak."
     )
-    std_ai_mode: AiMode | None = Field(default=None, description="Nilai standar AI mode.")
     std_va_type: VaType | None = Field(default=None, description="Nilai standar VA type.")
-    std_dcs_flag: bool | None = Field(default=None, description="Nilai standar flag risiko DCS.")
 
 
 class UraianTugasUpdate(BaseModel):
@@ -118,9 +116,7 @@ class UraianTugasUpdate(BaseModel):
     std_peak4w_hours: float | None = Field(
         default=None, ge=0, description="Nilai standar jam pada 4 minggu peak."
     )
-    std_ai_mode: AiMode | None = Field(default=None, description="Nilai standar AI mode.")
     std_va_type: VaType | None = Field(default=None, description="Nilai standar VA type.")
-    std_dcs_flag: bool | None = Field(default=None, description="Nilai standar flag risiko DCS.")
 
 
 class UraianTugasRead(BaseModel):
@@ -161,7 +157,5 @@ class UraianTugasRead(BaseModel):
     std_peak4w_hours: float | None = Field(
         default=None, ge=0, description="Nilai standar jam pada 4 minggu peak."
     )
-    std_ai_mode: AiMode | None = Field(default=None, description="Nilai standar AI mode.")
     std_va_type: VaType | None = Field(default=None, description="Nilai standar VA type.")
-    std_dcs_flag: bool | None = Field(default=None, description="Nilai standar flag risiko DCS.")
     created_at: datetime = Field(description="Waktu pembuatan (UTC, ISO-8601).")

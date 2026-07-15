@@ -108,7 +108,7 @@ def create_responden(
                 "Partisipan tidak dapat ditambahkan:"
                 " belum tergabung dalam SME panel jabatan ini."
             )
-    return rsp_service.create(sesi_id, payload, sesi.max_responden)
+    return rsp_service.create(sesi_id, payload)
 
 
 @router.post(
@@ -168,7 +168,7 @@ def create_responden_banyak(
             continue
         anggota_valid.append(partisipan_id)
 
-    result = rsp_service.assign_banyak(sesi_id, anggota_valid, max_responden=sesi.max_responden)
+    result = rsp_service.assign_banyak(sesi_id, anggota_valid)
     result.skipped = skipped + result.skipped
     return result
 

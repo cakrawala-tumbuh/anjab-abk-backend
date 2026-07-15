@@ -44,8 +44,6 @@ def assign_ti_responden_banyak(
     session: Session,
     sesi_id: str,
     partisipan_ids: list[str],
-    *,
-    max_responden: int,
 ) -> BulkAssignResult[TiRespondenRead]:
     """Assign banyak partisipan sekaligus sebagai responden Task Inventory.
 
@@ -74,15 +72,6 @@ def assign_ti_responden_banyak(
             ).all()
         )
 
-    current = (
-        session.scalar(
-            select(func.count())
-            .select_from(TiRespondenModel)
-            .where(TiRespondenModel.sesi_id == sesi_id)
-        )
-        or 0
-    )
-
     to_create = [pid for pid in candidates if pid not in existing_ids]
     par_map: dict[str, PartisipanModel] = {}
     if to_create:
@@ -96,9 +85,6 @@ def assign_ti_responden_banyak(
         if partisipan_id in existing_ids:
             skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="sudah_terdaftar"))
             continue
-        if current >= max_responden:
-            skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="kapasitas_penuh"))
-            continue
         par = par_map.get(partisipan_id)
         rec = TiRespondenModel(
             id=f"trsp_{uuid.uuid4().hex[:8]}",
@@ -110,7 +96,6 @@ def assign_ti_responden_banyak(
         )
         session.add(rec)
         session.flush()
-        current += 1
         created.append(_to_read(rec))
 
     return BulkAssignResult(created=created, skipped=skipped)
@@ -170,12 +155,7 @@ class SqlTiRespondenService:
     def get(self, responden_id: str) -> TiRespondenRead:
         return _to_read(self._get_model(responden_id))
 
-    def create(self, sesi_id: str, data: TiRespondenCreate, max_responden: int) -> TiRespondenRead:
-        current = self.count_by_sesi(sesi_id)
-        if current >= max_responden:
-            raise ValidationAppError(
-                f"Sesi sudah mencapai batas maksimum {max_responden} responden."
-            )
+    def create(self, sesi_id: str, data: TiRespondenCreate) -> TiRespondenRead:
         rec = TiRespondenModel(
             id=f"trsp_{uuid.uuid4().hex[:8]}",
             sesi_id=sesi_id,
@@ -189,11 +169,9 @@ class SqlTiRespondenService:
         return _to_read(rec)
 
     def assign_banyak(
-        self, sesi_id: str, partisipan_ids: list[str], *, max_responden: int
+        self, sesi_id: str, partisipan_ids: list[str]
     ) -> BulkAssignResult[TiRespondenRead]:
-        return assign_ti_responden_banyak(
-            self._s, sesi_id, partisipan_ids, max_responden=max_responden
-        )
+        return assign_ti_responden_banyak(self._s, sesi_id, partisipan_ids)
 
     def mark_tahap1(self, responden_id: str) -> TiRespondenRead:
         rec = self._get_model(responden_id)

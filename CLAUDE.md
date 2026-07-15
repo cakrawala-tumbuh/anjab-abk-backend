@@ -82,6 +82,94 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-15] TI: hapus tuntas `ai_mode` (`AiMode`) & `dcs_flag` dari kontrak CalHR
+
+Backlog 039, feedback user (foto, 2026-07-14) pada halaman Task Inventory Tahap 3:
+dua opsi isian CalHR — **"AI mode"** dan **"Resiko DCS"** — dihapus dari produk.
+Keputusan: hapus tuntas dari schema/model/DB, bukan sekadar `exclude`/`disabled` di
+UI. Cakupan penuh, semua turunan ikut dibuang:
+
+- **Isian per-entri Tahap 3**: `TiDetailItem.ai_mode`/`.dcs_flag`,
+  `TiDetailRead.ai_mode`/`.dcs_flag` (`taskinv/schemas/detail.py`), service
+  in-memory + SQL (`services/detail.py`, `services/detail_sql.py`).
+- **Nilai standar master (prefill Tahap 3)**: `std_ai_mode`/`std_dcs_flag` di
+  `TiCatalogRead` (`schemas/catalog.py`), `UraianTugasCreate`/`Update`/`Read`
+  (`schemas/uraian_tugas.py`), service in-memory + SQL
+  (`services/uraian_tugas.py`, `services/uraian_tugas_sql.py`,
+  `services/catalog.py`).
+- **Agregasi hasil**: `TiHasilTaskRead.ai_mode_dist`/`.dcs_flag_count` dan
+  `TiTaskTerpilihRead.std_ai_mode`/`.std_dcs_flag` (`schemas/hasil.py`,
+  `services/analisis.py`). `va_type`/`va_type_dist`/`std_va_type` **tidak
+  disentuh** — hanya `ai_mode`/`dcs_flag` yang dibuang.
+- **Enum `AiMode`** (`schemas/calhr.py`) dihapus total, verifikasi 0 importer
+  tersisa (`grep -rn AiMode src/`) sebelum dihapus. `VaType`/`SumberBukti`/
+  `Kondisi` tetap ada.
+- **Model ORM**: `TiDetailModel.ai_mode`/`.dcs_flag`,
+  `TiUraianTugasModel.std_ai_mode`/`.std_dcs_flag` dihapus (`models.py`).
+- **Migrasi Alembic `fd3dd550aa99`** (dirantai setelah `08b6b999ee05` dari
+  backlog 037): `DROP COLUMN` 4 kolom (2 tabel). `ti_detail.ai_mode`/`dcs_flag`
+  semula `NOT NULL` tanpa `server_default` — `downgrade()` menambahkan
+  `server_default` sementara sebelum `ADD COLUMN` (agar tak gagal di tabel
+  berisi), lalu melepas default-nya, konsisten dengan konvensi downgrade
+  best-effort repo (`3b10e24fa970`). **Data produksi pada kolom ini hilang
+  permanen saat migrasi benar-benar dijalankan** (baris uji coba TI Teranalisis
+  YPII kemungkinan terdampak) — konsekuensi produk yang diterima, backup wajib
+  sebelum migrasi produksi.
+- Test baru `test_detail_ai_mode_dcs_flag_ditolak_sebagai_field_asing`
+  (`tests/test_taskinv.py`) menegaskan `422` (`extra="forbid"`) untuk payload
+  yang masih menyertakan `ai_mode`/`dcs_flag`.
+- Breaking change kontrak API (`openapi.json` berubah). Item 040 (web-app,
+  blocked-by 039) meregenerasi tipe setelahnya.
+
+### [2026-07-15] TI: `periode` → `cabang`, hapus `min_responden`/`max_responden`
+
+Backlog 037, feedback user (foto tulisan tangan, 2026-07-14) atas form "Mulai
+Analisis Jabatan" Task Inventory. Dua perubahan pada `TiSesi`:
+
+- **`periode` (string bebas `YYYY-MM`) diganti `cabang`** — enum aplikasi 2
+  nilai hardcoded, `CabangSesi = Literal["Bandung", "Semarang"]`
+  (`taskinv/schemas/sesi.py`, pola sama dengan `StatusSesi`). Bukan FK, bukan
+  lookup ke master data. `TiSesiCreate.cabang` **wajib**; `TiSesiRead.cabang`/
+  `TiSesiUpdate.cabang` **Optional** — lihat catatan nullable di bawah.
+- **`min_responden`/`max_responden` dihapus total** dari `TiSesi` (model,
+  semua skema, service SQL + in-memory, search field) — konsisten dengan
+  keputusan DCS/WCP di entri `[2026-07-12]` ("1 deployment = 1 studi; tidak
+  ada lagi batas atas jumlah responden"). Aturan 422 "panel SME >
+  `max_responden`" (backlog 028, entri `[2026-07-14]` di bawah) **dibuang**
+  sepenuhnya — auto-populate responden dari SME panel saat create sesi tetap
+  ada, sekarang selalu memasukkan SELURUH anggota panel tanpa cap. Cap juga
+  dicabut dari lapisan responden TI (`assign_ti_responden_banyak`,
+  `SqlTiRespondenService.create`/`assign_banyak`, endpoint
+  `POST .../responden` & `.../responden/bulk`) — parameter `max_responden`
+  dan cabang `kapasitas_penuh` dihapus dari seluruh jalur TI (string alasan
+  `"kapasitas_penuh"` tetap ada di `schemas/common.py` untuk OPM, hanya
+  berhenti dipakai TI).
+- **Kolom `cabang` di database `nullable=True`, TANPA backfill** (keputusan
+  eksplisit, bukan rekomendasi awal backlog yang minta backfill NOT NULL).
+  Baris `ti_sesi` produksi lama (2 baris YPII, data uji coba) tetap
+  `cabang = NULL` — YPII punya dua cabang (Bandung & Semarang) sehingga nilai
+  default tidak bisa ditebak dari data yang ada; admin mengisi manual nanti
+  bila perlu, di luar cakupan revisi ini. Migrasi `08b6b999ee05` TIDAK
+  menyentuh data produksi (tidak ada `UPDATE`).
+- Uniqueness sesi berubah dari `(jabatan_id, periode)` menjadi
+  `(jabatan_id, cabang)`.
+- Downstream yang membaca `sesi.periode` diganti `sesi.cabang` (bukan sekadar
+  dihapus — cabang berguna di UI hasil/kuesioner): `TiHasilSesiRead.periode`
+  → `cabang`, `TiKuesionerItemRead.sesi_periode` → `sesi_cabang`
+  (`analisis.py`, `api/v1/taskinv_kuesioner.py`), keduanya ikut `CabangSesi |
+  None` (echo dari `sesi.cabang` yang Optional).
+- Payload lama yang masih mengirim `periode`/`min_responden`/`max_responden`
+  ditolak `422` (`TiSesiCreate`/`Update` sudah `extra="forbid"`) — breaking
+  change kontrak API, `openapi.json` berubah. Klien (web-app form "Mulai
+  Analisis Jabatan", MCP tool `buat_ti_sesi`/`ti_tambah_responden*`)
+  menyusul di item 038 + audit MCP terpisah.
+- **`OpmSesi` sengaja tidak disentuh** — field `periode`/`min_responden`/
+  `max_responden` paralel (`opm/schemas/sesi.py:28,35,38`) tetap ada; scope
+  revisi ini murni TI (satu item = satu concern).
+- Test regresi baru menegaskan cap benar-benar hilang: panel 11 anggota
+  (>batas lama 10) → sesi tetap dibuat, seluruh 11 jadi responden
+  (`test_create_sesi_panel_besar_semua_jadi_responden`, `test_taskinv.py`).
+
 ### [2026-07-14] OPM: create sesi tidak lagi 409 palsu (`ForeignKeyViolation` yang tersamar)
 
 Risiko yang dicatat sendiri di entri `[2026-07-13]` di bawah ("OPM punya pola bare-FK

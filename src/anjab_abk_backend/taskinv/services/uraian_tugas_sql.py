@@ -66,9 +66,7 @@ def _to_read(rec: TiUraianTugasModel) -> UraianTugasRead:
         std_durasi_per_kali=rec.std_durasi_per_kali,
         std_jam_per_minggu=rec.std_jam_per_minggu,
         std_peak4w_hours=rec.std_peak4w_hours,
-        std_ai_mode=rec.std_ai_mode,  # type: ignore[arg-type]
         std_va_type=rec.std_va_type,  # type: ignore[arg-type]
-        std_dcs_flag=rec.std_dcs_flag,
         created_at=created,
     )
 
@@ -149,9 +147,7 @@ class SqlUraianTugasService:
             std_durasi_per_kali=data.std_durasi_per_kali,
             std_jam_per_minggu=data.std_jam_per_minggu,
             std_peak4w_hours=data.std_peak4w_hours,
-            std_ai_mode=data.std_ai_mode,
             std_va_type=data.std_va_type,
-            std_dcs_flag=data.std_dcs_flag,
         )
         self._s.add(rec)
         self._flush_checked(on_conflict=f"UraianTugas dengan kode '{data.kode}' sudah ada.")

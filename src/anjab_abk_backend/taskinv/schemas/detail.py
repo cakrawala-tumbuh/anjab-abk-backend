@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .calhr import AiMode, Kondisi, SumberBukti, VaType
+from .calhr import Kondisi, SumberBukti, VaType
 
 
 class TiDetailItem(BaseModel):
@@ -21,9 +21,7 @@ class TiDetailItem(BaseModel):
     durasi_per_kali: int = Field(ge=0, description="Durasi per pelaksanaan (menit).")
     jam_per_minggu: float = Field(ge=0, description="Estimasi jam per minggu.")
     peak4w_hours: float = Field(default=0.0, ge=0, description="Jam pada 4 minggu peak.")
-    ai_mode: AiMode = Field(description="Human-led/Co-Pilot/AI-assisted.")
     va_type: VaType = Field(description="VA-Core/VA-Enable/NVA-Residual.")
-    dcs_flag: bool = Field(default=False, description="True bila ada risiko DCS.")
     setuju_standar: bool = Field(
         default=True, description="True bila partisipan menerima nilai standar master apa adanya."
     )
@@ -60,8 +58,6 @@ class TiDetailRead(BaseModel):
     durasi_per_kali: int
     jam_per_minggu: float
     peak4w_hours: float
-    ai_mode: AiMode
     va_type: VaType
-    dcs_flag: bool
     setuju_standar: bool
     catatan: str | None = None

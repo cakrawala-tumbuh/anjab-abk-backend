@@ -23,9 +23,7 @@ class _Record:
     durasi_per_kali: int
     jam_per_minggu: float
     peak4w_hours: float
-    ai_mode: str
     va_type: str
-    dcs_flag: bool
     setuju_standar: bool = True
     catatan: str | None = None
 
@@ -82,9 +80,7 @@ class InMemoryTiDetailService:
                     existing.durasi_per_kali = item.durasi_per_kali
                     existing.jam_per_minggu = item.jam_per_minggu
                     existing.peak4w_hours = item.peak4w_hours
-                    existing.ai_mode = item.ai_mode
                     existing.va_type = item.va_type
-                    existing.dcs_flag = item.dcs_flag
                     existing.setuju_standar = item.setuju_standar
                     existing.catatan = item.catatan
                     results.append(existing)
@@ -100,9 +96,7 @@ class InMemoryTiDetailService:
                         durasi_per_kali=item.durasi_per_kali,
                         jam_per_minggu=item.jam_per_minggu,
                         peak4w_hours=item.peak4w_hours,
-                        ai_mode=item.ai_mode,
                         va_type=item.va_type,
-                        dcs_flag=item.dcs_flag,
                         setuju_standar=item.setuju_standar,
                         catatan=item.catatan,
                     )

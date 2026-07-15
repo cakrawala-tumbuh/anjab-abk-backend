@@ -100,10 +100,8 @@ def test_create_sesi_ti_jabatan_beda(client: TestClient, jabatan_id_tk: str, db_
     other = TiSesiModel(
         id=f"tises_{uuid.uuid4().hex[:8]}",
         jabatan_id=f"jbt_{uuid.uuid4().hex[:8]}",
-        periode=_uniq_periode(),
+        cabang="Bandung",
         status="DRAFT",
-        min_responden=1,
-        max_responden=10,
     )
     db_session.add(other)
     db_session.flush()
@@ -122,7 +120,7 @@ def test_create_sesi_ti_belum_frozen(client: TestClient, jabatan_id_tk: str) -> 
 
     r_ti = client.post(
         TI_SESI,
-        json={"jabatan_id": par_ctx_jabatan, "periode": _uniq_periode(), "min_responden": 1},
+        json={"jabatan_id": par_ctx_jabatan, "cabang": "Bandung"},
     )
     assert r_ti.status_code == 201, r_ti.text
     # Belum mulai-tahap1 sama sekali → task_frozen masih False.

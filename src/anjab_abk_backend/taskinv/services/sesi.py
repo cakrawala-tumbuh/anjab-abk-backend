@@ -13,7 +13,7 @@ from ...schemas.search import Domain, Order
 from ...services.domain import run_search, validate_searchable_fields
 from ..schemas.sesi import StatusSesi, TiSesiCreate, TiSesiRead, TiSesiUpdate
 
-SEARCHABLE_FIELDS = frozenset({"id", "jabatan_id", "periode", "status", "created_at"})
+SEARCHABLE_FIELDS = frozenset({"id", "jabatan_id", "cabang", "status", "created_at"})
 
 _VALID_TRANSITIONS: dict[StatusSesi, StatusSesi] = {
     "DRAFT": "TAHAP1",
@@ -33,10 +33,8 @@ _ERR_NON_DRAFT = (
 class _Record:
     id: str
     jabatan_id: str
-    periode: str
+    cabang: str | None
     status: str
-    min_responden: int
-    max_responden: int
     created_at: datetime
     koordinator_id: str | None = None
     catatan: str | None = None
@@ -71,11 +69,9 @@ class InMemoryTiSesiService:
         return TiSesiRead(
             id=rec.id,
             jabatan_id=rec.jabatan_id,
-            periode=rec.periode,
+            cabang=rec.cabang,  # type: ignore[arg-type]
             status=rec.status,  # type: ignore[arg-type]
             koordinator_id=rec.koordinator_id,
-            min_responden=rec.min_responden,
-            max_responden=rec.max_responden,
             jumlah_task_terpilih=(
                 len(rec.task_terpilih) if rec.task_terpilih is not None else None
             ),
@@ -101,25 +97,20 @@ class InMemoryTiSesiService:
         # panel di sini) — berbeda dari `SqlTiSesiService.create()` yang mewarisi
         # `koordinator_id` dari `SmePanel.koordinator_id` jabatan bila payload tidak
         # mengirimnya. Perilaku itu sengaja TIDAK direplikasi di seam ini.
-        if data.min_responden > data.max_responden:
-            raise ValidationAppError("min_responden tidak boleh lebih besar dari max_responden.")
         with self._lock:
             if any(
-                r.jabatan_id == data.jabatan_id and r.periode == data.periode
+                r.jabatan_id == data.jabatan_id and r.cabang == data.cabang
                 for r in self._data.values()
             ):
                 raise ConflictError(
-                    f"Sesi untuk jabatan '{data.jabatan_id}'"
-                    f" periode '{data.periode}' sudah ada."
+                    f"Sesi untuk jabatan '{data.jabatan_id}' cabang '{data.cabang}' sudah ada."
                 )
             rec = _Record(
                 id=f"tises_{uuid.uuid4().hex[:8]}",
                 jabatan_id=data.jabatan_id,
-                periode=data.periode,
+                cabang=data.cabang,
                 status="DRAFT",
                 koordinator_id=data.koordinator_id,
-                min_responden=data.min_responden,
-                max_responden=data.max_responden,
                 catatan=data.catatan,
                 created_at=datetime.now(UTC),
             )
@@ -134,12 +125,6 @@ class InMemoryTiSesiService:
                 raise NotFoundError(f"Sesi Task Inventory '{sesi_id}' tidak ditemukan.")
             if rec.status != "DRAFT" and any(k != "koordinator_id" for k in changes):
                 raise ValidationAppError("Sesi hanya dapat diperbarui saat berstatus DRAFT.")
-            new_min = changes.get("min_responden", rec.min_responden)
-            new_max = changes.get("max_responden", rec.max_responden)
-            if new_min > new_max:
-                raise ValidationAppError(
-                    "min_responden tidak boleh lebih besar dari max_responden."
-                )
             for key, value in changes.items():
                 setattr(rec, key, value)
             return self._to_read(rec)
@@ -200,8 +185,7 @@ class InMemoryTiSesiService:
                 {
                     "id": r.id,
                     "jabatan_id": r.jabatan_id,
-                    "unit": r.unit,
-                    "periode": r.periode,
+                    "cabang": r.cabang,
                     "status": r.status,
                     "created_at": r.created_at,
                 }
