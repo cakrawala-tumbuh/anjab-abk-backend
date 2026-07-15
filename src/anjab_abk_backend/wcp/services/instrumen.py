@@ -43,10 +43,17 @@ class WcpInstrumenService(Protocol):
     def tutup(self) -> WcpInstrumenRead: ...
     def buka_ulang(self) -> WcpInstrumenRead: ...
     def set_analyzed(self) -> WcpInstrumenRead: ...
+    def reset(self) -> WcpInstrumenRead: ...
 
 
 class InMemoryWcpInstrumenService:
-    """Placeholder in-memory thread-safe. Baris awal dibuat di `__init__` (meniru migrasi)."""
+    """Placeholder in-memory thread-safe. Baris awal dibuat di `__init__` (meniru migrasi).
+
+    Tidak mengimplementasikan `reset()` — operasi itu butuh menghapus SEMUA baris
+    `WcpResponden`, yang berada di seam terpisah tanpa referensi balik ke sini (pola
+    yang sama dengan `InMemoryWcpRespondenService` yang tidak mengimplementasikan
+    `create_banyak`). Implementasi nyata ada di `SqlWcpInstrumenService`.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()

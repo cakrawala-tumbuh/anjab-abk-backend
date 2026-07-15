@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from ...errors import AppError, ValidationAppError
-from ...models import WcpInstrumenModel
+from ...models import WcpInstrumenModel, WcpRespondenModel
 from ..schemas.instrumen import StatusInstrumenWcp, WcpInstrumenRead, WcpInstrumenUpdate
 
 # Sumber tunggal id singleton & state machine.
@@ -81,3 +81,22 @@ class SqlWcpInstrumenService:
 
     def set_analyzed(self) -> WcpInstrumenRead:
         return self._transition("ANALYZED")
+
+    def reset(self) -> WcpInstrumenRead:
+        """Hapus SEMUA responden WCP (jawaban ikut lewat `ON DELETE CASCADE`) dan
+        kembalikan instrumen ke `OPEN`, `closed_at=NULL` — dalam satu transaksi.
+
+        Melewati `_VALID_TRANSITIONS`: berbeda dari `buka_ulang()` (hanya sah dari
+        `CLOSED`), `reset()` sengaja sah dipanggil dari status APA PUN (idempoten) —
+        ini satu-satunya jalur resmi keluar dari `ANALYZED` (terminal untuk
+        `buka_ulang()`/`_transition`). Bulk-delete lewat `Query.delete()` meniru pola
+        `purge_catalog()` (`taskinv/services/catalog_admin.py`) — operasi admin bulk
+        lintas-baris dalam satu domain, bukan lewat `RespondenService` per-baris
+        (yang menolak baris `sudah_submit`).
+        """
+        rec = self._get_model()
+        self._s.query(WcpRespondenModel).delete()
+        rec.status = "OPEN"
+        rec.closed_at = None
+        self._s.flush()
+        return _to_read(rec)

@@ -7,6 +7,18 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-07-15
+
+### Ditambahkan
+
+- **`POST /api/v1/{dcs,wcp}/instrumen/reset`** (admin): jalur resmi keluar dari
+  status `ANALYZED` (terminal) — menghapus SEMUA responden & jawaban instrumen
+  (dalam satu transaksi) dan mengembalikan status ke `OPEN`. Sah dipanggil dari
+  status apa pun (idempoten). Berbeda dari `/buka-ulang` yang tetap hanya sah dari
+  `CLOSED` dan tidak menghapus data (perilaku `/buka-ulang` tidak berubah).
+  Menyelesaikan backlog 043 (WCP/DCS produksi terjebak `ANALYZED` oleh data uji
+  coba, tanpa jalan buka kembali via API).
+
 ## [0.36.0] - 2026-07-15
 
 ### Diubah (breaking change)

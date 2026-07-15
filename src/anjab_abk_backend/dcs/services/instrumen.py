@@ -43,10 +43,17 @@ class DcsInstrumenService(Protocol):
     def tutup(self) -> DcsInstrumenRead: ...
     def buka_ulang(self) -> DcsInstrumenRead: ...
     def set_analyzed(self) -> DcsInstrumenRead: ...
+    def reset(self) -> DcsInstrumenRead: ...
 
 
 class InMemoryDcsInstrumenService:
-    """Placeholder in-memory thread-safe. Baris awal dibuat di `__init__` (meniru migrasi)."""
+    """Placeholder in-memory thread-safe. Baris awal dibuat di `__init__` (meniru migrasi).
+
+    Tidak mengimplementasikan `reset()` — operasi itu butuh menghapus SEMUA baris
+    `DcsResponden`, yang berada di seam terpisah tanpa referensi balik ke sini (pola
+    yang sama dengan `InMemoryDcsRespondenService` yang tidak mengimplementasikan
+    `create_banyak`). Implementasi nyata ada di `SqlDcsInstrumenService`.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()

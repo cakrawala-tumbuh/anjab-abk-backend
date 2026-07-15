@@ -82,6 +82,52 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-15] DCS & WCP: endpoint `reset` — jalur keluar resmi dari `ANALYZED`
+
+Backlog 043. Feedback user (foto, 2026-07-14): "WCP tidak bisa buka sesi" —
+instrumen produksi WCP & DCS ter-`ANALYZED` (terminal) oleh **data uji coba** (test
+run 2026-07-14, lihat memory `dcs-test-run-2026-07-14.md`/`wcp-test-run-2026-07-14.md`),
+tanpa jalan keluar via API untuk memulai pengumpulan data asli. Keputusan produk
+(user, 2026-07-15): **Opsi (b)** dari tiga opsi yang disajikan (a: izinkan
+`ANALYZED→OPEN` biasa; b: endpoint reset destruktif terpisah; c: tetap terminal,
+selesaikan via SQL manual) — dipilih karena memisahkan "buka ulang non-destruktif"
+dari "reset destruktif" tanpa mengaburkan makna keduanya.
+
+- **`POST /api/v1/{dcs,wcp}/instrumen/reset`** (admin-only, `_ADMIN_GUARDS`) — dalam
+  satu transaksi: hapus SEMUA baris `{Dcs,Wcp}Responden` (jawaban ikut lewat
+  `ON DELETE CASCADE`, migrasi `a4aeb5bcbe81`), lalu `status → OPEN`,
+  `closed_at → NULL`. **Sah dipanggil dari status APA PUN** (OPEN/CLOSED/ANALYZED) —
+  idempoten, berbeda dari `/buka-ulang` yang tetap **hanya** sah `CLOSED→OPEN` dan
+  **tidak** menghapus data (tidak berubah). `_VALID_TRANSITIONS` kedua modul
+  **tidak diubah** — `reset()` melewati tabel transisi sepenuhnya (method terpisah
+  di `{Dcs,Wcp}InstrumenService`, bukan `_transition()`).
+- Bulk-delete responden memakai `session.query(Model).delete()` langsung di
+  `Sql{Dcs,Wcp}InstrumenService.reset()` (`instrumen_sql.py`) — meniru pola
+  `purge_catalog()` (`taskinv/services/catalog_admin.py`): operasi admin bulk
+  lintas-baris dalam satu domain. **Sengaja tidak** lewat
+  `{Dcs,Wcp}RespondenService.delete()` per-baris — method itu menolak baris
+  `sudah_submit=True` (`ValidationAppError`), yang justru SELALU true untuk
+  instrumen yang sudah `ANALYZED` (syarat `min_responden` submit sebelum analisis).
+- `InMemory{Dcs,Wcp}InstrumenService` **tidak mengimplementasikan** `reset()` —
+  konsisten dengan `InMemory{Dcs,Wcp}RespondenService` yang juga tidak
+  mengimplementasikan `create_banyak()`: placeholder in-memory tidak punya akses
+  lintas-seam ke data responden. Implementasi nyata hanya di seam SQL (yang memang
+  satu-satunya dipakai produksi/test, lihat `dependencies.py`).
+- `logger.warning("instrumen_reset", extra={"modul": "dcs"|"wcp", "actor": ...})`
+  mencatat aktor tiap kali dipanggil (pola sama dengan `paksa=true` di entri
+  `[2026-07-12]` dan `catalog_purge` di `taskinv_catalog.py`).
+- Tidak ada migrasi Alembic (skema `*_instrumen`/`*_responden` tidak berubah).
+  `openapi.json` bertambah 2 operasi baru (`dcs_instrumen_reset`,
+  `wcp_instrumen_reset`) — breaking-additive; MCP (`{dcs,wcp}_reset_instrumen`) &
+  web app menyusul sebagai item backlog terpisah setelah kontrak ini dirilis.
+- Test baru (`test_wcp_instrumen.py`, `test_dcs_instrumen.py`):
+  reset dari `ANALYZED` → `OPEN` + responden kosong; idempoten dari `OPEN`; non-admin
+  → 403; tanpa token → 401; `buka-ulang` biasa **tetap** 422 dari `ANALYZED` (bukti
+  `reset` ≠ `buka-ulang`).
+- **Kebutuhan 1 (data-ops)** dari backlog 043 — reset data uji coba DCS produksi
+  (3 responden test run 2026-07-14) — dieksekusi terpisah SETELAH endpoint ini
+  dirilis, didahului `make backup`. WCP mengikuti pola sama saat/bila dibutuhkan.
+
 ### [2026-07-15] TI: hapus tuntas `ai_mode` (`AiMode`) & `dcs_flag` dari kontrak CalHR
 
 Backlog 039, feedback user (foto, 2026-07-14) pada halaman Task Inventory Tahap 3:
