@@ -7,6 +7,16 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diperbaiki
+
+- **Task Inventory: `task-terpilih`, `hasil`, dan `analisis` tidak lagi 500 untuk task
+  ber-`detil_tugas` NULL** (issue #15). Katalog mengizinkan `detil_tugas` bernilai
+  `NULL` (task tanpa detil tugas induk), tapi `compute_task_terpilih()` dan
+  `compute_hasil_sesi()` (`taskinv/services/analisis.py`) mengoper `None` langsung ke
+  skema yang mewajibkan string, memicu `pydantic.ValidationError` → `500`. Fallback
+  kini `(cat.detil_tugas or "")` — konsisten dengan pola `tugas_pokok`/`uraian_tugas`
+  yang sudah benar. Terjadi di produksi untuk sesi Wali Kelas (`tises_434a8864`).
+
 ## [0.37.0] - 2026-07-15
 
 ### Ditambahkan
