@@ -556,6 +556,95 @@ def test_full_three_phase_flow(client: TestClient, jabatan_id_tk: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Regresi #15: task ber-`detil_tugas` NULL tidak boleh 500-kan penyaji hasil
+# --------------------------------------------------------------------------- #
+
+
+def _create_jabatan_regresi(client: TestClient) -> dict:
+    kode = f"JBT{uuid.uuid4().hex[:8]}"
+    payload = {
+        "kode": kode,
+        "nama": f"Jabatan Regresi {kode}",
+        "jenis": "fungsional",
+        "aktif": True,
+    }
+    r = client.post("/api/v1/jabatan", json=payload)
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def _create_uraian_tugas_tanpa_detil(client: TestClient, jabatan_id: str) -> dict:
+    """Uraian tugas dengan `detil_tugas_id=None` — mereproduksi katalog ber-`detil_tugas` NULL."""
+    tp = client.post(
+        f"{BASE}/tugas-pokok",
+        json={"jabatan_ids": [jabatan_id], "nama": f"Tugas Pokok Regresi {uuid.uuid4().hex[:8]}"},
+    )
+    assert tp.status_code == 201, tp.text
+    kode = f"TI{uuid.uuid4().hex[:8]}"
+    ut = client.post(
+        f"{BASE}/uraian-tugas",
+        json={
+            "kode": kode,
+            "uraian": f"Uraian tugas {kode}",
+            "unit": UNIT,
+            "urutan": 1,
+            "tugas_pokok_id": tp.json()["id"],
+            "jabatan_id": jabatan_id,
+        },
+    )
+    assert ut.status_code == 201, ut.text
+    return ut.json()
+
+
+def test_task_terpilih_toleran_detil_tugas_null(client: TestClient) -> None:
+    """Sesi yang membekukan task ber-`detil_tugas_id=NULL` tetap 200, bukan 500."""
+    jbt = _create_jabatan_regresi(client)
+    ut = _create_uraian_tugas_tanpa_detil(client, jbt["id"])
+    assert ut["detil_tugas_id"] is None
+
+    sesi = _create_sesi(client, jbt["id"])
+    sid = sesi["id"]
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    _seleksi_submit(client, ra["id"], [ut["kode"]])
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    r3 = client.post(f"{SESI}/{sid}/mulai-tahap3")
+    assert r3.status_code == 200, r3.text
+    assert r3.json()["jumlah_task_terpilih"] == 1
+
+    tt = client.get(f"{SESI}/{sid}/task-terpilih")
+    assert tt.status_code == 200, tt.text
+    item = next(x for x in tt.json() if x["kode"] == ut["kode"])
+    assert item["detil_tugas"] == ""
+
+    _detail_submit(
+        client,
+        ra["id"],
+        [
+            {
+                "task_kode": ut["kode"],
+                "sumber_bukti": "Aktual",
+                "kondisi": "Baseline",
+                "frekuensi_teks": "Mingguan",
+                "durasi_per_kali": 60,
+                "jam_per_minggu": 2.0,
+                "peak4w_hours": 0,
+                "va_type": "VA-Core",
+            }
+        ],
+    )
+    assert client.post(f"{SESI}/{sid}/tutup").json()["status"] == "CLOSED"
+
+    an = client.post(f"{SESI}/{sid}/analisis")
+    assert an.status_code == 200, an.text
+    hasil_item = next(t for t in an.json()["tasks"] if t["kode"] == ut["kode"])
+    assert hasil_item["detil_tugas"] == ""
+
+    hg = client.get(f"{SESI}/{sid}/hasil")
+    assert hg.status_code == 200, hg.text
+
+
+# --------------------------------------------------------------------------- #
 # Nilai standar CalHR (std_*) — prefill Tahap 3 & agregat setuju/ubah
 # --------------------------------------------------------------------------- #
 

@@ -36,7 +36,7 @@ def compute_task_terpilih(
             TiTaskTerpilihRead(
                 kode=kode,
                 tugas_pokok=cat.tugas_pokok if cat else "",
-                detil_tugas=cat.detil_tugas if cat else "",
+                detil_tugas=(cat.detil_tugas or "") if cat else "",
                 uraian_tugas=cat.uraian_tugas if cat else "",
                 n_relevan=n_relevan,
                 pct_relevan=_pct(n_relevan, n_tahap1),
@@ -93,7 +93,7 @@ def compute_hasil_sesi(
             TiHasilTaskRead(
                 kode=kode,
                 tugas_pokok=cat.tugas_pokok if cat else "",
-                detil_tugas=cat.detil_tugas if cat else "",
+                detil_tugas=(cat.detil_tugas or "") if cat else "",
                 uraian_tugas=cat.uraian_tugas if cat else "",
                 n_relevan=relevan_counts.get(kode, 0),
                 pct_relevan=_pct(relevan_counts.get(kode, 0), n_tahap1),
