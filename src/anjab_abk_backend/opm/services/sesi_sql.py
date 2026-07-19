@@ -155,7 +155,7 @@ class SqlOpmSesiService:
             select(OpmSesiModel.id).where(OpmSesiModel.jabatan_id == data.jabatan_id)
         )
         if exists is not None:
-            raise ConflictError(f"Sesi OPM untuk jabatan '{data.jabatan_id}' sudah ada.")
+            raise ConflictError(f"Sesi OPM untuk jabatan '{jabatan.nama}' sudah ada.")
 
         # 5. TiSesi sumber wajib ada, milik jabatan yang sama, dan sudah frozen.
         ti = self._s.get(TiSesiModel, data.ti_sesi_id)
@@ -180,7 +180,7 @@ class SqlOpmSesiService:
                 f" max_responden ({data.max_responden})."
             )
 
-        konflik = f"Sesi OPM untuk jabatan '{data.jabatan_id}' sudah ada."
+        konflik = f"Sesi OPM untuk jabatan '{jabatan.nama}' sudah ada."
 
         rec = OpmSesiModel(
             id=f"opses_{uuid.uuid4().hex[:8]}",

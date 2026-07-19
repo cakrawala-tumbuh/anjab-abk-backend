@@ -138,6 +138,24 @@ def test_create_sesi_conflict_jabatan_sudah_punya_sesi(
     assert r2.status_code == 409, r2.text
 
 
+def test_create_sesi_conflict_pesan_pakai_nama_jabatan_bukan_id_mentah(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Regresi #18: pesan 409 harus menyebut nama jabatan, bukan `jbt_...` mentah."""
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    jbt = client.get(f"/api/v1/jabatan/{ctx['jabatan_id']}")
+    assert jbt.status_code == 200, jbt.text
+    nama_jabatan = jbt.json()["nama"]
+
+    r1 = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"]))
+    assert r1.status_code == 201, r1.text
+    r2 = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"]))
+    assert r2.status_code == 409, r2.text
+    body = r2.json()
+    assert nama_jabatan in body["message"], body
+    assert ctx["jabatan_id"] not in body["message"], body
+
+
 def test_create_sesi_tanpa_autoflush_seperti_produksi(
     client: TestClient, jabatan_id_tk: str, db_session
 ) -> None:

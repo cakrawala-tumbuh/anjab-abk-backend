@@ -7,6 +7,14 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diperbaiki
+
+- **OPM: pesan 409 create sesi memakai nama jabatan, bukan ID mentah** (issue #18).
+  `SqlOpmSesiService.create()` sudah meng-resolve nama jabatan sebelum pre-check
+  konflik, tapi pesan `ConflictError` masih menginterpolasi `data.jabatan_id`
+  (`jbt_...`). Kolom Jabatan di halaman `/opm` & `/opm/{id}` sudah benar sejak
+  sebelumnya (tidak disentuh) — murni perbaikan teks pesan error.
+
 ## [0.37.0] - 2026-07-15
 
 ### Ditambahkan
