@@ -8,10 +8,11 @@ from fastapi import APIRouter, Depends, Path
 
 from ...core.services.partisipan import PartisipanService
 from ...dcs.schemas.hasil import DcsHasilRead, DcsHasilRespondenRead
-from ...dcs.services.analisis import compute_hasil, compute_hasil_responden
+from ...dcs.services.analisis import build_catalog, compute_hasil, compute_hasil_responden
 from ...dcs.services.instrumen import DcsInstrumenService
 from ...dcs.services.jawaban import DcsJawabanService
 from ...dcs.services.responden import DcsRespondenService
+from ...dcs.services.subskala import DcsSubSkalaService
 from ...dependencies import (
     READ_GUARDS,
     authorize_responden_access,
@@ -19,7 +20,9 @@ from ...dependencies import (
     get_dcs_instrumen_service,
     get_dcs_jawaban_service,
     get_dcs_responden_service,
+    get_dcs_subskala_service,
     get_partisipan_service,
+    get_wcp_dimensi_service,
     get_wcp_jawaban_service,
     get_wcp_responden_service,
     rate_limit,
@@ -27,8 +30,16 @@ from ...dependencies import (
 from ...errors import ValidationAppError
 from ...schemas.common import ErrorResponse
 from ...security import Principal
-from ...wcp.seed import DIMENSI
-from ...wcp.services.analisis import compute_hasil_responden as wcp_compute_responden
+from ...wcp.services.analisis import (
+    WcpCatalog,
+)
+from ...wcp.services.analisis import (
+    build_catalog as build_wcp_catalog,
+)
+from ...wcp.services.analisis import (
+    compute_hasil_responden as wcp_compute_responden,
+)
+from ...wcp.services.dimensi import WcpDimensiService
 from ...wcp.services.jawaban import WcpJawabanService
 from ...wcp.services.responden import WcpRespondenService
 
@@ -42,25 +53,34 @@ _FORBIDDEN = {
     403: {"model": ErrorResponse, "description": "Bukan admin atau bukan pemilik responden."}
 }
 
-# Kode dimensi risiko WCP (is_risk=True): CH, SD, PI
-_WCP_RISK_KODES = frozenset(kode for kode, _, _, is_risk in DIMENSI if is_risk)
+
+def _build_dcs_catalog(sk_service: DcsSubSkalaService):
+    return build_catalog(sk_service.list_sub_skala(), sk_service.list_item())
+
+
+def _build_wcp_catalog(dim_service: WcpDimensiService) -> WcpCatalog:
+    return build_wcp_catalog(dim_service.list_dimensi(), dim_service.list_item())
 
 
 def _compute_wcp_risk_score(
     wcp_rsp_service: WcpRespondenService,
     wcp_jwb_service: WcpJawabanService,
+    wcp_catalog: WcpCatalog,
 ) -> float | None:
     """Skor risiko WCP ternormalisasi (0–1); `None` bila WCP belum punya responden submit."""
     submitted = [r for r in wcp_rsp_service.list_all() if r.sudah_submit]
     if not submitted:
         return None
 
+    # Kode dimensi risiko WCP (is_risk=True) — diturunkan dari katalog DB, bukan seed.
+    risk_kodes = {kode for kode, _, is_risk in wcp_catalog.dimensi_sorted if is_risk}
+
     risk_scores: list[float] = []
     for rsp in submitted:
         raw = wcp_jwb_service.get_raw_by_responden(rsp.id)
-        hasil = wcp_compute_responden(rsp.id, raw)
+        hasil = wcp_compute_responden(rsp.id, raw, wcp_catalog)
         for dim in hasil.dimensi:
-            if dim.dimensi_kode in _WCP_RISK_KODES:
+            if dim.dimensi_kode in risk_kodes:
                 # Dimensi risiko: skor tinggi = risiko tinggi; normalisasi ke 0–1
                 risk_scores.append((dim.skor - 1.0) / 4.0)
 
@@ -79,8 +99,10 @@ def run_analisis(
     instrumen_service: Annotated[DcsInstrumenService, Depends(get_dcs_instrumen_service)],
     rsp_service: Annotated[DcsRespondenService, Depends(get_dcs_responden_service)],
     jwb_service: Annotated[DcsJawabanService, Depends(get_dcs_jawaban_service)],
+    sk_service: Annotated[DcsSubSkalaService, Depends(get_dcs_subskala_service)],
     wcp_rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     wcp_jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
+    wcp_dim_service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
 ) -> DcsHasilRead:
     instrumen = instrumen_service.get()
     if instrumen.status not in ("CLOSED", "ANALYZED"):
@@ -102,12 +124,13 @@ def run_analisis(
         (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted
     ]
 
-    wcp_risk = _compute_wcp_risk_score(wcp_rsp_service, wcp_jwb_service)
+    wcp_catalog = _build_wcp_catalog(wcp_dim_service)
+    wcp_risk = _compute_wcp_risk_score(wcp_rsp_service, wcp_jwb_service, wcp_catalog)
 
     if instrumen.status == "CLOSED":
         instrumen_service.set_analyzed()
 
-    return compute_hasil(responden_raw, wcp_risk)
+    return compute_hasil(responden_raw, wcp_risk, _build_dcs_catalog(sk_service))
 
 
 @router.get(
@@ -122,8 +145,10 @@ def get_hasil(
     instrumen_service: Annotated[DcsInstrumenService, Depends(get_dcs_instrumen_service)],
     rsp_service: Annotated[DcsRespondenService, Depends(get_dcs_responden_service)],
     jwb_service: Annotated[DcsJawabanService, Depends(get_dcs_jawaban_service)],
+    sk_service: Annotated[DcsSubSkalaService, Depends(get_dcs_subskala_service)],
     wcp_rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     wcp_jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
+    wcp_dim_service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
 ) -> DcsHasilRead:
     instrumen = instrumen_service.get()
     if instrumen.status != "ANALYZED":
@@ -137,9 +162,10 @@ def get_hasil(
         (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted
     ]
 
-    wcp_risk = _compute_wcp_risk_score(wcp_rsp_service, wcp_jwb_service)
+    wcp_catalog = _build_wcp_catalog(wcp_dim_service)
+    wcp_risk = _compute_wcp_risk_score(wcp_rsp_service, wcp_jwb_service, wcp_catalog)
 
-    return compute_hasil(responden_raw, wcp_risk)
+    return compute_hasil(responden_raw, wcp_risk, _build_dcs_catalog(sk_service))
 
 
 @router.get(
@@ -155,6 +181,7 @@ def get_hasil_responden(
     principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[DcsRespondenService, Depends(get_dcs_responden_service)],
     jwb_service: Annotated[DcsJawabanService, Depends(get_dcs_jawaban_service)],
+    sk_service: Annotated[DcsSubSkalaService, Depends(get_dcs_subskala_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
 ) -> DcsHasilRespondenRead:
     responden = rsp_service.get(responden_id)
@@ -162,4 +189,4 @@ def get_hasil_responden(
     if not responden.sudah_submit:
         raise ValidationAppError("Responden belum mengirimkan jawaban.")
     raw = jwb_service.get_raw_by_responden(responden_id)
-    return compute_hasil_responden(responden_id, raw)
+    return compute_hasil_responden(responden_id, raw, _build_dcs_catalog(sk_service))

@@ -1,9 +1,18 @@
-"""Service analisis WCP: reverse scoring, Cronbach's alpha, agregasi, interpretasi."""
+"""Service analisis WCP: reverse scoring, Cronbach's alpha, agregasi, interpretasi.
+
+Katalog item (dimensi, keanggotaan item, reverse_type, is_risk) TIDAK lagi dibaca
+dari konstanta seed (`wcp.seed`) melainkan diterima sebagai `WcpCatalog` yang
+dibangun dari tabel `wcp_item`/`wcp_dimensi` (via `WcpDimensiService`). Perubahan
+katalog lewat API (`update_item` reverse_type / `delete_item`) kini langsung
+tercermin di analisis; dulu analisis membaca seed sehingga perubahan API diabaikan.
+"""
 
 from __future__ import annotations
 
 import statistics
+from dataclasses import dataclass
 
+from ..schemas.dimensi import WcpDimensiRead, WcpItemRead
 from ..schemas.hasil import (
     Interpretasi,
     WcpHasilDimensiRead,
@@ -11,7 +20,38 @@ from ..schemas.hasil import (
     WcpHasilRead,
     WcpHasilRespondenRead,
 )
-from ..seed import DIMENSI, ITEM
+
+
+@dataclass(frozen=True)
+class WcpCatalog:
+    """Katalog item WCP aktif (snapshot DB) yang dipakai perhitungan analisis.
+
+    Attributes:
+        dimensi_sorted: Daftar ``(kode, nama, is_risk)`` dimensi terurut ``urutan``.
+        dim_items: Peta ``kode dimensi -> [item_id]`` terurut ``urutan``.
+        item_reverse: Peta ``item_id -> reverse_type``.
+    """
+
+    dimensi_sorted: list[tuple[str, str, bool]]
+    dim_items: dict[str, list[str]]
+    item_reverse: dict[str, str]
+
+
+def build_catalog(
+    dimensi: list[WcpDimensiRead],
+    items: list[WcpItemRead],
+) -> WcpCatalog:
+    """Bangun `WcpCatalog` dari hasil baca DB (`list_dimensi` + `list_item`)."""
+    dimensi_sorted = [(d.kode, d.nama, d.is_risk) for d in sorted(dimensi, key=lambda x: x.urutan)]
+    dim_items: dict[str, list[str]] = {}
+    for item in sorted(items, key=lambda x: x.urutan):
+        dim_items.setdefault(item.dimensi_kode, []).append(item.item_id)
+    item_reverse = {item.item_id: item.reverse_type for item in items}
+    return WcpCatalog(
+        dimensi_sorted=dimensi_sorted,
+        dim_items=dim_items,
+        item_reverse=item_reverse,
+    )
 
 
 def _adjusted(skor_raw: int, reverse_type: str) -> float:
@@ -58,39 +98,20 @@ def _cronbach_alpha(scores_matrix: list[list[float]]) -> float | None:
     return round(alpha, 4)
 
 
-# Pre-build lookup: item_id → (kode_dim, reverse_type)
-_ITEM_META: dict[str, tuple[str, str]] = {
-    item_id: (kode_dim, rev_type) for item_id, kode_dim, _, _, _, rev_type, _ in ITEM
-}
-
-# Pre-build lookup: kode_dim → sorted list of item_ids (urutan)
-_DIM_ITEMS: dict[str, list[str]] = {}
-for _item_id, _kode_dim, _, _, _, _, _urutan in sorted(ITEM, key=lambda x: x[6]):
-    _DIM_ITEMS.setdefault(_kode_dim, []).append(_item_id)
-
-# Pre-build dimensi meta: kode → (nama, is_risk)
-_DIM_META: dict[str, tuple[str, bool]] = {
-    kode: (nama, is_risk) for kode, nama, _, is_risk in DIMENSI
-}
-
-
-# Sorted list of (kode, nama, is_risk) by urutan — used in computation loops
-_DIMENSI_SORTED: list[tuple[str, str, bool]] = [
-    (kode, nama, is_risk) for kode, nama, _urutan, is_risk in sorted(DIMENSI, key=lambda x: x[2])
-]
-
-
 def compute_hasil_responden(
     responden_id: str,
     raw_scores: dict[str, int],
+    catalog: WcpCatalog,
 ) -> WcpHasilRespondenRead:
     """Hitung skor per dimensi untuk satu responden."""
     dimensi_results: list[WcpHasilDimensiRespondenRead] = []
 
-    for kode_dim, nama, is_risk in _DIMENSI_SORTED:
-        item_ids = _DIM_ITEMS.get(kode_dim, [])
+    for kode_dim, nama, is_risk in catalog.dimensi_sorted:
+        item_ids = catalog.dim_items.get(kode_dim, [])
         adjusted = [
-            _adjusted(raw_scores[iid], _ITEM_META[iid][1]) for iid in item_ids if iid in raw_scores
+            _adjusted(raw_scores[iid], catalog.item_reverse[iid])
+            for iid in item_ids
+            if iid in raw_scores
         ]
         skor = statistics.mean(adjusted) if adjusted else 0.0
         dimensi_results.append(
@@ -108,25 +129,29 @@ def compute_hasil_responden(
 
 def compute_hasil(
     responden_raw_scores: list[tuple[str, dict[str, int]]],
+    catalog: WcpCatalog,
 ) -> WcpHasilRead:
     """Hitung hasil agregat instrumen dari semua responden yang sudah submit.
 
     responden_raw_scores: list of (responden_id, {item_id: skor_raw})
+    catalog: katalog item WCP aktif (snapshot DB).
     """
     n = len(responden_raw_scores)
     dimensi_results: list[WcpHasilDimensiRead] = []
 
-    for kode_dim, nama, is_risk in _DIMENSI_SORTED:
-        item_ids = _DIM_ITEMS.get(kode_dim, [])
+    for kode_dim, nama, is_risk in catalog.dimensi_sorted:
+        item_ids = catalog.dim_items.get(kode_dim, [])
 
         per_responden: list[float] = []
         scores_matrix: list[list[float]] = []
 
         for _, raw in responden_raw_scores:
             adjusted_row = [
-                _adjusted(raw[iid], _ITEM_META[iid][1]) for iid in item_ids if iid in raw
+                _adjusted(raw[iid], catalog.item_reverse[iid]) for iid in item_ids if iid in raw
             ]
-            if len(adjusted_row) == len(item_ids):
+            # Dimensi tanpa item (item terakhir terhapus) dilewati agar tidak
+            # memanggil mean([]); guard hapus juga menolak menghapus item terakhir.
+            if item_ids and len(adjusted_row) == len(item_ids):
                 per_responden.append(statistics.mean(adjusted_row))
                 scores_matrix.append(adjusted_row)
 

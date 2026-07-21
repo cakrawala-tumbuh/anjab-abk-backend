@@ -11,11 +11,11 @@ data tersebut; hanya `update_item` yang menulis (field teks/tipe/urutan).
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ...errors import NotFoundError
-from ...models import WcpDimensiModel, WcpItemModel
+from ...errors import NotFoundError, ValidationAppError
+from ...models import WcpDimensiModel, WcpItemModel, WcpJawabanModel
 from ..schemas.dimensi import (
     WcpDimensiRead,
     WcpDimensiWithItemsRead,
@@ -93,3 +93,25 @@ class SqlWcpDimensiService:
             rec.urutan = patch["urutan"]
         self._s.flush()
         return _to_item_read(rec)
+
+    def delete_item(self, item_id: str) -> None:
+        rec = self._s.scalar(select(WcpItemModel).where(WcpItemModel.item_id == item_id))
+        if rec is None:
+            raise NotFoundError(f"Item WCP '{item_id}' tidak ditemukan.")
+        sisa = self._s.scalar(
+            select(func.count())
+            .select_from(WcpItemModel)
+            .where(WcpItemModel.dimensi_kode == rec.dimensi_kode)
+        )
+        if (sisa or 0) <= 1:
+            raise ValidationAppError(
+                f"Tidak dapat menghapus item terakhir dimensi '{rec.dimensi_kode}';"
+                f" dimensi harus punya minimal 1 item."
+            )
+        # Jawaban WCP mereferensikan item lewat `item_id` teks (bukan FK) — tidak ada
+        # cascade DB, jadi hapus jawaban yatim untuk item ini secara eksplisit.
+        self._s.query(WcpJawabanModel).filter(WcpJawabanModel.item_id == item_id).delete(
+            synchronize_session=False
+        )
+        self._s.delete(rec)
+        self._s.flush()

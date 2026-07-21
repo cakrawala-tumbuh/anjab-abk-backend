@@ -82,6 +82,61 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-21] DCS & WCP: hapus item master + analisis baca katalog dari DB
+
+Permintaan produk: admin bisa **menghapus** item dari master instrumen DCS/WCP
+(mis. item yang direvisi jadi "dihapus" pada hasil review CVI). Endpoint
+`update_item` sudah ada; yang kurang adalah `delete_item`. Investigasi menemukan
+tiga kopling yang membuat "hapus baris DB saja" **tidak benar**, sehingga cakupan
+melebar dari sekadar endpoint DELETE:
+
+- **Analisis membaca katalog dari SEED, bukan DB.** `dcs/services/analisis.py` &
+  `wcp/services/analisis.py` dulu mengimpor `ITEM`/`SUB_SKALA`/`DIMENSI` dari
+  `*.seed` sebagai konstanta modul. Gate kelengkapan
+  `if len(adjusted_row) == len(item_ids)` membandingkan jumlah jawaban dengan
+  jumlah item **seed**. Hapus item di DB → responden menjawab N−1 item → gugur
+  dari agregat sub-skala/dimensi (**n_responden=0**), **senyap**. (Bug laten yang
+  sama berlaku untuk `update_item` yang mengubah `arah`/`reverse_type`: analisis
+  membaca arah dari seed, jadi perubahan API diabaikan.) **Perbaikan:**
+  `compute_hasil`/`compute_hasil_responden` kini menerima parameter `catalog`
+  (`DcsCatalog`/`WcpCatalog`, dibangun via `build_catalog(...)` dari hasil baca
+  DB sub-skala/dimensi service). Caller (`api/v1/dcs_hasil.py`, `wcp_hasil.py`)
+  membangun katalog dari DB dan meneruskannya. `dcs_hasil` juga menurunkan
+  himpunan kode dimensi risiko WCP dari katalog DB (bukan lagi `wcp.seed.DIMENSI`).
+  Helper murni (`_adjusted`, `_cronbach_alpha`, `_compute_risk_flag`,
+  `_compute_k_index`, `_interpret`) **tidak berubah** — angka untuk katalog utuh
+  identik (dijaga test regresi `..._regresi_angka_identik...`).
+- **Seed meng-"resurrect" item terhapus.** `initdb.main()` menjalankan `seed_all`
+  di **tiap boot**, dan `_seed_dcs`/`_seed_wcp` dulu top-up per-baris (insert item
+  yang hilang dari DB) → item yang dihapus admin muncul lagi pada redeploy.
+  **Perbaikan:** seeding item jadi **first-run** — bila tabel `dcs_item`/`wcp_item`
+  sudah berisi ≥1 baris, blok seeding item dilewati (seeding sub-skala/dimensi
+  tetap idempoten per-baris). Konsekuensi diterima: item baru pada konstanta seed
+  tidak di-top-up ke deployment lama — sejalan model "1 instance = 1 studi"
+  (tiap studi = DB baru yang mendapat seed penuh di first-run).
+- **`*_jawaban.item_id` bukan FK** (kolom teks `String(20)`), jadi tidak ada
+  `ON DELETE CASCADE`. `delete_item` di seam SQL menghapus baris `*_jawaban`
+  untuk item itu secara eksplisit (bulk `.delete(synchronize_session=False)`,
+  pola sama dengan `reset()`).
+
+Keputusan endpoint:
+
+- **`DELETE /dcs/sub-skala/items/{item_id}`** & **`DELETE /wcp/dimensi/items/{item_id}`**,
+  admin-only (`Depends(require_admin)`), 204 sukses.
+- **OPEN-only**: endpoint menolak (422) bila instrumen bukan `OPEN` — cegah katalog
+  berubah di bawah analisis yang sudah/segera jalan (CLOSED/ANALYZED). Guard ditaruh
+  di router (inject instrumen service), meniru pola `_require_instrumen_open`
+  milik jawaban; seam `subskala`/`dimensi` sengaja tidak dikopel ke status instrumen.
+- **Tolak hapus item terakhir** sebuah sub-skala/dimensi (422) — grup tanpa item
+  akan memicu `mean([])` di analisis. Analisis juga diberi guard defensif
+  (`if item_ids and len(...) == len(...)`) agar grup kosong dilewati, bukan crash.
+- Tidak ada migrasi Alembic (skema tidak berubah — hanya `DELETE` baris pada tabel
+  yang sudah ada). `openapi.json` bertambah 2 operasi (`dcs_item_delete`,
+  `wcp_item_delete`) — breaking-additive; MCP menyusul (`dcs_hapus_item`/
+  `wcp_hapus_item`).
+- `InMemory*` seam ikut mengimplementasikan `delete_item` (parity Protocol) dengan
+  guard item-terakhir yang sama; produksi/test tetap memakai seam SQL.
+
 ### [2026-07-15] DCS & WCP: endpoint `reset` — jalur keluar resmi dari `ANALYZED`
 
 Backlog 043. Feedback user (foto, 2026-07-14): "WCP tidak bisa buka sesi" —

@@ -12,6 +12,7 @@ from ...dependencies import (
     authorize_responden_access,
     get_current_principal,
     get_partisipan_service,
+    get_wcp_dimensi_service,
     get_wcp_instrumen_service,
     get_wcp_jawaban_service,
     get_wcp_responden_service,
@@ -21,7 +22,8 @@ from ...errors import ValidationAppError
 from ...schemas.common import ErrorResponse
 from ...security import Principal
 from ...wcp.schemas.hasil import WcpHasilRead, WcpHasilRespondenRead
-from ...wcp.services.analisis import compute_hasil, compute_hasil_responden
+from ...wcp.services.analisis import build_catalog, compute_hasil, compute_hasil_responden
+from ...wcp.services.dimensi import WcpDimensiService
 from ...wcp.services.instrumen import WcpInstrumenService
 from ...wcp.services.jawaban import WcpJawabanService
 from ...wcp.services.responden import WcpRespondenService
@@ -37,6 +39,10 @@ _FORBIDDEN = {
 }
 
 
+def _build_wcp_catalog(dim_service: WcpDimensiService):
+    return build_catalog(dim_service.list_dimensi(), dim_service.list_item())
+
+
 @router.post(
     "/analisis",
     response_model=WcpHasilRead,
@@ -49,6 +55,7 @@ def run_analisis(
     instrumen_service: Annotated[WcpInstrumenService, Depends(get_wcp_instrumen_service)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
+    dim_service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
 ) -> WcpHasilRead:
     instrumen = instrumen_service.get()
     if instrumen.status not in ("CLOSED", "ANALYZED"):
@@ -73,7 +80,7 @@ def run_analisis(
     if instrumen.status == "CLOSED":
         instrumen_service.set_analyzed()
 
-    return compute_hasil(responden_raw)
+    return compute_hasil(responden_raw, _build_wcp_catalog(dim_service))
 
 
 @router.get(
@@ -88,6 +95,7 @@ def get_hasil(
     instrumen_service: Annotated[WcpInstrumenService, Depends(get_wcp_instrumen_service)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
+    dim_service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
 ) -> WcpHasilRead:
     instrumen = instrumen_service.get()
     if instrumen.status != "ANALYZED":
@@ -100,7 +108,7 @@ def get_hasil(
     responden_raw: list[tuple[str, dict[str, int]]] = [
         (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted
     ]
-    return compute_hasil(responden_raw)
+    return compute_hasil(responden_raw, _build_wcp_catalog(dim_service))
 
 
 @router.get(
@@ -116,6 +124,7 @@ def get_hasil_responden(
     principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
+    dim_service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
 ) -> WcpHasilRespondenRead:
     responden = rsp_service.get(responden_id)
@@ -123,4 +132,4 @@ def get_hasil_responden(
     if not responden.sudah_submit:
         raise ValidationAppError("Responden belum mengirimkan jawaban.")
     raw = jwb_service.get_raw_by_responden(responden_id)
-    return compute_hasil_responden(responden_id, raw)
+    return compute_hasil_responden(responden_id, raw, _build_wcp_catalog(dim_service))

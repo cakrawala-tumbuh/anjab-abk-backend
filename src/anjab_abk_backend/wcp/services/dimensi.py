@@ -12,7 +12,7 @@ import threading
 from dataclasses import dataclass
 from typing import Protocol
 
-from ...errors import NotFoundError
+from ...errors import NotFoundError, ValidationAppError
 from ..schemas.dimensi import (
     WcpDimensiRead,
     WcpDimensiWithItemsRead,
@@ -51,6 +51,7 @@ class WcpDimensiService(Protocol):
     def list_item(self) -> list[WcpItemRead]: ...
     def get_item_by_item_id(self, item_id: str) -> WcpItemRead: ...
     def update_item(self, item_id: str, data: WcpItemUpdate) -> WcpItemRead: ...
+    def delete_item(self, item_id: str) -> None: ...
 
 
 def _to_item_read(rec: _ItemRecord) -> WcpItemRead:
@@ -131,3 +132,16 @@ class InMemoryWcpDimensiService:
             if "urutan" in patch:
                 rec.urutan = patch["urutan"]
             return _to_item_read(rec)
+
+    def delete_item(self, item_id: str) -> None:
+        with self._lock:
+            rec = self._items.get(item_id)
+            if rec is None:
+                raise NotFoundError(f"Item WCP '{item_id}' tidak ditemukan.")
+            sisa = [i for i in self._items.values() if i.dimensi_kode == rec.dimensi_kode]
+            if len(sisa) <= 1:
+                raise ValidationAppError(
+                    f"Tidak dapat menghapus item terakhir dimensi '{rec.dimensi_kode}';"
+                    f" dimensi harus punya minimal 1 item."
+                )
+            del self._items[item_id]

@@ -39,10 +39,15 @@ def _seed_dcs(session: Session) -> None:
             continue
         session.add(DcsSubSkalaModel(id=f"dsk_{kode}", kode=kode, nama=nama, urutan=urutan))
 
-    existing_item = set(session.scalars(select(DcsItemModel.item_id)).all())
+    # Item DCS di-seed HANYA sekali (first-run): bila tabel `dcs_item` sudah berisi,
+    # katalog dianggap milik admin — item yang sengaja DIHAPUS lewat API tidak boleh
+    # muncul lagi ("resurrection") saat redeploy/restart (initdb menjalankan seed tiap
+    # boot). Konsekuensi: item baru yang ditambahkan ke konstanta seed TIDAK di-top-up
+    # ke deployment lama — sesuai model "1 instance = 1 studi" (tiap studi = DB baru).
+    if session.scalar(select(DcsItemModel.item_id).limit(1)) is not None:
+        session.flush()
+        return
     for item_id, subskala_kode, sub_dimensi, pernyataan, arah, urutan in DCS_ITEM:
-        if item_id in existing_item:
-            continue
         session.add(
             DcsItemModel(
                 id=f"ditm_{item_id}",
@@ -66,10 +71,11 @@ def _seed_wcp(session: Session) -> None:
             WcpDimensiModel(id=f"wdim_{kode}", kode=kode, nama=nama, urutan=urutan, is_risk=is_risk)
         )
 
-    existing_item = set(session.scalars(select(WcpItemModel.item_id)).all())
+    # Item WCP di-seed HANYA sekali (first-run) — lihat penjelasan di `_seed_dcs`.
+    if session.scalar(select(WcpItemModel.item_id).limit(1)) is not None:
+        session.flush()
+        return
     for item_id, kode_dim, ind_kode, ind_label, pernyataan, rev_type, urutan in WCP_ITEM:
-        if item_id in existing_item:
-            continue
         session.add(
             WcpItemModel(
                 id=f"witm_{item_id}",

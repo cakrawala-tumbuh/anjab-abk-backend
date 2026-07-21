@@ -1,8 +1,18 @@
-"""Service analisis DCS: reverse scoring, Cronbach's alpha, risk flag, K-Index."""
+"""Service analisis DCS: reverse scoring, Cronbach's alpha, risk flag, K-Index.
+
+Katalog item (sub-skala, keanggotaan item, arah) TIDAK lagi dibaca dari konstanta
+seed (`dcs.seed.ITEM`) melainkan diterima sebagai `DcsCatalog` yang dibangun dari
+tabel `dcs_item`/`dcs_subskala` (via `DcsSubSkalaService`). Ini membuat perubahan
+katalog lewat API — `update_item` (arah) maupun `delete_item` — langsung tercermin
+di analisis; dulu analisis membaca seed sehingga hapus/ubah-arah item lewat API
+DIABAIKAN diam-diam (setiap responden yang menjawab jumlah item ≠ jumlah item seed
+gugur dari agregat sub-skala).
+"""
 
 from __future__ import annotations
 
 import statistics
+from dataclasses import dataclass
 
 from ..schemas.hasil import (
     DcsHasilRead,
@@ -11,7 +21,7 @@ from ..schemas.hasil import (
     DcsHasilSubSkalaRespondenRead,
     DcsRiskFlag,
 )
-from ..seed import ITEM, SUB_SKALA
+from ..schemas.subskala import DcsItemRead, DcsSubSkalaRead
 
 # Threshold interpretasi DCS (Karasek model)
 _DEMAND_HIGH_THRESHOLD = 3.5
@@ -24,6 +34,38 @@ _DEMAND_NORM_RANGE = 5.0 - _DEMAND_HIGH_THRESHOLD  # = 1.5
 # ControlDeficit / SupportDeficit: deficit mulai dari threshold, max di skor 1
 _CONTROL_NORM_RANGE = _CONTROL_LOW_THRESHOLD - 1.0  # = 1.5
 _SUPPORT_NORM_RANGE = _SUPPORT_LOW_THRESHOLD - 1.0  # = 1.5
+
+
+@dataclass(frozen=True)
+class DcsCatalog:
+    """Katalog item DCS aktif (snapshot DB) yang dipakai perhitungan analisis.
+
+    Attributes:
+        sub_skala_sorted: Daftar ``(kode, nama)`` sub-skala terurut ``urutan``.
+        sk_items: Peta ``kode sub-skala -> [item_id]`` terurut ``urutan``.
+        item_arah: Peta ``item_id -> arah`` ("F"/"UF").
+    """
+
+    sub_skala_sorted: list[tuple[str, str]]
+    sk_items: dict[str, list[str]]
+    item_arah: dict[str, str]
+
+
+def build_catalog(
+    sub_skala: list[DcsSubSkalaRead],
+    items: list[DcsItemRead],
+) -> DcsCatalog:
+    """Bangun `DcsCatalog` dari hasil baca DB (`list_sub_skala` + `list_item`)."""
+    sub_skala_sorted = [(s.kode, s.nama) for s in sorted(sub_skala, key=lambda x: x.urutan)]
+    sk_items: dict[str, list[str]] = {}
+    for item in sorted(items, key=lambda x: x.urutan):
+        sk_items.setdefault(item.subskala_kode, []).append(item.item_id)
+    item_arah = {item.item_id: item.arah for item in items}
+    return DcsCatalog(
+        sub_skala_sorted=sub_skala_sorted,
+        sk_items=sk_items,
+        item_arah=item_arah,
+    )
 
 
 def _adjusted(skor_raw: int, arah: str) -> float:
@@ -88,32 +130,21 @@ def _compute_k_index(
     return round(min(1.0, k), 4)
 
 
-# Pre-build lookup: item_id → arah
-_ITEM_ARAH: dict[str, str] = {item_id: arah for item_id, _, _, _, arah, _ in ITEM}
-
-# Pre-build lookup: subskala_kode → sorted list of item_ids
-_SK_ITEMS: dict[str, list[str]] = {}
-for _item_id, _sk_kode, _, _, _, _urutan in sorted(ITEM, key=lambda x: x[5]):
-    _SK_ITEMS.setdefault(_sk_kode, []).append(_item_id)
-
-# Sorted sub-skala list by urutan
-_SUB_SKALA_SORTED: list[tuple[str, str]] = [
-    (kode, nama) for kode, nama, _urutan in sorted(SUB_SKALA, key=lambda x: x[2])
-]
-
-
 def compute_hasil_responden(
     responden_id: str,
     raw_scores: dict[str, int],
+    catalog: DcsCatalog,
 ) -> DcsHasilRespondenRead:
     """Hitung skor per sub-skala untuk satu responden."""
     sub_skala_results: list[DcsHasilSubSkalaRespondenRead] = []
     scores_by_sk: dict[str, float] = {}
 
-    for kode, nama in _SUB_SKALA_SORTED:
-        item_ids = _SK_ITEMS.get(kode, [])
+    for kode, nama in catalog.sub_skala_sorted:
+        item_ids = catalog.sk_items.get(kode, [])
         adjusted = [
-            _adjusted(raw_scores[iid], _ITEM_ARAH[iid]) for iid in item_ids if iid in raw_scores
+            _adjusted(raw_scores[iid], catalog.item_arah[iid])
+            for iid in item_ids
+            if iid in raw_scores
         ]
         skor = statistics.mean(adjusted) if adjusted else 0.0
         scores_by_sk[kode] = skor
@@ -140,25 +171,31 @@ def compute_hasil_responden(
 
 def compute_hasil(
     responden_raw_scores: list[tuple[str, dict[str, int]]],
-    wcp_risk_score: float | None = None,
+    wcp_risk_score: float | None,
+    catalog: DcsCatalog,
 ) -> DcsHasilRead:
     """Hitung hasil agregat instrumen dari semua responden yang sudah submit.
 
     responden_raw_scores: list of (responden_id, {item_id: skor_raw})
     wcp_risk_score: skor risiko WCP ternormalisasi (0–1), opsional untuk K-Index.
+    catalog: katalog item DCS aktif (snapshot DB).
     """
     n = len(responden_raw_scores)
     sub_skala_results: list[DcsHasilSubSkalaRead] = []
     mean_by_sk: dict[str, float] = {}
 
-    for kode, nama in _SUB_SKALA_SORTED:
-        item_ids = _SK_ITEMS.get(kode, [])
+    for kode, nama in catalog.sub_skala_sorted:
+        item_ids = catalog.sk_items.get(kode, [])
         per_responden: list[float] = []
         scores_matrix: list[list[float]] = []
 
         for _, raw in responden_raw_scores:
-            adjusted_row = [_adjusted(raw[iid], _ITEM_ARAH[iid]) for iid in item_ids if iid in raw]
-            if len(adjusted_row) == len(item_ids):
+            adjusted_row = [
+                _adjusted(raw[iid], catalog.item_arah[iid]) for iid in item_ids if iid in raw
+            ]
+            # Sub-skala tanpa item (item terakhir terhapus) dilewati agar tidak
+            # memanggil mean([]); guard hapus juga menolak menghapus item terakhir.
+            if item_ids and len(adjusted_row) == len(item_ids):
                 per_responden.append(statistics.mean(adjusted_row))
                 scores_matrix.append(adjusted_row)
 

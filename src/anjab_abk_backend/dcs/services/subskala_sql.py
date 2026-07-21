@@ -9,11 +9,11 @@ teks/arah/urutan item lewat `update_item`.
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ...errors import NotFoundError
-from ...models import DcsItemModel, DcsSubSkalaModel
+from ...errors import NotFoundError, ValidationAppError
+from ...models import DcsItemModel, DcsJawabanModel, DcsSubSkalaModel
 from ..schemas.subskala import (
     DcsItemRead,
     DcsItemUpdate,
@@ -87,3 +87,23 @@ class SqlDcsSubSkalaService:
             rec.urutan = patch["urutan"]
         self._s.flush()
         return _to_item_read(rec)
+
+    def delete_item(self, item_id: str) -> None:
+        rec = self._get_item_model(item_id)
+        sisa = self._s.scalar(
+            select(func.count())
+            .select_from(DcsItemModel)
+            .where(DcsItemModel.subskala_kode == rec.subskala_kode)
+        )
+        if (sisa or 0) <= 1:
+            raise ValidationAppError(
+                f"Tidak dapat menghapus item terakhir sub-skala '{rec.subskala_kode}';"
+                f" sub-skala harus punya minimal 1 item."
+            )
+        # Jawaban DCS mereferensikan item lewat `item_id` teks (bukan FK) — tidak ada
+        # cascade DB, jadi hapus jawaban yatim untuk item ini secara eksplisit.
+        self._s.query(DcsJawabanModel).filter(DcsJawabanModel.item_id == item_id).delete(
+            synchronize_session=False
+        )
+        self._s.delete(rec)
+        self._s.flush()

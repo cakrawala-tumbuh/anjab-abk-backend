@@ -121,3 +121,65 @@ def test_update_item_not_found(client: TestClient) -> None:
 def test_update_item_rejects_invalid_arah(client: TestClient) -> None:
     r = client.patch(f"{BASE}/items/D1a", json={"arah": "X"})
     assert r.status_code == 422
+
+
+# --- Delete item (admin-only, OPEN-only) ---
+
+INSTRUMEN_BASE = "/api/v1/dcs/instrumen"
+RSP_BASE = "/api/v1/dcs/responden"
+
+
+def test_delete_item_as_admin(client: TestClient) -> None:
+    r = client.delete(f"{BASE}/items/D8")
+    assert r.status_code == 204
+    item_ids = [i["item_id"] for i in client.get(f"{BASE}/DEMAND/items").json()]
+    assert "D8" not in item_ids
+    assert len(item_ids) == 13
+
+
+def test_delete_item_requires_auth(anon_client: TestClient) -> None:
+    r = anon_client.delete(f"{BASE}/items/D8")
+    assert r.status_code == 401
+
+
+def test_delete_item_forbidden_for_non_admin(settings: Settings) -> None:
+    app = create_app(settings=settings)
+    app.dependency_overrides[get_token_verifier] = lambda: _NonAdminVerifier()
+    with TestClient(app) as c:
+        r = c.delete(f"{BASE}/items/D8", headers={"Authorization": "Bearer t"})
+    assert r.status_code == 403
+
+
+def test_delete_item_not_found(client: TestClient) -> None:
+    r = client.delete(f"{BASE}/items/TIDAKADA")
+    assert r.status_code == 404
+
+
+def test_delete_item_ditolak_saat_instrumen_tidak_open(client: TestClient) -> None:
+    client.post(f"{INSTRUMEN_BASE}/tutup")  # OPEN -> CLOSED
+    r = client.delete(f"{BASE}/items/D8")
+    assert r.status_code == 422
+
+
+def test_delete_last_item_subskala_ditolak(client: TestClient) -> None:
+    item_ids = [i["item_id"] for i in client.get(f"{BASE}/DEMAND/items").json()]
+    # Hapus semua kecuali satu — sisa 1 item, penghapusan berikutnya harus 422.
+    for iid in item_ids[:-1]:
+        assert client.delete(f"{BASE}/items/{iid}").status_code == 204
+    r = client.delete(f"{BASE}/items/{item_ids[-1]}")
+    assert r.status_code == 422
+
+
+def test_delete_item_membersihkan_jawaban_yatim(client: TestClient, partisipan_factory) -> None:
+    par_id = partisipan_factory("dcs-del-jwb")
+    rsp = client.post(RSP_BASE, json={"partisipan_ids": [par_id]}).json()["created"][0]
+    client.put(
+        f"{RSP_BASE}/{rsp['id']}/jawaban",
+        json={"jawaban": [{"item_id": "D8", "skor_raw": 4}]},
+    )
+    assert any(j["item_id"] == "D8" for j in client.get(f"{RSP_BASE}/{rsp['id']}/jawaban").json())
+
+    assert client.delete(f"{BASE}/items/D8").status_code == 204
+
+    sisa = client.get(f"{RSP_BASE}/{rsp['id']}/jawaban").json()
+    assert all(j["item_id"] != "D8" for j in sisa)

@@ -106,6 +106,37 @@ def test_hasil_requires_analyzed(client: TestClient) -> None:
     assert r.status_code == 422
 
 
+def test_analisis_konsisten_setelah_hapus_item(client: TestClient, partisipan_factory) -> None:
+    """REGRESI dua-sumber-kebenaran: setelah item dimensi SC dihapus (6→5), responden
+    yang menjawab 5 item SC HARUS tetap dihitung (n_responden SC = jumlah submit).
+    Sebelum analisis membaca katalog dari DB, responden gugur senyap (n_responden=0).
+    """
+    assert client.delete(f"{DIM_BASE}/items/SC1a").status_code == 204
+    item_ids: list[str] = []
+    for dim in client.get(DIM_BASE).json():
+        item_ids.extend(i["item_id"] for i in client.get(f"{DIM_BASE}/{dim['kode']}/items").json())
+    assert "SC1a" not in item_ids
+
+    client.patch(INSTRUMEN_BASE, json={"min_responden": 2})
+    ids = [partisipan_factory(f"wcp-del-anls-{i}") for i in range(2)]
+    rsps = _assign(client, ids)
+    for rsp in rsps:
+        r = client.put(
+            f"{RSP_BASE}/{rsp['id']}/jawaban",
+            json={"jawaban": [{"item_id": iid, "skor_raw": 3} for iid in item_ids]},
+        )
+        assert r.status_code == 200, r.text
+        assert client.post(f"{RSP_BASE}/{rsp['id']}/jawaban/submit").status_code == 201
+    client.post(f"{INSTRUMEN_BASE}/tutup")
+
+    r = client.post(ANALISIS_URL)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["n_responden"] == 2
+    sc = next(d for d in data["dimensi"] if d["dimensi_kode"] == "SC")
+    assert sc["n_responden"] == 2
+
+
 def test_analisis_regresi_angka_identik_dengan_formula_lama(
     client: TestClient, partisipan_factory
 ) -> None:

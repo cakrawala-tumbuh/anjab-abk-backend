@@ -7,6 +7,34 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-07-21
+
+### Ditambahkan
+
+- **`DELETE /api/v1/dcs/sub-skala/items/{item_id}`** dan
+  **`DELETE /api/v1/wcp/dimensi/items/{item_id}`** (admin): hapus satu item dari
+  master instrumen DCS/WCP. Hanya sah saat instrumen berstatus `OPEN` (422 bila
+  tidak), menolak menghapus item terakhir sebuah sub-skala/dimensi (422), dan
+  membersihkan jawaban yatim untuk item tersebut (kolom `*_jawaban.item_id` bukan
+  FK sehingga tidak ada cascade DB). 404 bila item tidak ada, 401/403 untuk
+  non-admin.
+
+### Diubah
+
+- **Analisis DCS & WCP kini membaca katalog item dari DATABASE**, bukan dari
+  konstanta seed (`dcs.seed`/`wcp.seed`). `compute_hasil`/`compute_hasil_responden`
+  menerima parameter `catalog` yang dibangun dari `dcs_item`/`wcp_item` (via
+  sub-skala/dimensi service). Sebelumnya perubahan katalog lewat API (hapus item,
+  atau ubah `arah`/`reverse_type`) DIABAIKAN diam-diam oleh analisis: setiap
+  responden yang menjawab jumlah item ≠ jumlah item seed gugur dari agregat
+  sub-skala/dimensi (`n_responden` bisa jadi 0 tanpa peringatan). Angka statistik
+  untuk katalog utuh (belum ada item dihapus) tidak berubah.
+- **Seeding item DCS/WCP menjadi first-run** (`seed_db.py`): bila tabel item sudah
+  berisi, seeding item dilewati. Mencegah item yang sengaja dihapus admin muncul
+  lagi ("resurrection") saat `initdb` menjalankan seed di tiap boot container.
+  Konsekuensi: item baru pada konstanta seed tidak lagi di-top-up ke deployment
+  lama — sesuai model "1 instance = 1 studi".
+
 ## [0.37.0] - 2026-07-15
 
 ### Ditambahkan

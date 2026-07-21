@@ -122,6 +122,40 @@ def test_analisis_regresi_angka_identik_dengan_formula_lama(
     assert r2.json() == data
 
 
+def test_analisis_konsisten_setelah_hapus_item(client: TestClient, partisipan_factory) -> None:
+    """REGRESI dua-sumber-kebenaran: setelah item DEMAND dihapus (14→13), responden
+    yang menjawab 13 item DEMAND HARUS tetap dihitung. Sebelum analisis membaca katalog
+    dari DB, `len(jawaban)=13 != len(seed)=14` membuat SETIAP responden gugur dari
+    agregat DEMAND (n_responden=0) — bug senyap. Kini n_responden DEMAND = jumlah submit.
+    """
+    assert client.delete("/api/v1/dcs/sub-skala/items/D8").status_code == 204
+    item_ids: list[str] = []
+    for kode in ("DEMAND", "CONTROL", "SUPPORT"):
+        item_ids.extend(
+            i["item_id"] for i in client.get(f"/api/v1/dcs/sub-skala/{kode}/items").json()
+        )
+    assert "D8" not in item_ids
+
+    client.patch(INSTRUMEN_BASE, json={"min_responden": 2})
+    ids = [partisipan_factory(f"dcs-del-anls-{i}") for i in range(2)]
+    rsps = _assign(client, ids)
+    for rsp in rsps:
+        r = client.put(
+            f"{RSP_BASE}/{rsp['id']}/jawaban",
+            json={"jawaban": [{"item_id": iid, "skor_raw": 3} for iid in item_ids]},
+        )
+        assert r.status_code == 200, r.text
+        assert client.post(f"{RSP_BASE}/{rsp['id']}/jawaban/submit").status_code == 201
+    client.post(f"{INSTRUMEN_BASE}/tutup")
+
+    r = client.post(ANALISIS_URL)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["n_responden"] == 2
+    demand = next(s for s in data["sub_skala"] if s["subskala_kode"] == "DEMAND")
+    assert demand["n_responden"] == 2
+
+
 def test_k_index_terisi_saat_wcp_punya_responden_submit(
     client: TestClient, partisipan_factory
 ) -> None:

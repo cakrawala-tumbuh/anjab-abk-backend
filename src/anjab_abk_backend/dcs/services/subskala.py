@@ -11,7 +11,7 @@ import threading
 from dataclasses import dataclass
 from typing import Protocol
 
-from ...errors import NotFoundError
+from ...errors import NotFoundError, ValidationAppError
 from ..schemas.subskala import (
     DcsItemRead,
     DcsItemUpdate,
@@ -48,6 +48,7 @@ class DcsSubSkalaService(Protocol):
     def list_item(self) -> list[DcsItemRead]: ...
     def get_item_by_item_id(self, item_id: str) -> DcsItemRead: ...
     def update_item(self, item_id: str, data: DcsItemUpdate) -> DcsItemRead: ...
+    def delete_item(self, item_id: str) -> None: ...
 
 
 def _to_item_read(rec: _ItemRecord) -> DcsItemRead:
@@ -123,3 +124,16 @@ class InMemoryDcsSubSkalaService:
             if "urutan" in patch:
                 rec.urutan = patch["urutan"]
             return _to_item_read(rec)
+
+    def delete_item(self, item_id: str) -> None:
+        with self._lock:
+            rec = self._items.get(item_id)
+            if rec is None:
+                raise NotFoundError(f"Item DCS '{item_id}' tidak ditemukan.")
+            sisa = [i for i in self._items.values() if i.subskala_kode == rec.subskala_kode]
+            if len(sisa) <= 1:
+                raise ValidationAppError(
+                    f"Tidak dapat menghapus item terakhir sub-skala '{rec.subskala_kode}';"
+                    f" sub-skala harus punya minimal 1 item."
+                )
+            del self._items[item_id]
