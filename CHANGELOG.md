@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-07-23
+
 ### Diubah
 
 - **Endpoint list "koleksi anak" kini mengembalikan `Page[T]`** (`{items, total,
