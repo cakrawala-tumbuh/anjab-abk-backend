@@ -302,17 +302,33 @@ class SqlOpmSesiService:
         jab = self._s.get(JabatanModel, rec.jabatan_id)
         return _to_read(rec, jab.nama if jab else None)
 
-    def list_task(self, sesi_id: str) -> list[OpmSesiTaskRead]:
+    def list_task(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[OpmSesiTaskRead], int]:
         self._get_model(sesi_id)
-        rows = self._s.scalars(
+        total = (
+            self._s.scalar(
+                select(func.count())
+                .select_from(OpmSesiTaskModel)
+                .where(OpmSesiTaskModel.sesi_id == sesi_id)
+            )
+            or 0
+        )
+        stmt = (
             select(OpmSesiTaskModel)
             .where(OpmSesiTaskModel.sesi_id == sesi_id)
             .order_by(OpmSesiTaskModel.urutan, OpmSesiTaskModel.task_kode)
-        ).all()
-        return [_task_to_read(r) for r in rows]
+        )
+        if limit is not None:
+            stmt = stmt.limit(limit).offset(offset)
+        elif offset:
+            stmt = stmt.offset(offset)
+        rows = self._s.scalars(stmt).all()
+        return [_task_to_read(r) for r in rows], total
 
     def get_task_kodes(self, sesi_id: str) -> set[str]:
-        return {t.task_kode for t in self.list_task(sesi_id)}
+        tasks, _ = self.list_task(sesi_id)
+        return {t.task_kode for t in tasks}
 
     def search(
         self, *, domain: Domain, order: Order, limit: int, offset: int

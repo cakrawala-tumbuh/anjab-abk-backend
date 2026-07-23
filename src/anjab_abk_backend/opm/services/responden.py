@@ -28,7 +28,9 @@ class _Record:
 class OpmRespondenService(Protocol):
     """Kontrak operasi terhadap OpmResponden."""
 
-    def list_by_sesi(self, sesi_id: str) -> list[OpmRespondenRead]: ...
+    def list_by_sesi(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[OpmRespondenRead], int]: ...
     def list_by_partisipan(self, partisipan_id: str) -> list[OpmRespondenRead]: ...
     def get(self, responden_id: str) -> OpmRespondenRead: ...
     def create(
@@ -65,13 +67,17 @@ class InMemoryOpmRespondenService:
     def _to_read(rec: _Record) -> OpmRespondenRead:
         return OpmRespondenRead.model_validate(rec)
 
-    def list_by_sesi(self, sesi_id: str) -> list[OpmRespondenRead]:
+    def list_by_sesi(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[OpmRespondenRead], int]:
         with self._lock:
             ordered = sorted(
                 (r for r in self._data.values() if r.sesi_id == sesi_id),
                 key=lambda r: r.created_at,
             )
-        return [self._to_read(r) for r in ordered]
+        total = len(ordered)
+        page = ordered[offset:] if limit is None else ordered[offset : offset + limit]
+        return [self._to_read(r) for r in page], total
 
     def list_by_partisipan(self, partisipan_id: str) -> list[OpmRespondenRead]:
         with self._lock:

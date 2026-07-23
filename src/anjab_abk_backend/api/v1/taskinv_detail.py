@@ -4,26 +4,29 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, Path, Request, Response, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Pagination,
     authorize_responden_access,
     get_current_principal,
     get_partisipan_service,
     get_ti_detail_service,
     get_ti_responden_service,
     get_ti_sesi_service,
+    pagination_params,
     rate_limit,
 )
 from ...errors import ValidationAppError
-from ...schemas.common import ErrorResponse
+from ...schemas.common import ErrorResponse, Page
 from ...security import Principal
 from ...taskinv.schemas.detail import TiDetailRead, TiDetailUpsert
 from ...taskinv.services.detail import TiDetailService
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.sesi import TiSesiService
+from ..pagination import set_pagination_links
 
 router = APIRouter()
 
@@ -75,7 +78,8 @@ def save_draft_detail(
         raise ValidationAppError(
             "Responden ini sudah menyelesaikan Tahap 3; draft tidak bisa diubah."
         )
-    valid = set(sesi_service.get_task_terpilih(sesi.id))
+    kodes, _ = sesi_service.get_task_terpilih(sesi.id)
+    valid = set(kodes)
     return detail_service.upsert(responden_id, sesi.id, payload, valid)
 
 
@@ -124,7 +128,7 @@ def submit_detail(
 
 @router.get(
     "/responden/{responden_id}/detail",
-    response_model=list[TiDetailRead],
+    response_model=Page[TiDetailRead],
     summary="Lihat detail Tahap 3 satu responden (admin atau pemilik)",
     operation_id="taskinv_detail_list",
     dependencies=READ_GUARDS,
@@ -132,11 +136,18 @@ def submit_detail(
 )
 def list_detail(
     responden_id: Annotated[str, Path(description="ID responden.")],
+    request: Request,
+    response: Response,
+    page: Annotated[Pagination, Depends(pagination_params)],
     principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     detail_service: Annotated[TiDetailService, Depends(get_ti_detail_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
-) -> list[TiDetailRead]:
+) -> Page[TiDetailRead]:
     responden = rsp_service.get(responden_id)
     authorize_responden_access(principal, responden.partisipan_id, par_service)
-    return detail_service.list_by_responden(responden_id)
+    items, total = detail_service.list_by_responden(
+        responden_id, limit=page.limit, offset=page.offset
+    )
+    set_pagination_links(response, request, total, page.limit, page.offset)
+    return Page[TiDetailRead](items=items, total=total, limit=page.limit, offset=page.offset)

@@ -27,7 +27,9 @@ class _Record:
 class WcpRespondenService(Protocol):
     """Kontrak operasi terhadap WcpResponden."""
 
-    def list_all(self) -> list[WcpRespondenRead]: ...
+    def list_all(
+        self, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[WcpRespondenRead], int]: ...
     def list_by_partisipan(self, partisipan_id: str) -> list[WcpRespondenRead]: ...
     def get(self, responden_id: str) -> WcpRespondenRead: ...
     def create(
@@ -56,10 +58,14 @@ class InMemoryWcpRespondenService:
     def _to_read(rec: _Record) -> WcpRespondenRead:
         return WcpRespondenRead.model_validate(rec)
 
-    def list_all(self) -> list[WcpRespondenRead]:
+    def list_all(
+        self, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[WcpRespondenRead], int]:
         with self._lock:
             ordered = sorted(self._data.values(), key=lambda r: r.created_at)
-        return [self._to_read(r) for r in ordered]
+        total = len(ordered)
+        page = ordered[offset:] if limit is None else ordered[offset : offset + limit]
+        return [self._to_read(r) for r in page], total
 
     def list_by_partisipan(self, partisipan_id: str) -> list[WcpRespondenRead]:
         with self._lock:

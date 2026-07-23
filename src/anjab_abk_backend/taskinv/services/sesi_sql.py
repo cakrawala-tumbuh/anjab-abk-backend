@@ -179,10 +179,15 @@ class SqlTiSesiService:
         jab = self._s.get(JabatanModel, rec.jabatan_id)
         return _to_read(rec, jab.nama if jab else None)
 
-    def get_task_terpilih(self, sesi_id: str) -> list[str]:
+    def get_task_terpilih(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[str], int]:
         rec = self._get_model(sesi_id)
         terpilih = rec.task_terpilih
-        return list(terpilih) if terpilih is not None else []
+        kodes = list(terpilih) if terpilih is not None else []
+        total = len(kodes)
+        page = kodes[offset:] if limit is None else kodes[offset : offset + limit]
+        return page, total
 
     def transition(self, sesi_id: str, target: StatusSesi) -> TiSesiRead:
         rec = self._get_model(sesi_id)

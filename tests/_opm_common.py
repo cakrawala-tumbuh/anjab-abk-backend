@@ -51,7 +51,7 @@ def _setup_jabatan_panel_ti(client: TestClient, jabatan_id: str) -> dict:
 
     r = client.get(TI_BASE + "/catalog", params={"unit": UNIT, "jabatan_id": jabatan_id})
     assert r.status_code == 200, r.text
-    catalog_items = r.json()
+    catalog_items = r.json()["items"]
     assert len(catalog_items) >= 2
     kodes = [it["kode"] for it in catalog_items[:2]]
 

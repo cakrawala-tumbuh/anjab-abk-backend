@@ -109,7 +109,7 @@ def test_reset_dari_analyzed_kembali_open_dan_responden_kosong(
 
     r_rsp = client.get("/api/v1/wcp/responden")
     assert r_rsp.status_code == 200
-    assert r_rsp.json() == []
+    assert r_rsp.json()["items"] == []
 
 
 def test_reset_idempoten_dari_open(client: TestClient) -> None:

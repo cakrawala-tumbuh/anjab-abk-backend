@@ -50,13 +50,28 @@ class SqlOpmRespondenService:
             raise NotFoundError(f"Responden OPM '{responden_id}' tidak ditemukan.")
         return rec
 
-    def list_by_sesi(self, sesi_id: str) -> list[OpmRespondenRead]:
-        rows = self._s.scalars(
+    def list_by_sesi(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[OpmRespondenRead], int]:
+        total = (
+            self._s.scalar(
+                select(func.count())
+                .select_from(OpmRespondenModel)
+                .where(OpmRespondenModel.sesi_id == sesi_id)
+            )
+            or 0
+        )
+        stmt = (
             select(OpmRespondenModel)
             .where(OpmRespondenModel.sesi_id == sesi_id)
             .order_by(OpmRespondenModel.created_at)
-        ).all()
-        return [_to_read(r) for r in rows]
+        )
+        if limit is not None:
+            stmt = stmt.limit(limit).offset(offset)
+        elif offset:
+            stmt = stmt.offset(offset)
+        rows = self._s.scalars(stmt).all()
+        return [_to_read(r) for r in rows], total
 
     def list_by_partisipan(self, partisipan_id: str) -> list[OpmRespondenRead]:
         rows = self._s.scalars(

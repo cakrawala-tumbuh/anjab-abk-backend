@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Request, Response
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Pagination,
     authorize_sesi_access,
     get_current_principal,
     get_partisipan_service,
@@ -17,11 +18,12 @@ from ...dependencies import (
     get_ti_responden_service,
     get_ti_seleksi_service,
     get_ti_sesi_service,
+    pagination_params,
     rate_limit,
     require_admin,
 )
 from ...errors import ValidationAppError
-from ...schemas.common import ErrorResponse
+from ...schemas.common import ErrorResponse, Page
 from ...security import Principal
 from ...taskinv.schemas.catalog import TiCatalogRead
 from ...taskinv.schemas.hasil import TiHasilSesiRead, TiTaskTerpilihRead
@@ -31,6 +33,7 @@ from ...taskinv.services.detail import TiDetailService
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.seleksi import TiSeleksiService
 from ...taskinv.services.sesi import TiSesiService
+from ..pagination import set_pagination_links
 
 router = APIRouter()
 
@@ -56,7 +59,7 @@ def _catalog_map(catalog: TiCatalogService, kodes: list[str]) -> dict[str, TiCat
 
 @router.get(
     "/{sesi_id}/task-terpilih",
-    response_model=list[TiTaskTerpilihRead],
+    response_model=Page[TiTaskTerpilihRead],
     summary="Himpunan task relevan yang dibekukan (tersedia setelah TAHAP2) (admin/peserta)",
     operation_id="taskinv_task_terpilih",
     dependencies=READ_GUARDS,
@@ -70,23 +73,28 @@ def _catalog_map(catalog: TiCatalogService, kodes: list[str]) -> dict[str, TiCat
 )
 def get_task_terpilih(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
+    request: Request,
+    response: Response,
+    page: Annotated[Pagination, Depends(pagination_params)],
     principal: Annotated[Principal, Depends(get_current_principal)],
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
     catalog: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
-) -> list[TiTaskTerpilihRead]:
+) -> Page[TiTaskTerpilihRead]:
     sesi = sesi_service.get(sesi_id)
     authorize_sesi_access(principal, sesi, par_service, rsp_service)
     if sesi.status not in ("TAHAP3", "CLOSED", "ANALYZED"):
         raise ValidationAppError(
             f"Himpunan task terpilih baru tersedia setelah TAHAP3 (saat ini: {sesi.status})."
         )
-    kodes = sesi_service.get_task_terpilih(sesi_id)
+    kodes, total = sesi_service.get_task_terpilih(sesi_id, limit=page.limit, offset=page.offset)
     counts = seleksi_service.count_relevan_per_task(sesi_id)
     n_tahap1 = rsp_service.count_tahap1_submitted(sesi_id)
-    return compute_task_terpilih(kodes, _catalog_map(catalog, kodes), counts, n_tahap1)
+    items = compute_task_terpilih(kodes, _catalog_map(catalog, kodes), counts, n_tahap1)
+    set_pagination_links(response, request, total, page.limit, page.offset)
+    return Page[TiTaskTerpilihRead](items=items, total=total, limit=page.limit, offset=page.offset)
 
 
 @router.post(
@@ -171,7 +179,7 @@ def _build_hasil(
     catalog: TiCatalogService,
     n_tahap3: int | None = None,
 ) -> TiHasilSesiRead:
-    kodes = sesi_service.get_task_terpilih(sesi.id)
+    kodes, _ = sesi_service.get_task_terpilih(sesi.id)
     counts = seleksi_service.count_relevan_per_task(sesi.id)
     n_tahap1 = rsp_service.count_tahap1_submitted(sesi.id)
     details = detail_service.list_by_sesi(sesi.id)

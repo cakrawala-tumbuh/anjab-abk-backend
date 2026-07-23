@@ -7,6 +7,23 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diubah
+
+- **Endpoint list "koleksi anak" kini mengembalikan `Page[T]`** (`{items, total,
+  limit, offset}`) dengan query `limit` (`ge=1,le=500`, default 20) + `offset`
+  (`ge=0`, default 0) dan header `Link` (RFC 5988 first/prev/next/last), seragam
+  dengan resource master yang sudah dipaginasi. Terdampak: `GET /dcs/responden`,
+  `GET /wcp/responden`, `GET /opm/sesi/{id}/responden`, `GET /opm/sesi/{id}/task`,
+  `GET /task-inventory/sesi/{id}/responden`,
+  `GET /task-inventory/sesi/{id}/task-terpilih`,
+  `GET /task-inventory/sesi/responden/{id}/detail`,
+  `GET /task-inventory/catalog` (filter `jabatan_id`/`unit` tetap berlaku, kini
+  bertambah `limit`/`offset`), dan `GET /time-study/penugasan/{id}/log`. `total`
+  = jumlah SELURUH baris cocok filter (sebelum limit/offset). **Breaking**: klien
+  yang membaca array telanjang harus membaca `.items`. Kode status & auth tak
+  berubah (404 sesi/penugasan tak ada tetap 404). Helper header `Link` bersama
+  diekstrak ke `api/pagination.py`.
+
 ## [0.38.0] - 2026-07-21
 
 ### Ditambahkan

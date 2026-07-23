@@ -18,7 +18,7 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -88,11 +88,17 @@ class SqlDcsRespondenService:
                 f" (saat ini: {status})."
             )
 
-    def list_all(self) -> list[DcsRespondenRead]:
-        rows = self._s.scalars(
-            select(DcsRespondenModel).order_by(DcsRespondenModel.created_at.asc())
-        ).all()
-        return [_to_read(r) for r in rows]
+    def list_all(
+        self, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[DcsRespondenRead], int]:
+        total = self._s.scalar(select(func.count()).select_from(DcsRespondenModel)) or 0
+        stmt = select(DcsRespondenModel).order_by(DcsRespondenModel.created_at.asc())
+        if limit is not None:
+            stmt = stmt.limit(limit).offset(offset)
+        elif offset:
+            stmt = stmt.offset(offset)
+        rows = self._s.scalars(stmt).all()
+        return [_to_read(r) for r in rows], total
 
     def list_by_partisipan(self, partisipan_id: str) -> list[DcsRespondenRead]:
         rows = self._s.scalars(

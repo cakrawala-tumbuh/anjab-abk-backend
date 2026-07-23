@@ -27,7 +27,9 @@ class _Record:
 class DcsRespondenService(Protocol):
     """Kontrak operasi terhadap DcsResponden."""
 
-    def list_all(self) -> list[DcsRespondenRead]: ...
+    def list_all(
+        self, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[DcsRespondenRead], int]: ...
     def list_by_partisipan(self, partisipan_id: str) -> list[DcsRespondenRead]: ...
     def get(self, responden_id: str) -> DcsRespondenRead: ...
     def create(
@@ -56,10 +58,14 @@ class InMemoryDcsRespondenService:
     def _to_read(rec: _Record) -> DcsRespondenRead:
         return DcsRespondenRead.model_validate(rec)
 
-    def list_all(self) -> list[DcsRespondenRead]:
+    def list_all(
+        self, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[DcsRespondenRead], int]:
         with self._lock:
             ordered = sorted(self._data.values(), key=lambda r: r.created_at)
-        return [self._to_read(r) for r in ordered]
+        total = len(ordered)
+        page = ordered[offset:] if limit is None else ordered[offset : offset + limit]
+        return [self._to_read(r) for r in page], total
 
     def list_by_partisipan(self, partisipan_id: str) -> list[DcsRespondenRead]:
         with self._lock:

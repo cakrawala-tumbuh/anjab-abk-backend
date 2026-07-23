@@ -49,13 +49,13 @@ def test_create_sesi_ok(client: TestClient, jabatan_id_tk: str) -> None:
     # Snapshot task = task_terpilih TI.
     rt = client.get(f"{BASE}/{sesi['id']}/task")
     assert rt.status_code == 200, rt.text
-    task_kodes = {t["task_kode"] for t in rt.json()}
+    task_kodes = {t["task_kode"] for t in rt.json()["items"]}
     assert task_kodes == set(ctx["kodes"])
 
     # Auto-responden = anggota panel.
     rr = client.get(f"{BASE}/{sesi['id']}/responden")
     assert rr.status_code == 200, rr.text
-    responden = rr.json()
+    responden = rr.json()["items"]
     assert len(responden) == 2
     assert {r["partisipan_id"] for r in responden} == set(ctx["partisipan_ids"])
     assert all(r["sudah_submit"] is False for r in responden)
@@ -424,7 +424,7 @@ def test_opm_task_responden_boleh(
     as_a = client_as("opm-guard-task-boleh")
     r = as_a.get(f"{BASE}/{sesi['id']}/task")
     assert r.status_code == 200, r.text
-    assert {t["task_kode"] for t in r.json()} == set(ctx["kodes"])
+    assert {t["task_kode"] for t in r.json()["items"]} == set(ctx["kodes"])
 
 
 def test_opm_task_bukan_responden_403(

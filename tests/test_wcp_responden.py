@@ -57,7 +57,8 @@ def par_a(partisipan_factory) -> str:
 def test_list_responden_empty(client: TestClient) -> None:
     r = client.get(RSP_BASE)
     assert r.status_code == 200
-    assert r.json() == []
+    assert r.json()["items"] == []
+    assert r.json()["total"] == 0
 
 
 def test_list_responden_after_create(client: TestClient, partisipan_factory) -> None:
@@ -65,7 +66,8 @@ def test_list_responden_after_create(client: TestClient, partisipan_factory) -> 
     _assign(client, ids)
     r = client.get(RSP_BASE)
     assert r.status_code == 200
-    assert len(r.json()) == 2
+    assert len(r.json()["items"]) == 2
+    assert r.json()["total"] == 2
 
 
 def test_list_responden_requires_admin(anon_client: TestClient) -> None:

@@ -64,7 +64,7 @@ def run_analisis(
             f" (saat ini: {instrumen.status})."
         )
 
-    responden_list = rsp_service.list_all()
+    responden_list, _ = rsp_service.list_all()
     submitted = [r for r in responden_list if r.sudah_submit]
 
     if len(submitted) < instrumen.min_responden:
@@ -103,7 +103,7 @@ def get_hasil(
             f"Hasil hanya tersedia setelah analisis dijalankan"
             f" (status saat ini: {instrumen.status})."
         )
-    responden_list = rsp_service.list_all()
+    responden_list, _ = rsp_service.list_all()
     submitted = [r for r in responden_list if r.sudah_submit]
     responden_raw: list[tuple[str, dict[str, int]]] = [
         (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted

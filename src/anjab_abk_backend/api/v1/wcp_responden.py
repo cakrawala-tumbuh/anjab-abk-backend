@@ -4,28 +4,31 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, Path, Request, Response, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Pagination,
     authorize_responden_access,
     get_current_principal,
     get_partisipan_service,
     get_wcp_dimensi_service,
     get_wcp_jawaban_service,
     get_wcp_responden_service,
+    pagination_params,
     rate_limit,
     require_admin,
 )
 from ...errors import ValidationAppError
-from ...schemas.common import BulkAssignResult, ErrorResponse
+from ...schemas.common import BulkAssignResult, ErrorResponse, Page
 from ...security import Principal
 from ...wcp.schemas.jawaban import WcpJawabanRead, WcpJawabanUpsert
 from ...wcp.schemas.responden import WcpRespondenCreate, WcpRespondenRead
 from ...wcp.services.dimensi import WcpDimensiService
 from ...wcp.services.jawaban import WcpJawabanService
 from ...wcp.services.responden import WcpRespondenService
+from ..pagination import set_pagination_links
 
 router = APIRouter()
 
@@ -41,16 +44,21 @@ _FORBIDDEN = {
 
 @router.get(
     "",
-    response_model=list[WcpRespondenRead],
+    response_model=Page[WcpRespondenRead],
     summary="Daftar seluruh responden WCP (admin)",
     operation_id="wcp_responden_list",
     dependencies=[Depends(require_admin)],
     responses={**_AUTH, **_FORBIDDEN},
 )
 def list_responden(
+    request: Request,
+    response: Response,
+    page: Annotated[Pagination, Depends(pagination_params)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
-) -> list[WcpRespondenRead]:
-    return rsp_service.list_all()
+) -> Page[WcpRespondenRead]:
+    items, total = rsp_service.list_all(limit=page.limit, offset=page.offset)
+    set_pagination_links(response, request, total, page.limit, page.offset)
+    return Page[WcpRespondenRead](items=items, total=total, limit=page.limit, offset=page.offset)
 
 
 @router.post(

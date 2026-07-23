@@ -27,6 +27,19 @@ if TYPE_CHECKING:
     from .uraian_tugas import UraianTugasService
 
 
+def _paginate(
+    rows: list[TiCatalogRead], limit: int | None, offset: int
+) -> tuple[list[TiCatalogRead], int]:
+    """Iris daftar catalog yang sudah dirakit menjadi satu halaman + total penuh.
+
+    `limit=None` mengembalikan seluruh baris (dipakai pemanggil internal); total
+    selalu jumlah baris cocok filter sebelum limit/offset diterapkan.
+    """
+    total = len(rows)
+    page = rows[offset:] if limit is None else rows[offset : offset + limit]
+    return page, total
+
+
 def _synth_id(prefix: str, nama: str) -> str:
     """Sintesiskan id deterministik dari nama (hanya untuk fallback in-memory legacy)."""
     digest = hashlib.sha1(nama.encode("utf-8")).hexdigest()[:8]  # noqa: S324
@@ -37,8 +50,12 @@ class TiCatalogService(Protocol):
     """Kontrak akses catalog task."""
 
     def list_kombinasi(self) -> list[TiKombinasiRead]: ...
-    def list_by_kombinasi(self, unit: str, jabatan_id: str) -> list[TiCatalogRead]: ...
-    def list_by_jabatan(self, jabatan_id: str) -> list[TiCatalogRead]: ...
+    def list_by_kombinasi(
+        self, unit: str, jabatan_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TiCatalogRead], int]: ...
+    def list_by_jabatan(
+        self, jabatan_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TiCatalogRead], int]: ...
     def get(self, kode: str) -> TiCatalogRead: ...
     def valid_kodes(self, unit: str, jabatan_id: str) -> set[str]: ...
     def valid_kodes_for_jabatan(self, jabatan_id: str) -> set[str]: ...
@@ -90,11 +107,16 @@ class InMemoryTiCatalogService:
         rows.sort(key=lambda r: (r.unit, r.jabatan_id))
         return rows
 
-    def list_by_kombinasi(self, unit: str, jabatan_id: str) -> list[TiCatalogRead]:
+    def list_by_kombinasi(
+        self, unit: str, jabatan_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TiCatalogRead], int]:
         with self._lock:
-            return list(self._by_kombinasi.get((unit, jabatan_id), []))
+            result = list(self._by_kombinasi.get((unit, jabatan_id), []))
+        return _paginate(result, limit, offset)
 
-    def list_by_jabatan(self, jabatan_id: str) -> list[TiCatalogRead]:
+    def list_by_jabatan(
+        self, jabatan_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TiCatalogRead], int]:
         with self._lock:
             result = [
                 it
@@ -102,7 +124,7 @@ class InMemoryTiCatalogService:
                 if jid == jabatan_id
                 for it in its
             ]
-        return result
+        return _paginate(result, limit, offset)
 
     def get(self, kode: str) -> TiCatalogRead:
         with self._lock:
@@ -189,13 +211,17 @@ class UraianTugasBackedCatalogService:
         rows.sort(key=lambda r: (r.unit, r.jabatan_nama))
         return rows
 
-    def list_by_kombinasi(self, unit: str, jabatan_id: str) -> list[TiCatalogRead]:
+    def list_by_kombinasi(
+        self, unit: str, jabatan_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TiCatalogRead], int]:
         items = self._ut.list_by_unit_jabatan(unit, jabatan_id)
-        return [self._to_catalog(ut) for ut in items]
+        return _paginate([self._to_catalog(ut) for ut in items], limit, offset)
 
-    def list_by_jabatan(self, jabatan_id: str) -> list[TiCatalogRead]:
+    def list_by_jabatan(
+        self, jabatan_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TiCatalogRead], int]:
         items = self._ut.list_by_jabatan(jabatan_id)
-        return [self._to_catalog(ut) for ut in items]
+        return _paginate([self._to_catalog(ut) for ut in items], limit, offset)
 
     def get(self, kode: str) -> TiCatalogRead:
         ut = self._ut.get_by_kode(kode)

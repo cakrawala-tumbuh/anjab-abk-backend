@@ -76,13 +76,28 @@ class SqlTsLogService:
         except IntegrityError as exc:
             raise ConflictError(on_conflict) from exc
 
-    def list_by_partisipan(self, partisipan_id: str) -> list[TsLogRead]:
-        rows = self._s.scalars(
+    def list_by_partisipan(
+        self, partisipan_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TsLogRead], int]:
+        total = (
+            self._s.scalar(
+                select(func.count())
+                .select_from(TsLogModel)
+                .where(TsLogModel.partisipan_id == partisipan_id)
+            )
+            or 0
+        )
+        stmt = (
             select(TsLogModel)
             .where(TsLogModel.partisipan_id == partisipan_id)
             .order_by(TsLogModel.tanggal.desc())
-        ).all()
-        return [_to_read(r) for r in rows]
+        )
+        if limit is not None:
+            stmt = stmt.limit(limit).offset(offset)
+        elif offset:
+            stmt = stmt.offset(offset)
+        rows = self._s.scalars(stmt).all()
+        return [_to_read(r) for r in rows], total
 
     def count_by_partisipan(self, partisipan_id: str) -> int:
         return (

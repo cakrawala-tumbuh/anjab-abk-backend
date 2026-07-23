@@ -35,7 +35,9 @@ class TiDetailService(Protocol):
         self, responden_id: str, sesi_id: str, data: TiDetailUpsert, valid_kodes: set[str]
     ) -> list[TiDetailRead]: ...
     def submit(self, responden_id: str) -> list[TiDetailRead]: ...
-    def list_by_responden(self, responden_id: str) -> list[TiDetailRead]: ...
+    def list_by_responden(
+        self, responden_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TiDetailRead], int]: ...
     def list_by_sesi(self, sesi_id: str) -> list[TiDetailRead]: ...
     def count_responden_submitted(self, sesi_id: str) -> int: ...
     def delete_by_responden(self, responden_id: str) -> None: ...
@@ -105,20 +107,24 @@ class InMemoryTiDetailService:
         return [self._to_read(r) for r in results]
 
     def submit(self, responden_id: str) -> list[TiDetailRead]:
-        rows = self.list_by_responden(responden_id)
+        rows, _ = self.list_by_responden(responden_id)
         if not rows:
             raise ValidationAppError(
                 "Responden harus mengisi minimal 1 entri detail sebelum submit Tahap 3."
             )
         return rows
 
-    def list_by_responden(self, responden_id: str) -> list[TiDetailRead]:
+    def list_by_responden(
+        self, responden_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TiDetailRead], int]:
         with self._lock:
             ordered = sorted(
                 (r for r in self._data.values() if r.responden_id == responden_id),
                 key=lambda r: r.task_kode,
             )
-        return [self._to_read(r) for r in ordered]
+        total = len(ordered)
+        page = ordered[offset:] if limit is None else ordered[offset : offset + limit]
+        return [self._to_read(r) for r in page], total
 
     def list_by_sesi(self, sesi_id: str) -> list[TiDetailRead]:
         with self._lock:

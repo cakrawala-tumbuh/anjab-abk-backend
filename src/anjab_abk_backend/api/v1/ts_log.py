@@ -4,25 +4,28 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, Path, Request, Response, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Pagination,
     authorize_responden_access,
     get_current_principal,
     get_partisipan_service,
     get_ts_log_service,
     get_ts_penugasan_service,
+    pagination_params,
     rate_limit,
 )
 from ...errors import NotFoundError, ValidationAppError
-from ...schemas.common import ErrorResponse
+from ...schemas.common import ErrorResponse, Page
 from ...security import Principal
 from ...ts.schemas.log import TsLogCreate, TsLogRead, TsLogUpdate
 from ...ts.schemas.penugasan import TsPenugasanRead
 from ...ts.services.log import TsLogService
 from ...ts.services.penugasan import TsPenugasanService
+from ..pagination import set_pagination_links
 
 router = APIRouter()
 
@@ -66,7 +69,7 @@ def _require_active(
 
 @router.get(
     "/{penugasan_id}/log",
-    response_model=list[TsLogRead],
+    response_model=Page[TsLogRead],
     summary="Daftar log harian penugasan Time Study (admin atau pemilik)",
     operation_id="ts_log_list",
     dependencies=READ_GUARDS,
@@ -74,13 +77,20 @@ def _require_active(
 )
 def list_log(
     penugasan_id: Annotated[str, Path(description="ID penugasan Time Study.")],
+    request: Request,
+    response: Response,
+    page: Annotated[Pagination, Depends(pagination_params)],
     principal: Annotated[Principal, Depends(get_current_principal)],
     png_service: Annotated[TsPenugasanService, Depends(get_ts_penugasan_service)],
     log_service: Annotated[TsLogService, Depends(get_ts_log_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
-) -> list[TsLogRead]:
+) -> Page[TsLogRead]:
     penugasan = _authorize_penugasan(penugasan_id, png_service, principal, par_service)
-    return log_service.list_by_partisipan(penugasan.partisipan_id)
+    items, total = log_service.list_by_partisipan(
+        penugasan.partisipan_id, limit=page.limit, offset=page.offset
+    )
+    set_pagination_links(response, request, total, page.limit, page.offset)
+    return Page[TsLogRead](items=items, total=total, limit=page.limit, offset=page.offset)
 
 
 @router.post(

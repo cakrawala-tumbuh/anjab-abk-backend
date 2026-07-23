@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Path, Query, Response, status
+from fastapi import APIRouter, Body, Depends, Path, Query, Request, Response, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
@@ -29,6 +29,7 @@ from ...opm.services.sesi import OpmSesiService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
 from ...security import Principal
+from ..pagination import set_pagination_links
 
 router = APIRouter()
 
@@ -242,7 +243,7 @@ def tutup_sesi(
 
 @router.get(
     "/{sesi_id}/task",
-    response_model=list[OpmSesiTaskRead],
+    response_model=Page[OpmSesiTaskRead],
     summary="Daftar snapshot task dalam sesi OPM (admin atau responden sesi)",
     operation_id="opm_sesi_task_list",
     dependencies=READ_GUARDS,
@@ -250,11 +251,16 @@ def tutup_sesi(
 )
 def list_task(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
+    request: Request,
+    response: Response,
+    page: Annotated[Pagination, Depends(pagination_params)],
     principal: Annotated[Principal, Depends(get_current_principal)],
     service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
     rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
-) -> list[OpmSesiTaskRead]:
+) -> Page[OpmSesiTaskRead]:
     authorize_opm_sesi_access(principal, sesi_id, par_service, rsp_service)
     service.get(sesi_id)
-    return service.list_task(sesi_id)
+    items, total = service.list_task(sesi_id, limit=page.limit, offset=page.offset)
+    set_pagination_links(response, request, total, page.limit, page.offset)
+    return Page[OpmSesiTaskRead](items=items, total=total, limit=page.limit, offset=page.offset)

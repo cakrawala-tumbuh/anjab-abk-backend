@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, Path, Request, Response, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Pagination,
     authorize_responden_access,
     get_current_principal,
     get_opm_jawaban_service,
     get_opm_responden_service,
     get_opm_sesi_service,
     get_partisipan_service,
+    pagination_params,
     rate_limit,
     require_admin,
 )
@@ -24,8 +26,9 @@ from ...opm.schemas.responden import OpmRespondenBulkCreate, OpmRespondenCreate,
 from ...opm.services.jawaban import OpmJawabanService
 from ...opm.services.responden import OpmRespondenService
 from ...opm.services.sesi import OpmSesiService
-from ...schemas.common import BulkAssignResult, ErrorResponse
+from ...schemas.common import BulkAssignResult, ErrorResponse, Page
 from ...security import Principal
+from ..pagination import set_pagination_links
 
 router = APIRouter()
 
@@ -42,7 +45,7 @@ _FORBIDDEN = {
 
 @router.get(
     "/{sesi_id}/responden",
-    response_model=list[OpmRespondenRead],
+    response_model=Page[OpmRespondenRead],
     summary="Daftar responden dalam sesi OPM (admin)",
     operation_id="opm_responden_list",
     dependencies=[Depends(require_admin)],
@@ -50,11 +53,16 @@ _FORBIDDEN = {
 )
 def list_responden(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
+    request: Request,
+    response: Response,
+    page: Annotated[Pagination, Depends(pagination_params)],
     sesi_service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
     rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
-) -> list[OpmRespondenRead]:
+) -> Page[OpmRespondenRead]:
     sesi_service.get(sesi_id)
-    return rsp_service.list_by_sesi(sesi_id)
+    items, total = rsp_service.list_by_sesi(sesi_id, limit=page.limit, offset=page.offset)
+    set_pagination_links(response, request, total, page.limit, page.offset)
+    return Page[OpmRespondenRead](items=items, total=total, limit=page.limit, offset=page.offset)
 
 
 @router.post(

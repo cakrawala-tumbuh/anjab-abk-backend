@@ -33,7 +33,7 @@ def _sesi_payload(jabatan_id: str, cabang: str = "Bandung", **over) -> dict:
 def _catalog_kodes(client: TestClient, jabatan_id: str, n: int) -> list[str]:
     r = client.get(BASE + "/catalog", params={"unit": UNIT, "jabatan_id": jabatan_id})
     assert r.status_code == 200
-    items = r.json()
+    items = r.json()["items"]
     assert len(items) >= n
     return [it["kode"] for it in items[:n]]
 
@@ -86,7 +86,7 @@ def test_catalog_kombinasi(client: TestClient) -> None:
 def test_catalog_list_by_kombinasi(client: TestClient, jabatan_id_tk: str) -> None:
     r = client.get(BASE + "/catalog", params={"unit": UNIT, "jabatan_id": jabatan_id_tk})
     assert r.status_code == 200
-    items = r.json()
+    items = r.json()["items"]
     assert len(items) > 0
     assert all(it["unit"] == UNIT and it["jabatan_id"] == jabatan_id_tk for it in items)
     assert len(items[0]["kode"]) > 0
@@ -100,7 +100,9 @@ def test_catalog_list_by_kombinasi(client: TestClient, jabatan_id_tk: str) -> No
 def test_catalog_unknown_kombinasi_empty(client: TestClient) -> None:
     r = client.get(BASE + "/catalog", params={"unit": "ZZ", "jabatan_id": "jbt_tidakada"})
     assert r.status_code == 200
-    assert r.json() == []
+    body = r.json()
+    assert body["items"] == []
+    assert body["total"] == 0
 
 
 # --------------------------------------------------------------------------- #
@@ -332,7 +334,7 @@ def test_mulai_tahap3_dengan_review_koordinator(client: TestClient, jabatan_id_t
     # Verifikasi task terpilih: K1 dan K0
     tt = client.get(f"{SESI}/{sid}/task-terpilih")
     assert tt.status_code == 200
-    terpilih_kodes = {t["kode"] for t in tt.json()}
+    terpilih_kodes = {t["kode"] for t in tt.json()["items"]}
     assert kodes[1] in terpilih_kodes
     assert kodes[0] in terpilih_kodes
     assert kodes[2] not in terpilih_kodes
@@ -510,7 +512,7 @@ def test_full_three_phase_flow(client: TestClient, jabatan_id_tk: str) -> None:
     # task-terpilih: K1 n_relevan=2, K0 n_relevan=1
     tt = client.get(f"{SESI}/{sid}/task-terpilih")
     assert tt.status_code == 200
-    by_kode = {x["kode"]: x for x in tt.json()}
+    by_kode = {x["kode"]: x for x in tt.json()["items"]}
     assert by_kode[kodes[1]]["n_relevan"] == 2
     assert by_kode[kodes[0]]["n_relevan"] == 1
 
@@ -620,7 +622,7 @@ def test_std_calhr_prefill_task_terpilih_dan_agregat_setuju(
     # task-terpilih membawa std_* sesuai master
     tt = client.get(f"{SESI}/{sid}/task-terpilih")
     assert tt.status_code == 200
-    item = next(x for x in tt.json() if x["kode"] == kode_std)
+    item = next(x for x in tt.json()["items"] if x["kode"] == kode_std)
     for key, value in _STD_MASTER.items():
         assert item[key] == value
 
@@ -632,10 +634,10 @@ def test_std_calhr_prefill_task_terpilih_dan_agregat_setuju(
 
     det_a = client.get(f"{SESI}/responden/{ra['id']}/detail")
     assert det_a.status_code == 200
-    assert det_a.json()[0]["setuju_standar"] is True
+    assert det_a.json()["items"][0]["setuju_standar"] is True
     det_b = client.get(f"{SESI}/responden/{rb['id']}/detail")
     assert det_b.status_code == 200
-    assert det_b.json()[0]["setuju_standar"] is False
+    assert det_b.json()["items"][0]["setuju_standar"] is False
 
     assert client.post(f"{SESI}/{sid}/tutup").json()["status"] == "CLOSED"
     an = client.post(f"{SESI}/{sid}/analisis")
@@ -662,7 +664,7 @@ def test_submit_detail_tanpa_setuju_standar_default_true(
 
     det = client.get(f"{SESI}/responden/{ra['id']}/detail")
     assert det.status_code == 200
-    assert det.json()[0]["setuju_standar"] is True
+    assert det.json()["items"][0]["setuju_standar"] is True
 
 
 def test_detail_kode_diluar_terpilih_ditolak(client: TestClient, jabatan_id_tk: str) -> None:
@@ -1199,7 +1201,7 @@ def test_create_sesi_auto_populate_dari_panel(client: TestClient, jabatan_id_tk:
     sesi = _create_sesi(client, jabatan_id_tk)
     r = client.get(f"{SESI}/{sesi['id']}/responden")
     assert r.status_code == 200, r.text
-    responden = r.json()
+    responden = r.json()["items"]
     assert len(responden) == 2
     assert {row["partisipan_id"] for row in responden} == set(anggota)
     # nama diresolusi dari data partisipan (bukan anonim) — dipakai UI untuk
@@ -1218,7 +1220,7 @@ def test_create_sesi_panel_besar_semua_jadi_responden(
     sesi = _create_sesi(client, jabatan_id_tk)
     r = client.get(f"{SESI}/{sesi['id']}/responden")
     assert r.status_code == 200, r.text
-    responden = r.json()
+    responden = r.json()["items"]
     assert len(responden) == 11
     assert {row["partisipan_id"] for row in responden} == set(anggota)
 
@@ -1229,7 +1231,7 @@ def test_create_sesi_panel_muat_semua_anggota(client: TestClient, jabatan_id_tk:
     sesi = _create_sesi(client, jabatan_id_tk)
     r = client.get(f"{SESI}/{sesi['id']}/responden")
     assert r.status_code == 200, r.text
-    responden = r.json()
+    responden = r.json()["items"]
     assert len(responden) == 3
     assert {row["partisipan_id"] for row in responden} == set(anggota)
 
@@ -1238,7 +1240,7 @@ def test_create_sesi_tanpa_panel_tetap_kosong(client: TestClient, jabatan_id_tk:
     sesi = _create_sesi(client, jabatan_id_tk)
     r = client.get(f"{SESI}/{sesi['id']}/responden")
     assert r.status_code == 200, r.text
-    assert r.json() == []
+    assert r.json()["items"] == []
 
 
 def test_create_sesi_panel_tanpa_anggota_tetap_kosong(
@@ -1249,7 +1251,7 @@ def test_create_sesi_panel_tanpa_anggota_tetap_kosong(
     sesi = _create_sesi(client, jabatan_id_tk)
     r = client.get(f"{SESI}/{sesi['id']}/responden")
     assert r.status_code == 200, r.text
-    assert r.json() == []
+    assert r.json()["items"] == []
 
 
 # --------------------------------------------------------------------------- #
@@ -1705,7 +1707,7 @@ def test_get_task_terpilih_peserta_boleh(
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     # par_a sudah otomatis jadi responden lewat auto-populate SME panel saat sesi
     # dibuat — ambil id-nya, JANGAN POST responden lagi (akan jadi duplikat).
-    responden_list = client.get(f"{SESI}/{sid}/responden").json()
+    responden_list = client.get(f"{SESI}/{sid}/responden").json()["items"]
     rsp = next(r for r in responden_list if r["partisipan_id"] == par_a)
     _seleksi_submit(client, rsp["id"], kodes)
     client.post(f"{SESI}/{sid}/mulai-tahap2")

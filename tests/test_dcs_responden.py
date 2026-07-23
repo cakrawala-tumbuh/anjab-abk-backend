@@ -56,7 +56,8 @@ def par_b(partisipan_factory) -> str:
 def test_list_responden_empty(client: TestClient) -> None:
     r = client.get(RSP_BASE)
     assert r.status_code == 200
-    assert r.json() == []
+    assert r.json()["items"] == []
+    assert r.json()["total"] == 0
 
 
 def test_create_responden_bulk_5_dalam_satu_request(client: TestClient, partisipan_factory) -> None:
@@ -67,7 +68,7 @@ def test_create_responden_bulk_5_dalam_satu_request(client: TestClient, partisip
     assert data["skipped"] == []
 
     r = client.get(RSP_BASE)
-    assert len(r.json()) == 5
+    assert len(r.json()["items"]) == 5
 
 
 def test_create_responden_derives_nama_dan_jabatan_label(client: TestClient, par_a: str) -> None:

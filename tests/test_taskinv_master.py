@@ -489,9 +489,9 @@ def test_ut_seeded_data_via_catalog_endpoint(client: TestClient) -> None:
     assert len(first["jabatan_nama"]) > 0
     assert first["jabatan_nama"] != jabatan_id
 
-    r = client.get(CATALOG_BASE, params={"unit": unit, "jabatan_id": jabatan_id})
+    r = client.get(CATALOG_BASE, params={"unit": unit, "jabatan_id": jabatan_id, "limit": 500})
     assert r.status_code == 200
-    items = r.json()
+    items = r.json()["items"]
     assert len(items) > 0
     assert all(it["unit"] == unit for it in items)
     assert all(it["jabatan_id"] == jabatan_id for it in items)
@@ -507,9 +507,12 @@ def test_seeded_catalog_membawa_nilai_standar_calhr(client: TestClient) -> None:
     kombis = client.get(CATALOG_BASE + "/kombinasi").json()
     assert len(kombis) > 0
     first = kombis[0]
-    r = client.get(CATALOG_BASE, params={"unit": first["unit"], "jabatan_id": first["jabatan_id"]})
+    r = client.get(
+        CATALOG_BASE,
+        params={"unit": first["unit"], "jabatan_id": first["jabatan_id"], "limit": 500},
+    )
     assert r.status_code == 200
-    items = r.json()
+    items = r.json()["items"]
     assert len(items) > 0
     assert any(it["std_va_type"] is not None for it in items)
     assert any(it["std_sumber_bukti"] is not None for it in items)
@@ -523,10 +526,11 @@ def test_catalog_with_null_detil_tugas(client: TestClient) -> None:
     kombis = client.get(CATALOG_BASE + "/kombinasi").json()
     for kombi in kombis:
         r = client.get(
-            CATALOG_BASE, params={"unit": kombi["unit"], "jabatan_id": kombi["jabatan_id"]}
+            CATALOG_BASE,
+            params={"unit": kombi["unit"], "jabatan_id": kombi["jabatan_id"], "limit": 500},
         )
         assert r.status_code == 200
-        items = r.json()
+        items = r.json()["items"]
         if any(it["detil_tugas_id"] is None for it in items):
             return
     pytest.skip("Tidak ada task dengan detil_tugas_id=None dalam catalog")

@@ -57,7 +57,7 @@ def test_auto_responden_terisi(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk)
     r = client.get(f"{SESI_BASE}/{sesi['id']}/responden")
     assert r.status_code == 200
-    assert {x["partisipan_id"] for x in r.json()} == set(ctx["partisipan_ids"])
+    assert {x["partisipan_id"] for x in r.json()["items"]} == set(ctx["partisipan_ids"])
 
 
 def test_tambah_manual_anggota_panel_ok(client: TestClient, jabatan_id_tk: str) -> None:
@@ -189,7 +189,7 @@ def test_responden_bulk_payload_kosong_ditolak(client: TestClient, jabatan_id_tk
 
 def test_hapus_belum_submit_204(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk)
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rid = responden[0]["id"]
     r = client.delete(f"{SESI_BASE}/responden/{rid}")
     assert r.status_code == 204
@@ -199,7 +199,7 @@ def test_hapus_belum_submit_204(client: TestClient, jabatan_id_tk: str) -> None:
 def test_hapus_sudah_submit_422(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk)
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rid = responden[0]["id"]
     _submit(client, rid, ctx["kodes"])
     r = client.delete(f"{SESI_BASE}/responden/{rid}")
@@ -209,7 +209,7 @@ def test_hapus_sudah_submit_422(client: TestClient, jabatan_id_tk: str) -> None:
 def test_submit_jawaban_ok_dan_tandai_submit(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk)
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rid = responden[0]["id"]
     r_draft = _save_draft(client, rid, _bulk_payload(ctx["kodes"]))
     assert r_draft.status_code == 200, r_draft.text
@@ -228,7 +228,7 @@ def test_submit_jawaban_ok_dan_tandai_submit(client: TestClient, jabatan_id_tk: 
 
 def test_save_draft_sesi_bukan_open_422(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk)  # masih DRAFT
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rid = responden[0]["id"]
     r = _save_draft(client, rid, _bulk_payload(ctx["kodes"]))
     assert r.status_code == 422, r.text
@@ -237,7 +237,7 @@ def test_save_draft_sesi_bukan_open_422(client: TestClient, jabatan_id_tk: str) 
 def test_submit_dua_kali_422(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk)
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rid = responden[0]["id"]
     _submit(client, rid, ctx["kodes"])
     r2 = client.post(f"{SESI_BASE}/responden/{rid}/jawaban/submit")
@@ -247,7 +247,7 @@ def test_submit_dua_kali_422(client: TestClient, jabatan_id_tk: str) -> None:
 def test_submit_task_kurang_422(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk)
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rid = responden[0]["id"]
     r_draft = _save_draft(client, rid, _bulk_payload(ctx["kodes"][:1]))
     assert r_draft.status_code == 200, r_draft.text
@@ -258,7 +258,7 @@ def test_submit_task_kurang_422(client: TestClient, jabatan_id_tk: str) -> None:
 def test_submit_task_asing_422(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk)
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rid = responden[0]["id"]
     payload = _bulk_payload(ctx["kodes"])
     payload["jawaban"].append(
@@ -271,7 +271,7 @@ def test_submit_task_asing_422(client: TestClient, jabatan_id_tk: str) -> None:
 def test_submit_skor_di_luar_rentang_422(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk)
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rid = responden[0]["id"]
     payload = _bulk_payload(ctx["kodes"])
     payload["jawaban"][0]["importance"] = 6
@@ -282,7 +282,7 @@ def test_submit_skor_di_luar_rentang_422(client: TestClient, jabatan_id_tk: str)
 def test_save_draft_jawaban_parsial_lalu_lengkap(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk)
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rid = responden[0]["id"]
 
     r1 = _save_draft(client, rid, _bulk_payload(ctx["kodes"][:1]))
@@ -302,7 +302,7 @@ def test_save_draft_jawaban_parsial_lalu_lengkap(client: TestClient, jabatan_id_
 def test_save_draft_jawaban_rejected_after_submit(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk)
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rid = responden[0]["id"]
     _submit(client, rid, ctx["kodes"])
 
@@ -337,7 +337,7 @@ def test_kuesioner_saya_hanya_open(client: TestClient, jabatan_id_tk: str, db_se
     r_catalog = client.get(
         "/api/v1/task-inventory/catalog", params={"unit": "ALL", "jabatan_id": jabatan_id_tk}
     )
-    kodes = [it["kode"] for it in r_catalog.json()[:2]]
+    kodes = [it["kode"] for it in r_catalog.json()["items"][:2]]
 
     r_ti = client.post(
         TI_SESI,
@@ -409,7 +409,7 @@ def test_get_responden_forbidden_for_non_owner(
     _link_authentik_user(db_session, par_a, "opm-bola-a")
     _link_authentik_user(db_session, par_b, "opm-bola-b")
 
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rsp_a = next(r for r in responden if r["partisipan_id"] == par_a)
 
     as_b = client_as("opm-bola-b")
@@ -430,7 +430,7 @@ def test_save_draft_jawaban_forbidden_for_non_owner(
     _link_authentik_user(db_session, par_b, "opm-bola-d")
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
 
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rsp_a = next(r for r in responden if r["partisipan_id"] == par_a)
 
     as_d = client_as("opm-bola-d")
@@ -454,7 +454,7 @@ def test_admin_can_access_any_responden(
     par_a, _ = ctx["partisipan_ids"]
     _link_authentik_user(db_session, par_a, "opm-bola-f")
 
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     rsp_a = next(r for r in responden if r["partisipan_id"] == par_a)
 
     as_admin = client_as("opm-bola-other-admin", groups=["admin"])

@@ -68,7 +68,8 @@ def _compute_wcp_risk_score(
     wcp_catalog: WcpCatalog,
 ) -> float | None:
     """Skor risiko WCP ternormalisasi (0–1); `None` bila WCP belum punya responden submit."""
-    submitted = [r for r in wcp_rsp_service.list_all() if r.sudah_submit]
+    all_responden, _ = wcp_rsp_service.list_all()
+    submitted = [r for r in all_responden if r.sudah_submit]
     if not submitted:
         return None
 
@@ -111,7 +112,7 @@ def run_analisis(
             f" (saat ini: {instrumen.status})."
         )
 
-    responden_list = rsp_service.list_all()
+    responden_list, _ = rsp_service.list_all()
     submitted = [r for r in responden_list if r.sudah_submit]
 
     if len(submitted) < instrumen.min_responden:
@@ -156,7 +157,7 @@ def get_hasil(
             f"Hasil hanya tersedia setelah analisis dijalankan"
             f" (status saat ini: {instrumen.status})."
         )
-    responden_list = rsp_service.list_all()
+    responden_list, _ = rsp_service.list_all()
     submitted = [r for r in responden_list if r.sudah_submit]
     responden_raw: list[tuple[str, dict[str, int]]] = [
         (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted

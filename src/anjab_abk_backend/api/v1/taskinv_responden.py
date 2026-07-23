@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, Path, Request, Response, status
 
 from ...anjab.services.sme_panel import SMEPanelService
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Pagination,
     authorize_responden_access,
     authorize_sesi_access,
     get_current_principal,
@@ -17,15 +18,17 @@ from ...dependencies import (
     get_sme_panel_service,
     get_ti_responden_service,
     get_ti_sesi_service,
+    pagination_params,
     rate_limit,
     require_admin,
 )
 from ...errors import ValidationAppError
-from ...schemas.common import BulkAssignResult, BulkSkipped, ErrorResponse
+from ...schemas.common import BulkAssignResult, BulkSkipped, ErrorResponse, Page
 from ...security import Principal
 from ...taskinv.schemas.responden import TiRespondenBulkCreate, TiRespondenCreate, TiRespondenRead
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.sesi import TiSesiService
+from ..pagination import set_pagination_links
 
 router = APIRouter()
 
@@ -45,7 +48,7 @@ _FORBIDDEN_PESERTA = {
 
 @router.get(
     "/{sesi_id}/responden",
-    response_model=list[TiRespondenRead],
+    response_model=Page[TiRespondenRead],
     summary="Daftar responden dalam sesi (admin atau peserta sesi)",
     operation_id="taskinv_responden_list",
     dependencies=READ_GUARDS,
@@ -53,14 +56,19 @@ _FORBIDDEN_PESERTA = {
 )
 def list_responden(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
+    request: Request,
+    response: Response,
+    page: Annotated[Pagination, Depends(pagination_params)],
     principal: Annotated[Principal, Depends(get_current_principal)],
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
-) -> list[TiRespondenRead]:
+) -> Page[TiRespondenRead]:
     sesi = sesi_service.get(sesi_id)
     authorize_sesi_access(principal, sesi, par_service, rsp_service)
-    return rsp_service.list_by_sesi(sesi_id)
+    items, total = rsp_service.list_by_sesi(sesi_id, limit=page.limit, offset=page.offset)
+    set_pagination_links(response, request, total, page.limit, page.offset)
+    return Page[TiRespondenRead](items=items, total=total, limit=page.limit, offset=page.offset)
 
 
 @router.post(

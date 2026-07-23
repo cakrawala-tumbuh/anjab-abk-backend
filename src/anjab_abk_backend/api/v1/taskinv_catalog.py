@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from ...anjab.services.jabatan import JabatanService
 from ...dependencies import (
     READ_GUARDS,
+    Pagination,
     SessionDep,
     get_detil_tugas_service,
     get_jabatan_service,
@@ -17,10 +18,11 @@ from ...dependencies import (
     get_ti_sesi_service,
     get_tugas_pokok_service,
     get_uraian_tugas_service,
+    pagination_params,
     rate_limit,
     require_admin,
 )
-from ...schemas.common import ErrorResponse
+from ...schemas.common import ErrorResponse, Page
 from ...security import Principal
 from ...taskinv.schemas.catalog import (
     TiCatalogPurgeCounts,
@@ -37,6 +39,7 @@ from ...taskinv.services.detil_tugas import DetilTugasService
 from ...taskinv.services.sesi import TiSesiService
 from ...taskinv.services.tugas_pokok import TugasPokokService
 from ...taskinv.services.uraian_tugas import UraianTugasService
+from ..pagination import set_pagination_links
 
 router = APIRouter()
 
@@ -63,13 +66,16 @@ def list_kombinasi(
 
 @router.get(
     "",
-    response_model=list[TiCatalogRead],
+    response_model=Page[TiCatalogRead],
     summary="Daftar task catalog untuk kombinasi unit × jabatan",
     operation_id="taskinv_catalog_list",
     dependencies=READ_GUARDS,
     responses={**_AUTH, **_RATE},
 )
 def list_catalog(
+    request: Request,
+    response: Response,
+    page: Annotated[Pagination, Depends(pagination_params)],
     service: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
     jabatan_id: Annotated[str, Query(description="ID jabatan.")],
     unit: Annotated[
@@ -81,10 +87,15 @@ def list_catalog(
             )
         ),
     ] = None,
-) -> list[TiCatalogRead]:
+) -> Page[TiCatalogRead]:
     if unit is not None:
-        return service.list_by_kombinasi(unit, jabatan_id)
-    return service.list_by_jabatan(jabatan_id)
+        items, total = service.list_by_kombinasi(
+            unit, jabatan_id, limit=page.limit, offset=page.offset
+        )
+    else:
+        items, total = service.list_by_jabatan(jabatan_id, limit=page.limit, offset=page.offset)
+    set_pagination_links(response, request, total, page.limit, page.offset)
+    return Page[TiCatalogRead](items=items, total=total, limit=page.limit, offset=page.offset)
 
 
 @router.post(

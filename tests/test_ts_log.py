@@ -42,7 +42,8 @@ def penugasan(client: TestClient) -> dict:
 def test_list_log_empty(client: TestClient, penugasan: dict) -> None:
     r = client.get(f"{BASE_PNG}/{penugasan['id']}/log")
     assert r.status_code == 200
-    assert r.json() == []
+    assert r.json()["items"] == []
+    assert r.json()["total"] == 0
 
 
 def test_create_log(client: TestClient, penugasan: dict) -> None:

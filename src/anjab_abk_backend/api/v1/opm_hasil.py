@@ -60,7 +60,7 @@ def run_analisis(
             f" (saat ini: {sesi.status})."
         )
 
-    responden_list = rsp_service.list_by_sesi(sesi_id)
+    responden_list, _ = rsp_service.list_by_sesi(sesi_id)
     submitted = [r for r in responden_list if r.sudah_submit]
 
     if len(submitted) < sesi.min_responden:
@@ -69,7 +69,7 @@ def run_analisis(
             f" baru ada {len(submitted)}."
         )
 
-    tasks = sesi_service.list_task(sesi_id)
+    tasks, _ = sesi_service.list_task(sesi_id)
     responden_raw = [(r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted]
 
     if sesi.status == "CLOSED":
@@ -103,8 +103,8 @@ def get_hasil_sesi(
         raise ValidationAppError(
             f"Hasil hanya tersedia setelah analisis dijalankan (status saat ini: {sesi.status})."
         )
-    tasks = sesi_service.list_task(sesi_id)
-    responden_list = rsp_service.list_by_sesi(sesi_id)
+    tasks, _ = sesi_service.list_task(sesi_id)
+    responden_list, _ = rsp_service.list_by_sesi(sesi_id)
     submitted = [r for r in responden_list if r.sudah_submit]
     responden_raw = [(r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted]
     return compute_hasil_sesi(sesi, tasks, responden_raw)

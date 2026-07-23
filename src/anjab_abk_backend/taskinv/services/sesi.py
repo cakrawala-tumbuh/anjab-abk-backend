@@ -51,7 +51,9 @@ class TiSesiService(Protocol):
     def delete(self, sesi_id: str, *, paksa: bool = False) -> None: ...
     def transition(self, sesi_id: str, target: StatusSesi) -> TiSesiRead: ...
     def freeze_task_terpilih(self, sesi_id: str, kodes: list[str]) -> TiSesiRead: ...
-    def get_task_terpilih(self, sesi_id: str) -> list[str]: ...
+    def get_task_terpilih(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[str], int]: ...
     def search(
         self, *, domain: Domain, order: Order, limit: int, offset: int
     ) -> tuple[list[TiSesiRead], int]: ...
@@ -169,12 +171,17 @@ class InMemoryTiSesiService:
             rec.status = "TAHAP3"
             return self._to_read(rec)
 
-    def get_task_terpilih(self, sesi_id: str) -> list[str]:
+    def get_task_terpilih(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[str], int]:
         with self._lock:
             rec = self._data.get(sesi_id)
             if rec is None:
                 raise NotFoundError(f"Sesi Task Inventory '{sesi_id}' tidak ditemukan.")
-            return list(rec.task_terpilih) if rec.task_terpilih is not None else []
+            kodes = sorted(rec.task_terpilih) if rec.task_terpilih is not None else []
+        total = len(kodes)
+        page = kodes[offset:] if limit is None else kodes[offset : offset + limit]
+        return page, total
 
     def search(
         self, *, domain: Domain, order: Order, limit: int, offset: int

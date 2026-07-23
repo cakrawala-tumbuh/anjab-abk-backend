@@ -95,20 +95,35 @@ class SqlTiDetailService:
         return [_to_read(r) for r in results]
 
     def submit(self, responden_id: str) -> list[TiDetailRead]:
-        rows = self.list_by_responden(responden_id)
+        rows, _ = self.list_by_responden(responden_id)
         if not rows:
             raise ValidationAppError(
                 "Responden harus mengisi minimal 1 entri detail sebelum submit Tahap 3."
             )
         return rows
 
-    def list_by_responden(self, responden_id: str) -> list[TiDetailRead]:
-        rows = self._s.scalars(
+    def list_by_responden(
+        self, responden_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TiDetailRead], int]:
+        total = (
+            self._s.scalar(
+                select(func.count())
+                .select_from(TiDetailModel)
+                .where(TiDetailModel.responden_id == responden_id)
+            )
+            or 0
+        )
+        stmt = (
             select(TiDetailModel)
             .where(TiDetailModel.responden_id == responden_id)
             .order_by(TiDetailModel.task_kode)
-        ).all()
-        return [_to_read(r) for r in rows]
+        )
+        if limit is not None:
+            stmt = stmt.limit(limit).offset(offset)
+        elif offset:
+            stmt = stmt.offset(offset)
+        rows = self._s.scalars(stmt).all()
+        return [_to_read(r) for r in rows], total
 
     def list_by_sesi(self, sesi_id: str) -> list[TiDetailRead]:
         rows = self._s.scalars(

@@ -53,7 +53,7 @@ def test_analisis_butuh_closed_422(client: TestClient, jabatan_id_tk: str) -> No
 def test_analisis_kurang_min_responden_422(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk, min_responden=2)
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     _submit(client, responden[0]["id"], ctx["kodes"], 4, 3, 5)
     client.post(f"{SESI_BASE}/{sesi['id']}/tutup")
     r = client.post(f"{SESI_BASE}/{sesi['id']}/analisis")
@@ -63,7 +63,7 @@ def test_analisis_kurang_min_responden_422(client: TestClient, jabatan_id_tk: st
 def test_analisis_ok_dan_mean_sd_flag(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk, min_responden=2)
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     assert len(responden) == 2
     _submit(client, responden[0]["id"], ctx["kodes"], 4, 3, 5)
     _submit(client, responden[1]["id"], ctx["kodes"], 4, 3, 5)
@@ -96,7 +96,7 @@ def test_hasil_sebelum_analyzed_422(client: TestClient, jabatan_id_tk: str) -> N
 def test_hasil_ok_setelah_analyzed(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, ctx = _build_sesi(client, jabatan_id_tk, min_responden=2)
     client.post(f"{SESI_BASE}/{sesi['id']}/buka")
-    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
     _submit(client, responden[0]["id"], ctx["kodes"], 4, 3, 5)
     _submit(client, responden[1]["id"], ctx["kodes"], 2, 1, 1)
     client.post(f"{SESI_BASE}/{sesi['id']}/tutup")
@@ -216,7 +216,7 @@ def test_opm_admin_semua_endpoint_boleh(client: TestClient, jabatan_id_tk: str) 
     assert client.get(f"{SESI_BASE}/{sid}/task").status_code == 200
 
     assert client.post(f"{SESI_BASE}/{sid}/buka").status_code == 200
-    responden = client.get(f"{SESI_BASE}/{sid}/responden").json()
+    responden = client.get(f"{SESI_BASE}/{sid}/responden").json()["items"]
     _submit(client, responden[0]["id"], ctx["kodes"], 4, 3, 5)
     assert client.post(f"{SESI_BASE}/{sid}/tutup").status_code == 200
     assert client.post(f"{SESI_BASE}/{sid}/analisis").status_code == 200

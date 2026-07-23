@@ -29,7 +29,9 @@ class _Record:
 class TiRespondenService(Protocol):
     """Kontrak operasi terhadap TiResponden."""
 
-    def list_by_sesi(self, sesi_id: str) -> list[TiRespondenRead]: ...
+    def list_by_sesi(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TiRespondenRead], int]: ...
     def list_by_partisipan(self, partisipan_id: str) -> list[TiRespondenRead]: ...
     def count_by_sesi(self, sesi_id: str) -> int: ...
     def count_tahap1_submitted(self, sesi_id: str) -> int: ...
@@ -54,13 +56,17 @@ class InMemoryTiRespondenService:
     def _to_read(rec: _Record) -> TiRespondenRead:
         return TiRespondenRead.model_validate(rec)
 
-    def list_by_sesi(self, sesi_id: str) -> list[TiRespondenRead]:
+    def list_by_sesi(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TiRespondenRead], int]:
         with self._lock:
             ordered = sorted(
                 (r for r in self._data.values() if r.sesi_id == sesi_id),
                 key=lambda r: r.created_at,
             )
-        return [self._to_read(r) for r in ordered]
+        total = len(ordered)
+        page = ordered[offset:] if limit is None else ordered[offset : offset + limit]
+        return [self._to_read(r) for r in page], total
 
     def list_by_partisipan(self, partisipan_id: str) -> list[TiRespondenRead]:
         with self._lock:

@@ -70,7 +70,9 @@ class _Record:
 class TsLogService(Protocol):
     """Kontrak operasi terhadap TsLog."""
 
-    def list_by_partisipan(self, partisipan_id: str) -> list[TsLogRead]: ...
+    def list_by_partisipan(
+        self, partisipan_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TsLogRead], int]: ...
     def count_by_partisipan(self, partisipan_id: str) -> int: ...
     def get(self, log_id: str) -> TsLogRead: ...
     def create(self, partisipan_id: str, data: TsLogCreate) -> TsLogRead: ...
@@ -88,14 +90,18 @@ class InMemoryTsLogService:
     def _to_read(rec: _Record) -> TsLogRead:
         return TsLogRead.model_validate(rec)
 
-    def list_by_partisipan(self, partisipan_id: str) -> list[TsLogRead]:
+    def list_by_partisipan(
+        self, partisipan_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[TsLogRead], int]:
         with self._lock:
             ordered = sorted(
                 (r for r in self._data.values() if r.partisipan_id == partisipan_id),
                 key=lambda r: r.tanggal,
                 reverse=True,
             )
-        return [self._to_read(r) for r in ordered]
+        total = len(ordered)
+        page = ordered[offset:] if limit is None else ordered[offset : offset + limit]
+        return [self._to_read(r) for r in page], total
 
     def count_by_partisipan(self, partisipan_id: str) -> int:
         with self._lock:

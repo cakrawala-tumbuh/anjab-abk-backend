@@ -50,7 +50,9 @@ class OpmSesiService(Protocol):
     def update(self, sesi_id: str, data: OpmSesiUpdate) -> OpmSesiRead: ...
     def delete(self, sesi_id: str, *, paksa: bool = False) -> None: ...
     def transition(self, sesi_id: str, target: StatusSesi) -> OpmSesiRead: ...
-    def list_task(self, sesi_id: str) -> list[OpmSesiTaskRead]: ...
+    def list_task(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[OpmSesiTaskRead], int]: ...
     def get_task_kodes(self, sesi_id: str) -> set[str]: ...
     def search(
         self, *, domain: Domain, order: Order, limit: int, offset: int
@@ -157,15 +159,21 @@ class InMemoryOpmSesiService:
             rec.status = target
             return self._to_read(rec)
 
-    def list_task(self, sesi_id: str) -> list[OpmSesiTaskRead]:
+    def list_task(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[OpmSesiTaskRead], int]:
         with self._lock:
             rec = self._data.get(sesi_id)
             if rec is None:
                 raise NotFoundError(f"Sesi OPM '{sesi_id}' tidak ditemukan.")
-            return list(rec.tasks)
+            tasks = list(rec.tasks)
+        total = len(tasks)
+        page = tasks[offset:] if limit is None else tasks[offset : offset + limit]
+        return page, total
 
     def get_task_kodes(self, sesi_id: str) -> set[str]:
-        return {t.task_kode for t in self.list_task(sesi_id)}
+        tasks, _ = self.list_task(sesi_id)
+        return {t.task_kode for t in tasks}
 
     def search(
         self, *, domain: Domain, order: Order, limit: int, offset: int

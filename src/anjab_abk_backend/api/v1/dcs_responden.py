@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, Path, Request, Response, status
 
 from ...core.services.partisipan import PartisipanService
 from ...dcs.schemas.jawaban import DcsJawabanRead, DcsJawabanUpsert
@@ -14,18 +14,21 @@ from ...dcs.services.responden import DcsRespondenService
 from ...dcs.services.subskala import DcsSubSkalaService
 from ...dependencies import (
     READ_GUARDS,
+    Pagination,
     authorize_responden_access,
     get_current_principal,
     get_dcs_jawaban_service,
     get_dcs_responden_service,
     get_dcs_subskala_service,
     get_partisipan_service,
+    pagination_params,
     rate_limit,
     require_admin,
 )
 from ...errors import ValidationAppError
-from ...schemas.common import BulkAssignResult, ErrorResponse
+from ...schemas.common import BulkAssignResult, ErrorResponse, Page
 from ...security import Principal
+from ..pagination import set_pagination_links
 
 router = APIRouter()
 
@@ -41,16 +44,21 @@ _FORBIDDEN = {
 
 @router.get(
     "",
-    response_model=list[DcsRespondenRead],
+    response_model=Page[DcsRespondenRead],
     summary="Daftar seluruh responden DCS (admin)",
     operation_id="dcs_responden_list",
     dependencies=[Depends(require_admin)],
     responses={**_AUTH, **_FORBIDDEN},
 )
 def list_responden(
+    request: Request,
+    response: Response,
+    page: Annotated[Pagination, Depends(pagination_params)],
     rsp_service: Annotated[DcsRespondenService, Depends(get_dcs_responden_service)],
-) -> list[DcsRespondenRead]:
-    return rsp_service.list_all()
+) -> Page[DcsRespondenRead]:
+    items, total = rsp_service.list_all(limit=page.limit, offset=page.offset)
+    set_pagination_links(response, request, total, page.limit, page.offset)
+    return Page[DcsRespondenRead](items=items, total=total, limit=page.limit, offset=page.offset)
 
 
 @router.post(
