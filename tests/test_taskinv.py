@@ -867,6 +867,84 @@ def test_submit_detail_rejected_when_empty(client: TestClient, jabatan_id_tk: st
 
 
 # --------------------------------------------------------------------------- #
+# va_type "Context-Dependent" (prefill/draft) & "Needs Validation" (dihapus)
+# --------------------------------------------------------------------------- #
+
+
+def _setup_responden_di_tahap3(client: TestClient, jabatan_id_tk: str) -> tuple[str, str]:
+    """Bikin sesi + 1 responden yang sudah masuk TAHAP3 dengan 1 task terpilih."""
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    _seleksi_submit(client, ra["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    client.post(f"{SESI}/{sid}/mulai-tahap3")
+    return ra["id"], kodes[0]
+
+
+def test_save_draft_detail_context_dependent_diterima(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Draft-save (PUT) tetap menerima `va_type` `"Context-Dependent"` — hanya submit
+    final yang menolaknya (lihat `test_submit_detail_context_dependent_ditolak`)."""
+    responden_id, kode = _setup_responden_di_tahap3(client, jabatan_id_tk)
+
+    item = _detail_item(kode)
+    item["va_type"] = "Context-Dependent"
+    res = client.put(f"{SESI}/responden/{responden_id}/detail", json={"detail": [item]})
+    assert res.status_code == 200, res.text
+    assert res.json()[0]["va_type"] == "Context-Dependent"
+
+
+def test_submit_detail_context_dependent_ditolak(client: TestClient, jabatan_id_tk: str) -> None:
+    """Submit final (`POST .../detail/submit`) ditolak 422 selama masih ada entri
+    ber-`va_type` `"Context-Dependent"`; responden TIDAK berubah menjadi ter-submit."""
+    responden_id, kode = _setup_responden_di_tahap3(client, jabatan_id_tk)
+
+    item = _detail_item(kode)
+    item["va_type"] = "Context-Dependent"
+    client.put(f"{SESI}/responden/{responden_id}/detail", json={"detail": [item]})
+
+    res = client.post(f"{SESI}/responden/{responden_id}/detail/submit")
+    assert res.status_code == 422, res.text
+    assert kode in res.json()["message"]
+
+    assert client.get(f"{SESI}/responden/{responden_id}").json()["tahap3_submit"] is False
+
+
+def test_submit_detail_setelah_diubah_dari_context_dependent_sukses(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Setelah seluruh `va_type` diubah ke tipe kanonik (VA-Core/VA-Enable/NVA-Residual),
+    submit final sukses seperti sebelum aturan ini ada."""
+    responden_id, kode = _setup_responden_di_tahap3(client, jabatan_id_tk)
+
+    item = _detail_item(kode)
+    item["va_type"] = "Context-Dependent"
+    client.put(f"{SESI}/responden/{responden_id}/detail", json={"detail": [item]})
+
+    item["va_type"] = "VA-Core"
+    client.put(f"{SESI}/responden/{responden_id}/detail", json={"detail": [item]})
+
+    res = client.post(f"{SESI}/responden/{responden_id}/detail/submit")
+    assert res.status_code == 201, res.text
+    assert client.get(f"{SESI}/responden/{responden_id}").json()["tahap3_submit"] is True
+
+
+def test_detail_needs_validation_va_type_ditolak(client: TestClient, jabatan_id_tk: str) -> None:
+    """`"Needs Validation"` sudah dihapus tuntas dari `VaType` — payload yang masih
+    mengirimnya ditolak 422 (nilai tak dikenal `Literal`)."""
+    responden_id, kode = _setup_responden_di_tahap3(client, jabatan_id_tk)
+
+    item = _detail_item(kode)
+    item["va_type"] = "Needs Validation"
+    res = client.put(f"{SESI}/responden/{responden_id}/detail", json={"detail": [item]})
+    assert res.status_code == 422
+
+
+# --------------------------------------------------------------------------- #
 # Tahap 2 review koordinator
 # --------------------------------------------------------------------------- #
 

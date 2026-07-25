@@ -9324,34 +9324,6 @@
     "std_durasi_per_kali": "<10 menit/permintaan"
   },
   {
-    "kode": "STSAR-ALL-LEAD-026",
-    "unit": "ALL",
-    "kategori_jabatan": "Staff Sarana Prasarana",
-    "tugas_pokok": "Pengadaan fasilitas / peralatan",
-    "detil_tugas": "Pengadaan kondisional ruangan dan transportasi",
-    "uraian_tugas": "Menerima permintaan dari pihak yang membutuhkan ruangan dan transportasi untuk [tujuan: VALIDASI], menggunakan [cara/tools: VALIDASI], menghasilkan [output: VALIDASI].",
-    "urutan": 36,
-    "std_va_type": "Needs Validation",
-    "std_sumber_bukti": "Formal",
-    "std_kondisi": "Baseline",
-    "std_frekuensi_teks": "Mingguan",
-    "std_durasi_per_kali": null
-  },
-  {
-    "kode": "STSAR-ALL-LEAD-027",
-    "unit": "ALL",
-    "kategori_jabatan": "Staff Sarana Prasarana",
-    "tugas_pokok": "Pengadaan fasilitas / peralatan",
-    "detil_tugas": "Pengadaan kondisional ruangan dan transportasi",
-    "uraian_tugas": "Menerima permintaan dari pihak yang membutuhkan transportasi untuk [tujuan: VALIDASI], menggunakan [cara/tools: VALIDASI], menghasilkan [output: VALIDASI].",
-    "urutan": 37,
-    "std_va_type": "Needs Validation",
-    "std_sumber_bukti": "Formal",
-    "std_kondisi": "Baseline",
-    "std_frekuensi_teks": "Mingguan",
-    "std_durasi_per_kali": null
-  },
-  {
     "kode": "STSAR-ALL-ADMIN-006",
     "unit": "ALL",
     "kategori_jabatan": "Staff Sarana Prasarana",

@@ -9,6 +9,17 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Diubah
 
+- **Task Inventory Tahap 3: submit final menolak `va_type` "Context-Dependent"; `"Needs
+  Validation"` dihapus dari `VaType`.** `VaType` (`taskinv/schemas/calhr.py`) kini memuat
+  4 nilai (`VA-Core`/`VA-Enable`/`NVA-Residual`/`Context-Dependent`) — `"Needs Validation"`
+  dihapus tuntas dari kontrak (0 pemakai; 2 baris seed placeholder ber-`kode`
+  `STSAR-ALL-LEAD-026`/`027` yang masih memakainya turut dibersihkan dari
+  `data/task_catalog.json`, mengikuti pembersihan yang sama di live DB 2026-07-25).
+  `"Context-Dependent"` tetap diterima sebagai prefill katalog & draft (`PUT
+  .../detail`), tetapi `POST .../detail/submit` kini ditolak (422) selama masih ada
+  entri ber-`va_type` itu — pesan menyebut `task_kode` yang harus dipastikan menjadi
+  VA-Core/VA-Enable/NVA-Residual sebelum finalisasi. Diterapkan paritas di seam
+  in-memory (`services/detail.py`) dan SQL (`services/detail_sql.py`).
 - **Relasi `uraian_tugas` ↔ `jabatan` diubah menjadi m2m via association object**
   (`TiUraianTugasJabatanModel`, tabel `ti_uraian_tugas_jabatan`) — sebelumnya
   `TiUraianTugasModel` menautkan tiap uraian tugas ke tepat satu jabatan lewat

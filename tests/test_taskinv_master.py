@@ -322,7 +322,10 @@ def test_ut_list_ok(client: TestClient) -> None:
     assert r.status_code == 200
     body = r.json()
     assert "items" in body
-    assert body["total"] >= 1140  # seeded from task_catalog.json (Task Bank v2_19)
+    # Seeded dari task_catalog.json (Task Bank v2_19); turun dari 1140 ke 1138 sejak
+    # 2 baris placeholder "Needs Validation" (STSAR-ALL-LEAD-026/027) dihapus — lihat
+    # issue cakrawala-tumbuh/anjab-abk-backend#24.
+    assert body["total"] >= 1138
 
 
 def test_ut_create_and_get(client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]) -> None:

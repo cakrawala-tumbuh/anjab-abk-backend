@@ -95,10 +95,36 @@ class SqlTiDetailService:
         return [_to_read(r) for r in results]
 
     def submit(self, responden_id: str) -> list[TiDetailRead]:
+        """Finalisasi entri detail Tahap 3 milik satu responden.
+
+        Memvalidasi dari baris yang sudah tersimpan di DB (tanpa payload): minimal 1
+        entri harus ada, dan tidak boleh ada entri ber-`va_type` `"Context-Dependent"`
+        — nilai itu hanya diterima sebagai prefill/draft (lihat `upsert`), bukan
+        jawaban final. Tidak mengubah data; flag submit di-set caller (endpoint)
+        setelah pemanggilan ini berhasil tanpa exception.
+
+        Args:
+            responden_id: ID responden yang akan difinalisasi.
+
+        Returns:
+            Seluruh baris `TiDetailRead` milik responden tersebut.
+
+        Raises:
+            ValidationAppError: bila belum ada entri tersimpan, atau masih ada entri
+                ber-`va_type` `"Context-Dependent"` (pesan menyebut `task_kode`-nya).
+        """
         rows, _ = self.list_by_responden(responden_id)
         if not rows:
             raise ValidationAppError(
                 "Responden harus mengisi minimal 1 entri detail sebelum submit Tahap 3."
+            )
+        context_dependent = sorted(r.task_kode for r in rows if r.va_type == "Context-Dependent")
+        if context_dependent:
+            shown = ", ".join(context_dependent[:5])
+            raise ValidationAppError(
+                'Tidak dapat submit: task berikut masih bertipe VA "Context-Dependent", '
+                f"pastikan jadi VA-Core/VA-Enable/NVA-Residual sebelum finalisasi: {shown}"
+                + ("..." if len(context_dependent) > 5 else ".")
             )
         return rows
 

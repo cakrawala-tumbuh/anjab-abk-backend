@@ -98,7 +98,8 @@ def save_draft_detail(
         422: {
             "model": ErrorResponse,
             "description": (
-                "Sesi bukan TAHAP3, responden sudah submit, atau belum ada entri detail."
+                "Sesi bukan TAHAP3, responden sudah submit, belum ada entri detail, atau"
+                ' masih ada entri ber-va_type "Context-Dependent" yang belum difinalisasi.'
             ),
         },
     },

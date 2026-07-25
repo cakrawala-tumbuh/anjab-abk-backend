@@ -82,6 +82,39 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-26] TI Tahap 3: tolak `va_type` final "Context-Dependent"; hapus "Needs Validation"
+
+Backlog 024. `VaType` (`taskinv/schemas/calhr.py`) memuat 5 nilai; dua di antaranya
+menyimpang dari CF-3.0 (3 tipe kanonik VA-Core/VA-Enable/NVA-Residual):
+`"Context-Dependent"` (prefill katalog ~325 task, `std_va_type`) dan
+`"Needs Validation"` (placeholder, 0 pemakai live DB — sudah dibersihkan 2026-07-25).
+Keputusan produk: `"Context-Dependent"` boleh sebagai prefill & draft, tetapi ditolak
+sebagai jawaban final; `"Needs Validation"` dihapus total.
+
+- **Prasyarat (langkah pertama, wajib mendahului perubahan `Literal`)**: 2 baris seed
+  ber-`kode` `STSAR-ALL-LEAD-026`/`027` (placeholder `[tujuan: VALIDASI]`,
+  `std_va_type: "Needs Validation"`) dihapus dari
+  `taskinv/data/task_catalog.json` — berkas seed ini terpisah dari live DB;
+  `seed_catalog_models()` (`taskinv/seed.py`) membangun `UraianTugasCreate` dari
+  SELURUH baris JSON ini via fixture session-scoped `engine`
+  (`tests/conftest.py`), jadi menghapus nilai `Literal` sebelum membersihkan
+  baris seed akan meruntuhkan `make test` di tahap setup (`pydantic.ValidationError`
+  tak tertangkap — `seed_catalog_models` hanya menangkap `ConflictError`).
+  Eksekusi pertama (2026-07-25) berhenti `blocked` tepat pada temuan ini.
+- `VaType` kini 4 nilai: `VA-Core`/`VA-Enable`/`NVA-Residual`/`Context-Dependent`.
+- **Gate baru di `submit()`** (`taskinv/services/detail.py` seam in-memory +
+  `detail_sql.py` seam SQL, paritas): setelah gate "minimal 1 entri" yang sudah ada,
+  ditambah gate ke-2 — tolak (`ValidationAppError` → 422) bila ada ≥1 baris tersimpan
+  ber-`va_type == "Context-Dependent"`, pesan menyebut `task_kode`-nya (maks 5 + `...`).
+  Draft-save (`PUT .../detail`, `upsert()`) **tidak disentuh** — tetap menerima
+  `"Context-Dependent"` apa adanya. Endpoint (`api/v1/taskinv_detail.py::submit_detail`)
+  memanggil `detail_service.submit()` **sebelum** `rsp_service.mark_tahap3()` — gate
+  yang melempar exception otomatis mencegah responden ter-flag submit.
+- Tidak ada migrasi Alembic (`VaType` adalah `Literal` Pydantic, kolom tetap `String`).
+  `openapi.json` (gitignored, tidak di-commit) menyusut 5→4 nilai enum `VaType` —
+  klien bertipe (frontend `anjab-abk-web-app#39`, tool MCP) meregenerasi tipe di
+  item terpisah setelah kontrak ini live.
+
 ### [2026-07-21] DCS & WCP: hapus item master + analisis baca katalog dari DB
 
 Permintaan produk: admin bisa **menghapus** item dari master instrumen DCS/WCP
