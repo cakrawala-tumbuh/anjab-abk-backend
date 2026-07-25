@@ -402,13 +402,48 @@ class TiDetilTugasJabatanModel(Base):
 
 
 class TiUraianTugasModel(Base):
+    """Entitas kanonik uraian tugas (task statement) — 1 baris = 1 pernyataan tugas.
+
+    Sejak refactor m2m via association object (backlog `anjab-abk-backend#23`), kolom
+    per-jabatan (`kode`, `unit`, `jabatan_id`, `urutan`, `tugas_pokok_id`,
+    `detil_tugas_id`, `std_*`) dipindah ke `TiUraianTugasJabatanModel` lewat
+    `jabatan_links`. Migrasi awal (revisi Alembic pendampingnya) bersifat 1:1
+    non-lossy — setiap baris lama menjadi tepat satu kanonik + satu link; dedup/
+    kanonikalisasi baris `uraian` yang identik teksnya adalah pekerjaan terpisah
+    yang menyusul.
+    """
+
     __tablename__ = "ti_uraian_tugas"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    kode: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
     uraian: Mapped[str] = mapped_column(Text, nullable=False)
-    unit: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    created_at: Mapped[datetime] = _ts(index=True)
+
+    jabatan_links: Mapped[list[TiUraianTugasJabatanModel]] = relationship(
+        back_populates="uraian_tugas", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class TiUraianTugasJabatanModel(Base):
+    """Association object uraian tugas ↔ jabatan — memikul seluruh atribut per-jabatan.
+
+    Sebelum refactor `anjab-abk-backend#23`, kolom-kolom ini hidup langsung di
+    `TiUraianTugasModel` (relasi 1:N tunggal ke jabatan). Dipindah ke tabel terpisah
+    agar satu uraian tugas kanonik bisa suatu saat dipakai banyak jabatan tanpa
+    duplikasi fisik teksnya — meniru pola `TiTugasPokokJabatanModel`/
+    `TiDetilTugasJabatanModel` yang sudah m2m sejak awal.
+    """
+
+    __tablename__ = "ti_uraian_tugas_jabatan"
+    __table_args__ = (UniqueConstraint("uraian_tugas_id", "jabatan_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uraian_tugas_id: Mapped[str] = mapped_column(
+        ForeignKey("ti_uraian_tugas.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kode: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
     jabatan_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    unit: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     urutan: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     tugas_pokok_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     detil_tugas_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
@@ -421,7 +456,8 @@ class TiUraianTugasModel(Base):
     std_jam_per_minggu: Mapped[float | None] = mapped_column(Float, nullable=True)
     std_peak4w_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
     std_va_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    created_at: Mapped[datetime] = _ts(index=True)
+
+    uraian_tugas: Mapped[TiUraianTugasModel] = relationship(back_populates="jabatan_links")
 
 
 class TiSesiModel(Base):

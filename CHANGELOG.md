@@ -7,6 +7,19 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diubah
+
+- **Relasi `uraian_tugas` ↔ `jabatan` diubah menjadi m2m via association object**
+  (`TiUraianTugasJabatanModel`, tabel `ti_uraian_tugas_jabatan`) — sebelumnya
+  `TiUraianTugasModel` menautkan tiap uraian tugas ke tepat satu jabatan lewat
+  kolom tunggal `jabatan_id`. Kanonik (`TiUraianTugasModel`) kini hanya memuat
+  `id`/`uraian`/`created_at`; kolom per-jabatan (`kode`, `unit`, `jabatan_id`,
+  `urutan`, `tugas_pokok_id`, `detil_tugas_id`, `std_*`) pindah ke link. Migrasi
+  1:1 non-lossy — belum ada dedup/kanonikalisasi baris `uraian` yang teksnya
+  identik (menyusul terpisah). **Kontrak API (`ti_catalog`, CRUD
+  `uraian-tugas`, `openapi.json`) tidak berubah** — diverifikasi diff kosong
+  sebelum/sesudah refactor; MCP & frontend tidak perlu perubahan.
+
 ## [0.39.0] - 2026-07-23
 
 ### Diubah

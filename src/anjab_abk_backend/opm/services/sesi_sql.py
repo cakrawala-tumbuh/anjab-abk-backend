@@ -28,6 +28,7 @@ from ...models import (
     TiDetilTugasModel,
     TiSesiModel,
     TiTugasPokokModel,
+    TiUraianTugasJabatanModel,
     TiUraianTugasModel,
 )
 from ...schemas.search import Domain, Order
@@ -206,18 +207,25 @@ class SqlOpmSesiService:
         # urutannya memang dijamin.
         self._flush_checked(on_conflict=konflik)
 
-        # 6. Snapshot task terpilih TI → opm_sesi_task.
-        ut_rows = self._s.scalars(
-            select(TiUraianTugasModel).where(TiUraianTugasModel.kode.in_(terpilih))
+        # 6. Snapshot task terpilih TI → opm_sesi_task. `kode`/`tugas_pokok_id`/
+        # `detil_tugas_id`/`urutan` kini hidup di `TiUraianTugasJabatanModel` (link
+        # per-jabatan); `uraian` tetap di kanonik `TiUraianTugasModel` — join keduanya.
+        ut_rows = self._s.execute(
+            select(TiUraianTugasJabatanModel, TiUraianTugasModel.uraian)
+            .join(
+                TiUraianTugasModel,
+                TiUraianTugasModel.id == TiUraianTugasJabatanModel.uraian_tugas_id,
+            )
+            .where(TiUraianTugasJabatanModel.kode.in_(terpilih))
         ).all()
-        ut_by_kode = {u.kode: u for u in ut_rows}
+        ut_by_kode = {link.kode: (link, uraian_text) for link, uraian_text in ut_rows}
         tp_map = self._s.scalars(
             select(TiTugasPokokModel).where(
-                TiTugasPokokModel.id.in_({u.tugas_pokok_id for u in ut_rows})
+                TiTugasPokokModel.id.in_({link.tugas_pokok_id for link, _ in ut_rows})
             )
         ).all()
         tp_by_id = {t.id: t.nama for t in tp_map}
-        detil_ids = {u.detil_tugas_id for u in ut_rows if u.detil_tugas_id is not None}
+        detil_ids = {link.detil_tugas_id for link, _ in ut_rows if link.detil_tugas_id is not None}
         dt_map = (
             self._s.scalars(
                 select(TiDetilTugasModel).where(TiDetilTugasModel.id.in_(detil_ids))
@@ -228,16 +236,17 @@ class SqlOpmSesiService:
         dt_by_id = {d.id: d.nama for d in dt_map}
 
         for kode in sorted(terpilih):
-            ut = ut_by_kode.get(kode)
-            if ut is None:
+            entry = ut_by_kode.get(kode)
+            if entry is None:
                 continue  # tidak seharusnya terjadi; kode berasal dari snapshot TI valid
+            link, uraian_text = entry
             rec.task_links.append(
                 OpmSesiTaskModel(
                     task_kode=kode,
-                    uraian_tugas=ut.uraian,
-                    tugas_pokok=tp_by_id.get(ut.tugas_pokok_id, ""),
-                    detil_tugas=dt_by_id.get(ut.detil_tugas_id) if ut.detil_tugas_id else None,
-                    urutan=ut.urutan,
+                    uraian_tugas=uraian_text,
+                    tugas_pokok=tp_by_id.get(link.tugas_pokok_id, ""),
+                    detil_tugas=dt_by_id.get(link.detil_tugas_id) if link.detil_tugas_id else None,
+                    urutan=link.urutan,
                 )
             )
 
