@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ...errors import NotFoundError, ValidationAppError
+from ...errors import ConflictError, NotFoundError, ValidationAppError
 from ...models import PartisipanModel, TiRespondenModel
 from ...schemas.common import BulkAssignResult, BulkSkipped
 from ..schemas.responden import TiRespondenCreate, TiRespondenRead
@@ -171,6 +171,40 @@ class SqlTiRespondenService:
         return _to_read(self._get_model(responden_id))
 
     def create(self, sesi_id: str, data: TiRespondenCreate) -> TiRespondenRead:
+        """Daftarkan satu responden pada sesi Task Inventory `sesi_id`.
+
+        Menolak (`ConflictError`, 409) bila `data.partisipan_id` **non-null** dan
+        partisipan itu sudah punya baris responden di sesi yang sama
+        (backlog `anjab-abk-backend#29`) — dicek eksplisit di sini, SEBELUM
+        `INSERT`, agar pesannya spesifik alih-alih pesan generik
+        `IntegrityError`. `UniqueConstraint("sesi_id", "partisipan_id")`
+        (`uq_ti_responden_sesi_partisipan`) di `TiRespondenModel` tetap ada
+        sebagai jaring pengaman lapisan DB untuk race dua request bersamaan.
+        `partisipan_id = NULL` (responden manual tanpa partisipan) TIDAK
+        dicek — boleh berulang.
+
+        Args:
+            sesi_id: ID sesi Task Inventory tujuan.
+            data: payload pembuatan responden (`nama`, `partisipan_id` opsional).
+
+        Returns:
+            Responden yang baru dibuat.
+
+        Raises:
+            ConflictError: `data.partisipan_id` non-null sudah terdaftar sebagai
+                responden pada `sesi_id` ini.
+        """
+        if data.partisipan_id is not None:
+            sudah_ada = self._s.scalar(
+                select(TiRespondenModel.id).where(
+                    TiRespondenModel.sesi_id == sesi_id,
+                    TiRespondenModel.partisipan_id == data.partisipan_id,
+                )
+            )
+            if sudah_ada is not None:
+                raise ConflictError(
+                    "Partisipan ini sudah terdaftar sebagai responden pada sesi ini."
+                )
         rec = TiRespondenModel(
             id=f"trsp_{uuid.uuid4().hex[:8]}",
             sesi_id=sesi_id,

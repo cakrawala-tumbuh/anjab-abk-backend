@@ -499,7 +499,20 @@ class TiSesiTaskTerpilihModel(Base):
 
 
 class TiRespondenModel(Base):
+    """Satu baris responden Task Inventory dalam satu sesi.
+
+    `UniqueConstraint("sesi_id", "partisipan_id")` (`uq_ti_responden_sesi_partisipan`)
+    menegakkan **satu partisipan hanya satu responden per sesi** di lapisan basis data
+    (backlog `anjab-abk-backend#29`) — jaring pengaman terakhir setelah pengecekan
+    eksplisit di `SqlTiRespondenService.create()`. `partisipan_id = NULL` (responden
+    manual tanpa partisipan) TIDAK dibatasi constraint ini: PostgreSQL memperlakukan
+    NULL sebagai distinct pada unique constraint, sehingga boleh berulang.
+    """
+
     __tablename__ = "ti_responden"
+    __table_args__ = (
+        UniqueConstraint("sesi_id", "partisipan_id", name="uq_ti_responden_sesi_partisipan"),
+    )
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
     sesi_id: Mapped[str] = mapped_column(

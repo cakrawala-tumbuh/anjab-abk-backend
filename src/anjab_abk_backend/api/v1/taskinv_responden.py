@@ -83,6 +83,10 @@ def list_responden(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND_SESI,
+        409: {
+            "model": ErrorResponse,
+            "description": "Partisipan ini sudah terdaftar sebagai responden pada sesi ini.",
+        },
         422: {
             "model": ErrorResponse,
             "description": "Partisipan bukan anggota SME panel jabatan sesi ini.",
@@ -96,6 +100,14 @@ def create_responden(
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     sme_panel_service: Annotated[SMEPanelService, Depends(get_sme_panel_service)],
 ) -> TiRespondenRead:
+    """Daftarkan satu responden ke sesi Task Inventory `sesi_id` (admin).
+
+    Menolak `422` bila sesi bukan `DRAFT`/`TAHAP1`, atau bila `payload.partisipan_id`
+    diisi tapi bukan anggota SME panel jabatan sesi ini. Menolak `409` bila
+    `payload.partisipan_id` non-null sudah terdaftar sebagai responden di sesi ini
+    (`SqlTiRespondenService.create()`, backlog `anjab-abk-backend#29`) —
+    `partisipan_id` kosong (responden manual tanpa partisipan) boleh berulang.
+    """
     sesi = sesi_service.get(sesi_id)
     if sesi.status not in ("DRAFT", "TAHAP1"):
         raise ValidationAppError(

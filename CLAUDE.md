@@ -82,6 +82,51 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-26] TI: tolak responden ganda per partisipan per sesi (`ConflictError` + `UniqueConstraint`)
+
+Backlog `#29`, ditemukan lewat audit produksi R3 (sesi `tises_82c6127d`, partisipan
+`par_b43d6f4f` punya dua baris responden — satu submit Tahap 1, satu tidak). Aturan
+"tolak duplikat" sudah ada tapi hanya di `assign_ti_responden_banyak` (endpoint bulk);
+`SqlTiRespondenService.create()` (endpoint single `POST .../responden`) langsung
+`INSERT` tanpa cek apa pun, dan `TiRespondenModel` tak punya jaring pengaman DB.
+Baris responden ganda merusak diam-diam: gerbang `mulai-tahap2` (membandingkan jumlah
+baris vs jumlah submit), `unanimous_terpilih` (menghitung satu orang dua suara), dan
+`fmean` ABK (membobot ganda jawaban orang yang sama).
+
+- **`SqlTiRespondenService.create()`** kini mengecek eksplisit **sebelum** `INSERT`:
+  bila `data.partisipan_id` non-null dan sudah punya baris responden di sesi yang
+  sama, `raise ConflictError` (409) dengan pesan persis
+  `"Partisipan ini sudah terdaftar sebagai responden pada sesi ini."`
+  `partisipan_id = NULL` (responden manual tanpa partisipan) **tidak** dicek — boleh
+  berulang (PostgreSQL memperlakukan NULL sebagai distinct pada unique constraint).
+  Endpoint (`taskinv_responden.py::create_responden`) mendokumentasikan `409` di
+  OpenAPI operasinya.
+- **`UniqueConstraint("sesi_id", "partisipan_id")`** (`uq_ti_responden_sesi_partisipan`)
+  ditambahkan pada `TiRespondenModel` — jaring pengaman lapisan DB untuk race dua
+  request bersamaan, meniru pola cek-eksplisit-sebelum-flush yang sudah ada di OPM
+  (entri `[2026-07-14] OPM` di bawah).
+- **Migrasi `79edf4fa66b1`** membersihkan duplikat lama **sebelum** menambah
+  constraint: untuk tiap grup `(sesi_id, partisipan_id)` berisi >1 baris, baris yang
+  `tahap1_submit`/`tahap3_submit` bernilai true dipertahankan (atau `created_at`
+  paling awal bila tak ada yang submit); baris sisanya dihapus **hanya bila** kedua
+  flag submit false DAN tidak punya baris anak di `ti_seleksi`/`ti_detail`/
+  `ti_usulan_task` — bila ada baris yang tidak memenuhi syarat itu, migrasi **gagal**
+  (`RuntimeError`) menyebut `id` responden bersangkutan, bukan menghapus jawaban
+  partisipan diam-diam. `downgrade()` hanya melepas constraint; baris yang sudah
+  dihapus tidak dikembalikan.
+- **Endpoint bulk (`assign_ti_responden_banyak`/`.../responden/bulk`) TIDAK
+  disentuh** — tetap `skipped: sudah_terdaftar` (bukan 409), di luar lingkup revisi
+  ini (diverifikasi test regresi).
+- **Efek samping ke test lama**: tiga test otorisasi (`test_get_responden_forbidden_
+  for_non_owner`, `test_save_draft_seleksi_forbidden_for_non_owner`,
+  `test_usulan_forbidden_for_non_owner`) dan `test_responden_sme_panel_check` diam-diam
+  mengandalkan celah yang baru ditutup ini: partisipan sudah anggota SME panel
+  **sebelum** sesi dibuat → auto-populate (`SqlTiSesiService.create()`) sudah
+  mendaftarkannya sebagai responden, lalu test mem-POST manual partisipan yang sama
+  lagi (sebelumnya "berhasil" membuat duplikat — persis bug yang dilaporkan). Test
+  diperbaiki mengambil baris responden hasil auto-populate lewat `GET
+  .../sesi/{id}/responden` alih-alih POST kedua.
+
 ### [2026-07-26] TI Tahap 2: review usulan Tahap 1 & materialisasi ke katalog saat mulai-tahap3
 
 Backlog `#27`, lanjutan langsung `#26` di atas. Usulan tersimpan sejak `#26` tapi tidak

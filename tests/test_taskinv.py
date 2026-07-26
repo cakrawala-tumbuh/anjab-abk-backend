@@ -1155,11 +1155,12 @@ def test_responden_sme_panel_check(client: TestClient, db_session) -> None:
 
     jabatan_id = f"jbt_{uuid.uuid4().hex[:8]}"
 
-    # Buat SME panel untuk jabatan ini
+    # Buat SME panel untuk jabatan ini (masih tanpa anggota)
     sme_svc = SqlSMEPanelService(db_session)
     panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id))
 
-    # Buat partisipan A (akan menjadi anggota panel)
+    # Buat partisipan A (akan menjadi anggota panel — TAPI baru ditambahkan SETELAH
+    # sesi dibuat, lihat catatan di bawah)
     par_svc = SqlPartisipanService(db_session)
     par_a = par_svc.create(
         PartisipanCreate(
@@ -1171,7 +1172,6 @@ def test_responden_sme_panel_check(client: TestClient, db_session) -> None:
         ),
         authentik_user_id=f"uid_a_{uuid.uuid4().hex[:4]}",
     )
-    sme_svc.add_anggota(panel.id, par_a.id)
 
     # Buat partisipan B (tidak di panel)
     par_b = par_svc.create(
@@ -1188,7 +1188,11 @@ def test_responden_sme_panel_check(client: TestClient, db_session) -> None:
     # Buat sesi TI dengan jabatan_id (tanpa unit → tidak perlu catalog valid)
     # Gunakan jabatan_id yang memang ada di SME panel
     # Namun: jabatan ini tidak ada di catalog → cek validation
-    # Untuk tes ini, buat sesi langsung via service (bypass catalog check)
+    # Untuk tes ini, buat sesi langsung via service (bypass catalog check).
+    # Panel masih KOSONG saat sesi dibuat, jadi auto-populate tidak mendaftarkan
+    # siapa pun — par_a baru ditambahkan ke panel SETELAH sesi ada, agar POST
+    # manual di bawah ini benar-benar jadi pendaftaran PERTAMA-nya (bukan duplikat
+    # atas auto-populate, yang sejak backlog #29 ditolak 409).
     from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
     from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
@@ -1201,6 +1205,8 @@ def test_responden_sme_panel_check(client: TestClient, db_session) -> None:
     )
     sid = sesi_obj.id
     assert sesi_obj.jabatan_id == jabatan_id
+
+    sme_svc.add_anggota(panel.id, par_a.id)
 
     # Par A (anggota panel) → berhasil
     r_a = client.post(
@@ -1474,6 +1480,77 @@ def test_responden_bulk_payload_kosong_ditolak(client: TestClient, jabatan_id_tk
 
 
 # --------------------------------------------------------------------------- #
+# Penolakan responden ganda per partisipan per sesi (backlog #29)
+# --------------------------------------------------------------------------- #
+
+
+def test_responden_create_duplikat_partisipan_ditolak_409(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Partisipan yang sudah jadi responden sesi ini ditolak 409 saat didaftarkan lagi."""
+    sesi = _create_sesi(client, jabatan_id_tk)
+    anggota = _setup_panel(client, jabatan_id_tk, 1)
+    par_id = anggota[0]
+
+    r1 = client.post(
+        f"{SESI}/{sesi['id']}/responden", json={"partisipan_id": par_id, "nama": "Par Satu"}
+    )
+    assert r1.status_code == 201, r1.text
+
+    r2 = client.post(
+        f"{SESI}/{sesi['id']}/responden", json={"partisipan_id": par_id, "nama": "Par Satu Lagi"}
+    )
+    assert r2.status_code == 409, r2.text
+    assert r2.json()["message"] == "Partisipan ini sudah terdaftar sebagai responden pada sesi ini."
+
+
+def test_responden_create_partisipan_belum_terdaftar_berhasil(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Partisipan yang belum jadi responden sesi ini berhasil didaftarkan (201)."""
+    sesi = _create_sesi(client, jabatan_id_tk)
+    anggota = _setup_panel(client, jabatan_id_tk, 1)
+    r = client.post(
+        f"{SESI}/{sesi['id']}/responden", json={"partisipan_id": anggota[0], "nama": "Par Baru"}
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["partisipan_id"] == anggota[0]
+
+
+def test_responden_create_tanpa_partisipan_id_boleh_berulang(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Dua penambahan responden manual tanpa `partisipan_id` (hanya `nama`) tetap berhasil."""
+    sesi = _create_sesi(client, jabatan_id_tk)
+    r1 = client.post(f"{SESI}/{sesi['id']}/responden", json={"nama": "Manual Satu"})
+    assert r1.status_code == 201, r1.text
+    r2 = client.post(f"{SESI}/{sesi['id']}/responden", json={"nama": "Manual Dua"})
+    assert r2.status_code == 201, r2.text
+    assert r1.json()["partisipan_id"] is None
+    assert r2.json()["partisipan_id"] is None
+
+
+def test_responden_bulk_partisipan_terdaftar_tetap_skip_bukan_409(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Regresi: endpoint bulk tetap `skipped: sudah_terdaftar`, bukan 409 (di luar lingkup #29)."""
+    sesi = _create_sesi(client, jabatan_id_tk)
+    anggota = _setup_panel(client, jabatan_id_tk, 1)
+    par_id = anggota[0]
+
+    r1 = client.post(
+        f"{SESI}/{sesi['id']}/responden", json={"partisipan_id": par_id, "nama": "Par Satu"}
+    )
+    assert r1.status_code == 201, r1.text
+
+    r2 = client.post(f"{SESI}/{sesi['id']}/responden/bulk", json={"partisipan_ids": [par_id]})
+    assert r2.status_code == 201, r2.text
+    data = r2.json()
+    assert data["created"] == []
+    assert data["skipped"] == [{"partisipan_id": par_id, "alasan": "sudah_terdaftar"}]
+
+
+# --------------------------------------------------------------------------- #
 # Otorisasi object-level (BOLA/IDOR): partisipan tidak boleh akses responden
 # Task Inventory milik partisipan lain lewat penebakan responden_id.
 # --------------------------------------------------------------------------- #
@@ -1498,10 +1575,12 @@ def test_get_responden_forbidden_for_non_owner(
 
     sesi_svc = SqlTiSesiService(db_session)
     sesi_obj = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id, cabang="Bandung"))
-    rsp = client.post(
-        f"{SESI}/{sesi_obj.id}/responden",
-        json={"partisipan_id": par_a, "nama": "A"},
-    ).json()
+    # par_a/par_b sudah anggota panel SEBELUM sesi dibuat → auto-populate
+    # (`SqlTiSesiService.create()`) sudah mendaftarkan keduanya sebagai responden;
+    # ambil baris respondennya lewat daftar, bukan POST manual (sejak backlog #29,
+    # POST kedua untuk partisipan yang sama ditolak 409).
+    items = client.get(f"{SESI}/{sesi_obj.id}/responden").json()["items"]
+    rsp = next(r for r in items if r["partisipan_id"] == par_a)
 
     as_b = client_as("ti-bola-b")
     assert as_b.get(f"{SESI}/responden/{rsp['id']}").status_code == 403
@@ -1530,7 +1609,11 @@ def test_save_draft_seleksi_forbidden_for_non_owner(
     sid = sesi["id"]
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     kodes = _catalog_kodes(client, jabatan_id_tk, 1)
-    rsp = client.post(f"{SESI}/{sid}/responden", json={"partisipan_id": par_a, "nama": "A"}).json()
+    # par_a/par_b sudah anggota panel SEBELUM sesi dibuat → auto-populate sudah
+    # mendaftarkan keduanya; ambil baris respondennya lewat daftar, bukan POST
+    # manual (sejak backlog #29, POST kedua untuk partisipan yang sama ditolak 409).
+    items = client.get(f"{SESI}/{sid}/responden").json()["items"]
+    rsp = next(r for r in items if r["partisipan_id"] == par_a)
 
     as_d = client_as("ti-bola-d")
     r = as_d.put(f"{SESI}/responden/{rsp['id']}/seleksi", json={"task_kode": kodes})

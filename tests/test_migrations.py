@@ -289,3 +289,122 @@ def test_fk_cascade_membersihkan_baris_yatim(fresh_db_url: str) -> None:
         assert responden_valid_tetap_ada == 1, "responden VALID tidak boleh ikut terhapus"
     finally:
         engine.dispose()
+
+
+def _insert_ti_sesi_dan_partisipan_dasar(conn) -> tuple[str, str]:
+    """Sisipkan satu baris `ti_sesi` + satu `partisipan` minimal; kembalikan `(sesi_id, par_id)`.
+
+    Dipakai bersama oleh test duplikat `ti_responden` (`79edf4fa66b1`) agar tiap test
+    tidak mengulang boilerplate FK induk (`ti_sesi`, `partisipan`).
+    """
+    sesi_id = f"tises_mig_{uuid.uuid4().hex[:8]}"
+    par_id = f"par_mig_{uuid.uuid4().hex[:8]}"
+    conn.execute(
+        text(
+            "INSERT INTO ti_sesi (id, jabatan_id, cabang, status, task_frozen, created_at) "
+            "VALUES (:sid, 'jbt_mig_x', 'Bandung', 'DRAFT', false, now())"
+        ),
+        {"sid": sesi_id},
+    )
+    conn.execute(
+        text(
+            "INSERT INTO partisipan"
+            " (id, nama, email, sekolah_id, jabatan_utama_id, masa_kerja_tahun,"
+            "  masa_kerja_bulan, aktif, authentik_user_id, created_at) "
+            "VALUES (:pid, 'Par Migrasi', :email, 'skl_mig_x', 'jbt_mig_x', 0, 0, true,"
+            "        :pid, now())"
+        ),
+        {"pid": par_id, "email": f"{par_id}@test.id"},
+    )
+    return sesi_id, par_id
+
+
+def test_bersihkan_duplikat_ti_responden_tanpa_submit_tanpa_anak(fresh_db_url: str) -> None:
+    """Revisi `79edf4fa66b1` menghapus duplikat aman & menyisakan baris yang submit.
+
+    Dua baris `ti_responden` untuk `(sesi_id, partisipan_id)` yang sama: satu sudah
+    `tahap1_submit`, satu belum & tanpa baris anak. `upgrade(head)` harus menyisakan
+    hanya baris yang submit, dan constraint unique berhasil dipasang.
+    """
+    upgrade(fresh_db_url, "92f6851d040c")  # revisi tepat sebelum penambahan constraint
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            sesi_id, par_id = _insert_ti_sesi_dan_partisipan_dasar(conn)
+            conn.execute(
+                text(
+                    "INSERT INTO ti_responden"
+                    " (id, sesi_id, partisipan_id, tahap1_submit, tahap3_submit, created_at) "
+                    "VALUES ('trsp_migA', :sid, :pid, true, false, now())"
+                ),
+                {"sid": sesi_id, "pid": par_id},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO ti_responden"
+                    " (id, sesi_id, partisipan_id, tahap1_submit, tahap3_submit, created_at) "
+                    "VALUES ('trsp_migB', :sid, :pid, false, false, now() + interval '1 second')"
+                ),
+                {"sid": sesi_id, "pid": par_id},
+            )
+
+        upgrade(fresh_db_url, "head")  # jalankan revisi pembersihan + constraint
+
+        with engine.connect() as conn:
+            sisa = conn.execute(
+                text("SELECT id FROM ti_responden WHERE sesi_id = :sid AND partisipan_id = :pid"),
+                {"sid": sesi_id, "pid": par_id},
+            ).all()
+            constraint_ada = conn.execute(
+                text(
+                    "SELECT count(*) FROM pg_constraint "
+                    "WHERE conname = 'uq_ti_responden_sesi_partisipan'"
+                )
+            ).scalar_one()
+        assert [r.id for r in sisa] == ["trsp_migA"], "hanya baris yang submit boleh tersisa"
+        assert constraint_ada == 1, "constraint unik harus terpasang setelah pembersihan"
+    finally:
+        engine.dispose()
+
+
+def test_bersihkan_duplikat_ti_responden_dengan_baris_anak_gagal(fresh_db_url: str) -> None:
+    """Duplikat yang baris keduanya punya `ti_seleksi` membatalkan migrasi dengan pesan jelas.
+
+    Baris anak berarti ada jawaban tersimpan yang tidak boleh hilang diam-diam —
+    migrasi harus `raise` dan menyebut `id` responden yang bentrok, BUKAN menghapusnya.
+    """
+    upgrade(fresh_db_url, "92f6851d040c")
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            sesi_id, par_id = _insert_ti_sesi_dan_partisipan_dasar(conn)
+            conn.execute(
+                text(
+                    "INSERT INTO ti_responden"
+                    " (id, sesi_id, partisipan_id, tahap1_submit, tahap3_submit, created_at) "
+                    "VALUES ('trsp_migC', :sid, :pid, false, false, now())"
+                ),
+                {"sid": sesi_id, "pid": par_id},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO ti_responden"
+                    " (id, sesi_id, partisipan_id, tahap1_submit, tahap3_submit, created_at) "
+                    "VALUES ('trsp_migD', :sid, :pid, false, false, now() + interval '1 second')"
+                ),
+                {"sid": sesi_id, "pid": par_id},
+            )
+            # trsp_migC (baris paling awal, kandidat "keeper") tetap punya baris anak —
+            # trsp_migD (loser) yang harus diperiksa & menggagalkan migrasi.
+            conn.execute(
+                text(
+                    "INSERT INTO ti_seleksi (id, responden_id, sesi_id, task_kode, created_at) "
+                    "VALUES ('tisl_mig01', 'trsp_migD', :sid, 'TI001', now())"
+                ),
+                {"sid": sesi_id},
+            )
+
+        with pytest.raises(RuntimeError, match="trsp_migD"):
+            upgrade(fresh_db_url, "head")
+    finally:
+        engine.dispose()

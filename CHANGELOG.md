@@ -7,6 +7,18 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diperbaiki
+
+- **Tolak responden ganda per partisipan di satu sesi Task Inventory** (backlog #29)
+  — `POST /api/v1/task-inventory/sesi/{id}/responden` kini menolak `409` bila
+  `partisipan_id` sudah terdaftar sebagai responden di sesi itu (pesan:
+  "Partisipan ini sudah terdaftar sebagai responden pada sesi ini."). Endpoint
+  bulk (`.../responden/bulk`) tidak berubah (tetap `skipped: sudah_terdaftar`).
+  Ditegakkan juga di lapisan basis data lewat
+  `UniqueConstraint("sesi_id", "partisipan_id")` (`uq_ti_responden_sesi_partisipan`)
+  pada `ti_responden`; `partisipan_id` NULL (responden manual) tetap boleh
+  berulang. Migrasi baru membersihkan duplikat lama sebelum menambah constraint.
+
 ## [0.42.0] - 2026-07-26
 
 ### Ditambahkan

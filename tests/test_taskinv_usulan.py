@@ -274,9 +274,11 @@ def test_usulan_forbidden_for_non_owner(
 
     sesi = _create_sesi(client, jabatan_id_tk)
     client.post(f"{SESI}/{sesi['id']}/mulai-tahap1")
-    rsp = client.post(
-        f"{SESI}/{sesi['id']}/responden", json={"partisipan_id": par_a, "nama": "A"}
-    ).json()
+    # par_a/par_b sudah anggota panel SEBELUM sesi dibuat → auto-populate sudah
+    # mendaftarkan keduanya; ambil baris respondennya lewat daftar, bukan POST
+    # manual (sejak backlog #29, POST kedua untuk partisipan yang sama ditolak 409).
+    items = client.get(f"{SESI}/{sesi['id']}/responden").json()["items"]
+    rsp = next(r for r in items if r["partisipan_id"] == par_a)
 
     as_b = client_as("usulan-bola-b")
     r_forbidden = as_b.post(
