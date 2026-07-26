@@ -82,6 +82,61 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-26] TI Tahap 2: review usulan Tahap 1 & materialisasi ke katalog saat mulai-tahap3
+
+Backlog `#27`, lanjutan langsung `#26` di atas. Usulan tersimpan sejak `#26` tapi tidak
+berpengaruh apa pun: review koordinator Tahap 2 hanya mengenal task partial dari katalog,
+dan pembekuan himpunan final di `mulai-tahap3` hanya menggabungkan `unanimous ∪ approved`.
+Pemilik proses (sesi uji coba 2026-07-25) menegaskan usulan **wajib** dikonsensuskan —
+usulan yang tak pernah muncul di layar koordinator sama saja dengan tidak dicatat.
+
+- **`TiTahap2ReviewRead` bertambah `usulan: list[TiUsulanReviewRead]`** (proyeksi
+  `TiUsulanRead` + `responden_nama` ter-resolve, lihat `taskinv/schemas/tahap2.py`).
+  `jumlah_belum_diputuskan` kini menjumlahkan task partial **dan** usulan
+  ber-`disetujui is None`. `TiTahap2Service.get_review()` (Protocol + Sql + InMemory)
+  bertambah parameter wajib `usulan: list[TiUsulanReviewRead]` — router yang merakitnya
+  (menggabung `TiUsulanService.list_by_sesi()` + `TiRespondenService.get().nama`), bukan
+  seam tahap2 itu sendiri (seam tahap2 tetap murni soal keputusan TASK, tidak menyentuh
+  tabel `ti_usulan_task`). Pemanggilan `get_review()` dari gerbang `paksa` di
+  `mulai_tahap3` (`taskinv_sesi.py`) sengaja mengoper `usulan=[]` — gerbang itu tetap
+  murni soal task partial (perilaku pre-existing tidak diubah); keputusan usulan
+  Tahap 1 TIDAK menghalangi transisi ke TAHAP3.
+- **`TiTahap2Submit.keputusan` diturunkan dari `min_length=1` menjadi default `[]`**,
+  ditambah `keputusan_usulan: list[TiUsulanKeputusanItem]` (default `[]`). Router
+  (`submit_tahap2_keputusan`) menolak `422` bila **kedua** daftar kosong — tanpa
+  pelonggaran ini sesi yang hanya punya usulan (tanpa task partial) tak bisa disubmit.
+  `usulan_id` yang bukan milik sesi → `422` menyebut id-nya, validasi dijalankan
+  **sebelum** memanggil `tahap2_service.submit_keputusan()`/`usulan_service.set_keputusan()`
+  apa pun — payload ditolak utuh, bukan sebagian (dijamin aman oleh transaksi
+  satu-sesi-per-request: exception apa pun sebelum return me-rollback SELURUH
+  perubahan yang sempat di-`flush()`, lihat `db.py::session_scope`).
+- **Materialisasi** (`SqlTiUsulanService.materialize_approved(sesi_id, jabatan_id)`,
+  dipanggil `mulai_tahap3` setelah `final_kodes` dihitung, sebelum `freeze_task_terpilih`):
+  untuk tiap usulan ber-`disetujui=True` dan `task_kode` masih NULL, tulis LANGSUNG
+  (bukan lewat `UraianTugasService.create()`) satu baris `TiUraianTugasModel` +
+  `TiUraianTugasJabatanModel` — validasi jabatan↔detil_tugas yang dilakukan
+  `SqlUraianTugasService.create()` sudah ditegakkan saat usulan itu SENDIRI dibuat
+  (`#26`), mengulanginya di sini cuma menambah query. Kode baru berpola `TIU<8 hex>`
+  (retry hingga 8× bila bentrok, sangat tidak mungkin di ruang 16⁸). `unit` DITURUNKAN,
+  bukan diminta: satu-satunya `unit` katalog jabatan itu bila tunggal; bila jabatan
+  punya >1 unit, dipersempit ke `unit` di bawah `tugas_pokok_id` usulan yang sama;
+  ambigu atau jabatan tanpa baris katalog sama sekali → `ValidationAppError` (422)
+  menyebut usulan mana yang gagal, membatalkan SELURUH transisi (sesi tetap TAHAP2,
+  tidak ada baris katalog yang tertinggal — dijamin oleh transaksi satu-request yang
+  sama). `urutan` = urutan maksimum kombinasi `jabatan_id`+`unit` (bukan disempit ke
+  tugas pokok) + 1, dilacak per-unit dalam satu pemanggilan `materialize_approved`
+  agar beberapa usulan disetujui pada unit yang sama mendapat urutan berurutan.
+  Sekali jalan: usulan ber-`task_kode` terisi dilewati (aman dipanggil ulang).
+  Kode hasil digabung `final_kodes` sebelum `freeze_task_terpilih`.
+- **`InMemoryTiUsulanService` TIDAK mengimplementasikan `materialize_approved`**
+  (dideklarasikan di Protocol, tapi placeholder in-memory tak punya akses ke katalog)
+  — konsisten dengan pola beberapa placeholder in-memory lain di repo ini (mis.
+  `InMemoryDcsInstrumenService.reset`, lihat entri `[2026-07-15]` di bawah).
+- Tidak ada migrasi Alembic baru (`ti_usulan_task.disetujui`/`task_kode` sudah ada
+  dari `#26`). `openapi.json` (gitignored) berubah bentuk (`TiTahap2ReviewRead.usulan`
+  baru, `TiTahap2Submit.keputusan` tak lagi wajib) — breaking-additive; klien
+  (`anjab-abk-web-app#45`) menyusul setelah kontrak ini live.
+
 ### [2026-07-26] TI Tahap 1: entitas & endpoint usulan uraian tugas tambahan peserta
 
 Backlog `#26`. Uji coba workshop SME panel (2026-07-25, `review-aplikasi.txt` di repo

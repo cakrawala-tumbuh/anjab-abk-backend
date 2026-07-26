@@ -14,7 +14,12 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from ...errors import ValidationAppError
-from ..schemas.tahap2 import TiTahap2KeputusanItem, TiTahap2ReviewRead, TiTahap2TaskRead
+from ..schemas.tahap2 import (
+    TiTahap2KeputusanItem,
+    TiTahap2ReviewRead,
+    TiTahap2TaskRead,
+    TiUsulanReviewRead,
+)
 
 
 @dataclass
@@ -27,10 +32,23 @@ class _Keputusan:
 
 
 class TiTahap2Service(Protocol):
-    """Kontrak operasi terhadap review koordinator Tahap 2."""
+    """Kontrak operasi terhadap review koordinator Tahap 2.
+
+    `get_review` **tidak** menyentuh data usulan sendiri — pemanggil (router)
+    merakit `usulan` dari `TiUsulanService`/`TiRespondenService` dan
+    meneruskannya di sini murni untuk digabung ke perhitungan
+    `jumlah_belum_diputuskan` dan disertakan di `TiTahap2ReviewRead.usulan`.
+    Keputusan koordinator atas usulan disimpan langsung di `ti_usulan_task`
+    (lewat `TiUsulanService.set_keputusan`) — bukan di sini.
+    """
 
     def get_review(
-        self, sesi_id: str, partial_kodes: list[str], counts: dict[str, int], n_total: int
+        self,
+        sesi_id: str,
+        partial_kodes: list[str],
+        counts: dict[str, int],
+        n_total: int,
+        usulan: list[TiUsulanReviewRead],
     ) -> TiTahap2ReviewRead: ...
     def submit_keputusan(
         self, sesi_id: str, keputusan: list[TiTahap2KeputusanItem], valid_kodes: set[str]
@@ -47,7 +65,12 @@ class InMemoryTiTahap2Service:
         self._data: dict[str, _Keputusan] = {}
 
     def get_review(
-        self, sesi_id: str, partial_kodes: list[str], counts: dict[str, int], n_total: int
+        self,
+        sesi_id: str,
+        partial_kodes: list[str],
+        counts: dict[str, int],
+        n_total: int,
+        usulan: list[TiUsulanReviewRead],
     ) -> TiTahap2ReviewRead:
         with self._lock:
             existing: dict[str, _Keputusan] = {
@@ -68,11 +91,13 @@ class InMemoryTiTahap2Service:
                     disetujui=disetujui,
                 )
             )
-        belum = sum(1 for t in tasks if t.disetujui is None)
+        belum_tasks = sum(1 for t in tasks if t.disetujui is None)
+        belum_usulan = sum(1 for u in usulan if u.disetujui is None)
         return TiTahap2ReviewRead(
             sesi_id=sesi_id,
             tasks=tasks,
-            jumlah_belum_diputuskan=belum,
+            usulan=usulan,
+            jumlah_belum_diputuskan=belum_tasks + belum_usulan,
             submitted_at=last_at,
         )
 

@@ -16,7 +16,12 @@ from sqlalchemy.orm import Session
 
 from ...errors import ValidationAppError
 from ...models import TiTahap2Model
-from ..schemas.tahap2 import TiTahap2KeputusanItem, TiTahap2ReviewRead, TiTahap2TaskRead
+from ..schemas.tahap2 import (
+    TiTahap2KeputusanItem,
+    TiTahap2ReviewRead,
+    TiTahap2TaskRead,
+    TiUsulanReviewRead,
+)
 
 
 class SqlTiTahap2Service:
@@ -26,7 +31,12 @@ class SqlTiTahap2Service:
         self._s = session
 
     def get_review(
-        self, sesi_id: str, partial_kodes: list[str], counts: dict[str, int], n_total: int
+        self,
+        sesi_id: str,
+        partial_kodes: list[str],
+        counts: dict[str, int],
+        n_total: int,
+        usulan: list[TiUsulanReviewRead],
     ) -> TiTahap2ReviewRead:
         rows = self._s.scalars(select(TiTahap2Model).where(TiTahap2Model.sesi_id == sesi_id)).all()
         existing: dict[str, TiTahap2Model] = {r.task_kode: r for r in rows}
@@ -49,11 +59,13 @@ class SqlTiTahap2Service:
                     disetujui=disetujui,
                 )
             )
-        belum = sum(1 for t in tasks if t.disetujui is None)
+        belum_tasks = sum(1 for t in tasks if t.disetujui is None)
+        belum_usulan = sum(1 for u in usulan if u.disetujui is None)
         return TiTahap2ReviewRead(
             sesi_id=sesi_id,
             tasks=tasks,
-            jumlah_belum_diputuskan=belum,
+            usulan=usulan,
+            jumlah_belum_diputuskan=belum_tasks + belum_usulan,
             submitted_at=last_at,
         )
 

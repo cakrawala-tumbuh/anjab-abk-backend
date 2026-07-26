@@ -20,6 +20,7 @@ from ...dependencies import (
     get_ti_seleksi_service,
     get_ti_sesi_service,
     get_ti_tahap2_service,
+    get_ti_usulan_service,
     idempotency,
     pagination_params,
     rate_limit,
@@ -35,6 +36,7 @@ from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.seleksi import TiSeleksiService
 from ...taskinv.services.sesi import TiSesiService
 from ...taskinv.services.tahap2 import TiTahap2Service
+from ...taskinv.services.usulan import TiUsulanService
 
 router = APIRouter()
 
@@ -296,6 +298,7 @@ def mulai_tahap3(
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     tahap2_service: Annotated[TiTahap2Service, Depends(get_ti_tahap2_service)],
+    usulan_service: Annotated[TiUsulanService, Depends(get_ti_usulan_service)],
     paksa: Annotated[
         bool,
         Query(
@@ -316,7 +319,11 @@ def mulai_tahap3(
     counts = seleksi_service.count_relevan_per_task(sesi_id)
 
     if partial:
-        review = tahap2_service.get_review(sesi_id, partial, counts, n_submitted)
+        # `usulan=[]`: gerbang `paksa` ini murni tentang task partial (perilaku
+        # pre-existing, tidak diubah) — keputusan usulan Tahap 1 TIDAK menghalangi
+        # transisi ke TAHAP3; usulan yang belum diputuskan hanya tidak dimaterialisasi
+        # (lihat `usulan_service.materialize_approved` di bawah).
+        review = tahap2_service.get_review(sesi_id, partial, counts, n_submitted, [])
         if review.jumlah_belum_diputuskan > 0 and not paksa:
             raise ValidationAppError(
                 f"Masih ada {review.jumlah_belum_diputuskan} task"
@@ -327,6 +334,8 @@ def mulai_tahap3(
 
     approved = tahap2_service.get_approved_kodes(sesi_id)
     final_kodes = sorted(set(unanimous) | set(approved))
+    usulan_kodes = usulan_service.materialize_approved(sesi_id, sesi.jabatan_id)
+    final_kodes = sorted(set(final_kodes) | set(usulan_kodes))
     return service.freeze_task_terpilih(sesi_id, final_kodes)
 
 

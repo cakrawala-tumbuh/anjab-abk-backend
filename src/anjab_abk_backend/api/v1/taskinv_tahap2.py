@@ -17,19 +17,42 @@ from ...dependencies import (
     get_ti_seleksi_service,
     get_ti_sesi_service,
     get_ti_tahap2_service,
+    get_ti_usulan_service,
     rate_limit,
 )
 from ...errors import ForbiddenError, ValidationAppError
 from ...schemas.common import ErrorResponse
 from ...security import Principal
-from ...taskinv.schemas.tahap2 import TiTahap2ReviewRead, TiTahap2Submit
+from ...taskinv.schemas.tahap2 import TiTahap2ReviewRead, TiTahap2Submit, TiUsulanReviewRead
+from ...taskinv.schemas.usulan import TiUsulanRead
 from ...taskinv.services.catalog import TiCatalogService
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.seleksi import TiSeleksiService
 from ...taskinv.services.sesi import TiSesiService
 from ...taskinv.services.tahap2 import TiTahap2Service
+from ...taskinv.services.usulan import TiUsulanService
 
 router = APIRouter()
+
+
+def _to_usulan_review(usulan: TiUsulanRead, rsp_service: TiRespondenService) -> TiUsulanReviewRead:
+    """Proyeksikan `TiUsulanRead` ke `TiUsulanReviewRead`, menambah `responden_nama`.
+
+    `responden_id` selalu valid saat proyeksi ini dipanggil (FK `ON DELETE CASCADE`
+    ke `ti_responden` — usulan tidak mungkin outlive respondennya), jadi `.get()`
+    dipanggil langsung tanpa fallback.
+    """
+    responden = rsp_service.get(usulan.responden_id)
+    return TiUsulanReviewRead(
+        usulan_id=usulan.id,
+        responden_id=usulan.responden_id,
+        responden_nama=responden.nama,
+        tugas_pokok=usulan.tugas_pokok,
+        detil_tugas=usulan.detil_tugas,
+        uraian=usulan.uraian,
+        disetujui=usulan.disetujui,
+    )
+
 
 _RATE_GUARD = [Depends(rate_limit)]
 _NOT_FOUND_SESI = {404: {"model": ErrorResponse, "description": "Sesi tidak ditemukan."}}
@@ -62,6 +85,7 @@ def get_tahap2_review(
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     tahap2_service: Annotated[TiTahap2Service, Depends(get_ti_tahap2_service)],
+    usulan_service: Annotated[TiUsulanService, Depends(get_ti_usulan_service)],
 ) -> TiTahap2ReviewRead:
     sesi = sesi_service.get(sesi_id)
     authorize_sesi_access(principal, sesi, par_service, rsp_service)
@@ -72,7 +96,8 @@ def get_tahap2_review(
     n_submitted = rsp_service.count_tahap1_submitted(sesi_id)
     partial = seleksi_service.partial_terpilih(sesi_id, n_submitted)
     counts = seleksi_service.count_relevan_per_task(sesi_id)
-    return tahap2_service.get_review(sesi_id, partial, counts, n_submitted)
+    usulan = [_to_usulan_review(u, rsp_service) for u in usulan_service.list_by_sesi(sesi_id)]
+    return tahap2_service.get_review(sesi_id, partial, counts, n_submitted, usulan)
 
 
 _FORBIDDEN_SESI = {
@@ -104,6 +129,7 @@ def submit_tahap2_keputusan(
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     catalog: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
     tahap2_service: Annotated[TiTahap2Service, Depends(get_ti_tahap2_service)],
+    usulan_service: Annotated[TiUsulanService, Depends(get_ti_usulan_service)],
 ) -> TiTahap2ReviewRead:
     sesi = sesi_service.get(sesi_id)
     if "admin" not in principal.groups:
@@ -118,6 +144,10 @@ def submit_tahap2_keputusan(
             f"Keputusan koordinator hanya dapat disubmit saat sesi berstatus TAHAP2"
             f" (saat ini: {sesi.status})."
         )
+    if not payload.keputusan and not payload.keputusan_usulan:
+        raise ValidationAppError(
+            "Payload tidak boleh kosong: isi 'keputusan' dan/atau 'keputusan_usulan'."
+        )
     n_submitted = rsp_service.count_tahap1_submitted(sesi_id)
     partial = seleksi_service.partial_terpilih(sesi_id, n_submitted)
     partial_set = set(partial)
@@ -128,5 +158,21 @@ def submit_tahap2_keputusan(
             f"Task berikut bukan task partial (sudah dipilih semua atau tidak ada di seleksi): "
             f"{', '.join(sorted(non_partial)[:5])}"
         )
+    # Validasi kepemilikan usulan SEBELUM menyimpan apa pun — payload ditolak utuh
+    # (bukan sebagian) bila ada usulan_id yang bukan milik sesi ini.
+    usulan_ids_payload = {k.usulan_id for k in payload.keputusan_usulan}
+    sesi_usulan_ids = {u.id for u in usulan_service.list_by_sesi(sesi_id)}
+    unknown_usulan = usulan_ids_payload - sesi_usulan_ids
+    if unknown_usulan:
+        raise ValidationAppError(
+            f"Usulan berikut bukan milik sesi ini: {', '.join(sorted(unknown_usulan)[:5])}"
+            + ("..." if len(unknown_usulan) > 5 else ".")
+        )
     valid_kodes = catalog.valid_kodes_for_jabatan(sesi.jabatan_id)
-    return tahap2_service.submit_keputusan(sesi_id, payload.keputusan, valid_kodes)
+    result = tahap2_service.submit_keputusan(sesi_id, payload.keputusan, valid_kodes)
+
+    usulan_reviews = [
+        _to_usulan_review(usulan_service.set_keputusan(item.usulan_id, item.disetujui), rsp_service)
+        for item in payload.keputusan_usulan
+    ]
+    return result.model_copy(update={"usulan": usulan_reviews})

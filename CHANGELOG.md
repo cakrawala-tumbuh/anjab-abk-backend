@@ -9,6 +9,17 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Review koordinator Tahap 2 memuat usulan Tahap 1 & materialisasi ke katalog**
+  (backlog #27) — koordinator kini melihat usulan uraian tugas peserta Tahap 1
+  berdampingan dengan task partial di `GET /api/v1/task-inventory/sesi/{id}/tahap2`
+  (`TiTahap2ReviewRead.usulan`), dan bisa memutuskannya lewat `POST .../tahap2`
+  (`keputusan_usulan`). `jumlah_belum_diputuskan` kini menghitung task **dan**
+  usulan yang belum diputuskan. Usulan yang disetujui dimateralisasi otomatis
+  menjadi baris katalog `ti_uraian_tugas` berkode `TIU<8 hex>` saat
+  `POST .../mulai-tahap3` — `unit` diturunkan dari katalog jabatan yang ada,
+  `urutan` melanjutkan urutan tertinggi kombinasi jabatan+unit. Materialisasi
+  bersifat sekali jalan (aman dipanggil ulang). Usulan yang ditolak/belum
+  diputuskan tidak masuk himpunan final.
 - **Entitas & endpoint usulan uraian tugas tambahan peserta Tahap 1** (backlog #26) —
   responden Task Inventory Tahap 1 kini bisa mencatat, melihat, dan menghapus usulan
   uraian tugas baru di bawah tugas pokok/detil tugas pilihannya, saat tugas yang ia

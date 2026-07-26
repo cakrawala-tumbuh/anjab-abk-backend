@@ -45,11 +45,21 @@ class _Record:
 
 
 class TiUsulanService(Protocol):
-    """Kontrak operasi terhadap usulan uraian tugas Tahap 1."""
+    """Kontrak operasi terhadap usulan uraian tugas Tahap 1.
+
+    `materialize_approved` (backlog `anjab-abk-backend#27`) butuh akses ke katalog
+    `ti_uraian_tugas*` untuk menurunkan `unit` & menghitung `urutan` — placeholder
+    `InMemoryTiUsulanService` **tidak mengimplementasikan** method ini (tidak
+    punya akses ke data katalog), konsisten dengan pola beberapa placeholder
+    in-memory lain di repo ini (mis. `InMemoryDcsInstrumenService.reset`).
+    """
 
     def create(self, responden_id: str, sesi_id: str, data: TiUsulanCreate) -> TiUsulanRead: ...
     def get(self, usulan_id: str) -> TiUsulanRead: ...
     def list_by_responden(self, responden_id: str) -> list[TiUsulanRead]: ...
+    def list_by_sesi(self, sesi_id: str) -> list[TiUsulanRead]: ...
+    def set_keputusan(self, usulan_id: str, disetujui: bool) -> TiUsulanRead: ...
+    def materialize_approved(self, sesi_id: str, jabatan_id: str) -> list[str]: ...
     def delete(self, usulan_id: str) -> None: ...
 
 
@@ -133,6 +143,20 @@ class InMemoryTiUsulanService:
             recs = [r for r in self._data.values() if r.responden_id == responden_id]
         recs.sort(key=lambda r: r.created_at)
         return [self._to_read(r) for r in recs]
+
+    def list_by_sesi(self, sesi_id: str) -> list[TiUsulanRead]:
+        with self._lock:
+            recs = [r for r in self._data.values() if r.sesi_id == sesi_id]
+        recs.sort(key=lambda r: r.created_at)
+        return [self._to_read(r) for r in recs]
+
+    def set_keputusan(self, usulan_id: str, disetujui: bool) -> TiUsulanRead:
+        with self._lock:
+            rec = self._data.get(usulan_id)
+            if rec is None:
+                raise NotFoundError(f"Usulan '{usulan_id}' tidak ditemukan.")
+            rec.disetujui = disetujui
+            return self._to_read(rec)
 
     def delete(self, usulan_id: str) -> None:
         with self._lock:
