@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-07-26
+
 ### Ditambahkan
 
 - **Review koordinator Tahap 2 memuat usulan Tahap 1 & materialisasi ke katalog**
