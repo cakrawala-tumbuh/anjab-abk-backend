@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-07-26
+
 ### Diubah
 
 - **Task Inventory Tahap 3: submit final menolak `va_type` "Context-Dependent"; `"Needs
