@@ -30,6 +30,10 @@ class Settings(BaseSettings):
 
     # Hardening HTTP
     max_request_body_bytes: int = 1_048_576  # 1 MiB
+    # Batas khusus `POST /api/v1/system/restore` (unggah dump basis data) — jauh lebih
+    # besar dari batas umum karena berkas dump bisa berukuran ratusan MB. Middleware
+    # `BodySizeLimitMiddleware` memakai nilai ini HANYA untuk path itu (lihat middleware.py).
+    restore_max_body_bytes: int = 536_870_912  # 512 MiB
     request_timeout_seconds: float = 0
     enable_security_headers: bool = True
     enable_hsts: bool = False

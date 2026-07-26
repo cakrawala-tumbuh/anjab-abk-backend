@@ -28,6 +28,22 @@ RUN pip install /tmp/*.whl \
     && rm -rf /tmp/*.whl \
     && useradd --create-home --uid 1000 appuser
 
+# postgresql-client-16 dari repositori resmi PGDG (apt.postgresql.org) — WAJIB versi 16,
+# bukan paket `postgresql-client` bawaan Debian bookworm (versi 15): produksi memakai
+# PostgreSQL 16, dan `pg_dump`/`pg_restore` 15 MENOLAK melayani server 16 ("server version
+# mismatch"). Dipakai oleh endpoint admin backup/restore (backlog 025, services/backup.py).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+        | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-16 \
+    && apt-get purge -y --auto-remove curl gnupg \
+    && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/pgdg.list
+
 # Migrasi & entrypoint ikut ke image agar init DB OTOMATIS saat startup (tanpa langkah
 # deploy manual). Paket di-install ke site-packages, jadi alembic.ini + migrations/
 # disalin ke WORKDIR (/app) tempat `migrate._resolve_base()` & alembic CLI menemukannya.

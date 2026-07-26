@@ -7,6 +7,24 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Ditambahkan
+
+- **Endpoint admin `POST /api/v1/system/backup` & `POST /api/v1/system/restore`**
+  (backlog 025) — admin (grup Authentik `admin`) kini bisa mengunduh cadangan penuh
+  basis data dan memulihkannya lewat API, tanpa akses shell ke server. `backup`
+  mengalirkan langsung keluaran `pg_dump --format=custom --no-acl --no-owner`
+  (server tidak menyimpan salinan); `restore` menerima unggahan multipart
+  (`berkas` + `konfirmasi` yang harus persis sama dengan nama basis data tujuan)
+  dan menjalankan `pg_restore --clean --if-exists --no-acl --no-owner
+  --single-transaction`. Skema hasil restore **tidak** di-upgrade otomatis — respons
+  `RestoreResult.peringatan` memberi tahu bila revisi Alembic berbeda dari head
+  aplikasi. Logika baru di `services/backup.py` (`BackupService`); kredensial DB
+  dioper lewat environment `PGPASSWORD`, tidak pernah sebagai argumen command line.
+  Setting baru `restore_max_body_bytes` (default 512 MiB) mengecualikan path restore
+  dari batas ukuran body umum 1 MiB. `Dockerfile`/`Dockerfile.test` kini memasang
+  `postgresql-client-16` dari repositori PGDG (produksi memakai PostgreSQL 16;
+  paket bawaan Debian bookworm versi 15 tidak kompatibel).
+
 ## [0.40.0] - 2026-07-26
 
 ### Diubah

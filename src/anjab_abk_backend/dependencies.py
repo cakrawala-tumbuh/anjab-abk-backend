@@ -32,7 +32,7 @@ from .core.services.partisipan import PartisipanService
 from .core.services.partisipan_sql import SqlPartisipanService
 from .core.services.sekolah import SekolahService
 from .core.services.sekolah_sql import SqlSekolahService
-from .db import get_session
+from .db import get_db_settings, get_session
 from .dcs.services.instrumen import DcsInstrumenService
 from .dcs.services.instrumen_sql import SqlDcsInstrumenService
 from .dcs.services.jawaban import DcsJawabanService
@@ -54,6 +54,7 @@ from .services.authentik_provisioner import (
     HttpAuthentikProvisioner,
     PlaceholderAuthentikProvisioner,
 )
+from .services.backup import BackupService
 from .services.idempotency import IdempotencyStore
 from .services.idempotency_sql import SqlIdempotencyStore
 from .services.ratelimit import AllowAllRateLimiter, RateLimiter
@@ -282,6 +283,18 @@ def get_opm_responden_service(session: SessionDep) -> OpmRespondenService:
 def get_opm_jawaban_service(session: SessionDep) -> OpmJawabanService:
     """SEAM: implementasi `OpmJawabanService` berbasis PostgreSQL."""
     return SqlOpmJawabanService(session)
+
+
+# --- Backup & restore (backlog 025) ---
+
+
+def get_backup_service() -> BackupService:
+    """SEAM: layanan backup/restore basis data (subprocess `pg_dump`/`pg_restore`).
+
+    Bukan seam bertingkat (Protocol + placeholder) seperti provider data lain —
+    operasi ini inheren terikat PostgreSQL nyata, sama seperti `db.py` sendiri.
+    """
+    return BackupService(get_db_settings())
 
 
 # --- Authentik Provisioner ---

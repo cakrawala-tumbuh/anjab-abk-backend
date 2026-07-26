@@ -151,18 +151,35 @@ class TimeoutMiddleware:
 
 
 class BodySizeLimitMiddleware:
-    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+    """Batasi ukuran body request; mendukung pengecualian batas per-path.
+
+    `path_overrides` memetakan path persis (mis. `/api/v1/system/restore`) ke batas
+    byte-nya sendiri, dipakai alih-alih `max_bytes` umum — dibutuhkan karena unggahan
+    dump basis data (backlog 025) jauh melebihi batas 1 MiB default aplikasi.
+    """
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        max_bytes: int,
+        path_overrides: dict[str, int] | None = None,
+    ) -> None:
         self.app = app
         self.max_bytes = max_bytes
+        self.path_overrides = path_overrides or {}
+
+    def _limit_for(self, path: str) -> int:
+        return self.path_overrides.get(path, self.max_bytes)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
+        limit = self._limit_for(scope.get("path", ""))
         content_length = Headers(scope=scope).get("content-length")
-        if content_length and content_length.isdigit() and int(content_length) > self.max_bytes:
-            await self._reject(scope, receive, send)
+        if content_length and content_length.isdigit() and int(content_length) > limit:
+            await self._reject(scope, receive, send, limit)
             return
 
         total = 0
@@ -173,7 +190,7 @@ class BodySizeLimitMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 total += len(message.get("body", b""))
-                if total > self.max_bytes:
+                if total > limit:
                     too_large = True
             return message
 
@@ -187,14 +204,14 @@ class BodySizeLimitMiddleware:
 
         await self.app(scope, limited_receive, guarded_send)
         if too_large and not started:  # pragma: no cover
-            await self._reject(scope, receive, send)
+            await self._reject(scope, receive, send, limit)
 
-    async def _reject(self, scope: Scope, receive: Receive, send: Send) -> None:
+    async def _reject(self, scope: Scope, receive: Receive, send: Send, limit: int) -> None:
         response = JSONResponse(
             status_code=413,
             content=error_envelope(
                 "payload_too_large",
-                f"Body melebihi batas {self.max_bytes} byte.",
+                f"Body melebihi batas {limit} byte.",
                 request_id_ctx.get(),
             ),
         )
@@ -203,7 +220,11 @@ class BodySizeLimitMiddleware:
 
 def install_middleware(app: FastAPI, settings: Settings) -> None:
     if settings.max_request_body_bytes:
-        app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_body_bytes)
+        app.add_middleware(
+            BodySizeLimitMiddleware,
+            max_bytes=settings.max_request_body_bytes,
+            path_overrides={"/api/v1/system/restore": settings.restore_max_body_bytes},
+        )
     if settings.gzip_min_size:
         app.add_middleware(GZipMiddleware, minimum_size=settings.gzip_min_size)
     if settings.enable_security_headers:
