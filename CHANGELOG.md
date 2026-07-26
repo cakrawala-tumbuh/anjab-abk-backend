@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.42.1] - 2026-07-26
+
 ### Diperbaiki
 
 - **Tolak responden ganda per partisipan di satu sesi Task Inventory** (backlog #29)
