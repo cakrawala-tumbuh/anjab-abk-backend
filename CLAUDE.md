@@ -82,6 +82,52 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-26] TI Tahap 1: entitas & endpoint usulan uraian tugas tambahan peserta
+
+Backlog `#26`. Uji coba workshop SME panel (2026-07-25, `review-aplikasi.txt` di repo
+induk) menemukan peserta berulang kali mengerjakan tugas yang tidak ada di katalog
+Tahap 1 — seleksi hanya menerima `task_kode` yang sudah ada
+(`api/v1/taskinv_seleksi.py::valid_kodes_for_jabatan`), jadi tugas itu hilang dari
+sistem, hanya jadi catatan lepas fasilitator. Pemilik proses memutuskan usulan ditulis
+**per orang** di **level uraian tugas**, dengan tugas pokok/detil tugas induknya ikut
+dipilih — tanpa induk, usulan tidak bisa ditempatkan saat konsensus Tahap 2. Review &
+materialisasi usulan ke katalog adalah item lanjutan terpisah (`#27`, blocked-by ini).
+
+- **Tabel baru `ti_usulan_task`** (migrasi `92f6851d040c`): `sesi_id`/`responden_id`
+  FK `ON DELETE CASCADE`; `tugas_pokok_id`/`detil_tugas_id` **sengaja BUKAN**
+  `ForeignKey` — usulan **tidak menyentuh katalog master** (`ti_uraian_tugas*`, yang
+  dipakai sesi lain & sedang dibersihkan). `disetujui`/`task_kode` nullable, diisi
+  item `#27`. **Tanpa `UniqueConstraint`** — dua orang boleh mengusulkan tugas mirip,
+  koordinator Tahap 2 yang memutuskan.
+- **Nama induk diresolusi LIVE, tidak disimpan sebagai snapshot kolom.**
+  `TiUsulanRead.tugas_pokok`/`.detil_tugas` dihitung saat baca lewat
+  `TugasPokokService`/`DetilTugasService` yang di-inject ke `SqlTiUsulanService`
+  (`taskinv/services/usulan_sql.py`) — pola yang sama dengan resolusi
+  `jabatan_label` di `SqlDcsRespondenService`/`SqlWcpRespondenService` (entri
+  `[2026-07-14]` di bawah), termasuk fallback ke id mentah + `logger.warning` bila
+  induknya sudah terhapus dari master data. Konsekuensi: `get()`/`list_by_responden()`
+  melakukan query tambahan ke `ti_tugas_pokok`/`ti_detil_tugas` per baris usulan —
+  diterima karena volume usulan per responden kecil (bukan agregasi massal).
+- **Endpoint** (prefix `/api/v1/task-inventory`, router baru `taskinv_usulan.py`):
+  `POST`/`GET /sesi/responden/{responden_id}/usulan`, `DELETE /usulan/{usulan_id}`.
+  Otorisasi ketiganya memakai `authorize_responden_access` yang sudah ada (admin
+  ATAU pemilik responden) — **bukan** helper baru.
+- **422 di POST *dan* DELETE** (aturan simetris): sesi bukan `TAHAP1`, responden
+  sudah `tahap1_submit`, `tugas_pokok_id` tidak terkait `sesi.jabatan_id` (termasuk
+  `tugas_pokok_id` yang sama sekali tidak ditemukan — `NotFoundError` seam
+  dipetakan ulang jadi `ValidationAppError` di router, bukan 404, karena ini input
+  tak valid dari klien), atau `detil_tugas_id` bukan turunan `tugas_pokok_id`.
+  Validasi ini ada di helper `_validasi_induk_usulan()` (`taskinv_usulan.py`),
+  dipanggil hanya dari `create_usulan` — `delete_usulan` mengulang gate
+  status-sesi/submit tapi TIDAK mengulang validasi induk (usulan yang sudah
+  tersimpan induknya sudah tentu valid saat dibuat).
+- **Urutan guard di `DELETE`**: `usulan_service.get()` (404 bila usulan tak ada) →
+  `rsp_service.get(usulan.responden_id)` → `authorize_responden_access` → cek
+  sesi/submit — meniru urutan `POST` (get responden dulu, baru validasi state).
+- `openapi.json` (gitignored) bertambah 3 operasi baru
+  (`taskinv_usulan_create`/`_list`/`_delete`) — breaking-additive murni penambahan;
+  klien (web app `#45`, MCP) menyusul di item terpisah setelah kontrak ini live.
+
 ### [2026-07-26] TI Tahap 3: tolak `va_type` final "Context-Dependent"; hapus "Needs Validation"
 
 Backlog 024. `VaType` (`taskinv/schemas/calhr.py`) memuat 5 nilai; dua di antaranya

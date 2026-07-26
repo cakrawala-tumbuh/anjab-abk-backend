@@ -33,6 +33,7 @@ from .v1 import (
     taskinv_tahap2,
     taskinv_tugas_pokok,
     taskinv_uraian_tugas,
+    taskinv_usulan,
     ts_kuesioner,
     ts_log,
     ts_penugasan,
@@ -189,6 +190,11 @@ api_router.include_router(
     taskinv_hasil.router,
     prefix="/task-inventory/sesi",
     tags=["taskinv.hasil"],
+)
+api_router.include_router(
+    taskinv_usulan.router,
+    prefix="/task-inventory",
+    tags=["taskinv.usulan"],
 )
 api_router.include_router(
     ts_kuesioner.router,

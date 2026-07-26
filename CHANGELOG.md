@@ -7,6 +7,17 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Ditambahkan
+
+- **Entitas & endpoint usulan uraian tugas tambahan peserta Tahap 1** (backlog #26) —
+  responden Task Inventory Tahap 1 kini bisa mencatat, melihat, dan menghapus usulan
+  uraian tugas baru di bawah tugas pokok/detil tugas pilihannya, saat tugas yang ia
+  kerjakan tidak ada di katalog. `POST`/`GET /api/v1/task-inventory/sesi/responden/
+  {responden_id}/usulan`, `DELETE /api/v1/task-inventory/usulan/{usulan_id}`. Usulan
+  tidak menyentuh katalog master; nama tugas pokok/detil tugas induk diresolusi live
+  saat baca. Review koordinator Tahap 2 & materialisasi ke katalog menyusul di item
+  terpisah (#27). Tabel baru `ti_usulan_task` (migrasi `92f6851d040c`).
+
 ## [0.41.0] - 2026-07-26
 
 ### Ditambahkan

@@ -573,6 +573,38 @@ class TiDetailModel(Base):
     created_at: Mapped[datetime] = _ts(index=True)
 
 
+class TiUsulanTaskModel(Base):
+    """Usulan uraian tugas baru dari responden Tahap 1 (backlog `anjab-abk-backend#26`).
+
+    Dicatat per orang di bawah tugas pokok (dan opsional detil tugas) pilihannya saat
+    tugas yang ia kerjakan tidak ada di katalog Tahap 1 (`ti_uraian_tugas*`). Usulan
+    TIDAK menyentuh katalog master — `tugas_pokok_id`/`detil_tugas_id` sengaja BUKAN
+    `ForeignKey` (nama induknya diresolusi live saat baca via
+    `TugasPokokService`/`DetilTugasService`, lihat `taskinv/services/usulan_sql.py`).
+    Tanpa `UniqueConstraint`: dua orang boleh mengusulkan tugas yang mirip, koordinator
+    Tahap 2 yang memutuskan (`disetujui`) — pekerjaan review & materialisasi
+    `task_kode` menyusul di `anjab-abk-backend#27`.
+    """
+
+    __tablename__ = "ti_usulan_task"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    sesi_id: Mapped[str] = mapped_column(
+        ForeignKey("ti_sesi.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    responden_id: Mapped[str] = mapped_column(
+        ForeignKey("ti_responden.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tugas_pokok_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    detil_tugas_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    uraian: Mapped[str] = mapped_column(Text, nullable=False)
+    # NULL = belum diputuskan koordinator Tahap 2.
+    disetujui: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # Diisi item lanjutan (anjab-abk-backend#27) saat materialisasi ke katalog.
+    task_kode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    created_at: Mapped[datetime] = _ts(index=True)
+
+
 # ======================================================================================
 # Time Study
 # ======================================================================================

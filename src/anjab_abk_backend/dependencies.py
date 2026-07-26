@@ -78,6 +78,8 @@ from .taskinv.services.tugas_pokok import TugasPokokService
 from .taskinv.services.tugas_pokok_sql import SqlTugasPokokService
 from .taskinv.services.uraian_tugas import UraianTugasService
 from .taskinv.services.uraian_tugas_sql import SqlUraianTugasService
+from .taskinv.services.usulan import TiUsulanService
+from .taskinv.services.usulan_sql import SqlTiUsulanService
 from .ts.services.log import TsLogService
 from .ts.services.log_sql import SqlTsLogService
 from .ts.services.penugasan import TsPenugasanService
@@ -252,6 +254,18 @@ def get_ti_detail_service(session: SessionDep) -> TiDetailService:
 def get_ti_tahap2_service(session: SessionDep) -> TiTahap2Service:
     """SEAM: implementasi `TiTahap2Service` berbasis PostgreSQL."""
     return SqlTiTahap2Service(session)
+
+
+def get_ti_usulan_service(session: SessionDep) -> TiUsulanService:
+    """SEAM: implementasi `TiUsulanService` berbasis PostgreSQL.
+
+    Menyuntik `TugasPokokService`/`DetilTugasService` (pola sama dengan
+    `get_ti_catalog_service`) agar `TiUsulanRead.tugas_pokok`/`.detil_tugas` bisa
+    diresolusi live tanpa menyimpan snapshot nama di tabel usulan.
+    """
+    return SqlTiUsulanService(
+        session, tp_svc=SqlTugasPokokService(session), dt_svc=SqlDetilTugasService(session)
+    )
 
 
 # --- TS services ---
