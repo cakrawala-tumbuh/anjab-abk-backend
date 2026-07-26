@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-07-26
+
 ### Ditambahkan
 
 - **Endpoint admin `POST /api/v1/system/backup` & `POST /api/v1/system/restore`**
