@@ -7,6 +7,18 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diubah
+
+- **Selaraskan uraian tugas katalog TI dengan redaksi sederhana v2.19-R1** (backlog
+  #30) — 740 dari 1.138 task di katalog Task Inventory (`kategori
+  Language_Eligibility_Status == ELIGIBLE`) kini memakai redaksi bahasa yang lebih
+  sederhana hasil panel bahasa (`Task_Bank_Redaksi_Sederhana_v2_19_R1.xlsx`),
+  menggantikan pola 5C asli yang berbelit ("...untuk alasan, cara, menghasilkan
+  output"). 398 task yang masih menunggu klarifikasi SME (`SPLIT_REQUIRED`,
+  `OUTPUT_UNCLEAR`, dll.) tidak berubah. Instance yang sudah berjalan (mis. pilot
+  YPII) ikut diperbarui lewat migrasi data Alembic baru yang hanya menimpa baris
+  bertext persis redaksi lama (baris yang sudah diedit manual tidak tersentuh).
+
 ## [0.42.1] - 2026-07-26
 
 ### Diperbaiki

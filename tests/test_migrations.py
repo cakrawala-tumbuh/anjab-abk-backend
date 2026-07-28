@@ -13,6 +13,9 @@ Yang dijamin:
    gagal sehingga developer dipaksa membuat migrasi.
 5. ``test_upgrade_downgrade_roundtrip`` — seluruh rantai bisa dijalankan maju lalu
    mundur sampai ``base`` lalu maju lagi (downgrade benar-benar terdefinisi).
+6. ``test_uraian_sederhana_v2_19_r1_*`` — revisi data `cdd92c950f19` (backlog `#30`)
+   mengganti `ti_uraian_tugas.uraian` lama->baru per kode HANYA bila teksnya masih
+   persis nilai lama yang diharapkan; baris yang sudah diedit manual tidak tersentuh.
 
 Test berbasis-DB membangun **database sekali-pakai** terpisah dari DB test utama agar
 tidak mengganggu fixtur ``engine`` (yang sudah di-seed). Database itu dibuat & dihapus
@@ -21,7 +24,9 @@ di dalam fixtur ``fresh_db_url``.
 
 from __future__ import annotations
 
+import json
 import uuid
+from pathlib import Path
 
 import pytest
 from alembic.autogenerate import compare_metadata
@@ -408,3 +413,110 @@ def test_bersihkan_duplikat_ti_responden_dengan_baris_anak_gagal(fresh_db_url: s
             upgrade(fresh_db_url, "head")
     finally:
         engine.dispose()
+
+
+_FROZEN_REDAKSI_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "migrations"
+    / "data"
+    / "20260728_uraian_sederhana_v2_19_r1.json"
+)
+
+
+def _entri_redaksi_kontrol() -> dict[str, str]:
+    """Entri beku berkode `KS-ALL-ADMIN-001`, dipakai bersama oleh test redaksi sederhana."""
+    with _FROZEN_REDAKSI_PATH.open(encoding="utf-8") as f:
+        frozen: list[dict[str, str]] = json.load(f)
+    return next(e for e in frozen if e["kode"] == "KS-ALL-ADMIN-001")
+
+
+def _insert_ti_uraian_tugas_kontrol(conn, *, kode: str, uraian: str) -> str:
+    """Sisipkan satu baris `ti_uraian_tugas` + `ti_uraian_tugas_jabatan` minimal; kembalikan `id`.
+
+    `jabatan_id`/`tugas_pokok_id` tidak punya FK (lihat `models.py::TiUraianTugasJabatanModel`)
+    sehingga nilai dummy aman dipakai tanpa perlu menyisipkan baris `jabatan`/`ti_tugas_pokok`.
+    """
+    ut_id = f"tiut_mig_{uuid.uuid4().hex[:8]}"
+    conn.execute(
+        text("INSERT INTO ti_uraian_tugas (id, uraian, created_at) VALUES (:id, :uraian, now())"),
+        {"id": ut_id, "uraian": uraian},
+    )
+    conn.execute(
+        text(
+            "INSERT INTO ti_uraian_tugas_jabatan "
+            "(uraian_tugas_id, kode, jabatan_id, unit, urutan, tugas_pokok_id) "
+            "VALUES (:uid, :kode, 'jbt_mig_x', 'ALL', 1, 'tp_mig_x')"
+        ),
+        {"uid": ut_id, "kode": kode},
+    )
+    return ut_id
+
+
+def _baca_uraian(engine, ut_id: str) -> str:
+    with engine.connect() as conn:
+        return conn.execute(
+            text("SELECT uraian FROM ti_uraian_tugas WHERE id = :id"), {"id": ut_id}
+        ).scalar_one()
+
+
+def test_uraian_sederhana_v2_19_r1_upgrade_mengganti_lama_jadi_baru(fresh_db_url: str) -> None:
+    """Revisi `cdd92c950f19`: baris berkode ELIGIBLE bertext `lama` berubah jadi `baru`."""
+    entry = _entri_redaksi_kontrol()
+    upgrade(fresh_db_url, "79edf4fa66b1")  # revisi tepat sebelum redaksi sederhana
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            ut_id = _insert_ti_uraian_tugas_kontrol(conn, kode=entry["kode"], uraian=entry["lama"])
+
+        upgrade(fresh_db_url, "head")  # jalankan revisi redaksi sederhana
+
+        assert _baca_uraian(engine, ut_id) == entry["baru"]
+    finally:
+        engine.dispose()
+
+
+def test_uraian_sederhana_v2_19_r1_downgrade_mengembalikan_baru_jadi_lama(
+    fresh_db_url: str,
+) -> None:
+    """`downgrade()` satu langkah dari head mengembalikan teks `baru` menjadi `lama` semula."""
+    entry = _entri_redaksi_kontrol()
+    upgrade(fresh_db_url, "79edf4fa66b1")
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            ut_id = _insert_ti_uraian_tugas_kontrol(conn, kode=entry["kode"], uraian=entry["lama"])
+
+        upgrade(fresh_db_url, "head")
+        assert _baca_uraian(engine, ut_id) == entry["baru"]
+
+        downgrade(fresh_db_url, "79edf4fa66b1")
+        assert _baca_uraian(engine, ut_id) == entry["lama"]
+    finally:
+        engine.dispose()
+
+
+def test_uraian_sederhana_v2_19_r1_tidak_menimpa_baris_yang_sudah_diedit_manual(
+    fresh_db_url: str,
+) -> None:
+    """Baris berkode ELIGIBLE tapi teksnya sudah diedit manual (≠ `lama`) tidak ikut berubah."""
+    entry = _entri_redaksi_kontrol()
+    teks_manual = "Sudah diedit manual oleh koordinator sebelum migrasi berjalan."
+    upgrade(fresh_db_url, "79edf4fa66b1")
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            ut_id = _insert_ti_uraian_tugas_kontrol(conn, kode=entry["kode"], uraian=teks_manual)
+
+        upgrade(fresh_db_url, "head")
+
+        assert _baca_uraian(engine, ut_id) == teks_manual
+    finally:
+        engine.dispose()
+
+
+def test_uraian_sederhana_v2_19_r1_database_kosong_tanpa_error(fresh_db_url: str) -> None:
+    """Upgrade & downgrade revisi `cdd92c950f19` pada database TANPA baris `ti_uraian_tugas`
+    manapun selesai tanpa error (0 baris terpengaruh)."""
+    upgrade(fresh_db_url, "79edf4fa66b1")
+    upgrade(fresh_db_url, "head")  # tidak boleh raise walau tabel ti_uraian_tugas kosong
+    downgrade(fresh_db_url, "79edf4fa66b1")  # idem untuk arah sebaliknya
