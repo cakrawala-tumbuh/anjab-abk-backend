@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.42.2] - 2026-07-28
+
 ### Diubah
 
 - **Selaraskan uraian tugas katalog TI dengan redaksi sederhana v2.19-R1** (backlog
