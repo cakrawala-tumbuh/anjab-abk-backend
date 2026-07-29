@@ -82,6 +82,41 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-29] TI: samakan redaksi 75 baris klon jabatan `Koordinator …` dengan kembarannya
+
+Lanjutan langsung `cdd92c950f19` (entri `[2026-07-28]`-nya ada di CHANGELOG, backlog
+`#30`). Audit live MCP menemukan katalog produksi berisi **1.262** baris sementara
+`taskinv/data/task_catalog.json` hanya **1.138** — selisih 124 baris ada di tiga jabatan
+`Koordinator Ekstrakurikuler` (`KOEKS-*`, 46), `Koordinator Humas` (`KOHUM-*`, 29),
+`Koordinator Sarana Prasarana` (`KOSAR-*`, 49). Baris itu **dibuat manual 2026-07-12
+~20.00** (seed katalog jalan 18.47) dengan menyalin uraian tugas dari jabatan kembarannya
+di nomenklatur Semarang (`PEK-*`/`WKHUM-*`/`WKSAR-*`) — user mengonfirmasi ini disengaja;
+dua cabang memakai nama jabatan berbeda untuk job desc yang sama.
+
+Karena kode `KO*` tidak ada di `task_catalog.json` **maupun** di sumber panel bahasa
+(`Task_Bank_Redaksi_Sederhana_v2_19_R1.xlsx`), `cdd92c950f19` yang mencocokkan per `kode`
+melewati semuanya: 75 baris klon tertinggal di redaksi 5C lama sementara kembarannya sudah
+disederhanakan — dua cabang membaca kalimat berbeda untuk tugas yang sama.
+
+- **Migrasi data `3889bd9af66e`** menyamakan 75 baris itu. Mekanismenya menyalin
+  `cdd92c950f19` persis (UPDATE bertarget per `kode` via `ti_uraian_tugas_jabatan.kode`,
+  hanya bila teks saat ini masih persis `lama`; `downgrade()` kebalikannya; aman di DB
+  kosong; ketidakcocokan dicatat `logger.warning`, tidak menggagalkan migrasi).
+- **Berkas beku** `migrations/data/20260729_uraian_klon_koordinator_v2_19_r1.json`
+  (75 entri `{kode, kembaran, lama, baru}`) — `lama`/`baru` **disalin** dari berkas beku
+  `cdd92c950f19` milik kembarannya, bukan diturunkan ulang dari xlsx. Pasangan klon↔kembaran
+  deterministik karena **sufiks kodenya identik** (`PEK-ALL-ADMIN-005` ↔
+  `KOEKS-ALL-ADMIN-005`); `kembaran` disimpan sebagai jejak asal-usul, SQL hanya memakai
+  `kode`/`lama`/`baru`. Test `test_uraian_klon_koordinator.py` menjaga kedua konsistensi itu.
+- **49 baris klon sisanya tidak disentuh** — kembarannya juga masih menunggu klarifikasi
+  SME (`SPLIT_REQUIRED`/`OUTPUT_UNCLEAR`/dll.), jadi kedua sisi memang sudah konsisten.
+- **Ketiga jabatan tetap TIDAK dimasukkan ke `task_catalog.json`** (keputusan sadar, bukan
+  kelalaian): instalasi baru tetap tidak memilikinya seperti sejak 2026-07-12, dan
+  perubahan redaksi berikutnya akan melewatinya lagi dengan pola yang sama. Test
+  `test_kode_klon_memang_tidak_ada_di_katalog_seed` sengaja **gagal** bila suatu saat kode
+  klon dimasukkan ke katalog seed, memaksa keputusan ini ditinjau ulang.
+- Tidak ada perubahan skema/model/kontrak API — `openapi.json` tidak berubah.
+
 ### [2026-07-26] TI: tolak responden ganda per partisipan per sesi (`ConflictError` + `UniqueConstraint`)
 
 Backlog `#29`, ditemukan lewat audit produksi R3 (sesi `tises_82c6127d`, partisipan

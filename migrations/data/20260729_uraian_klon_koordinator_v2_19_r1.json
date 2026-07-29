@@ -1,0 +1,452 @@
+[
+  {
+    "kode": "KOEKS-ALL-ADMIN-001",
+    "kembaran": "PEK-ALL-ADMIN-001",
+    "lama": "Melaporkan catatan pelaksanaan lomba kepada staff kesiswaan untuk mendokumentasikan hasil & proses pelaksanaan lomba secara resmi, menyusun & menyerahkan laporan pelaksanaan lomba, menghasilkan laporan pelaksanaan lomba tersampaikan.",
+    "baru": "Melaporkan catatan pelaksanaan lomba kepada staff kesiswaan dengan menyusun dan menyerahkan laporan pelaksanaan lomba untuk mendokumentasikan hasil dan proses pelaksanaan lomba secara resmi, menghasilkan laporan pelaksanaan lomba tersampaikan."
+  },
+  {
+    "kode": "KOEKS-ALL-ADMIN-002",
+    "kembaran": "PEK-ALL-ADMIN-002",
+    "lama": "Melengkapi berkas dan catatan pelaksanaan lomba sebagai pendamping untuk memastikan dokumentasi lomba lengkap untuk keperluan administrasi & arsip, mengumpulkan & merapikan berkas terkait lomba (sertifikat, hasil, dokumentasi), menghasilkan berkas lomba lengkap & terarsip.",
+    "baru": "Melengkapi berkas dan catatan pelaksanaan lomba sebagai pendamping agar dokumentasi lomba lengkap untuk keperluan administrasi dan arsip, menghasilkan berkas lomba lengkap dan terarsip."
+  },
+  {
+    "kode": "KOEKS-ALL-ADMIN-003",
+    "kembaran": "PEK-ALL-ADMIN-003",
+    "lama": "Melaporkan proposal anggaran lomba kepada staff kesiswaan untuk diserahkan ke yayasan untuk memperoleh persetujuan & pendanaan kegiatan lomba, menyerahkan proposal anggaran yang telah disusun, menghasilkan proposal anggaran tersampaikan untuk diproses.",
+    "baru": "Melaporkan proposal anggaran lomba kepada staff kesiswaan untuk diserahkan ke yayasan untuk memperoleh persetujuan dan pendanaan kegiatan lomba, menghasilkan proposal anggaran tersampaikan untuk diproses."
+  },
+  {
+    "kode": "KOEKS-ALL-ADMIN-004",
+    "kembaran": "PEK-ALL-ADMIN-004",
+    "lama": "Mengisi form agenda latihan dan absensi siswa untuk mendokumentasikan pelaksanaan latihan secara administratif, mencatat agenda & kehadiran siswa setiap sesi latihan, menghasilkan form agenda & absensi terisi.",
+    "baru": "Mengisi form agenda latihan dan absensi siswa dengan mencatat agenda dan kehadiran siswa setiap sesi latihan untuk mendokumentasikan pelaksanaan latihan secara administratif, menghasilkan form agenda dan absensi terisi."
+  },
+  {
+    "kode": "KOEKS-ALL-ADMIN-005",
+    "kembaran": "PEK-ALL-ADMIN-005",
+    "lama": "Mengisi laporan pemberian materi (jurnal) dan absensi kegiatan ekskur untuk mendokumentasikan pelaksanaan kegiatan ekskur secara administratif, mencatat materi yang diberikan & kehadiran siswa setiap sesi, menghasilkan jurnal materi & absensi terisi.",
+    "baru": "Mengisi laporan pemberian materi (jurnal) dan absensi kegiatan ekskur untuk mendokumentasikan pelaksanaan kegiatan ekskur secara administratif, menghasilkan jurnal materi dan absensi terisi."
+  },
+  {
+    "kode": "KOEKS-ALL-ADMIN-006",
+    "kembaran": "PEK-ALL-ADMIN-006",
+    "lama": "Mengurus administrasi pelaksanaan berupa surat-menyurat dan perizinan untuk memenuhi persyaratan administratif & legal kegiatan di luar sekolah, menyusun & mengurus surat izin sesuai prosedur sekolah, menghasilkan surat-menyurat & perizinan lengkap.",
+    "baru": "Mengurus administrasi pelaksanaan berupa surat-menyurat dan perizinan untuk memenuhi persyaratan administratif dan legal kegiatan di luar sekolah, menghasilkan surat-menyurat dan perizinan lengkap."
+  },
+  {
+    "kode": "KOEKS-ALL-ADMIN-007",
+    "kembaran": "PEK-ALL-ADMIN-007",
+    "lama": "Melaporkan hasil penilaian ekskur siswa untuk memberi visibilitas hasil penilaian ke pihak struktural terkait, menyusun & menyerahkan laporan penilaian ekskur, menghasilkan laporan penilaian ekskur tersampaikan.",
+    "baru": "Melaporkan hasil penilaian ekskur siswa dengan menyusun dan menyerahkan laporan penilaian ekskur untuk memberi visibilitas hasil penilaian ke pihak struktural terkait, menghasilkan laporan penilaian ekskur tersampaikan."
+  },
+  {
+    "kode": "KOEKS-ALL-ADMIN-008",
+    "kembaran": "PEK-ALL-ADMIN-008",
+    "lama": "Merekapitulasi nilai ekskur siswa ke dalam excel untuk mendokumentasikan hasil penilaian secara terstruktur untuk pelaporan, memasukkan nilai siswa ke spreadsheet sesuai format, menghasilkan rekap nilai ekskur tersimpan di excel.",
+    "baru": "Merekapitulasi nilai ekskur siswa ke dalam excel dengan memasukkan nilai siswa ke spreadsheet sesuai format untuk mendokumentasikan hasil penilaian secara terstruktur untuk pelaporan, menghasilkan rekap nilai ekskur tersimpan di excel."
+  },
+  {
+    "kode": "KOEKS-ALL-ADMIN-009",
+    "kembaran": "PEK-ALL-ADMIN-009",
+    "lama": "Melaporkan kelengkapan administratif pelatih (mis. data diri, sertifikasi) untuk memenuhi persyaratan administratif sebagai pelatih ekskur resmi, menyerahkan dokumen administratif yang diminta pihak sekolah, menghasilkan kelengkapan administratif pelatih tersampaikan.",
+    "baru": "Melaporkan kelengkapan administratif pelatih (mis. data diri, sertifikasi) dengan menyerahkan dokumen administratif yang diminta pihak sekolah untuk memenuhi persyaratan administratif sebagai pelatih ekskur resmi, menghasilkan kelengkapan administratif pelatih tersampaikan."
+  },
+  {
+    "kode": "KOEKS-ALL-ADMIN-010",
+    "kembaran": "PEK-ALL-ADMIN-010",
+    "lama": "Melaporkan revisi silabus dan RPM (rencana pelaksanaan mingguan) kepada pihak struktural terkait (Kepala Sekolah untuk TK; Staff Kesiswaan untuk SMP & SMA) untuk memastikan revisi silabus/RPM disetujui sebelum diterapkan, menyerahkan dokumen revisi kepada pihak struktural sesuai jenjang, menghasilkan revisi silabus/RPM tersampaikan & disetujui.",
+    "baru": "Melaporkan revisi silabus dan RPM (rencana pelaksanaan mingguan) kepada pihak struktural terkait (Kepala Sekolah untuk TK; Staff Kesiswaan untuk SMP dan SMA) agar revisi silabus atau RPM disetujui sebelum diterapkan, menghasilkan revisi silabus atau RPM tersampaikan dan disetujui."
+  },
+  {
+    "kode": "KOEKS-ALL-LEAD-001",
+    "kembaran": "PEK-ALL-LEAD-001",
+    "lama": "Berkoordinasi dengan wali kelas terkait penentuan cabang lomba internal (Hari Pramuka) untuk menyelaraskan pemilihan cabang lomba dengan kondisi & minat siswa per kelas, mendiskusikan opsi cabang lomba & kesiapan siswa bersama wali kelas, menghasilkan cabang lomba disepakati bersama wali kelas.",
+    "baru": "Berkoordinasi dengan wali kelas terkait penentuan cabang lomba internal (Hari Pramuka) untuk menyelaraskan pemilihan cabang lomba dengan kondisi dan minat siswa per kelas, menghasilkan cabang lomba disepakati bersama wali kelas."
+  },
+  {
+    "kode": "KOEKS-ALL-LEAD-002",
+    "kembaran": "PEK-ALL-LEAD-002",
+    "lama": "Memfinalisasi kepesertaan dalam lomba (eksternal) untuk memastikan daftar peserta lomba final & sesuai kriteria sebelum pendaftaran ditutup, mengonfirmasi kesiapan & kelayakan peserta terpilih, menghasilkan daftar peserta lomba final.",
+    "baru": "Memfinalisasi kepesertaan dalam lomba (eksternal) dengan mengonfirmasi kesiapan dan kelayakan peserta terpilih agar daftar peserta lomba final dan sesuai kriteria sebelum pendaftaran ditutup, menghasilkan daftar peserta lomba final."
+  },
+  {
+    "kode": "KOEKS-ALL-LEAD-004",
+    "kembaran": "PEK-ALL-LEAD-004",
+    "lama": "Meninjau informasi dan proposal lomba yang tersedia untuk menyeleksi lomba yang relevan & layak diikuti siswa, mengevaluasi kesesuaian & kelayakan tiap tawaran lomba, menghasilkan daftar lomba terpilih untuk diikuti.",
+    "baru": "Meninjau informasi dan proposal lomba yang tersedia dengan mengevaluasi kesesuaian dan kelayakan tiap tawaran lomba untuk menyeleksi lomba yang relevan dan layak diikuti siswa, menghasilkan daftar lomba terpilih untuk diikuti."
+  },
+  {
+    "kode": "KOEKS-ALL-LEAD-005",
+    "kembaran": "PEK-ALL-LEAD-005",
+    "lama": "Menyusun proposal anggaran untuk lomba untuk merencanakan kebutuhan dana secara rinci sebelum diajukan, menghitung & menyusun rincian kebutuhan anggaran lomba, menghasilkan dokumen proposal anggaran lomba.",
+    "baru": "Menyusun proposal anggaran untuk lomba dengan menghitung dan menyusun rincian kebutuhan anggaran lomba untuk merencanakan kebutuhan dana secara rinci sebelum diajukan, menghasilkan dokumen proposal anggaran lomba."
+  },
+  {
+    "kode": "KOEKS-ALL-LEAD-006",
+    "kembaran": "PEK-ALL-LEAD-006",
+    "lama": "Menentukan peserta lomba dan jadwal latihan persiapan untuk memastikan peserta terpilih sesuai kemampuan & latihan terjadwal efektif, menyeleksi peserta berdasarkan kemampuan & menyusun jadwal latihan, menghasilkan daftar peserta lomba & jadwal latihan.",
+    "baru": "Menentukan peserta lomba dan jadwal latihan persiapan agar peserta terpilih sesuai kemampuan dan latihan terjadwal efektif, menghasilkan daftar peserta lomba dan jadwal latihan."
+  },
+  {
+    "kode": "KOEKS-ALL-LEAD-008",
+    "kembaran": "PEK-ALL-LEAD-008",
+    "lama": "Menyusun rundown kegiatan camping untuk memastikan kegiatan berjalan terstruktur & tepat waktu, merancang jadwal & urutan aktivitas kegiatan camping, menghasilkan dokumen rundown kegiatan camping.",
+    "baru": "Menyusun rundown kegiatan camping dengan merancang jadwal dan urutan aktivitas kegiatan camping agar kegiatan berjalan terstruktur dan tepat waktu, menghasilkan dokumen rundown kegiatan camping."
+  },
+  {
+    "kode": "KOEKS-ALL-LEAD-010",
+    "kembaran": "PEK-ALL-LEAD-010",
+    "lama": "Melakukan koordinasi dengan pelatih sekolah lain terkait pelaksanaan uji coba untuk menyelaraskan jadwal & teknis pelaksanaan uji coba/latih-tanding antar sekolah, menghubungi & menyepakati detail teknis dengan pelatih sekolah lain, menghasilkan jadwal & teknis uji coba disepakati antar sekolah.",
+    "baru": "Mengoordinasikan dengan pelatih sekolah lain terkait pelaksanaan uji coba untuk menyelaraskan jadwal dan teknis pelaksanaan uji coba atau latih-tanding antar sekolah, menghasilkan jadwal dan teknis uji coba disepakati antar sekolah."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-001",
+    "kembaran": "PEK-ALL-STUSUP-001",
+    "lama": "Melaksanakan evaluasi lomba melalui pengisian refleksi oleh siswa untuk mendorong siswa merefleksikan pengalaman & pembelajaran dari lomba, memfasilitasi sesi refleksi & mengumpulkan lembar refleksi siswa, menghasilkan hasil refleksi siswa terkumpul sebagai bahan evaluasi.",
+    "baru": "Mengevaluasi lomba melalui pengisian refleksi oleh siswa untuk mendorong siswa merefleksikan pengalaman dan pembelajaran dari lomba, menghasilkan hasil refleksi siswa terkumpul sebagai bahan evaluasi."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-002",
+    "kembaran": "PEK-ALL-STUSUP-002",
+    "lama": "Melaksanakan lomba internal (Hari Pramuka) sesuai rencana untuk memberi wadah kompetisi & unjuk keterampilan bagi siswa, menjalankan rangkaian perlombaan sesuai jadwal & aturan yang ditetapkan, menghasilkan lomba terlaksana sesuai rencana.",
+    "baru": "Melaksanakan lomba internal (Hari Pramuka) sesuai rencana untuk memberi wadah kompetisi dan unjuk keterampilan bagi siswa, menghasilkan lomba terlaksana sesuai rencana."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-005",
+    "kembaran": "PEK-ALL-STUSUP-005",
+    "lama": "Menginventarisir informasi dan proposal lomba yang tersedia untuk mengumpulkan seluruh opsi lomba sebagai bahan seleksi, mencari & mendata informasi lomba dari berbagai sumber, menghasilkan daftar informasi & proposal lomba terkumpul.",
+    "baru": "Menginventarisasi informasi dan proposal lomba yang tersedia untuk mengumpulkan seluruh opsi lomba sebagai bahan seleksi, menghasilkan daftar informasi dan proposal lomba terkumpul."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-007",
+    "kembaran": "PEK-ALL-STUSUP-007",
+    "lama": "Melaksanakan evaluasi latihan kegiatan ekstrakurikuler untuk mengukur capaian & efektivitas latihan secara berkala, mereview capaian latihan & memberi umpan balik kepada siswa, menghasilkan catatan evaluasi latihan & umpan balik siswa.",
+    "baru": "Mengevaluasi latihan kegiatan ekstrakurikuler dengan mereview capaian latihan dan memberi umpan balik kepada siswa untuk mengukur capaian dan efektivitas latihan secara berkala, menghasilkan catatan evaluasi latihan dan umpan balik siswa."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-008",
+    "kembaran": "PEK-ALL-STUSUP-008",
+    "lama": "Melakukan pencatatan observasi perkembangan siswa dalam kegiatan ekskur untuk memantau perkembangan keterampilan & sikap siswa secara berkelanjutan, mengamati & mencatat perkembangan siswa setiap sesi latihan, menghasilkan catatan observasi perkembangan siswa per periode.",
+    "baru": "Mencatat observasi perkembangan siswa dalam kegiatan ekskur untuk memantau perkembangan keterampilan dan sikap siswa secara berkelanjutan, menghasilkan catatan observasi perkembangan siswa per periode."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-010",
+    "kembaran": "PEK-ALL-STUSUP-010",
+    "lama": "Menyepakati aturan kegiatan ekstrakurikuler bersama siswa untuk membangun komitmen bersama & kedisiplinan dalam kegiatan ekskur, mendiskusikan & menyepakati aturan/tata tertib bersama siswa di awal program, menghasilkan aturan kegiatan ekskur disepakati bersama siswa.",
+    "baru": "Menyepakati aturan kegiatan ekstrakurikuler bersama siswa untuk membangun komitmen bersama dan kedisiplinan dalam kegiatan ekskur, menghasilkan aturan kegiatan ekskur disepakati bersama siswa."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-016",
+    "kembaran": "PEK-ALL-STUSUP-016",
+    "lama": "Menyiapkan bahan/materi penampilan untuk memastikan konten penampilan (koreografi/materi) siap sebelum latihan & tampil, merancang/menyusun materi atau koreografi sesuai tema penampilan, menghasilkan bahan/materi penampilan siap digunakan.",
+    "baru": "Menyiapkan bahan atau materi penampilan agar konten penampilan (koreografi atau materi) siap sebelum latihan dan tampil, menghasilkan bahan atau materi penampilan siap digunakan."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-017",
+    "kembaran": "PEK-ALL-STUSUP-017",
+    "lama": "Menyiapkan video sebagai bahan latihan tambahan untuk mendukung latihan mandiri siswa di luar sesi tatap muka, merekam/mengumpulkan video contoh gerakan atau materi latihan, menghasilkan video bahan latihan tersedia untuk siswa.",
+    "baru": "Menyiapkan video sebagai bahan latihan tambahan untuk mendukung latihan mandiri siswa di luar sesi tatap muka, menghasilkan video bahan latihan tersedia untuk siswa."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-019",
+    "kembaran": "PEK-ALL-STUSUP-019",
+    "lama": "Membuat materi/soal penilaian ekskur untuk memastikan penilaian mengukur capaian keterampilan siswa secara relevan, menyusun kriteria & materi/soal penilaian sesuai cabang ekskur, menghasilkan materi/soal penilaian ekskur siap digunakan.",
+    "baru": "Membuat materi atau soal penilaian ekskur agar penilaian mengukur capaian keterampilan siswa secara relevan, menghasilkan materi atau soal penilaian ekskur siap digunakan."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-020",
+    "kembaran": "PEK-ALL-STUSUP-020",
+    "lama": "Melaksanakan penilaian keterampilan/capaian ekskur siswa untuk mengukur perkembangan & capaian keterampilan siswa dalam ekskur, menilai unjuk kerja/keterampilan siswa sesuai instrumen yang disusun, menghasilkan nilai/hasil penilaian ekskur per siswa.",
+    "baru": "Menilai keterampilan atau capaian ekskur siswa untuk mengukur perkembangan dan capaian keterampilan siswa dalam ekskur, menghasilkan nilai atau hasil penilaian ekskur per siswa."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-021",
+    "kembaran": "PEK-ALL-STUSUP-021",
+    "lama": "Melakukan riset materi untuk penyusunan silabus ekskur untuk memastikan materi silabus relevan, terkini, & sesuai kebutuhan siswa, mencari & mengumpulkan referensi materi dari berbagai sumber, menghasilkan kumpulan referensi materi siap disusun jadi silabus.",
+    "baru": "Melakukan riset materi untuk penyusunan silabus ekskur agar materi silabus relevan, terkini, dan sesuai kebutuhan siswa, menghasilkan kumpulan referensi materi siap disusun jadi silabus."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-022",
+    "kembaran": "PEK-ALL-STUSUP-022",
+    "lama": "Mempersiapkan materi, alat peraga, dan ruangan tambahan untuk pelaksanaan latihan ekskur untuk memastikan seluruh kebutuhan logistik latihan tersedia sebelum sesi dimulai, menyiapkan materi & alat peraga serta mengonfirmasi ruangan tambahan yang dibutuhkan, menghasilkan materi, alat peraga, & ruangan siap untuk latihan.",
+    "baru": "Menyiapkan materi, alat peraga, dan ruangan tambahan untuk pelaksanaan latihan ekskur agar seluruh kebutuhan logistik latihan tersedia sebelum sesi dimulai, menghasilkan materi, alat peraga, dan ruangan siap untuk latihan."
+  },
+  {
+    "kode": "KOEKS-ALL-STUSUP-024",
+    "kembaran": "PEK-ALL-STUSUP-024",
+    "lama": "Merevisi silabus dan RPM sesuai masukan dari pihak struktural untuk menyempurnakan program ekskur berdasarkan umpan balik yang diberikan, menyesuaikan dokumen silabus/RPM berdasarkan catatan revisi dari struktural, menghasilkan silabus & RPM final sesuai masukan.",
+    "baru": "Merevisi silabus dan RPM sesuai masukan dari pihak struktural untuk menyempurnakan program ekskur berdasarkan umpan balik yang diberikan, menghasilkan silabus dan RPM final sesuai masukan."
+  },
+  {
+    "kode": "KOHUM-ALL-ADMIN-003",
+    "kembaran": "WKHUM-ALL-ADMIN-003",
+    "lama": "Menyusun instrumen survei kepuasan orang tua untuk menyiapkan alat ukur mutu layanan, menyusun kuesioner survei, menghasilkan instrumen survei.",
+    "baru": "Menyusun instrumen survei kepuasan orang tua untuk menyiapkan alat ukur mutu layanan."
+  },
+  {
+    "kode": "KOHUM-ALL-ADMIN-005",
+    "kembaran": "WKHUM-ALL-ADMIN-005",
+    "lama": "Mendokumentasikan kegiatan-kegiatan penting sekolah untuk menyediakan arsip & bahan publikasi, mendokumentasikan kegiatan, menghasilkan dokumentasi kegiatan.",
+    "baru": "Mendokumentasikan kegiatan-kegiatan penting sekolah untuk menyediakan arsip dan bahan publikasi, menghasilkan dokumentasi kegiatan."
+  },
+  {
+    "kode": "KOHUM-ALL-LEAD-002",
+    "kembaran": "WKHUM-ALL-LEAD-002",
+    "lama": "Menyusun program bakti sosial & kegiatan kemasyarakatan untuk mewujudkan tanggung jawab sosial sekolah, merancang program baksos, menghasilkan rencana baksos.",
+    "baru": "Menyusun program bakti sosial dan kegiatan kemasyarakatan dengan merancang program baksos untuk mewujudkan tanggung jawab sosial sekolah, menghasilkan rencana baksos."
+  },
+  {
+    "kode": "KOHUM-ALL-LEAD-009",
+    "kembaran": "WKHUM-ALL-LEAD-009",
+    "lama": "Mewakili kepala sekolah dalam rapat/kegiatan eksternal sesuai tupoksi untuk menjaga representasi sekolah, menghadiri sebagai wakil KS, menghasilkan sekolah terwakili.",
+    "baru": "Mewakili kepala sekolah dalam rapat atau kegiatan eksternal sesuai tupoksi dengan menghadiri sebagai wakil KS untuk menjaga representasi sekolah, menghasilkan sekolah terwakili."
+  },
+  {
+    "kode": "KOHUM-ALL-PD-001",
+    "kembaran": "WKHUM-ALL-PD-001",
+    "lama": "Melaksanakan evaluasi harian untuk merefleksikan isu harian, meninjau kejadian harian, menghasilkan catatan evaluasi.",
+    "baru": "Mengevaluasi harian dengan meninjau kejadian harian untuk merefleksikan isu harian, menghasilkan catatan evaluasi."
+  },
+  {
+    "kode": "KOHUM-ALL-STRAT-004",
+    "kembaran": "WKHUM-ALL-STRAT-004",
+    "lama": "Memantau pelaksanaan program kerja humas untuk memastikan proker berjalan, supervisi pelaksanaan, menghasilkan proker termonitor.",
+    "baru": "Memantau pelaksanaan program kerja humas berdasarkan supervisi pelaksanaan agar proker berjalan, menghasilkan proker termonitor."
+  },
+  {
+    "kode": "KOHUM-ALL-STRAT-005",
+    "kembaran": "WKHUM-ALL-STRAT-005",
+    "lama": "Mengevaluasi pelaksanaan program kerja humas untuk menilai capaian program, meninjau pelaksanaan, menghasilkan laporan evaluasi.",
+    "baru": "Mengevaluasi pelaksanaan program kerja humas dengan meninjau pelaksanaan untuk menilai capaian program, menghasilkan laporan evaluasi."
+  },
+  {
+    "kode": "KOHUM-ALL-STRAT-006",
+    "kembaran": "WKHUM-ALL-STRAT-006",
+    "lama": "Menyusun laporan pelaksanaan proker humas kepada kepala sekolah untuk memenuhi akuntabilitas, menyusun laporan, menghasilkan laporan proker.",
+    "baru": "Menyusun laporan pelaksanaan proker humas kepada kepala sekolah untuk memenuhi akuntabilitas."
+  },
+  {
+    "kode": "KOHUM-ALL-STRAT-007",
+    "kembaran": "WKHUM-ALL-STRAT-007",
+    "lama": "Menyusun rencana anggaran program kerja humas untuk memastikan program terdanai, menyusun anggaran, menghasilkan anggaran proker.",
+    "baru": "Menyusun rencana anggaran program kerja humas agar program terdanai, menghasilkan anggaran proker."
+  },
+  {
+    "kode": "KOHUM-ALL-STRAT-008",
+    "kembaran": "WKHUM-ALL-STRAT-008",
+    "lama": "Menyusun rencana program kerja bidang humas untuk menetapkan arah kerja humas, menyusun proker humas, menghasilkan proker humas.",
+    "baru": "Menyusun rencana program kerja bidang humas untuk menetapkan arah kerja humas, menghasilkan proker humas."
+  },
+  {
+    "kode": "KOHUM-ALL-STRAT-009",
+    "kembaran": "WKHUM-ALL-STRAT-009",
+    "lama": "Merevisi program kerja humas sesuai catatan revisi untuk menyempurnakan proker, menindaklanjuti catatan, menghasilkan proker terrevisi.",
+    "baru": "Merevisi program kerja humas sesuai catatan revisi dengan menindaklanjuti catatan untuk menyempurnakan proker, menghasilkan proker terrevisi."
+  },
+  {
+    "kode": "KOSAR-ALL-ADMIN-001",
+    "kembaran": "WKSAR-ALL-ADMIN-001",
+    "lama": "Melaporkan rekap inventaris ke GA untuk memenuhi alur pelaporan aset, menyampaikan rekap ke GA, menghasilkan rekap terlapor.",
+    "baru": "Melaporkan rekap inventaris ke GA dengan menyampaikan rekap ke GA untuk memenuhi alur pelaporan aset, menghasilkan rekap terlapor."
+  },
+  {
+    "kode": "KOSAR-ALL-ADMIN-002",
+    "kembaran": "WKSAR-ALL-ADMIN-002",
+    "lama": "Menyusun rekap inventaris untuk mendokumentasikan aset sekolah, merangkum data inventaris, menghasilkan rekap inventaris.",
+    "baru": "Menyusun rekap inventaris dengan merangkum data inventaris untuk mendokumentasikan aset sekolah."
+  },
+  {
+    "kode": "KOSAR-ALL-ADMIN-003",
+    "kembaran": "WKSAR-ALL-ADMIN-003",
+    "lama": "Mengarsipkan tanda terima kunci loker dari guru untuk mendokumentasikan serah terima, menyimpan tanda terima, menghasilkan arsip tanda terima.",
+    "baru": "Mengarsipkan tanda terima kunci loker dari guru dengan menyimpan tanda terima untuk mendokumentasikan serah terima, menghasilkan arsip tanda terima."
+  },
+  {
+    "kode": "KOSAR-ALL-ADMIN-004",
+    "kembaran": "WKSAR-ALL-ADMIN-004",
+    "lama": "Mengarsipkan tanda terima kunci loker dari siswa untuk mendokumentasikan serah terima, menyimpan tanda terima, menghasilkan arsip tanda terima.",
+    "baru": "Mengarsipkan tanda terima kunci loker dari siswa dengan menyimpan tanda terima untuk mendokumentasikan serah terima, menghasilkan arsip tanda terima."
+  },
+  {
+    "kode": "KOSAR-ALL-ADMIN-005",
+    "kembaran": "WKSAR-ALL-ADMIN-005",
+    "lama": "Menginventarisir kunci loker di akhir tahun ajaran untuk memastikan kelengkapan aset kunci, mengecek & mendata kunci, menghasilkan inventaris kunci.",
+    "baru": "Menginventarisasi kunci loker di akhir tahun ajaran dengan mengecek dan mendata kunci agar kelengkapan aset kunci, menghasilkan inventaris kunci."
+  },
+  {
+    "kode": "KOSAR-ALL-ADMIN-006",
+    "kembaran": "WKSAR-ALL-ADMIN-006",
+    "lama": "Mengajukan pengadaan fasilitas untuk memproses pemenuhan kebutuhan, meneruskan pengajuan, menghasilkan pengadaan terajukan.",
+    "baru": "Mengajukan pengadaan fasilitas dengan meneruskan pengajuan untuk memproses pemenuhan kebutuhan, menghasilkan pengadaan terajukan."
+  },
+  {
+    "kode": "KOSAR-ALL-ADMIN-007",
+    "kembaran": "WKSAR-ALL-ADMIN-007",
+    "lama": "Mengecek ketersediaan pengadaan yang diajukan untuk menghindari pengadaan ganda, memverifikasi ketersediaan, menghasilkan status ketersediaan.",
+    "baru": "Memeriksa ketersediaan pengadaan yang diajukan dengan memverifikasi ketersediaan untuk menghindari pengadaan ganda, menghasilkan status ketersediaan."
+  },
+  {
+    "kode": "KOSAR-ALL-ADMIN-008",
+    "kembaran": "WKSAR-ALL-ADMIN-008",
+    "lama": "Menerima pengajuan pengadaan barang/fasilitas dari guru untuk menghimpun kebutuhan, menerima pengajuan, menghasilkan pengajuan tercatat.",
+    "baru": "Menerima pengajuan pengadaan barang atau fasilitas dari guru untuk menghimpun kebutuhan, menghasilkan pengajuan tercatat."
+  },
+  {
+    "kode": "KOSAR-ALL-ADMIN-009",
+    "kembaran": "WKSAR-ALL-ADMIN-009",
+    "lama": "Membuat form pengadaan untuk guru untuk menstandarkan pengajuan, menyusun form, menghasilkan form pengadaan.",
+    "baru": "Membuat form pengadaan untuk guru dengan menyusun form untuk menstandarkan pengajuan."
+  },
+  {
+    "kode": "KOSAR-ALL-ADMIN-010",
+    "kembaran": "WKSAR-ALL-ADMIN-010",
+    "lama": "Mengajukan rekap pengajuan pengadaan ke GA untuk memproses pengadaan tahunan, menyampaikan rekap ke GA, menghasilkan rekap terajukan.",
+    "baru": "Mengajukan rekap pengajuan pengadaan ke GA dengan menyampaikan rekap ke GA untuk memproses pengadaan tahunan, menghasilkan rekap terajukan."
+  },
+  {
+    "kode": "KOSAR-ALL-ADMIN-011",
+    "kembaran": "WKSAR-ALL-ADMIN-011",
+    "lama": "Menyusun rekap pengajuan pengadaan dari unit untuk mengonsolidasikan kebutuhan, merangkum pengajuan, menghasilkan rekap pengajuan.",
+    "baru": "Menyusun rekap pengajuan pengadaan dari unit dengan merangkum pengajuan untuk mengonsolidasikan kebutuhan."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-005",
+    "kembaran": "WKSAR-ALL-LEAD-005",
+    "lama": "Mengoordinasikan penataan ruang ujian dengan staf sarpras & OB untuk memastikan ruang siap, berkoordinasi penataan, menghasilkan ruang tertata.",
+    "baru": "Mengoordinasikan penataan ruang ujian dengan staf sarpras dan OB dengan berkoordinasi penataan agar ruang siap, menghasilkan ruang tertata."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-007",
+    "kembaran": "WKSAR-ALL-LEAD-007",
+    "lama": "Membuat denah ruang ujian untuk menyiapkan tata letak pelaksanaan ujian, menyusun denah ruangan, menghasilkan denah ruang ujian.",
+    "baru": "Membuat denah ruang ujian dengan menyusun denah ruangan untuk menyiapkan tata letak pelaksanaan ujian."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-008",
+    "kembaran": "WKSAR-ALL-LEAD-008",
+    "lama": "Memeriksa laporan kesesuaian ruang ujian dengan denah & kesiapan fasilitas untuk menjamin kesiapan sebelum ujian, memverifikasi laporan staf, menghasilkan ruang terverifikasi.",
+    "baru": "Memeriksa laporan kesesuaian ruang ujian dengan denah dan kesiapan fasilitas dengan memverifikasi laporan staf untuk menjamin kesiapan sebelum ujian, menghasilkan ruang terverifikasi."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-010",
+    "kembaran": "WKSAR-ALL-LEAD-010",
+    "lama": "Menerima laporan kunci loker guru hilang/rusak untuk menindaklanjuti masalah loker, menghimpun laporan, menghasilkan laporan tercatat.",
+    "baru": "Menerima laporan kunci loker guru hilang atau rusak dengan menghimpun laporan untuk menindaklanjuti masalah loker, menghasilkan laporan tercatat."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-011",
+    "kembaran": "WKSAR-ALL-LEAD-011",
+    "lama": "Membagi loker guru untuk mengalokasikan penyimpanan bagi guru, menetapkan alokasi loker, menghasilkan loker guru teralokasi.",
+    "baru": "Membagi loker guru dengan menetapkan alokasi loker untuk mengalokasikan penyimpanan bagi guru, menghasilkan loker guru teralokasi."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-012",
+    "kembaran": "WKSAR-ALL-LEAD-012",
+    "lama": "Menerima laporan perbaikan elektronik dari staf sarpras untuk menghimpun kebutuhan perbaikan, menerima laporan, menghasilkan laporan tercatat.",
+    "baru": "Menerima laporan perbaikan elektronik dari staf sarpras untuk menghimpun kebutuhan perbaikan, menghasilkan laporan tercatat."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-013",
+    "kembaran": "WKSAR-ALL-LEAD-013",
+    "lama": "Menindaklanjuti kebutuhan perbaikan peralatan elektronik untuk memastikan alat berfungsi, memproses perbaikan, menghasilkan alat diperbaiki.",
+    "baru": "Menindaklanjuti kebutuhan perbaikan peralatan elektronik dengan memproses perbaikan agar alat berfungsi, menghasilkan alat diperbaiki."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-014",
+    "kembaran": "WKSAR-ALL-LEAD-014",
+    "lama": "Mengevaluasi kinerja kebersihan dengan OB & CS untuk memperbaiki layanan kebersihan, meninjau kinerja bersama, menghasilkan catatan evaluasi.",
+    "baru": "Mengevaluasi kinerja kebersihan dengan OB dan CS dengan meninjau kinerja bersama untuk memperbaiki layanan kebersihan, menghasilkan catatan evaluasi."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-016",
+    "kembaran": "WKSAR-ALL-LEAD-016",
+    "lama": "Memantau kebersihan toilet untuk menjaga sanitasi & kenyamanan, inspeksi kebersihan toilet, menghasilkan toilet bersih.",
+    "baru": "Memantau kebersihan toilet berdasarkan inspeksi kebersihan toilet untuk menjaga sanitasi dan kenyamanan, menghasilkan toilet bersih."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-019",
+    "kembaran": "WKSAR-ALL-LEAD-019",
+    "lama": "Memonitor pengisian form pemeliharaan fasilitas & elektronik untuk menjamin dokumentasi pemeliharaan, mengecek kelengkapan form, menghasilkan form terisi.",
+    "baru": "Memantau pengisian form pemeliharaan fasilitas dan elektronik dengan mengecek kelengkapan form untuk menjamin dokumentasi pemeliharaan, menghasilkan form terisi."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-020",
+    "kembaran": "WKSAR-ALL-LEAD-020",
+    "lama": "Menerima laporan kerusakan fasilitas untuk menghimpun kebutuhan pemeliharaan, menerima laporan, menghasilkan laporan tercatat.",
+    "baru": "Menerima laporan kerusakan fasilitas untuk menghimpun kebutuhan pemeliharaan, menghasilkan laporan tercatat."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-021",
+    "kembaran": "WKSAR-ALL-LEAD-021",
+    "lama": "Menerima laporan perbaikan fasilitas dari teknisi untuk memverifikasi penyelesaian, menerima laporan teknisi, menghasilkan perbaikan terkonfirmasi.",
+    "baru": "Menerima laporan perbaikan fasilitas dari teknisi untuk memverifikasi penyelesaian, menghasilkan perbaikan terkonfirmasi."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-022",
+    "kembaran": "WKSAR-ALL-LEAD-022",
+    "lama": "Menyampaikan kebutuhan pemeliharaan (non-elektronik) kepada GA untuk mengeskalasi ke pihak berwenang, meneruskan kebutuhan ke GA, menghasilkan kebutuhan tersampaikan.",
+    "baru": "Menyampaikan kebutuhan pemeliharaan (non-elektronik) kepada GA dengan meneruskan kebutuhan ke GA untuk mengeskalasi ke pihak berwenang, menghasilkan kebutuhan tersampaikan."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-023",
+    "kembaran": "WKSAR-ALL-LEAD-023",
+    "lama": "Mengoordinasikan permintaan dengan pihak pengaju untuk menyelaraskan kebutuhan pengadaan, berkoordinasi dengan pengaju, menghasilkan kebutuhan jelas.",
+    "baru": "Mengoordinasikan permintaan dengan pihak pengaju dengan berkoordinasi dengan pengaju untuk menyelaraskan kebutuhan pengadaan, menghasilkan kebutuhan jelas."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-024",
+    "kembaran": "WKSAR-ALL-LEAD-024",
+    "lama": "Mengoordinasikan penggunaan fasilitas yayasan (kendaraan & supir) untuk memenuhi kebutuhan transportasi, berkoordinasi dengan yayasan, menghasilkan fasilitas tersedia.",
+    "baru": "Mengoordinasikan penggunaan fasilitas yayasan (kendaraan dan supir) dengan berkoordinasi dengan yayasan untuk memenuhi kebutuhan transportasi, menghasilkan fasilitas tersedia."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-025",
+    "kembaran": "WKSAR-ALL-LEAD-025",
+    "lama": "Mendistribusikan form pengajuan pengadaan kepada guru untuk menjaring kebutuhan tahunan, menyebarkan form, menghasilkan form terdistribusi.",
+    "baru": "Mendistribusikan form pengajuan pengadaan kepada guru dengan menyebarkan form untuk menjaring kebutuhan tahunan, menghasilkan form terdistribusi."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-026",
+    "kembaran": "WKSAR-ALL-LEAD-026",
+    "lama": "Mendistribusikan barang pengadaan ke guru untuk menyalurkan barang ke pengguna, menyalurkan barang, menghasilkan barang tersalur.",
+    "baru": "Mendistribusikan barang pengadaan ke guru dengan menyalurkan barang untuk menyalurkan barang ke pengguna, menghasilkan barang tersalur."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-027",
+    "kembaran": "WKSAR-ALL-LEAD-027",
+    "lama": "Menerima pengadaan barang dari GA untuk memverifikasi barang masuk, menerima & mengecek barang, menghasilkan barang diterima.",
+    "baru": "Menerima pengadaan barang dari GA untuk memverifikasi barang masuk, menghasilkan barang diterima."
+  },
+  {
+    "kode": "KOSAR-ALL-LEAD-028",
+    "kembaran": "WKSAR-ALL-LEAD-028",
+    "lama": "Mengecek ketersediaan sarpras sebelum tahun ajaran baru untuk memastikan kesiapan awal tahun, inspeksi kesiapan sarpras, menghasilkan status kesiapan.",
+    "baru": "Memeriksa ketersediaan sarpras sebelum tahun ajaran baru berdasarkan inspeksi kesiapan sarpras agar kesiapan awal tahun, menghasilkan status kesiapan."
+  },
+  {
+    "kode": "KOSAR-ALL-PD-002",
+    "kembaran": "WKSAR-ALL-PD-002",
+    "lama": "Melaksanakan evaluasi harian untuk merefleksikan isu harian, meninjau kejadian harian, menghasilkan catatan evaluasi.",
+    "baru": "Mengevaluasi harian dengan meninjau kejadian harian untuk merefleksikan isu harian, menghasilkan catatan evaluasi."
+  },
+  {
+    "kode": "KOSAR-ALL-STUSUP-004",
+    "kembaran": "WKSAR-ALL-STUSUP-004",
+    "lama": "Membagi loker siswa untuk mengalokasikan penyimpanan bagi siswa, menetapkan alokasi loker, menghasilkan loker siswa teralokasi.",
+    "baru": "Membagi loker siswa dengan menetapkan alokasi loker untuk mengalokasikan penyimpanan bagi siswa, menghasilkan loker siswa teralokasi."
+  },
+  {
+    "kode": "KOSAR-ALL-STUSUP-005",
+    "kembaran": "WKSAR-ALL-STUSUP-005",
+    "lama": "Mengelompokkan kunci loker berdasarkan kelas siswa baru untuk menyiapkan distribusi loker, mengelompokkan kunci, menghasilkan kunci terkelompok.",
+    "baru": "Mengelompokkan kunci loker berdasarkan kelas siswa baru untuk menyiapkan distribusi loker, menghasilkan kunci terkelompok."
+  },
+  {
+    "kode": "KOSAR-ALL-STUSUP-006",
+    "kembaran": "WKSAR-ALL-STUSUP-006",
+    "lama": "Menindaklanjuti hasil pemantauan isi loker untuk menangani temuan pemeriksaan, memproses temuan, menghasilkan temuan tertangani.",
+    "baru": "Menindaklanjuti hasil pemantauan isi loker dengan memproses temuan untuk menangani temuan pemeriksaan, menghasilkan temuan tertangani."
+  }
+]

@@ -16,6 +16,9 @@ Yang dijamin:
 6. ``test_uraian_sederhana_v2_19_r1_*`` — revisi data `cdd92c950f19` (backlog `#30`)
    mengganti `ti_uraian_tugas.uraian` lama->baru per kode HANYA bila teksnya masih
    persis nilai lama yang diharapkan; baris yang sudah diedit manual tidak tersentuh.
+7. ``test_uraian_klon_koordinator_*`` — revisi data `3889bd9af66e` menerapkan aturan
+   yang sama pada 75 baris klon `KOEKS-`/`KOHUM-`/`KOSAR-` (di luar `task_catalog.json`)
+   agar redaksinya sama dengan kembarannya di katalog.
 
 Test berbasis-DB membangun **database sekali-pakai** terpisah dari DB test utama agar
 tidak mengganggu fixtur ``engine`` (yang sudah di-seed). Database itu dibuat & dihapus
@@ -520,3 +523,100 @@ def test_uraian_sederhana_v2_19_r1_database_kosong_tanpa_error(fresh_db_url: str
     upgrade(fresh_db_url, "79edf4fa66b1")
     upgrade(fresh_db_url, "head")  # tidak boleh raise walau tabel ti_uraian_tugas kosong
     downgrade(fresh_db_url, "79edf4fa66b1")  # idem untuk arah sebaliknya
+
+
+_FROZEN_KLON_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "migrations"
+    / "data"
+    / "20260729_uraian_klon_koordinator_v2_19_r1.json"
+)
+
+
+def _entri_klon_kontrol() -> dict[str, str]:
+    """Entri beku berkode `KOEKS-ALL-ADMIN-005`, dipakai bersama oleh test klon Koordinator."""
+    with _FROZEN_KLON_PATH.open(encoding="utf-8") as f:
+        frozen: list[dict[str, str]] = json.load(f)
+    return next(e for e in frozen if e["kode"] == "KOEKS-ALL-ADMIN-005")
+
+
+def test_uraian_klon_koordinator_upgrade_menyamakan_dengan_kembaran(fresh_db_url: str) -> None:
+    """Revisi `3889bd9af66e`: baris klon bertext `lama` berubah jadi redaksi kembarannya."""
+    entry = _entri_klon_kontrol()
+    upgrade(fresh_db_url, "cdd92c950f19")  # revisi tepat sebelum penyamaan klon
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            ut_id = _insert_ti_uraian_tugas_kontrol(conn, kode=entry["kode"], uraian=entry["lama"])
+
+        upgrade(fresh_db_url, "head")
+
+        assert _baca_uraian(engine, ut_id) == entry["baru"]
+    finally:
+        engine.dispose()
+
+
+def test_uraian_klon_koordinator_downgrade_mengembalikan_baru_jadi_lama(fresh_db_url: str) -> None:
+    """`downgrade()` satu langkah dari head mengembalikan teks klon menjadi `lama` semula."""
+    entry = _entri_klon_kontrol()
+    upgrade(fresh_db_url, "cdd92c950f19")
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            ut_id = _insert_ti_uraian_tugas_kontrol(conn, kode=entry["kode"], uraian=entry["lama"])
+
+        upgrade(fresh_db_url, "head")
+        assert _baca_uraian(engine, ut_id) == entry["baru"]
+
+        downgrade(fresh_db_url, "cdd92c950f19")
+        assert _baca_uraian(engine, ut_id) == entry["lama"]
+    finally:
+        engine.dispose()
+
+
+def test_uraian_klon_koordinator_tidak_menimpa_baris_yang_sudah_diedit_manual(
+    fresh_db_url: str,
+) -> None:
+    """Baris klon yang teksnya sudah diedit manual (≠ `lama`) tidak ikut berubah."""
+    entry = _entri_klon_kontrol()
+    teks_manual = "Redaksi klon yang sudah disesuaikan manual untuk cabang Bandung."
+    upgrade(fresh_db_url, "cdd92c950f19")
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            ut_id = _insert_ti_uraian_tugas_kontrol(conn, kode=entry["kode"], uraian=teks_manual)
+
+        upgrade(fresh_db_url, "head")
+
+        assert _baca_uraian(engine, ut_id) == teks_manual
+    finally:
+        engine.dispose()
+
+
+def test_uraian_klon_koordinator_tidak_menyentuh_kembarannya(fresh_db_url: str) -> None:
+    """Baris kembaran (`PEK-*`) yang sudah bertext `baru` tidak ikut di-UPDATE lagi."""
+    entry = _entri_klon_kontrol()
+    upgrade(fresh_db_url, "cdd92c950f19")
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            ut_id = _insert_ti_uraian_tugas_kontrol(
+                conn, kode=entry["kembaran"], uraian=entry["baru"]
+            )
+
+        upgrade(fresh_db_url, "head")
+        assert _baca_uraian(engine, ut_id) == entry["baru"]
+
+        # downgrade klon TIDAK boleh menarik mundur redaksi kembarannya
+        downgrade(fresh_db_url, "cdd92c950f19")
+        assert _baca_uraian(engine, ut_id) == entry["baru"]
+    finally:
+        engine.dispose()
+
+
+def test_uraian_klon_koordinator_database_kosong_tanpa_error(fresh_db_url: str) -> None:
+    """Upgrade & downgrade revisi `3889bd9af66e` pada database tanpa baris klon selesai tanpa
+    error (0 baris terpengaruh — instalasi baru memang tidak punya jabatan `Koordinator …`)."""
+    upgrade(fresh_db_url, "cdd92c950f19")
+    upgrade(fresh_db_url, "head")
+    downgrade(fresh_db_url, "cdd92c950f19")

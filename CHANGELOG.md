@@ -7,6 +7,20 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diubah
+
+- **Samakan redaksi 75 baris klon jabatan `Koordinator …` dengan kembarannya di katalog**
+  — jabatan `Koordinator Ekstrakurikuler`/`Koordinator Humas`/`Koordinator Sarana
+  Prasarana` (nomenklatur cabang Bandung, 124 baris `KOEKS-`/`KOHUM-`/`KOSAR-`) dibuat
+  manual di luar `task_catalog.json` dengan menyalin uraian tugas dari jabatan
+  kembarannya (`PEK-`/`WKHUM-`/`WKSAR-`), sehingga terlewat oleh penyederhanaan redaksi
+  v2.19-R1 (#30): kembarannya sudah disederhanakan, klonnya masih redaksi 5C lama. 75
+  baris yang menganga itu kini disamakan lewat migrasi data Alembic `3889bd9af66e`
+  (mekanisme sama: hanya menimpa baris yang teksnya masih persis redaksi lama). 49 baris
+  klon sisanya kembarannya juga belum disederhanakan, jadi memang sudah konsisten.
+  Ketiga jabatan tetap tidak dimasukkan ke `task_catalog.json` — instalasi baru tetap
+  tidak memilikinya (status quo).
+
 ## [0.42.2] - 2026-07-28
 
 ### Diubah
