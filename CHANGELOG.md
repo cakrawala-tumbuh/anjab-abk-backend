@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-07-29
+
 ### Ditambahkan
 
 - **Nilai standar OPM dibawa ke snapshot task sesi & respons API** (backlog #34,
