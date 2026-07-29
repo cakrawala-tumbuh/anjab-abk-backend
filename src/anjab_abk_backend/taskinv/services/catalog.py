@@ -186,6 +186,9 @@ class UraianTugasBackedCatalogService:
             std_jam_per_minggu=ut.std_jam_per_minggu,
             std_peak4w_hours=ut.std_peak4w_hours,
             std_va_type=ut.std_va_type,
+            std_opm_importance=ut.std_opm_importance,
+            std_opm_frequency=ut.std_opm_frequency,
+            std_opm_criticality=ut.std_opm_criticality,
         )
 
     def list_kombinasi(self) -> list[TiKombinasiRead]:

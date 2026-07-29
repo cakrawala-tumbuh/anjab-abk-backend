@@ -569,6 +569,11 @@ _STD_MASTER = {
     "std_jam_per_minggu": 2.0,
     "std_peak4w_hours": 0.0,
     "std_va_type": "VA-Core",
+    # Nilai standar OPM (backlog #33) — ikut diprefill ke task-terpilih lewat jalur
+    # yang sama dengan std_* CalHR di atas.
+    "std_opm_importance": 4,
+    "std_opm_frequency": 3,
+    "std_opm_criticality": 5,
 }
 
 # durasi_per_kali jawaban responden (ti_detail) tetap Integer — beda dari

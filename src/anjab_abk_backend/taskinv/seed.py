@@ -3,7 +3,9 @@
 Sumber: sheet `05_Raw_Task_Migration` dari Task_Bank_Complete_AllRoles_v2_19.xlsx,
 diekstrak lewat `data/task-inventory/extract_task_bank.py` (di repo induk) lalu disimpan
 sebagai `data/task_catalog.json`. Data di-load sekali saat startup (read-only, tidak
-diubah lewat API). Termasuk 5 nilai standar CalHR (`std_*`) per task.
+diubah lewat API). Termasuk 5 nilai standar CalHR (`std_*`) per task, ditambah 3 nilai
+standar OPM (`std_opm_importance`/`std_opm_frequency`/`std_opm_criticality`, backlog
+`anjab-abk-backend#33`) dari kolom Importance/Frequency/Criticality sheet yang sama.
 
 Fungsi `seed_catalog_models` memigrasikan data JSON ke tiga model terpisah:
 TugasPokok, DetilTugas, dan UraianTugas — yang menjadi sumber tunggal data catalog.
@@ -57,6 +59,9 @@ class CatalogItem(TypedDict):
     std_kondisi: str | None
     std_frekuensi_teks: str | None
     std_durasi_per_kali: str | None
+    std_opm_importance: int | None
+    std_opm_frequency: int | None
+    std_opm_criticality: int | None
 
 
 @lru_cache
@@ -246,6 +251,9 @@ def seed_catalog_models(
                     std_kondisi=item.get("std_kondisi"),
                     std_frekuensi_teks=item.get("std_frekuensi_teks"),
                     std_durasi_per_kali=item.get("std_durasi_per_kali"),
+                    std_opm_importance=item.get("std_opm_importance"),
+                    std_opm_frequency=item.get("std_opm_frequency"),
+                    std_opm_criticality=item.get("std_opm_criticality"),
                 )
             )
         except ConflictError:

@@ -82,6 +82,27 @@ class UraianTugasCreate(BaseModel):
         default=None, ge=0, description="Nilai standar jam pada 4 minggu peak."
     )
     std_va_type: VaType | None = Field(default=None, description="Nilai standar VA type.")
+    std_opm_importance: int | None = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description="Nilai standar OPM — importance (skala 1-5).",
+        examples=[3],
+    )
+    std_opm_frequency: int | None = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description="Nilai standar OPM — frequency (skala 1-5).",
+        examples=[2],
+    )
+    std_opm_criticality: int | None = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description="Nilai standar OPM — criticality (skala 1-5).",
+        examples=[3],
+    )
 
 
 class UraianTugasUpdate(BaseModel):
@@ -117,6 +138,15 @@ class UraianTugasUpdate(BaseModel):
         default=None, ge=0, description="Nilai standar jam pada 4 minggu peak."
     )
     std_va_type: VaType | None = Field(default=None, description="Nilai standar VA type.")
+    std_opm_importance: int | None = Field(
+        default=None, ge=1, le=5, description="Nilai standar OPM — importance (skala 1-5)."
+    )
+    std_opm_frequency: int | None = Field(
+        default=None, ge=1, le=5, description="Nilai standar OPM — frequency (skala 1-5)."
+    )
+    std_opm_criticality: int | None = Field(
+        default=None, ge=1, le=5, description="Nilai standar OPM — criticality (skala 1-5)."
+    )
 
 
 class UraianTugasRead(BaseModel):
@@ -158,4 +188,13 @@ class UraianTugasRead(BaseModel):
         default=None, ge=0, description="Nilai standar jam pada 4 minggu peak."
     )
     std_va_type: VaType | None = Field(default=None, description="Nilai standar VA type.")
+    std_opm_importance: int | None = Field(
+        default=None, ge=1, le=5, description="Nilai standar OPM — importance (skala 1-5)."
+    )
+    std_opm_frequency: int | None = Field(
+        default=None, ge=1, le=5, description="Nilai standar OPM — frequency (skala 1-5)."
+    )
+    std_opm_criticality: int | None = Field(
+        default=None, ge=1, le=5, description="Nilai standar OPM — criticality (skala 1-5)."
+    )
     created_at: datetime = Field(description="Waktu pembuatan (UTC, ISO-8601).")

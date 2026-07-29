@@ -1,0 +1,6830 @@
+[
+  {
+    "kode": "GBK-ALL-ADMIN-001",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "GBK-ALL-ADMIN-002",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "GBK-ALL-ADMIN-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GBK-ALL-ADMIN-004",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "GBK-ALL-ADMIN-005",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "GBK-ALL-INST-001",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "GBK-ALL-INST-002",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GBK-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GBK-ALL-LEAD-002",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "GBK-ALL-LEAD-003",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "GBK-ALL-PD-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GBK-ALL-PD-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GBK-ALL-STUSUP-001",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "GBK-ALL-STUSUP-002",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "GBK-ALL-STUSUP-003",
+    "importance": 5,
+    "frequency": 4,
+    "criticality": 5
+  },
+  {
+    "kode": "GBK-ALL-STUSUP-004",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 4
+  },
+  {
+    "kode": "GBK-ALL-STUSUP-005",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "GBK-ALL-STUSUP-006",
+    "importance": 5,
+    "frequency": 1,
+    "criticality": 5
+  },
+  {
+    "kode": "GBK-ALL-STUSUP-007",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "GBK-ALL-STUSUP-008",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "GBK-ALL-STUSUP-009",
+    "importance": 5,
+    "frequency": 1,
+    "criticality": 5
+  },
+  {
+    "kode": "GBK-ALL-STUSUP-010",
+    "importance": 5,
+    "frequency": 1,
+    "criticality": 5
+  },
+  {
+    "kode": "GBK-ALL-STUSUP-011",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "GBK-ALL-STUSUP-012",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GKSD-SD-ADMIN-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GKSD-SD-ADMIN-002",
+    "importance": 2,
+    "frequency": null,
+    "criticality": 2
+  },
+  {
+    "kode": "GKSD-SD-ADMIN-003",
+    "importance": 3,
+    "frequency": null,
+    "criticality": 3
+  },
+  {
+    "kode": "GKSD-SD-ADMIN-004",
+    "importance": 4,
+    "frequency": null,
+    "criticality": 4
+  },
+  {
+    "kode": "GKSD-SD-ADMIN-005",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GKSD-SD-INST-001",
+    "importance": 5,
+    "frequency": 5,
+    "criticality": 5
+  },
+  {
+    "kode": "GKSD-SD-INST-002",
+    "importance": 4,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "GKSD-SD-INST-003",
+    "importance": 5,
+    "frequency": 5,
+    "criticality": 4
+  },
+  {
+    "kode": "GKSD-SD-INST-004",
+    "importance": 5,
+    "frequency": null,
+    "criticality": 4
+  },
+  {
+    "kode": "GKSD-SD-INST-005",
+    "importance": 4,
+    "frequency": null,
+    "criticality": 4
+  },
+  {
+    "kode": "GKSD-SD-INST-006",
+    "importance": 5,
+    "frequency": null,
+    "criticality": 4
+  },
+  {
+    "kode": "GKSD-SD-INST-007",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GKSD-SD-INST-008",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "GKSD-SD-INST-009",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GKSD-SD-INST-010",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "GKSD-SD-INST-011",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GKSD-SD-INST-012",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "GKSD-SD-LEAD-001",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "GKSD-SD-PD-001",
+    "importance": 2,
+    "frequency": null,
+    "criticality": 2
+  },
+  {
+    "kode": "GKSD-SD-PD-002",
+    "importance": 3,
+    "frequency": null,
+    "criticality": 2
+  },
+  {
+    "kode": "GKSD-SD-PD-003",
+    "importance": 3,
+    "frequency": null,
+    "criticality": 2
+  },
+  {
+    "kode": "GKSD-SD-STUSUP-001",
+    "importance": 4,
+    "frequency": null,
+    "criticality": 4
+  },
+  {
+    "kode": "GKSD-SD-STUSUP-002",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "GKSD-SD-STUSUP-003",
+    "importance": 2,
+    "frequency": null,
+    "criticality": 2
+  },
+  {
+    "kode": "GKSD-SD-STUSUP-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GKSD-SD-STUSUP-005",
+    "importance": 5,
+    "frequency": 5,
+    "criticality": 4
+  },
+  {
+    "kode": "GKSD-SD-STUSUP-006",
+    "importance": 4,
+    "frequency": null,
+    "criticality": 3
+  },
+  {
+    "kode": "GKSD-SD-STUSUP-007",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "GKSD-SD-STUSUP-008",
+    "importance": 4,
+    "frequency": null,
+    "criticality": 3
+  },
+  {
+    "kode": "GKSD-SD-STUSUP-009",
+    "importance": 4,
+    "frequency": null,
+    "criticality": 3
+  },
+  {
+    "kode": "GKTK-TK-ADMIN-001",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GKTK-TK-ADMIN-002",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "GKTK-TK-ADMIN-003",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GKTK-TK-ADMIN-004",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GKTK-TK-ADMIN-005",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GKTK-TK-INST-001",
+    "importance": 5,
+    "frequency": 5,
+    "criticality": 5
+  },
+  {
+    "kode": "GKTK-TK-INST-002",
+    "importance": 5,
+    "frequency": 5,
+    "criticality": 4
+  },
+  {
+    "kode": "GKTK-TK-INST-003",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "GKTK-TK-INST-004",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "GKTK-TK-INST-005",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GKTK-TK-INST-006",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "GKTK-TK-INST-007",
+    "importance": 5,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "GKTK-TK-LEAD-001",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "GKTK-TK-PD-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GKTK-TK-PD-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GKTK-TK-STUSUP-001",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "GKTK-TK-STUSUP-002",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "GKTK-TK-STUSUP-003",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GKTK-TK-STUSUP-004",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "GKTK-TK-STUSUP-005",
+    "importance": 5,
+    "frequency": 5,
+    "criticality": 4
+  },
+  {
+    "kode": "GKTK-TK-STUSUP-006",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMA-SMA-ADMIN-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GMSMA-SMA-ADMIN-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMA-SMA-ADMIN-003",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GMSMA-SMA-INST-001",
+    "importance": 5,
+    "frequency": 5,
+    "criticality": 5
+  },
+  {
+    "kode": "GMSMA-SMA-INST-002",
+    "importance": 5,
+    "frequency": 5,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMA-SMA-INST-003",
+    "importance": 4,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMA-SMA-INST-004",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMA-SMA-INST-005",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMA-SMA-INST-006",
+    "importance": 5,
+    "frequency": 3,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMA-SMA-INST-007",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMA-SMA-INST-008",
+    "importance": 5,
+    "frequency": 3,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMA-SMA-INST-009",
+    "importance": 5,
+    "frequency": 3,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMA-SMA-INST-010",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMA-SMA-INST-011",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMA-SMA-INST-012",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMA-SMA-INST-013",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMA-SMA-INST-014",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMA-SMA-LEAD-001",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "GMSMA-SMA-PD-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GMSMA-SMA-PD-002",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "GMSMA-SMA-PD-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GMSMA-SMA-STUSUP-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMA-SMA-STUSUP-002",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMA-SMA-STUSUP-003",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMP-SMP-ADMIN-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GMSMP-SMP-ADMIN-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMP-SMP-ADMIN-003",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GMSMP-SMP-INST-001",
+    "importance": 5,
+    "frequency": 5,
+    "criticality": 5
+  },
+  {
+    "kode": "GMSMP-SMP-INST-002",
+    "importance": 5,
+    "frequency": 5,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMP-SMP-INST-003",
+    "importance": 4,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMP-SMP-INST-004",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMP-SMP-INST-005",
+    "importance": 5,
+    "frequency": 3,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMP-SMP-INST-006",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMP-SMP-INST-007",
+    "importance": 5,
+    "frequency": 3,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMP-SMP-INST-008",
+    "importance": 5,
+    "frequency": 3,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMP-SMP-INST-009",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMP-SMP-INST-010",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMP-SMP-INST-011",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMP-SMP-INST-012",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMP-SMP-INST-013",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "GMSMP-SMP-LEAD-001",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "GMSMP-SMP-PD-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GMSMP-SMP-PD-002",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "GMSMP-SMP-PD-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GMSMP-SMP-STUSUP-001",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "GMSMP-SMP-STUSUP-002",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "GPD1-ALL-ADMIN-001",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-ADMIN-002",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "GPD1-ALL-ADMIN-003",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-ADMIN-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-ADMIN-005",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "GPD1-ALL-ADMIN-006",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-ADMIN-007",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "GPD1-ALL-ADMIN-008",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-LEAD-001",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-LEAD-002",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-LEAD-003",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-PD-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-PD-002",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-PD-003",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-PD-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-STUSUP-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-STUSUP-002",
+    "importance": 4,
+    "frequency": 5,
+    "criticality": 4
+  },
+  {
+    "kode": "GPD1-ALL-STUSUP-003",
+    "importance": 5,
+    "frequency": 5,
+    "criticality": 5
+  },
+  {
+    "kode": "GPD1-ALL-STUSUP-004",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-STUSUP-005",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-STUSUP-006",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD1-ALL-STUSUP-007",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "GPD2-ALL-LEAD-002",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "GPD2-ALL-PD-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KPRAM-ALL-ADMIN-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KPRAM-ALL-ADMIN-002",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "KPRAM-ALL-ADMIN-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KPRAM-ALL-ADMIN-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KPRAM-ALL-ADMIN-005",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KPRAM-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KPRAM-ALL-LEAD-002",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "KPRAM-ALL-LEAD-003",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "KPRAM-ALL-LEAD-004",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "KPRAM-ALL-PD-001",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "KPRAM-ALL-STRAT-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KPRAM-ALL-STUSUP-001",
+    "importance": 5,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "KPRAM-ALL-STUSUP-002",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "KPRAM-ALL-STUSUP-003",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "KPRAM-ALL-STUSUP-004",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-ADMIN-001",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-ADMIN-002",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-ADMIN-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-ADMIN-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-ADMIN-005",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "KS-ALL-ADMIN-007",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "KS-ALL-ADMIN-008",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "KS-ALL-ADMIN-009",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-ADMIN-010",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-ADMIN-011",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-ADMIN-012",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-ADMIN-013",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-ADMIN-014",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 1
+  },
+  {
+    "kode": "KS-ALL-ADMIN-015",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 1
+  },
+  {
+    "kode": "KS-ALL-ADMIN-016",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-ADMIN-017",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-ADMIN-018",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-ADMIN-019",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-ADMIN-020",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-ADMIN-021",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-ADMIN-022",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-INST-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-INST-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-002",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "KS-ALL-LEAD-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-005",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-006",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-008",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-009",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-010",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-011",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-012",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-013",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-014",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-015",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-016",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-017",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-018",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-019",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-020",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-021",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-022",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-023",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "KS-ALL-LEAD-024",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-025",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-026",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-027",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-028",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-029",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-030",
+    "importance": 5,
+    "frequency": 3,
+    "criticality": 4
+  },
+  {
+    "kode": "KS-ALL-LEAD-031",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-032",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-033",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-034",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-035",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-036",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-037",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-038",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-039",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "KS-ALL-LEAD-040",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "KS-ALL-LEAD-041",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-042",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-043",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-044",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-045",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-046",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-047",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-048",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-049",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-050",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-051",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-052",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-053",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-054",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-055",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-056",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-057",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-058",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "KS-ALL-LEAD-059",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-060",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-061",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-062",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-LEAD-063",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-064",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-065",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-LEAD-066",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-STRAT-001",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "KS-ALL-STUSUP-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-STUSUP-002",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-STUSUP-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-STUSUP-004",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-STUSUP-005",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "KS-ALL-STUSUP-006",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-STUSUP-007",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-STUSUP-008",
+    "importance": 5,
+    "frequency": 1,
+    "criticality": 5
+  },
+  {
+    "kode": "KS-ALL-STUSUP-009",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-STUSUP-010",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-STUSUP-011",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-STUSUP-012",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "KS-ALL-STUSUP-013",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "KS-ALL-STUSUP-014",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-STUSUP-015",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-STUSUP-016",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "KS-ALL-STUSUP-017",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 5
+  },
+  {
+    "kode": "MBK-ALL-ADMIN-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "MBK-ALL-ADMIN-002",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "MBK-ALL-ADMIN-003",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "MBK-ALL-ADMIN-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "MBK-ALL-INST-001",
+    "importance": 5,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "MBK-ALL-INST-002",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "MBK-ALL-INST-003",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "MBK-ALL-INST-004",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "MBK-ALL-INST-005",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "MBK-ALL-INST-006",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "MBK-ALL-INST-007",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "MBK-ALL-INST-008",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "MBK-ALL-LEAD-001",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "MBK-ALL-LEAD-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "MBK-ALL-LEAD-003",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "MBK-ALL-LEAD-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "MPM-ALL-ADMIN-001",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "MPM-ALL-ADMIN-002",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "MPM-ALL-ADMIN-003",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "MPM-ALL-ADMIN-004",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "MPM-ALL-ADMIN-005",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "MPM-ALL-INST-001",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "MPM-ALL-INST-002",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "MPM-ALL-INST-003",
+    "importance": 5,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "MPM-ALL-INST-004",
+    "importance": 5,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "MPM-ALL-INST-005",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "MPM-ALL-INST-006",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "MPM-ALL-INST-007",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "MPM-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "MPM-ALL-LEAD-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "MPM-ALL-LEAD-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-001",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-002",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-003",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-005",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-006",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-007",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 5
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-008",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-009",
+    "importance": 5,
+    "frequency": 3,
+    "criticality": 5
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-010",
+    "importance": 5,
+    "frequency": 3,
+    "criticality": 5
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-011",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-012",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-013",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-014",
+    "importance": 5,
+    "frequency": 4,
+    "criticality": 5
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-015",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-016",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 5
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-017",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-018",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 4
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-019",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 5
+  },
+  {
+    "kode": "OPDAP-ALL-ADMIN-020",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 5
+  },
+  {
+    "kode": "OPDAP-ALL-PD-001",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "OPDAP-ALL-PD-002",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-ADMIN-001",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-ADMIN-002",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-ADMIN-003",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PBP-ALL-ADMIN-004",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "PBP-ALL-ADMIN-005",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-INST-001",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "PBP-ALL-INST-002",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-INST-003",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-INST-004",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "PBP-ALL-INST-005",
+    "importance": 5,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "PBP-ALL-INST-006",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-INST-007",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-INST-008",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-INST-009",
+    "importance": 5,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "PBP-ALL-INST-010",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "PBP-ALL-INST-011",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "PBP-ALL-INST-012",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-INST-013",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-INST-014",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-INST-015",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-INST-016",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-INST-017",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-LEAD-002",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-LEAD-003",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "PBP-ALL-LEAD-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-LEAD-005",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "PBP-ALL-LEAD-006",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "PBP-ALL-LEAD-007",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "PBP-ALL-LEAD-008",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-ADMIN-001",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-ADMIN-002",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-ADMIN-003",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-ADMIN-004",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-ADMIN-005",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-ADMIN-006",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-ADMIN-007",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-ADMIN-008",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-ADMIN-009",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-ADMIN-010",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-LEAD-002",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-LEAD-003",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-LEAD-004",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-LEAD-005",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-LEAD-006",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-LEAD-007",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-LEAD-008",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-LEAD-009",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-LEAD-010",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-LEAD-011",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-LEAD-012",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-001",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-002",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-003",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-004",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-005",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-006",
+    "importance": 5,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-007",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-008",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-009",
+    "importance": 5,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-010",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-011",
+    "importance": 5,
+    "frequency": 1,
+    "criticality": 5
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-012",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-013",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-014",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-015",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-016",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-017",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-018",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-019",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-020",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-021",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-022",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-023",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "PEK-ALL-STUSUP-024",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-001",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-002",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-003",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-004",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-005",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-006",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-007",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-008",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-009",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-010",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-011",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-012",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-013",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-014",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-015",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-016",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-017",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-018",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-019",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-020",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC1-ALL-ADMIN-021",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-002",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-003",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-004",
+    "importance": 5,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-005",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-006",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-007",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-008",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-009",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-010",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-011",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-012",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-013",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-014",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-015",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-016",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-017",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-018",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-019",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-020",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-021",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-022",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-023",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-024",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-025",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-026",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-027",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-028",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-029",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-030",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-031",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-032",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-033",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-034",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-035",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-036",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC1-ALL-LEAD-037",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC2-ALL-ADMIN-001",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC2-ALL-ADMIN-003",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC2-ALL-ADMIN-005",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC2-ALL-ADMIN-015",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC2-ALL-ADMIN-017",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC2-ALL-ADMIN-018",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "PIC2-ALL-ADMIN-019",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC2-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PIC2-ALL-LEAD-004",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC2-ALL-LEAD-005",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC2-ALL-LEAD-010",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC2-ALL-LEAD-011",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC2-ALL-LEAD-014",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC2-ALL-LEAD-016",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC2-ALL-LEAD-017",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PIC2-ALL-LEAD-022",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PKT-ALL-ADMIN-001",
+    "importance": 4,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "PKT-ALL-ADMIN-002",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "PKT-ALL-ADMIN-003",
+    "importance": 4,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "PKT-ALL-ADMIN-004",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "PKT-ALL-ADMIN-005",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "PKT-ALL-ADMIN-006",
+    "importance": 1,
+    "frequency": 5,
+    "criticality": 1
+  },
+  {
+    "kode": "PKT-ALL-INST-001",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "PKT-ALL-LEAD-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "PKT-ALL-LEAD-002",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "PKT-ALL-LEAD-003",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PKT-ALL-LEAD-004",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "PKT-ALL-LEAD-005",
+    "importance": 1,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "PKT-ALL-LEAD-006",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "PKT-ALL-LEAD-007",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "PKT-ALL-LEAD-008",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "PKT-ALL-LEAD-009",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 5
+  },
+  {
+    "kode": "PKT-ALL-LEAD-010",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "PKT-ALL-LEAD-011",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "PKT-ALL-LEAD-012",
+    "importance": 1,
+    "frequency": 5,
+    "criticality": 1
+  },
+  {
+    "kode": "PKT-ALL-STUSUP-001",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "PKT-ALL-STUSUP-002",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "PKT-ALL-STUSUP-003",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "PKT-ALL-STUSUP-004",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "POSIS-ALL-ADMIN-001",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "POSIS-ALL-ADMIN-002",
+    "importance": 3,
+    "frequency": null,
+    "criticality": 3
+  },
+  {
+    "kode": "POSIS-ALL-ADMIN-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "POSIS-ALL-LEAD-001",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "POSIS-ALL-LEAD-002",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "POSIS-ALL-LEAD-003",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "POSIS-ALL-PD-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "POSIS-ALL-PD-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "POSIS-ALL-STUSUP-001",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "POSIS-ALL-STUSUP-002",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "POSIS-ALL-STUSUP-003",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "POSIS-ALL-STUSUP-004",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "POSIS-ALL-STUSUP-005",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "POSIS-ALL-STUSUP-006",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "POSIS-ALL-STUSUP-007",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "POSIS-ALL-STUSUP-008",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-001",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-002",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-003",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-004",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-005",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-006",
+    "importance": 1,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-007",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-008",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-009",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-010",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-011",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-012",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-013",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 1
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-014",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-015",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-016",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-017",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-018",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-019",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-020",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-021",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-022",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-ADMIN-023",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STKUR-ALL-INST-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-INST-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-INST-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-INST-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-INST-005",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-INST-006",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-INST-007",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-INST-008",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-INST-009",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-INST-010",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-INST-011",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-002",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-003",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-004",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-005",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-006",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-007",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-008",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-009",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-010",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-011",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-012",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-013",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-014",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-015",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-016",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-017",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-018",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-019",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-020",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-021",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-022",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-023",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-024",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-025",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-026",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-027",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-028",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-029",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-030",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-031",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-032",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-033",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-034",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-035",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-036",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-037",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-038",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-039",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-040",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-041",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-042",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-043",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-044",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-045",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-046",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-047",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-048",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-049",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-050",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-051",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-052",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-053",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-LEAD-054",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-PD-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-PD-002",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-PD-003",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "STKUR-ALL-STUSUP-001",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STKUR-ALL-STUSUP-002",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STSAR-ALL-ADMIN-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-ADMIN-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-ADMIN-003",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-ADMIN-004",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-ADMIN-005",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-ADMIN-006",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "STSAR-ALL-ADMIN-007",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-ADMIN-008",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-ADMIN-009",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-ADMIN-010",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-003",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-004",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-005",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-006",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 5
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-007",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-008",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-009",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-010",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-011",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-012",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-013",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-014",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-015",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-016",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-017",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-018",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-019",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-020",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-021",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-022",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-023",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-024",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-025",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-028",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-LEAD-029",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-PD-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "STSAR-ALL-PD-002",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "STSAR-ALL-PD-003",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "STSAR-ALL-STUSUP-001",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "STSAR-ALL-STUSUP-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-001",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-002",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-003",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-004",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-005",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-006",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-007",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-008",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-009",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-010",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-011",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-012",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-013",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-014",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-015",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-016",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-017",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-018",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-019",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-020",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-021",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-022",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-ADMIN-023",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-002",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-003",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-005",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-006",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-007",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-008",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-009",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-010",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-011",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-012",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-013",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-014",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-015",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-016",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-017",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-018",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-019",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-020",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-021",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 1
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-022",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-023",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-024",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-025",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-026",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-LEAD-027",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-PD-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-PD-002",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-PD-003",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-001",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-002",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-003",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-005",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-006",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-007",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-008",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-009",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-010",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-011",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-012",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-013",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-014",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-015",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-016",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-017",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-018",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-019",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-020",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-021",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-022",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-023",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-024",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-025",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-026",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-027",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-028",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "STSIS-ALL-STUSUP-029",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-ADMIN-001",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-ADMIN-002",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WK-ALL-ADMIN-003",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-ADMIN-004",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-ADMIN-005",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-ADMIN-006",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-ADMIN-007",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-ADMIN-008",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-ADMIN-009",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-ADMIN-010",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-ADMIN-011",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-ADMIN-012",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-ADMIN-013",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-ADMIN-014",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-ADMIN-015",
+    "importance": 1,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-ADMIN-016",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-ADMIN-017",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-ADMIN-018",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-LEAD-001",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-LEAD-002",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-LEAD-003",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-LEAD-004",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-LEAD-005",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-LEAD-006",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-LEAD-007",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-LEAD-008",
+    "importance": 1,
+    "frequency": 4,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-PD-001",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-PD-002",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-PD-003",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-PD-004",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-STRAT-001",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "WK-ALL-STUSUP-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-STUSUP-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-STUSUP-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-STUSUP-004",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-STUSUP-005",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-STUSUP-007",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-STUSUP-008",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-STUSUP-009",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-STUSUP-010",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-STUSUP-011",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-STUSUP-012",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-STUSUP-013",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-STUSUP-014",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-STUSUP-015",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-STUSUP-016",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WK-ALL-STUSUP-018",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-STUSUP-019",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-STUSUP-020",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-STUSUP-021",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "WK-ALL-STUSUP-022",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "WK-ALL-STUSUP-023",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 4
+  },
+  {
+    "kode": "WK-ALL-STUSUP-025",
+    "importance": 5,
+    "frequency": 5,
+    "criticality": 4
+  },
+  {
+    "kode": "WK-ALL-STUSUP-026",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-STUSUP-027",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-STUSUP-028",
+    "importance": 3,
+    "frequency": 5,
+    "criticality": 3
+  },
+  {
+    "kode": "WK-ALL-STUSUP-029",
+    "importance": 1,
+    "frequency": 5,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-STUSUP-030",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WK-ALL-STUSUP-031",
+    "importance": 1,
+    "frequency": 4,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-STUSUP-032",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-STUSUP-033",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-STUSUP-034",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WK-ALL-STUSUP-035",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-ADMIN-001",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-ADMIN-002",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKHUM-ALL-ADMIN-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-ADMIN-004",
+    "importance": 1,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-ADMIN-005",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 1
+  },
+  {
+    "kode": "WKHUM-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-LEAD-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-LEAD-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-LEAD-004",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "WKHUM-ALL-LEAD-005",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKHUM-ALL-LEAD-006",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-LEAD-007",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKHUM-ALL-LEAD-008",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-LEAD-009",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-LEAD-010",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-LEAD-011",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-PD-001",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-PD-002",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-STRAT-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-STRAT-002",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "WKHUM-ALL-STRAT-003",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKHUM-ALL-STRAT-004",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-STRAT-005",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-STRAT-006",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-STRAT-007",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-STRAT-008",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKHUM-ALL-STRAT-009",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKHUM-ALL-STUSUP-001",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "WKHUM-ALL-STUSUP-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-001",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-002",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-003",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-004",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-005",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-006",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-007",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-008",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-009",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-010",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-011",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-012",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-013",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-014",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-015",
+    "importance": 1,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-016",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-017",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-018",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-019",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-020",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-022",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-023",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-024",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-025",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-026",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-027",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-029",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-030",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-031",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-033",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-034",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-035",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-036",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-037",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-038",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-039",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-040",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-041",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-042",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-043",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-044",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-045",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-ADMIN-046",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-INST-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-INST-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-INST-003",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-INST-004",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-INST-005",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WKKUR-ALL-INST-006",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WKKUR-ALL-INST-007",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-INST-008",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-INST-009",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-INST-010",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-INST-011",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-INST-012",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-INST-013",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-INST-014",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-INST-015",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-INST-016",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-003",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-004",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-005",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-006",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-007",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-008",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-009",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-010",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-011",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-012",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-013",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-014",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-015",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-016",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-017",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-018",
+    "importance": 5,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-019",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-020",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-021",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-022",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-023",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-024",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-025",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-026",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-027",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-028",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-029",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-030",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-031",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-032",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-033",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-034",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-035",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-036",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-037",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-038",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-039",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-040",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-041",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-042",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-043",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-044",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-045",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-046",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-047",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-048",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-049",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-050",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-051",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-052",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-053",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-054",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-055",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-056",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-057",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-058",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-059",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-060",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-061",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-062",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-063",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-064",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-065",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-066",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-067",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-068",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-069",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-070",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-071",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-072",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-073",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-074",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-075",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-076",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-077",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-078",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-079",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-080",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-081",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-082",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-083",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-084",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-085",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-086",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-087",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-LEAD-088",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-PD-001",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-PD-002",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-PD-003",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-PD-004",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-PD-005",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-PD-006",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-PD-008",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-STUSUP-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKKUR-ALL-STUSUP-002",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-STUSUP-003",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-STUSUP-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKKUR-ALL-STUSUP-005",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-ADMIN-001",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSAR-ALL-ADMIN-002",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-ADMIN-003",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSAR-ALL-ADMIN-004",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSAR-ALL-ADMIN-005",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSAR-ALL-ADMIN-006",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-ADMIN-007",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-ADMIN-008",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-ADMIN-009",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSAR-ALL-ADMIN-010",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSAR-ALL-ADMIN-011",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-002",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-003",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-004",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-005",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-006",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-007",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-008",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-009",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-010",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-011",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-012",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-013",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-014",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-015",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-016",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-017",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-018",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-019",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-020",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-021",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-022",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-023",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-024",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-025",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-026",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-027",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-LEAD-028",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSAR-ALL-PD-001",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-PD-002",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-PD-003",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-PD-004",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-STUSUP-001",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-STUSUP-002",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSAR-ALL-STUSUP-003",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSAR-ALL-STUSUP-004",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSAR-ALL-STUSUP-005",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSAR-ALL-STUSUP-006",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-002",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-003",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-004",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-005",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-006",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-007",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-008",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-009",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-010",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-011",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-012",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-013",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-014",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-015",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-016",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-017",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-018",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-020",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-021",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-022",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-023",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-024",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-025",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-026",
+    "importance": 1,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-027",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-028",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-029",
+    "importance": 1,
+    "frequency": 1,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSIS-ALL-ADMIN-030",
+    "importance": 1,
+    "frequency": 2,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-001",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-002",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-003",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-004",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-005",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-006",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-007",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-008",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-009",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-010",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-011",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-012",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-013",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-014",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-015",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-016",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-017",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-018",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-019",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-020",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-021",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-022",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-023",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-024",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-025",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-026",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-027",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-029",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-030",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-031",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-032",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-033",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-034",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-036",
+    "importance": 1,
+    "frequency": 4,
+    "criticality": 1
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-037",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-038",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-039",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-040",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-041",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-042",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-043",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-044",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-045",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-046",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 4
+  },
+  {
+    "kode": "WKSIS-ALL-LEAD-047",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-PD-001",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-PD-002",
+    "importance": 2,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-PD-003",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-PD-004",
+    "importance": 2,
+    "frequency": 5,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-PD-005",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-001",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-002",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-003",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-004",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-005",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-006",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-007",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-008",
+    "importance": 4,
+    "frequency": 3,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-009",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-010",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-011",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-012",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-013",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-014",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-015",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-016",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-017",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-018",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-019",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-020",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-021",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-022",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-023",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-024",
+    "importance": 3,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-025",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-026",
+    "importance": 2,
+    "frequency": 4,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-027",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-028",
+    "importance": 3,
+    "frequency": 3,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-029",
+    "importance": 4,
+    "frequency": 4,
+    "criticality": 4
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-030",
+    "importance": 4,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-031",
+    "importance": 4,
+    "frequency": 2,
+    "criticality": 3
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-032",
+    "importance": 2,
+    "frequency": 1,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-033",
+    "importance": 3,
+    "frequency": 1,
+    "criticality": 4
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-034",
+    "importance": 3,
+    "frequency": 2,
+    "criticality": 2
+  },
+  {
+    "kode": "WKSIS-ALL-STUSUP-035",
+    "importance": 2,
+    "frequency": 2,
+    "criticality": 2
+  }
+]

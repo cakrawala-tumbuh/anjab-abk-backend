@@ -78,6 +78,9 @@ class _Record:
     std_jam_per_minggu: float | None = None
     std_peak4w_hours: float | None = None
     std_va_type: str | None = None
+    std_opm_importance: int | None = None
+    std_opm_frequency: int | None = None
+    std_opm_criticality: int | None = None
 
 
 class InMemoryUraianTugasService:
@@ -147,6 +150,9 @@ class InMemoryUraianTugasService:
                 std_jam_per_minggu=data.std_jam_per_minggu,
                 std_peak4w_hours=data.std_peak4w_hours,
                 std_va_type=data.std_va_type,
+                std_opm_importance=data.std_opm_importance,
+                std_opm_frequency=data.std_opm_frequency,
+                std_opm_criticality=data.std_opm_criticality,
             )
             self._data[rec.id] = rec
             return self._to_read(rec)

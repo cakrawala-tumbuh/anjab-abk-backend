@@ -641,6 +641,129 @@ def test_uraian_tugas_std_invalid_enum(
 
 
 # --------------------------------------------------------------------------- #
+# UraianTugas — nilai standar OPM (std_opm_*, backlog #33)
+# --------------------------------------------------------------------------- #
+
+_STD_OPM_PAYLOAD = {
+    "std_opm_importance": 3,
+    "std_opm_frequency": 4,
+    "std_opm_criticality": 2,
+}
+
+
+def test_create_uraian_tugas_dengan_std_opm(
+    client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]
+) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    kode = f"TI{_uniq()}"
+    payload = {
+        "kode": kode,
+        "uraian": f"Uraian tugas {kode}",
+        "unit": "TK",
+        "urutan": 1,
+        "detil_tugas_id": dt["id"],
+        "tugas_pokok_id": tp["id"],
+        "jabatan_id": jbt_id,
+        **_STD_OPM_PAYLOAD,
+    }
+    r = client.post(UT_BASE, json=payload)
+    assert r.status_code == 201, r.text
+    body = r.json()
+    for key, value in _STD_OPM_PAYLOAD.items():
+        assert body[key] == value
+
+    r2 = client.get(f"{UT_BASE}/{body['id']}")
+    assert r2.status_code == 200
+    for key, value in _STD_OPM_PAYLOAD.items():
+        assert r2.json()[key] == value
+
+
+def test_create_uraian_tugas_tanpa_std_opm(
+    client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]
+) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
+    for key in _STD_OPM_PAYLOAD:
+        assert ut[key] is None
+
+
+def test_update_uraian_tugas_std_opm(
+    client: TestClient, tp_dt_jbt_for_ut: tuple[dict, dict, str]
+) -> None:
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
+    r = client.patch(f"{UT_BASE}/{ut['id']}", json={"std_opm_importance": 5})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["std_opm_importance"] == 5
+    # Field lain tidak berubah.
+    assert body["std_opm_frequency"] is None
+    assert body["std_opm_criticality"] is None
+    assert body["uraian"] == ut["uraian"]
+
+
+@pytest.mark.parametrize(
+    "field", ["std_opm_importance", "std_opm_frequency", "std_opm_criticality"]
+)
+@pytest.mark.parametrize("nilai", [0, 6])
+def test_create_uraian_tugas_std_opm_di_luar_rentang_ditolak(
+    client: TestClient,
+    tp_dt_jbt_for_ut: tuple[dict, dict, str],
+    field: str,
+    nilai: int,
+) -> None:
+    """Payload create dengan std_opm_* = 0 atau 6 ditolak 422 (validasi ge=1, le=5)."""
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    kode = f"TI{_uniq()}"
+    payload = {
+        "kode": kode,
+        "uraian": f"Uraian tugas {kode}",
+        "unit": "TK",
+        "urutan": 1,
+        "detil_tugas_id": dt["id"],
+        "tugas_pokok_id": tp["id"],
+        "jabatan_id": jbt_id,
+        field: nilai,
+    }
+    r = client.post(UT_BASE, json=payload)
+    assert r.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "field", ["std_opm_importance", "std_opm_frequency", "std_opm_criticality"]
+)
+@pytest.mark.parametrize("nilai", [0, 6])
+def test_update_uraian_tugas_std_opm_di_luar_rentang_ditolak(
+    client: TestClient,
+    tp_dt_jbt_for_ut: tuple[dict, dict, str],
+    field: str,
+    nilai: int,
+) -> None:
+    """Payload update dengan std_opm_* = 0 atau 6 ditolak 422 (validasi ge=1, le=5)."""
+    tp, dt, jbt_id = tp_dt_jbt_for_ut
+    ut = _create_ut(client, dt["id"], tp["id"], jbt_id)
+    r = client.patch(f"{UT_BASE}/{ut['id']}", json={field: nilai})
+    assert r.status_code == 422
+
+
+def test_seeded_catalog_membawa_nilai_standar_opm(client: TestClient) -> None:
+    """Katalog hasil seed (bukan hanya item yang dibuat langsung via API) membawa
+    std_opm_importance/frequency/criticality dari task_catalog.json."""
+    kombis = client.get(CATALOG_BASE + "/kombinasi").json()
+    assert len(kombis) > 0
+    first = kombis[0]
+    r = client.get(
+        CATALOG_BASE,
+        params={"unit": first["unit"], "jabatan_id": first["jabatan_id"], "limit": 500},
+    )
+    assert r.status_code == 200
+    items = r.json()["items"]
+    assert len(items) > 0
+    assert any(it["std_opm_importance"] is not None for it in items)
+    assert any(it["std_opm_criticality"] is not None for it in items)
+
+
+# --------------------------------------------------------------------------- #
 # Purge & reseed katalog master (admin)
 # --------------------------------------------------------------------------- #
 

@@ -47,6 +47,9 @@ def compute_task_terpilih(
                 std_jam_per_minggu=cat.std_jam_per_minggu if cat else None,
                 std_peak4w_hours=cat.std_peak4w_hours if cat else None,
                 std_va_type=cat.std_va_type if cat else None,
+                std_opm_importance=cat.std_opm_importance if cat else None,
+                std_opm_frequency=cat.std_opm_frequency if cat else None,
+                std_opm_criticality=cat.std_opm_criticality if cat else None,
             )
         )
     rows.sort(key=lambda r: (-r.n_relevan, r.kode))

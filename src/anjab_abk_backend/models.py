@@ -456,6 +456,14 @@ class TiUraianTugasJabatanModel(Base):
     std_jam_per_minggu: Mapped[float | None] = mapped_column(Float, nullable=True)
     std_peak4w_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
     std_va_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Nilai standar OPM (backlog `anjab-abk-backend#33`) — skala 1-5, sumber sheet
+    # `05_Raw_Task_Migration` (kolom Importance/Frequency/Criticality). Prefiks
+    # `std_opm_` sengaja dipakai agar tidak tertukar dengan `std_frekuensi_teks`
+    # (frekuensi teks bebas untuk ABK) — makna & format keduanya berbeda. Semua
+    # nullable: master lama tanpa nilai standar OPM tetap valid.
+    std_opm_importance: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    std_opm_frequency: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    std_opm_criticality: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     uraian_tugas: Mapped[TiUraianTugasModel] = relationship(back_populates="jabatan_links")
 

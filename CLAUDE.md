@@ -82,6 +82,45 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-29] TI: nilai standar OPM (importance/frequency/criticality) di katalog
+
+Backlog `#33`. Instrumen OPM meminta responden menilai tiap task pada tiga dimensi 1-5
+(`importance`, `frequency`, `criticality`) dari nol — tidak ada prefill sama sekali,
+berbeda dari Tahap 3 TI yang sudah punya 7 field `std_*`. Padahal nilainya sudah ada di
+Task Bank sumber (sheet `05_Raw_Task_Migration`, kolom `Importance`/`Criticality`/
+`Frequency`) — saat migrasi awal ke `task_catalog.json`, kolom lain ikut terbawa
+(`Frequency` → `std_frekuensi_teks`, dll.) tapi `Importance`/`Criticality` tidak ikut
+sama sekali.
+
+- **Tiga kolom baru di `ti_uraian_tugas_jabatan`**: `std_opm_importance`,
+  `std_opm_frequency`, `std_opm_criticality` — `Integer`, nullable, tanpa server
+  default. Prefiks `std_opm_` sengaja dipakai agar tidak tertukar dengan
+  `std_frekuensi_teks` (frekuensi teks bebas untuk ABK, makna berbeda). Terekspos di
+  `UraianTugasCreate`/`Update`/`Read`, `TiCatalogRead`, `TiTaskTerpilihRead` sebagai
+  `int | None` dengan validasi `ge=1, le=5` — payload `0`/`6` ditolak `422`.
+- **Dua revisi Alembic terpisah** (disiplin satu perubahan = satu berkas): DDL
+  `c8fb8be9e184` (ADD COLUMN tiga kolom) lalu data backfill `ad595b80d3d1` (UPDATE
+  bertarget per `kode` dari berkas beku `migrations/data/20260729_opm_std_values_v2_19.json`,
+  1138 entri `{"kode","importance","frequency","criticality"}`). `upgrade()` hanya
+  menulis bila SEMUA tiga kolom `std_opm_*` saat ini `NULL` (baris yang sudah diisi
+  manual sebelum migrasi tidak tertimpa sebagian); `downgrade()` mengosongkan kembali
+  ke `NULL` hanya untuk baris yang nilainya masih persis sama dengan berkas beku
+  (`IS NOT DISTINCT FROM` untuk `frequency` yang boleh `NULL`). Ketidakcocokan dicatat
+  `logger.warning`, tidak menggagalkan migrasi — aman di DB kosong.
+- **Pemetaan `Frequency` teks → skor**: Insidental=1, Tahunan=2, Semesteran=2,
+  Bulanan=3, Mingguan=4, Harian=5 (anchor label OPM "1 Insidental … 5 Sangat
+  sering/Harian"). 15 kode ber-`Frequency` kotor (`Baseline`/`Peak`/`Perlu Validasi`) di
+  Task Bank mendapat `std_opm_frequency = NULL` — tidak ditebak; `importance`/
+  `criticality` terisi penuh 1138/1138 sehingga tidak ada `NULL` dari sisi itu.
+  `task_catalog.json` diperbarui in-place (tetap 1.138 baris) sehingga
+  `seed_catalog_models` mengisi instalasi baru dengan nilai yang sama.
+- **Berkas beku dibangkitkan skrip ad-hoc yang TIDAK di-commit** (`openpyxl` sengaja
+  tidak masuk dependensi backend) — mengikuti preseden `cdd92c950f19`. Berkas beku
+  tidak boleh diubah lagi setelah merge; ia masukan tetap bagi kedua arah migrasi.
+- **Di luar lingkup**: pemakaian nilai ini di modul OPM (snapshot sesi, endpoint,
+  analisis) — item lanjutan; perubahan Tahap 3 TI; `std_frekuensi_teks` tetap ada apa
+  adanya.
+
 ### [2026-07-29] TI: samakan redaksi 75 baris klon jabatan `Koordinator …` dengan kembarannya
 
 Lanjutan langsung `cdd92c950f19` (entri `[2026-07-28]`-nya ada di CHANGELOG, backlog

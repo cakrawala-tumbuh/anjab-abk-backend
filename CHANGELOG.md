@@ -7,6 +7,23 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Ditambahkan
+
+- **Nilai standar OPM (importance/frequency/criticality) di katalog Task Inventory**
+  (backlog #33) — tiga kolom baru `std_opm_importance`/`std_opm_frequency`/
+  `std_opm_criticality` (skala 1-5, nullable) pada `ti_uraian_tugas_jabatan`, terekspos
+  di skema baca/tulis katalog uraian tugas (`UraianTugasCreate`/`Update`/`Read`,
+  `TiCatalogRead`, `TiTaskTerpilihRead`). Sumber nilai: sheet `05_Raw_Task_Migration`
+  Task Bank (kolom `Importance`/`Criticality`/`Frequency`) — sebelumnya hanya kolom
+  lain (`Frequency` teks, `Formal_Actual`, `Baseline_Peak`, `Duration_Estimate`) yang
+  ikut termigrasi ke `task_catalog.json`, dua kolom ini terlewat. `task_catalog.json`
+  diperbarui in-place (1.138 baris, seluruhnya bernilai `Importance`/`Criticality`;
+  15 baris ber-`Frequency` kotor mendapat `std_opm_frequency = null`, tidak ditebak).
+  Instance yang sudah berjalan diisi via migrasi data terpisah dari berkas beku
+  `migrations/data/20260729_opm_std_values_v2_19.json` (hanya menimpa baris `NULL`,
+  baris yang sudah diedit manual tidak tersentuh). Item lanjutan (pemakaian nilai ini
+  di modul OPM) di luar lingkup revisi ini.
+
 ### Diubah
 
 - **Samakan redaksi 75 baris klon jabatan `Koordinator …` dengan kembarannya di katalog**

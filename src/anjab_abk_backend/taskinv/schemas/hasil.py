@@ -26,6 +26,15 @@ class TiTaskTerpilihRead(BaseModel):
     std_jam_per_minggu: float | None = None
     std_peak4w_hours: float | None = None
     std_va_type: VaType | None = None
+    std_opm_importance: int | None = Field(
+        default=None, ge=1, le=5, description="Nilai standar OPM — importance (skala 1-5)."
+    )
+    std_opm_frequency: int | None = Field(
+        default=None, ge=1, le=5, description="Nilai standar OPM — frequency (skala 1-5)."
+    )
+    std_opm_criticality: int | None = Field(
+        default=None, ge=1, le=5, description="Nilai standar OPM — criticality (skala 1-5)."
+    )
 
 
 class TiHasilTaskRead(BaseModel):

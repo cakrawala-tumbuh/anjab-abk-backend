@@ -55,6 +55,9 @@ _LINK_FIELDS = (
     "std_jam_per_minggu",
     "std_peak4w_hours",
     "std_va_type",
+    "std_opm_importance",
+    "std_opm_frequency",
+    "std_opm_criticality",
 )
 
 
@@ -105,6 +108,9 @@ def _to_read(rec: TiUraianTugasModel) -> UraianTugasRead:
         std_jam_per_minggu=link.std_jam_per_minggu,
         std_peak4w_hours=link.std_peak4w_hours,
         std_va_type=link.std_va_type,  # type: ignore[arg-type]
+        std_opm_importance=link.std_opm_importance,
+        std_opm_frequency=link.std_opm_frequency,
+        std_opm_criticality=link.std_opm_criticality,
         created_at=created,
     )
 

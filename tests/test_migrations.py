@@ -19,6 +19,11 @@ Yang dijamin:
 7. ``test_uraian_klon_koordinator_*`` — revisi data `3889bd9af66e` menerapkan aturan
    yang sama pada 75 baris klon `KOEKS-`/`KOHUM-`/`KOSAR-` (di luar `task_catalog.json`)
    agar redaksinya sama dengan kembarannya di katalog.
+8. ``test_opm_std_*`` — revisi data `ad595b80d3d1` (backlog `#33`) mem-backfill tiga
+   kolom `std_opm_importance`/`std_opm_frequency`/`std_opm_criticality` pada
+   `ti_uraian_tugas_jabatan` dari berkas beku
+   `migrations/data/20260729_opm_std_values_v2_19.json`, hanya untuk baris yang
+   ketiga kolomnya masih `NULL`.
 
 Test berbasis-DB membangun **database sekali-pakai** terpisah dari DB test utama agar
 tidak mengganggu fixtur ``engine`` (yang sudah di-seed). Database itu dibuat & dihapus
@@ -620,3 +625,152 @@ def test_uraian_klon_koordinator_database_kosong_tanpa_error(fresh_db_url: str) 
     upgrade(fresh_db_url, "cdd92c950f19")
     upgrade(fresh_db_url, "head")
     downgrade(fresh_db_url, "cdd92c950f19")
+
+
+# --- Backfill nilai standar OPM (`ad595b80d3d1`, backlog #33) --------------------
+
+_FROZEN_OPM_STD_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "migrations"
+    / "data"
+    / "20260729_opm_std_values_v2_19.json"
+)
+
+# Revisi tepat sebelum backfill data — kolom std_opm_* sudah ada (DDL `c8fb8be9e184`)
+# tetapi masih NULL untuk seluruh baris.
+_OPM_STD_DDL_REVISION = "c8fb8be9e184"
+
+
+def _entri_opm_std_kontrol() -> dict[str, object]:
+    """Entri beku berkode `KS-ALL-LEAD-001` (importance/frequency/criticality penuh,
+    tanpa Frequency kotor), dipakai bersama oleh test backfill nilai standar OPM."""
+    with _FROZEN_OPM_STD_PATH.open(encoding="utf-8") as f:
+        frozen: list[dict[str, object]] = json.load(f)
+    return next(e for e in frozen if e["kode"] == "KS-ALL-LEAD-001")
+
+
+def _insert_ti_uraian_tugas_jabatan_opm(
+    conn,
+    *,
+    kode: str,
+    importance: int | None = None,
+    frequency: int | None = None,
+    criticality: int | None = None,
+) -> str:
+    """Sisipkan satu baris `ti_uraian_tugas` + `ti_uraian_tugas_jabatan` minimal, dengan
+    `std_opm_*` opsional (default `NULL`); kembalikan `id` kanoniknya.
+
+    `jabatan_id`/`tugas_pokok_id` tidak punya FK (lihat
+    `models.py::TiUraianTugasJabatanModel`) sehingga nilai dummy aman dipakai tanpa
+    perlu menyisipkan baris `jabatan`/`ti_tugas_pokok`. Dipakai khusus oleh test
+    revisi `ad595b80d3d1` (backfill nilai standar OPM, backlog #33).
+    """
+    ut_id = f"tiut_mig_{uuid.uuid4().hex[:8]}"
+    conn.execute(
+        text("INSERT INTO ti_uraian_tugas (id, uraian, created_at) VALUES (:id, 'x', now())"),
+        {"id": ut_id},
+    )
+    conn.execute(
+        text(
+            "INSERT INTO ti_uraian_tugas_jabatan "
+            "(uraian_tugas_id, kode, jabatan_id, unit, urutan, tugas_pokok_id, "
+            " std_opm_importance, std_opm_frequency, std_opm_criticality) "
+            "VALUES (:uid, :kode, 'jbt_mig_x', 'ALL', 1, 'tp_mig_x', :imp, :freq, :crit)"
+        ),
+        {"uid": ut_id, "kode": kode, "imp": importance, "freq": frequency, "crit": criticality},
+    )
+    return ut_id
+
+
+def _baca_std_opm(engine, ut_id: str) -> tuple[int | None, int | None, int | None]:
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                "SELECT std_opm_importance, std_opm_frequency, std_opm_criticality "
+                "FROM ti_uraian_tugas_jabatan WHERE uraian_tugas_id = :id"
+            ),
+            {"id": ut_id},
+        ).one()
+    return row.std_opm_importance, row.std_opm_frequency, row.std_opm_criticality
+
+
+def test_opm_std_upgrade_mengisi_baris_null(fresh_db_url: str) -> None:
+    """Revisi `ad595b80d3d1`: baris kosong (`std_opm_*` NULL) diisi sesuai berkas beku."""
+    entry = _entri_opm_std_kontrol()
+    upgrade(fresh_db_url, _OPM_STD_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            ut_id = _insert_ti_uraian_tugas_jabatan_opm(conn, kode=entry["kode"])
+
+        upgrade(fresh_db_url, "head")
+
+        assert _baca_std_opm(engine, ut_id) == (
+            entry["importance"],
+            entry["frequency"],
+            entry["criticality"],
+        )
+    finally:
+        engine.dispose()
+
+
+def test_opm_std_downgrade_mengembalikan_ke_null(fresh_db_url: str) -> None:
+    """`downgrade()` satu langkah dari head mengosongkan kembali `std_opm_*` ke `NULL`."""
+    entry = _entri_opm_std_kontrol()
+    upgrade(fresh_db_url, _OPM_STD_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            ut_id = _insert_ti_uraian_tugas_jabatan_opm(conn, kode=entry["kode"])
+
+        upgrade(fresh_db_url, "head")
+        assert _baca_std_opm(engine, ut_id) == (
+            entry["importance"],
+            entry["frequency"],
+            entry["criticality"],
+        )
+
+        downgrade(fresh_db_url, _OPM_STD_DDL_REVISION)
+        assert _baca_std_opm(engine, ut_id) == (None, None, None)
+    finally:
+        engine.dispose()
+
+
+def test_opm_std_tidak_menimpa_baris_sudah_diisi_manual(fresh_db_url: str) -> None:
+    """Baris yang salah satu kolom `std_opm_*`-nya sudah terisi manual sebelum migrasi
+    dilewati UTUH — ketiga kolom dibiarkan apa adanya, tidak ditimpa sebagian."""
+    entry = _entri_opm_std_kontrol()
+    upgrade(fresh_db_url, _OPM_STD_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            ut_id = _insert_ti_uraian_tugas_jabatan_opm(conn, kode=entry["kode"], importance=1)
+
+        upgrade(fresh_db_url, "head")
+
+        assert _baca_std_opm(engine, ut_id) == (1, None, None)
+    finally:
+        engine.dispose()
+
+
+def test_opm_std_kode_tidak_dikenal_tidak_error(fresh_db_url: str) -> None:
+    """Baris ber-kode yang tidak ada di berkas beku dilewati tanpa error, tetap NULL."""
+    upgrade(fresh_db_url, _OPM_STD_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            ut_id = _insert_ti_uraian_tugas_jabatan_opm(conn, kode="TI_TAK_DIKENAL_01")
+
+        upgrade(fresh_db_url, "head")  # tidak boleh raise walau kode tak dikenal
+
+        assert _baca_std_opm(engine, ut_id) == (None, None, None)
+    finally:
+        engine.dispose()
+
+
+def test_opm_std_database_kosong_tanpa_error(fresh_db_url: str) -> None:
+    """Upgrade & downgrade revisi `ad595b80d3d1` pada database TANPA baris
+    `ti_uraian_tugas_jabatan` manapun selesai tanpa error (0 baris terpengaruh)."""
+    upgrade(fresh_db_url, _OPM_STD_DDL_REVISION)
+    upgrade(fresh_db_url, "head")
+    downgrade(fresh_db_url, _OPM_STD_DDL_REVISION)
