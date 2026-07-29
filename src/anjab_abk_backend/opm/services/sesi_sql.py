@@ -60,6 +60,9 @@ def _task_to_read(rec: OpmSesiTaskModel) -> OpmSesiTaskRead:
         tugas_pokok=rec.tugas_pokok,
         detil_tugas=rec.detil_tugas,
         urutan=rec.urutan,
+        std_importance=rec.std_importance,
+        std_frequency=rec.std_frequency,
+        std_criticality=rec.std_criticality,
     )
 
 
@@ -247,6 +250,13 @@ class SqlOpmSesiService:
                     tugas_pokok=tp_by_id.get(link.tugas_pokok_id, ""),
                     detil_tugas=dt_by_id.get(link.detil_tugas_id) if link.detil_tugas_id else None,
                     urutan=link.urutan,
+                    # Nilai standar OPM DISALIN dari katalog TI di titik waktu ini —
+                    # beku, tidak pernah disegarkan ulang (backlog #34). `link` tidak
+                    # punya nilai standar (mis. task hasil materialisasi usulan Tahap 1)
+                    # → ketiganya tetap `None` di sini, bukan error.
+                    std_importance=link.std_opm_importance,
+                    std_frequency=link.std_opm_frequency,
+                    std_criticality=link.std_opm_criticality,
                 )
             )
 

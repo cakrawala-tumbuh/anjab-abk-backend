@@ -94,3 +94,33 @@ class OpmSesiTaskRead(BaseModel):
     tugas_pokok: str = Field(description="Nama tugas pokok induk.")
     detil_tugas: str | None = Field(default=None, description="Nama detil tugas induk, bila ada.")
     urutan: int = Field(description="Urutan tampil task.")
+    std_importance: int | None = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description=(
+            "Nilai standar Importance (1-5), dibekukan dari katalog Task Inventory saat"
+            " sesi OPM dibuat. Saran nilai awal untuk klien — bukan jawaban tersimpan;"
+            " `null` bila task ini tidak punya nilai standar di katalog."
+        ),
+    )
+    std_frequency: int | None = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description=(
+            "Nilai standar Frequency (1-5), dibekukan dari katalog Task Inventory saat"
+            " sesi OPM dibuat. Saran nilai awal untuk klien — bukan jawaban tersimpan;"
+            " `null` bila task ini tidak punya nilai standar di katalog."
+        ),
+    )
+    std_criticality: int | None = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description=(
+            "Nilai standar Criticality (1-5), dibekukan dari katalog Task Inventory saat"
+            " sesi OPM dibuat. Saran nilai awal untuk klien — bukan jawaban tersimpan;"
+            " `null` bila task ini tidak punya nilai standar di katalog."
+        ),
+    )

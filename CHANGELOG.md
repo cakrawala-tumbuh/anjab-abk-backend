@@ -9,6 +9,18 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Nilai standar OPM dibawa ke snapshot task sesi & respons API** (backlog #34,
+  lanjutan #33) — tiga kolom baru `std_importance`/`std_frequency`/`std_criticality`
+  (skala 1-5, nullable) pada `opm_sesi_task`, diisi sekali oleh
+  `SqlOpmSesiService.create()` dengan MENYALIN nilai dari
+  `ti_uraian_tugas_jabatan.std_opm_*` pada saat sesi OPM dibuat — beku, tidak pernah
+  disegarkan ulang meski katalog TI berubah setelahnya. Terekspos di
+  `GET /api/v1/opm/sesi/{id}/task` (`OpmSesiTaskRead`) sebagai saran nilai awal untuk
+  form responden; `POST .../jawaban` & `.../jawaban/submit` tidak berubah — ketiga
+  dimensi tetap wajib diisi eksplisit 1-5, nilai standar tidak menggantikan jawaban.
+  Task yang kodenya tidak punya nilai standar di katalog (mis. hasil materialisasi
+  usulan Tahap 1) mendapat baris snapshot dengan ketiganya `null`, bukan error.
+
 - **Nilai standar OPM (importance/frequency/criticality) di katalog Task Inventory**
   (backlog #33) — tiga kolom baru `std_opm_importance`/`std_opm_frequency`/
   `std_opm_criticality` (skala 1-5, nullable) pada `ti_uraian_tugas_jabatan`, terekspos

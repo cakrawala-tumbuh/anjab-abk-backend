@@ -690,6 +690,16 @@ class OpmSesiModel(Base):
 
 
 class OpmSesiTaskModel(Base):
+    """Snapshot beku satu task terpilih Task Inventory di dalam sesi OPM.
+
+    Dibekukan sekali oleh `SqlOpmSesiService.create()` dari `ti_uraian_tugas_jabatan`
+    (via `task_kode`) — termasuk tiga kolom `std_*` di bawah, yang disalin dari
+    `TiUraianTugasJabatanModel.std_opm_importance`/`std_opm_frequency`/
+    `std_opm_criticality` (backlog `anjab-abk-backend#33`). Nilai beku, TIDAK pernah
+    disegarkan ulang setelah sesi OPM dibuat — perubahan katalog TI berikutnya tidak
+    memengaruhi sesi OPM yang sudah ada.
+    """
+
     __tablename__ = "opm_sesi_task"
     __table_args__ = (UniqueConstraint("sesi_id", "task_kode"),)
 
@@ -702,6 +712,16 @@ class OpmSesiTaskModel(Base):
     tugas_pokok: Mapped[str] = mapped_column(String(300), nullable=False)
     detil_tugas: Mapped[str | None] = mapped_column(String(300), nullable=True)
     urutan: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # Nilai standar OPM (backlog `anjab-abk-backend#33`/`#34`) — skala 1-5, DISALIN
+    # (bukan direferensikan) dari `ti_uraian_tugas_jabatan.std_opm_*` saat sesi OPM
+    # dibuat. Semua nullable: task yang kodenya tidak punya nilai standar di katalog
+    # (mis. hasil materialisasi usulan Tahap 1) tetap menghasilkan baris snapshot,
+    # hanya dengan ketiganya `NULL` — bukan error. Tanpa prefiks `opm_` karena tabel
+    # ini sudah milik OPM (beda dari katalog TI yang perlu `std_opm_` untuk
+    # membedakannya dari `std_frekuensi_teks`).
+    std_importance: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    std_frequency: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    std_criticality: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     sesi: Mapped[OpmSesiModel] = relationship(back_populates="task_links")
 

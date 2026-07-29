@@ -12,6 +12,7 @@ from _opm_common import (
     _uniq_periode,
 )
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 SESI_BASE = "/api/v1/opm/sesi"
 KUESIONER_BASE = "/api/v1/opm"
@@ -275,6 +276,32 @@ def test_submit_skor_di_luar_rentang_422(client: TestClient, jabatan_id_tk: str)
     rid = responden[0]["id"]
     payload = _bulk_payload(ctx["kodes"])
     payload["jawaban"][0]["importance"] = 6
+    r = _save_draft(client, rid, payload)
+    assert r.status_code == 422, r.text
+
+
+def test_save_draft_dimensi_hilang_422_meski_nilai_standar_tersedia(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    """Nilai standar (`std_*`, backlog #34) adalah SARAN untuk klien, bukan default
+    otomatis untuk jawaban — payload yang tidak mengisi salah satu dimensi tetap
+    ditolak 422 walau task itu punya nilai standar lengkap di snapshot."""
+    from anjab_abk_backend.models import TiUraianTugasJabatanModel
+
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    link = db_session.scalar(
+        select(TiUraianTugasJabatanModel).where(TiUraianTugasJabatanModel.kode == ctx["kodes"][0])
+    )
+    link.std_opm_importance = 4
+    link.std_opm_frequency = 3
+    link.std_opm_criticality = 5
+    db_session.flush()
+
+    client.post(f"{SESI_BASE}/{sesi['id']}/buka")
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    rid = responden[0]["id"]
+    payload = _bulk_payload(ctx["kodes"])
+    del payload["jawaban"][0]["frequency"]  # dimensi hilang dari payload
     r = _save_draft(client, rid, payload)
     assert r.status_code == 422, r.text
 

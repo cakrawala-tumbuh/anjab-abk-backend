@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from anjab_abk_backend.models import OpmRespondenModel
+from anjab_abk_backend.models import OpmRespondenModel, TiUraianTugasJabatanModel
 from anjab_abk_backend.opm.schemas.sesi import OpmSesiCreate
 from anjab_abk_backend.opm.services.sesi_sql import SqlOpmSesiService
 
@@ -59,6 +59,82 @@ def test_create_sesi_ok(client: TestClient, jabatan_id_tk: str) -> None:
     assert len(responden) == 2
     assert {r["partisipan_id"] for r in responden} == set(ctx["partisipan_ids"])
     assert all(r["sudah_submit"] is False for r in responden)
+
+
+def test_create_sesi_membawa_nilai_standar_opm_dari_katalog(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    """Snapshot task OPM membawa `std_importance`/`std_frequency`/`std_criticality`
+    dari `ti_uraian_tugas_jabatan.std_opm_*` pada saat sesi dibuat (backlog #34).
+
+    Kode tanpa nilai standar di katalog (`std_opm_*` semua `NULL`) tetap menghasilkan
+    baris snapshot — ketiganya `null`, bukan error (skenario negatif di issue).
+    """
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    kode_a, kode_b = ctx["kodes"]
+
+    link_a = db_session.scalar(
+        select(TiUraianTugasJabatanModel).where(TiUraianTugasJabatanModel.kode == kode_a)
+    )
+    link_a.std_opm_importance = 4
+    link_a.std_opm_frequency = 3
+    link_a.std_opm_criticality = 5
+    link_b = db_session.scalar(
+        select(TiUraianTugasJabatanModel).where(TiUraianTugasJabatanModel.kode == kode_b)
+    )
+    link_b.std_opm_importance = None
+    link_b.std_opm_frequency = None
+    link_b.std_opm_criticality = None
+    db_session.flush()
+
+    r = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"]))
+    assert r.status_code == 201, r.text
+    sesi_id = r.json()["id"]
+
+    rt = client.get(f"{BASE}/{sesi_id}/task")
+    assert rt.status_code == 200, rt.text
+    by_kode = {t["task_kode"]: t for t in rt.json()["items"]}
+
+    assert by_kode[kode_a]["std_importance"] == 4
+    assert by_kode[kode_a]["std_frequency"] == 3
+    assert by_kode[kode_a]["std_criticality"] == 5
+
+    assert by_kode[kode_b]["std_importance"] is None
+    assert by_kode[kode_b]["std_frequency"] is None
+    assert by_kode[kode_b]["std_criticality"] is None
+
+
+def test_snapshot_opm_beku_tidak_ikut_perubahan_katalog_setelahnya(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    """Nilai standar disalin sekali saat `create()` — perubahan katalog TI SETELAH
+    sesi OPM dibuat tidak boleh terlihat di snapshot yang sudah beku (backlog #34)."""
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    kode = ctx["kodes"][0]
+
+    link = db_session.scalar(
+        select(TiUraianTugasJabatanModel).where(TiUraianTugasJabatanModel.kode == kode)
+    )
+    link.std_opm_importance = 2
+    link.std_opm_frequency = 2
+    link.std_opm_criticality = 2
+    db_session.flush()
+
+    r = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"]))
+    assert r.status_code == 201, r.text
+    sesi_id = r.json()["id"]
+
+    # Ubah nilai standar di katalog SETELAH sesi OPM dibuat.
+    link.std_opm_importance = 5
+    link.std_opm_frequency = 5
+    link.std_opm_criticality = 5
+    db_session.flush()
+
+    rt = client.get(f"{BASE}/{sesi_id}/task")
+    row = next(t for t in rt.json()["items"] if t["task_kode"] == kode)
+    assert row["std_importance"] == 2
+    assert row["std_frequency"] == 2
+    assert row["std_criticality"] == 2
 
 
 def test_create_sesi_requires_auth(anon_client: TestClient) -> None:

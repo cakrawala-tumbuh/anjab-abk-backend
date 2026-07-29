@@ -82,6 +82,49 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-07-29] OPM: bawa nilai standar ke snapshot task sesi & respons API
+
+Backlog `#34`, lanjutan langsung `#33` (entri di bawah). Snapshot task sesi OPM
+(`opm_sesi_task`, dibekukan dari task terpilih sesi Task Inventory saat sesi OPM
+dibuat) hanya memikul `task_kode`/`uraian_tugas`/`tugas_pokok`/`detil_tugas`/`urutan` —
+tidak ada satu pun nilai standar, meski katalog TI sudah memikulnya sejak `#33`.
+Akibatnya `GET /api/v1/opm/sesi/{id}/task` tidak punya apa pun untuk diprefill ke form
+responden.
+
+- **Tiga kolom baru di `opm_sesi_task`**: `std_importance`, `std_frequency`,
+  `std_criticality` — `Integer`, nullable, tanpa server default. **Tanpa** prefiks
+  `opm_` (beda dari katalog TI) karena tabel ini sudah milik domain OPM.
+- **Diisi sekali saat `SqlOpmSesiService.create()`** membangun tiap `OpmSesiTaskModel`
+  di loop snapshot task terpilih — disalin langsung dari `link.std_opm_importance`/
+  `std_opm_frequency`/`std_opm_criticality` (`link` adalah `TiUraianTugasJabatanModel`
+  yang sudah di-query untuk `uraian`/`tugas_pokok`/`detil_tugas`, tidak ada query
+  tambahan). **Nilai beku** — tidak pernah disegarkan ulang; perubahan katalog TI
+  setelah sesi OPM dibuat tidak terlihat di snapshot yang sudah ada (diverifikasi test
+  `test_snapshot_opm_beku_tidak_ikut_perubahan_katalog_setelahnya`). Task yang
+  `link`-nya tidak punya nilai standar (mis. hasil materialisasi usulan Tahap 1, entri
+  `[2026-07-26]` di bawah) → ketiganya tetap `NULL` secara alami, **bukan** error —
+  tidak ada percabangan kode khusus untuk kasus ini.
+- **`OpmSesiTaskRead` bertambah** `std_importance`/`std_frequency`/`std_criticality`
+  sebagai `int | None` (`ge=1, le=5` untuk nilai non-null). Additive murni.
+- **`OpmJawabanItem` SENGAJA tidak disentuh** — ketiga dimensi jawaban tetap wajib
+  1-5 tanpa default. Nilai standar adalah **saran nilai awal untuk klien** (prefill di
+  web app, item lintas-project `anjab-abk-web-app#48`), bukan nilai yang otomatis
+  tersimpan sebagai jawaban — diverifikasi test
+  `test_save_draft_dimensi_hilang_422_meski_nilai_standar_tersedia`: payload yang
+  tidak mengisi salah satu dimensi tetap `422` walau task itu punya nilai standar
+  lengkap di snapshot.
+- **Satu revisi Alembic DDL** (`c1eacaf37063`, `ADD COLUMN` tiga kolom) — tanpa
+  migrasi data: sesi OPM produksi saat ini nol baris (diverifikasi via MCP
+  `daftar_opm_sesi`, `total: 0`), jadi tidak ada baris `opm_sesi_task` existing yang
+  perlu di-backfill.
+- **`InMemoryOpmSesiService` tidak disentuh** — implementasi in-memory `create()` tidak
+  pernah membangun objek `OpmSesiTaskRead` sama sekali (list task-nya selalu kosong),
+  jadi menambah field baru dengan default `None` di skema sudah cukup untuk paritas
+  Protocol tanpa perlu perubahan kode di sana.
+- Tidak ada perubahan pada `opm_jawaban` maupun analisis/agregasi OPM — di luar
+  lingkup revisi ini (prefill UI & penanda bawaan/diubah adalah pekerjaan
+  `anjab-abk-web-app#48`).
+
 ### [2026-07-29] TI: nilai standar OPM (importance/frequency/criticality) di katalog
 
 Backlog `#33`. Instrumen OPM meminta responden menilai tiap task pada tiga dimensi 1-5
