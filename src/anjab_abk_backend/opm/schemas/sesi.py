@@ -7,11 +7,20 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ...schemas.common import CabangSesi
+
 StatusSesi = Literal["DRAFT", "OPEN", "CLOSED", "ANALYZED"]
 
 
 class OpmSesiCreate(BaseModel):
-    """Payload pembuatan sesi OPM."""
+    """Payload pembuatan sesi OPM.
+
+    **Sengaja tidak punya field `cabang`** (backlog `anjab-abk-backend#37`):
+    `SqlOpmSesiService.create()` menurunkannya dari `ti_sesi.cabang` milik
+    `ti_sesi_id` yang dikirim, sehingga `cabang` OPM mustahil menyimpang dari
+    sumbernya. Payload yang tetap mengirim `cabang` ditolak `422`
+    (`extra="forbid"`).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -75,6 +84,15 @@ class OpmSesiRead(BaseModel):
     jabatan_id: str = Field(description="ID jabatan yang dinilai.", examples=["jbt_a1b2c3d4"])
     jabatan_nama: str | None = Field(default=None, description="Nama jabatan yang dinilai.")
     ti_sesi_id: str = Field(description="ID sesi Task Inventory sumber snapshot.")
+    cabang: CabangSesi | None = Field(
+        default=None,
+        description=(
+            "Cabang lokasi kajian, DITURUNKAN dari `ti_sesi.cabang` sesi Task Inventory"
+            " sumber saat sesi ini dibuat — bisa `null` bila sesi TI sumbernya sendiri"
+            " ber-`cabang` null (sesi lama)."
+        ),
+        examples=["Bandung"],
+    )
     periode: str = Field(description="Periode survei (YYYY-MM).", examples=["2026-06"])
     status: StatusSesi = Field(description="Status sesi.", examples=["DRAFT"])
     min_responden: int = Field(description="Minimum responden.")

@@ -7,8 +7,12 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ...schemas.common import CabangSesi
+
 StatusSesi = Literal["DRAFT", "TAHAP1", "TAHAP2", "TAHAP3", "CLOSED", "ANALYZED"]
-CabangSesi = Literal["Bandung", "Semarang"]
+# `CabangSesi` diimpor dari `schemas/common.py` (sumber tunggal, backlog #37) dan
+# di-re-export di sini agar `from .sesi import CabangSesi` yang sudah dipakai
+# `taskinv/schemas/hasil.py`/`kuesioner.py` tetap jalan tanpa perubahan.
 
 
 class TiSesiCreate(BaseModel):

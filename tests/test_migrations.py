@@ -24,6 +24,11 @@ Yang dijamin:
    `ti_uraian_tugas_jabatan` dari berkas beku
    `migrations/data/20260729_opm_std_values_v2_19.json`, hanya untuk baris yang
    ketiga kolomnya masih `NULL`.
+9. ``test_opm_sesi_cabang_*`` — revisi DDL `981b2e1945b0` (tambah `opm_sesi.cabang`,
+   lepas `unique=True` `jabatan_id`) + revisi data `5f9c20955d88` (backfill `cabang`
+   dari `ti_sesi.cabang` sumber, backlog `#37`) TIDAK mengurangi baris `opm_sesi`/
+   `opm_responden`/`opm_jawaban`, idempoten, dan tidak menimpa `cabang` yang sudah
+   terisi.
 
 Test berbasis-DB membangun **database sekali-pakai** terpisah dari DB test utama agar
 tidak mengganggu fixtur ``engine`` (yang sudah di-seed). Database itu dibuat & dihapus
@@ -774,3 +779,247 @@ def test_opm_std_database_kosong_tanpa_error(fresh_db_url: str) -> None:
     upgrade(fresh_db_url, _OPM_STD_DDL_REVISION)
     upgrade(fresh_db_url, "head")
     downgrade(fresh_db_url, _OPM_STD_DDL_REVISION)
+
+
+# --------------------------------------------------------------------------- #
+# backlog #37 — opm_sesi.cabang: DDL `981b2e1945b0` + backfill `5f9c20955d88`
+# --------------------------------------------------------------------------- #
+
+_OPM_CABANG_DDL_REVISION = "981b2e1945b0"
+
+
+def _insert_jabatan(conn, *, jabatan_id: str, kode: str, nama: str) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO jabatan (id, kode, nama, jenis, aktif, created_at) "
+            "VALUES (:id, :kode, :nama, 'Guru', true, now())"
+        ),
+        {"id": jabatan_id, "kode": kode, "nama": nama},
+    )
+
+
+def _insert_ti_sesi_mig(conn, *, ti_sesi_id: str, jabatan_id: str, cabang: str | None) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO ti_sesi (id, jabatan_id, cabang, status, task_frozen, created_at) "
+            "VALUES (:id, :jabatan_id, :cabang, 'TAHAP3', true, now())"
+        ),
+        {"id": ti_sesi_id, "jabatan_id": jabatan_id, "cabang": cabang},
+    )
+
+
+def _insert_opm_sesi_mig(
+    conn, *, sesi_id: str, jabatan_id: str, ti_sesi_id: str, cabang: str | None, periode: str
+) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO opm_sesi "
+            "(id, jabatan_id, ti_sesi_id, cabang, periode, status, min_responden, "
+            " max_responden, created_at) "
+            "VALUES (:id, :jabatan_id, :ti_sesi_id, :cabang, :periode, 'ANALYZED', 3, 10, now())"
+        ),
+        {
+            "id": sesi_id,
+            "jabatan_id": jabatan_id,
+            "ti_sesi_id": ti_sesi_id,
+            "cabang": cabang,
+            "periode": periode,
+        },
+    )
+
+
+def _insert_opm_responden_mig(conn, *, responden_id: str, sesi_id: str) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO opm_responden (id, sesi_id, jabatan_label, sudah_submit, created_at) "
+            "VALUES (:id, :sesi_id, 'Guru', true, now())"
+        ),
+        {"id": responden_id, "sesi_id": sesi_id},
+    )
+
+
+def _insert_opm_jawaban_mig(conn, *, jawaban_id: str, responden_id: str, task_kode: str) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO opm_jawaban "
+            "(id, responden_id, task_kode, importance, frequency, criticality) "
+            "VALUES (:id, :responden_id, :task_kode, 4, 3, 5)"
+        ),
+        {"id": jawaban_id, "responden_id": responden_id, "task_kode": task_kode},
+    )
+
+
+def _hitung_baris_opm(engine) -> dict[str, int]:
+    with engine.connect() as conn:
+        return {
+            tabel: conn.execute(text(f"SELECT COUNT(*) FROM {tabel}")).scalar_one()
+            for tabel in ("opm_sesi", "opm_responden", "opm_jawaban")
+        }
+
+
+def _baca_cabang_opm_sesi(engine, sesi_id: str) -> str | None:
+    with engine.connect() as conn:
+        return conn.execute(
+            text("SELECT cabang FROM opm_sesi WHERE id = :id"), {"id": sesi_id}
+        ).scalar_one()
+
+
+def test_opm_sesi_cabang_upgrade_backfill_dari_ti_sesi(fresh_db_url: str) -> None:
+    """Revisi `5f9c20955d88`: sesi OPM ber-`cabang IS NULL` dibackfill dari `ti_sesi.cabang`
+    sumbernya — meniru 3 sesi OPM produksi YPII (2026-08-03), semuanya bersumber dari sesi
+    TI cabang Semarang. Jumlah baris `opm_sesi`/`opm_responden`/`opm_jawaban` TIDAK boleh
+    berkurang sebaris pun (tidak ada `DELETE` di revisi ini)."""
+    upgrade(fresh_db_url, _OPM_CABANG_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            _insert_jabatan(conn, jabatan_id="jbt_mig01", kode="MIG-01", nama="Guru BK")
+            _insert_ti_sesi_mig(
+                conn, ti_sesi_id="tises_mig01", jabatan_id="jbt_mig01", cabang="Semarang"
+            )
+            _insert_opm_sesi_mig(
+                conn,
+                sesi_id="opses_mig01",
+                jabatan_id="jbt_mig01",
+                ti_sesi_id="tises_mig01",
+                cabang=None,
+                periode="2026-06",
+            )
+            _insert_opm_responden_mig(conn, responden_id="oprs_mig01", sesi_id="opses_mig01")
+            _insert_opm_jawaban_mig(
+                conn, jawaban_id="opjw_mig01", responden_id="oprs_mig01", task_kode="K001"
+            )
+
+        before = _hitung_baris_opm(engine)
+        upgrade(fresh_db_url, "head")
+        after = _hitung_baris_opm(engine)
+
+        assert before == after, "jumlah baris opm_sesi/opm_responden/opm_jawaban berubah"
+        assert _baca_cabang_opm_sesi(engine, "opses_mig01") == "Semarang"
+    finally:
+        engine.dispose()
+
+
+def test_opm_sesi_cabang_tidak_menimpa_yang_sudah_terisi(fresh_db_url: str) -> None:
+    """Baris `opm_sesi.cabang` yang SUDAH terisi (non-NULL) tidak ditimpa, meski
+    `ti_sesi.cabang` sumbernya berbeda."""
+    upgrade(fresh_db_url, _OPM_CABANG_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            _insert_jabatan(conn, jabatan_id="jbt_mig02", kode="MIG-02", nama="Guru BK 2")
+            _insert_ti_sesi_mig(
+                conn, ti_sesi_id="tises_mig02", jabatan_id="jbt_mig02", cabang="Semarang"
+            )
+            _insert_opm_sesi_mig(
+                conn,
+                sesi_id="opses_mig02",
+                jabatan_id="jbt_mig02",
+                ti_sesi_id="tises_mig02",
+                cabang="Bandung",
+                periode="2026-06",
+            )
+
+        upgrade(fresh_db_url, "head")
+
+        assert _baca_cabang_opm_sesi(engine, "opses_mig02") == "Bandung"
+    finally:
+        engine.dispose()
+
+
+def test_opm_sesi_cabang_ti_sesi_sumber_null_tetap_null(fresh_db_url: str) -> None:
+    """`ti_sesi.cabang IS NULL` (sesi TI lama) → `opm_sesi.cabang` tetap `NULL` setelah
+    migrasi, bukan error."""
+    upgrade(fresh_db_url, _OPM_CABANG_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            _insert_jabatan(conn, jabatan_id="jbt_mig03", kode="MIG-03", nama="Guru BK 3")
+            _insert_ti_sesi_mig(conn, ti_sesi_id="tises_mig03", jabatan_id="jbt_mig03", cabang=None)
+            _insert_opm_sesi_mig(
+                conn,
+                sesi_id="opses_mig03",
+                jabatan_id="jbt_mig03",
+                ti_sesi_id="tises_mig03",
+                cabang=None,
+                periode="2026-06",
+            )
+
+        upgrade(fresh_db_url, "head")  # tidak boleh raise
+
+        assert _baca_cabang_opm_sesi(engine, "opses_mig03") is None
+    finally:
+        engine.dispose()
+
+
+def test_opm_sesi_cabang_downgrade_lalu_upgrade_ulang_idempoten(fresh_db_url: str) -> None:
+    """`downgrade()` mengosongkan kembali HANYA baris yang nilainya masih persis sama
+    dengan `ti_sesi.cabang`; `upgrade()` berikutnya membackfill nilai yang sama lagi —
+    aman dijalankan berulang (roundtrip)."""
+    upgrade(fresh_db_url, _OPM_CABANG_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            _insert_jabatan(conn, jabatan_id="jbt_mig04", kode="MIG-04", nama="Guru BK 4")
+            _insert_ti_sesi_mig(
+                conn, ti_sesi_id="tises_mig04", jabatan_id="jbt_mig04", cabang="Semarang"
+            )
+            _insert_opm_sesi_mig(
+                conn,
+                sesi_id="opses_mig04",
+                jabatan_id="jbt_mig04",
+                ti_sesi_id="tises_mig04",
+                cabang=None,
+                periode="2026-06",
+            )
+
+        upgrade(fresh_db_url, "head")
+        assert _baca_cabang_opm_sesi(engine, "opses_mig04") == "Semarang"
+
+        downgrade(fresh_db_url, _OPM_CABANG_DDL_REVISION)
+        assert _baca_cabang_opm_sesi(engine, "opses_mig04") is None
+
+        upgrade(fresh_db_url, "head")
+        assert _baca_cabang_opm_sesi(engine, "opses_mig04") == "Semarang"
+    finally:
+        engine.dispose()
+
+
+def test_opm_sesi_cabang_downgrade_tidak_menimpa_yang_diubah_manual(fresh_db_url: str) -> None:
+    """`downgrade()` TIDAK mengosongkan baris yang nilainya sudah diubah manual setelah
+    migrasi berjalan (nilainya kini tidak lagi persis sama dengan `ti_sesi.cabang`)."""
+    upgrade(fresh_db_url, _OPM_CABANG_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            _insert_jabatan(conn, jabatan_id="jbt_mig05", kode="MIG-05", nama="Guru BK 5")
+            _insert_ti_sesi_mig(
+                conn, ti_sesi_id="tises_mig05", jabatan_id="jbt_mig05", cabang="Semarang"
+            )
+            _insert_opm_sesi_mig(
+                conn,
+                sesi_id="opses_mig05",
+                jabatan_id="jbt_mig05",
+                ti_sesi_id="tises_mig05",
+                cabang=None,
+                periode="2026-06",
+            )
+
+        upgrade(fresh_db_url, "head")
+        assert _baca_cabang_opm_sesi(engine, "opses_mig05") == "Semarang"
+
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE opm_sesi SET cabang = 'Bandung' WHERE id = 'opses_mig05'"))
+
+        downgrade(fresh_db_url, _OPM_CABANG_DDL_REVISION)
+        assert _baca_cabang_opm_sesi(engine, "opses_mig05") == "Bandung"
+    finally:
+        engine.dispose()
+
+
+def test_opm_sesi_cabang_database_kosong_tanpa_error(fresh_db_url: str) -> None:
+    """Upgrade & downgrade revisi `5f9c20955d88` pada database TANPA baris `opm_sesi`
+    manapun selesai tanpa error (0 baris terpengaruh)."""
+    upgrade(fresh_db_url, _OPM_CABANG_DDL_REVISION)
+    upgrade(fresh_db_url, "head")
+    downgrade(fresh_db_url, _OPM_CABANG_DDL_REVISION)

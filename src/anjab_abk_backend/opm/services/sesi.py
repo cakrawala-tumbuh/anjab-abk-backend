@@ -13,7 +13,9 @@ from ...schemas.search import Domain, Order
 from ...services.domain import run_search, validate_searchable_fields
 from ..schemas.sesi import OpmSesiCreate, OpmSesiRead, OpmSesiTaskRead, OpmSesiUpdate, StatusSesi
 
-SEARCHABLE_FIELDS = frozenset({"id", "jabatan_id", "ti_sesi_id", "periode", "status", "created_at"})
+SEARCHABLE_FIELDS = frozenset(
+    {"id", "jabatan_id", "ti_sesi_id", "cabang", "periode", "status", "created_at"}
+)
 
 _VALID_TRANSITIONS: dict[StatusSesi, StatusSesi] = {
     "DRAFT": "OPEN",
@@ -37,6 +39,7 @@ class _Record:
     min_responden: int
     max_responden: int
     created_at: datetime
+    cabang: str | None = None
     catatan: str | None = None
     tasks: list[OpmSesiTaskRead] = field(default_factory=list)
 
@@ -78,6 +81,7 @@ class InMemoryOpmSesiService:
             jabatan_id=rec.jabatan_id,
             jabatan_nama=None,
             ti_sesi_id=rec.ti_sesi_id,
+            cabang=rec.cabang,  # type: ignore[arg-type]
             periode=rec.periode,
             status=rec.status,  # type: ignore[arg-type]
             min_responden=rec.min_responden,
@@ -185,6 +189,7 @@ class InMemoryOpmSesiService:
                     "id": r.id,
                     "jabatan_id": r.jabatan_id,
                     "ti_sesi_id": r.ti_sesi_id,
+                    "cabang": r.cabang,
                     "periode": r.periode,
                     "status": r.status,
                     "created_at": r.created_at,

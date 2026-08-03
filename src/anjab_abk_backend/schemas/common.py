@@ -1,12 +1,20 @@
-"""Skema lintas-resource: Health, Message, Page[T], dan amplop error."""
+"""Skema lintas-resource: Health, Message, Page[T], CabangSesi, dan amplop error."""
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, Field
 
 T = TypeVar("T")
+
+CabangSesi = Literal["Bandung", "Semarang"]
+"""Cabang lokasi kajian sesi (Task Inventory & OPM).
+
+Sumber tunggal — `taskinv/schemas/sesi.py` mengimpor & me-re-export nama ini
+(backlog `anjab-abk-backend#37`) agar `from .sesi import CabangSesi` yang sudah
+dipakai `taskinv/schemas/hasil.py`/`kuesioner.py` tetap jalan tanpa perubahan.
+"""
 
 
 class Health(BaseModel):

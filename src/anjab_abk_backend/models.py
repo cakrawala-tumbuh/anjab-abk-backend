@@ -672,11 +672,23 @@ class TsLogModel(Base):
 
 
 class OpmSesiModel(Base):
+    """Satu sesi rating OPM, terikat pada satu `TiSesiModel` sumber snapshot task.
+
+    `cabang` DITURUNKAN dari `ti_sesi.cabang` oleh `SqlOpmSesiService.create()` —
+    bukan input pengguna (`OpmSesiCreate` tidak punya field ini). `jabatan_id`
+    kehilangan `unique=True` sejak backlog `anjab-abk-backend#37`: satu jabatan
+    kini boleh punya sesi OPM Bandung DAN Semarang berdampingan. Uniqueness
+    `(jabatan_id, cabang)` ditegakkan di APLIKASI (bukan constraint DB) karena
+    `cabang` nullable dan PostgreSQL memperlakukan `NULL` sebagai distinct pada
+    unique constraint — lihat `SqlOpmSesiService.create()` langkah pre-check.
+    """
+
     __tablename__ = "opm_sesi"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    jabatan_id: Mapped[str] = mapped_column(String(40), nullable=False, unique=True, index=True)
+    jabatan_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     ti_sesi_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    cabang: Mapped[str | None] = mapped_column(String(20), nullable=True)
     periode: Mapped[str] = mapped_column(String(7), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
     min_responden: Mapped[int] = mapped_column(Integer, nullable=False, default=3)

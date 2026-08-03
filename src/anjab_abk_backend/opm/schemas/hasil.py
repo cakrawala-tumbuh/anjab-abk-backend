@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ...schemas.common import CabangSesi
+
 
 class OpmHasilTaskRead(BaseModel):
     """Hasil agregat satu task lintas responden."""
@@ -56,6 +58,9 @@ class OpmHasilSesiRead(BaseModel):
     sesi_id: str = Field(description="ID sesi.")
     jabatan_id: str = Field(description="ID jabatan yang dinilai.")
     jabatan_nama: str | None = Field(default=None, description="Nama jabatan yang dinilai.")
+    cabang: CabangSesi | None = Field(
+        default=None, description="Cabang lokasi kajian (echo dari `OpmSesiRead.cabang`)."
+    )
     periode: str = Field(description="Periode survei.")
     n_responden_submit: int = Field(description="Jumlah responden yang sudah submit.")
     tasks: list[OpmHasilTaskRead] = Field(description="Hasil per task.")

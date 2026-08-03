@@ -87,6 +87,36 @@ def test_analisis_ok_dan_mean_sd_flag(client: TestClient, jabatan_id_tk: str) ->
     assert r_status.json()["status"] == "ANALYZED"
 
 
+def test_hasil_ekspos_cabang(client: TestClient, jabatan_id_tk: str) -> None:
+    """`OpmHasilSesiRead.cabang` (baik dari `run_analisis` maupun `get_hasil_sesi`)
+    mengikuti `OpmSesiRead.cabang` (backlog #37)."""
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk, cabang="Semarang")
+    payload = {
+        "jabatan_id": ctx["jabatan_id"],
+        "ti_sesi_id": ctx["ti_sesi_id"],
+        "periode": _uniq_periode(),
+        "min_responden": 1,
+        "max_responden": 10,
+    }
+    r = client.post(SESI_BASE, json=payload)
+    assert r.status_code == 201, r.text
+    sesi = r.json()
+    assert sesi["cabang"] == "Semarang"
+
+    client.post(f"{SESI_BASE}/{sesi['id']}/buka")
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    _submit(client, responden[0]["id"], ctx["kodes"], 4, 3, 5)
+    client.post(f"{SESI_BASE}/{sesi['id']}/tutup")
+
+    r_run = client.post(f"{SESI_BASE}/{sesi['id']}/analisis")
+    assert r_run.status_code == 200, r_run.text
+    assert r_run.json()["cabang"] == "Semarang"
+
+    r_hasil = client.get(f"{SESI_BASE}/{sesi['id']}/hasil")
+    assert r_hasil.status_code == 200, r_hasil.text
+    assert r_hasil.json()["cabang"] == "Semarang"
+
+
 def test_hasil_sebelum_analyzed_422(client: TestClient, jabatan_id_tk: str) -> None:
     sesi, _ctx = _build_sesi(client, jabatan_id_tk)
     r = client.get(f"{SESI_BASE}/{sesi['id']}/hasil")

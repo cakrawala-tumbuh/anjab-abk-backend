@@ -9,6 +9,25 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Sesi OPM dipisah per cabang** (backlog #37, menyerap #18) — kolom baru
+  `opm_sesi.cabang`, DITURUNKAN dari `ti_sesi.cabang` sesi Task Inventory sumber saat
+  sesi OPM dibuat (`OpmSesiCreate`/`Update` tidak berubah, tetap `extra="forbid"`;
+  payload yang mengirim `cabang` tetap `422`). Sebelumnya `opm_sesi.jabatan_id` unik
+  secara global, sehingga jabatan yang punya sesi TI Bandung *dan* Semarang mustahil
+  dibuatkan dua sesi OPM berdampingan — `unique=True` itu dilepas, diganti uniqueness
+  `(jabatan_id, cabang)` yang ditegakkan di lapisan aplikasi (bukan constraint DB,
+  karena `cabang` nullable). Pesan `409` kini menyebut **nama** jabatan + cabang
+  (`"Sesi OPM untuk jabatan 'Guru BK' cabang 'Bandung' sudah ada."`), bukan ID mentah.
+  **Sumber auto-populate responden berpindah** dari seluruh anggota SME panel menjadi
+  responden sesi TI sumber yang sudah submit Tahap 1 — `max_responden` kini
+  dibandingkan ke himpunan submitter itu, bukan ke ukuran panel. `cabang`
+  (`OpmSesiRead`) dan `sesi_cabang` (`OpmKuesionerItemRead`)/`cabang`
+  (`OpmHasilSesiRead`) ditambahkan additive, ikut `SEARCHABLE_FIELDS`. Dua revisi
+  Alembic: DDL (`981b2e1945b0`) lalu backfill data (`5f9c20955d88`, mengisi `cabang`
+  3 sesi OPM produksi YPII dari `ti_sesi.cabang` sumbernya — semuanya Semarang, tanpa
+  menghapus satu baris pun). Klien (web app `anjab-abk-web-app#54`, MCP
+  `anjab-abk-mcp#10`) menyusul setelah kontrak ini live.
+
 - **Batalkan freeze Tahap 3 sesi Task Inventory (`TAHAP3` → `TAHAP2`)** (backlog #35) —
   endpoint baru `POST /api/v1/task-inventory/sesi/{sesi_id}/batalkan-tahap3` (admin-only,
   body `{"alasan": "<min 1 karakter>"}`). Sebelumnya `mulai-tahap3` membekukan himpunan

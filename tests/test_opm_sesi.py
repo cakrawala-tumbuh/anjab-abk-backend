@@ -9,6 +9,7 @@ from _opm_common import (
     SME_BASE,
     TI_SESI,
     _buat_partisipan,
+    _setup_jabatan_dua_cabang,
     _setup_jabatan_panel_ti,
     _uniq_periode,
 )
@@ -214,6 +215,239 @@ def test_create_sesi_conflict_jabatan_sudah_punya_sesi(
     assert r2.status_code == 409, r2.text
 
 
+# --------------------------------------------------------------------------- #
+# Backlog #37 — sesi OPM per cabang (kolom `cabang`, unik per jabatan+cabang)
+# --------------------------------------------------------------------------- #
+
+
+def test_create_sesi_dua_cabang_berdampingan(client: TestClient, jabatan_id_tk: str) -> None:
+    """Jabatan yang punya dua sesi TI beku (Bandung & Semarang) boleh punya DUA sesi
+    OPM berdampingan, dan responden tiap sesi = submitter Tahap 1 sesi TI-nya sendiri
+    — BERBEDA antar kedua sesi meski SME panel-nya SATU dan mencakup keduanya."""
+    ctx = _setup_jabatan_dua_cabang(client, jabatan_id_tk)
+
+    r1 = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_ids"]["Bandung"]))
+    assert r1.status_code == 201, r1.text
+    assert r1.json()["cabang"] == "Bandung"
+
+    r2 = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_ids"]["Semarang"]))
+    assert r2.status_code == 201, r2.text
+    assert r2.json()["cabang"] == "Semarang"
+
+    rr1 = client.get(f"{BASE}/{r1.json()['id']}/responden")
+    rr2 = client.get(f"{BASE}/{r2.json()['id']}/responden")
+    assert {r["partisipan_id"] for r in rr1.json()["items"]} == set(ctx["submitter_ids"]["Bandung"])
+    assert {r["partisipan_id"] for r in rr2.json()["items"]} == set(
+        ctx["submitter_ids"]["Semarang"]
+    )
+    assert rr1.json()["items"] != rr2.json()["items"]
+
+
+def test_create_sesi_conflict_cabang_sama_pesan_menyebut_nama_jabatan_dan_cabang(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    """409 saat sesi OPM KEDUA dibuat untuk `(jabatan, cabang)` yang sudah ada — pesan
+    menyebut NAMA jabatan (bukan `jbt_...` mentah) DAN cabang (menyerap #18)."""
+    from anjab_abk_backend.models import TiSesiModel, TiSesiTaskTerpilihModel
+
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk, cabang="Bandung")
+    r1 = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"]))
+    assert r1.status_code == 201, r1.text
+
+    jabatan_nama = client.get(f"/api/v1/jabatan/{ctx['jabatan_id']}").json()["nama"]
+
+    # TI sesi KEDUA, jabatan & cabang sama (Bandung) — TI sendiri menolak dua sesi
+    # (jabatan_id, cabang) yang sama lewat API-nya, jadi baris ini disisipkan
+    # langsung (pola sama dengan `test_create_sesi_ti_jabatan_beda`), meniru
+    # skenario legacy/manual yang secara teori bisa ada di DB.
+    ti2 = TiSesiModel(
+        id=f"tises_{uuid.uuid4().hex[:8]}",
+        jabatan_id=ctx["jabatan_id"],
+        cabang="Bandung",
+        status="TAHAP3",
+        task_frozen=True,
+    )
+    db_session.add(ti2)
+    db_session.flush()
+    for kode in ctx["kodes"]:
+        db_session.add(TiSesiTaskTerpilihModel(sesi_id=ti2.id, task_kode=kode))
+    db_session.flush()
+
+    r2 = client.post(BASE, json=_payload(ctx["jabatan_id"], ti2.id))
+    assert r2.status_code == 409, r2.text
+    msg = r2.json()["message"]
+    assert jabatan_nama in msg
+    assert "Bandung" in msg
+    assert ctx["jabatan_id"] not in msg
+
+
+def test_create_sesi_dua_ti_sesi_cabang_null_untuk_jabatan_sama_juga_konflik(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    """Dua sesi TI ber-`cabang IS NULL` untuk jabatan yang sama → sesi OPM kedua tetap
+    `409` — bukti pre-check APLIKASI (bukan constraint DB) menutup celah `NULL` yang
+    diperlakukan PostgreSQL sebagai distinct pada unique constraint maupun `=`."""
+    from anjab_abk_backend.models import TiSesiModel
+
+    ctx1 = _setup_jabatan_panel_ti(client, jabatan_id_tk, cabang="Bandung")
+    ti1 = db_session.get(TiSesiModel, ctx1["ti_sesi_id"])
+    ti1.cabang = None
+    db_session.flush()
+    r1 = client.post(BASE, json=_payload(ctx1["jabatan_id"], ctx1["ti_sesi_id"]))
+    assert r1.status_code == 201, r1.text
+    assert r1.json()["cabang"] is None
+
+    # Sesi TI KEDUA untuk jabatan yang sama — panel sudah ada (dari `_setup_jabatan_
+    # panel_ti` di atas, berisi par1/par2), jadi auto-populate langsung mengisi
+    # responden-nya tanpa perlu `POST .../responden` manual (yang mensyaratkan
+    # partisipan_id sudah jadi anggota panel, backlog #37).
+    r_ti2 = client.post(TI_SESI, json={"jabatan_id": ctx1["jabatan_id"], "cabang": "Semarang"})
+    assert r_ti2.status_code == 201, r_ti2.text
+    ti2_id = r_ti2.json()["id"]
+    ti2 = db_session.get(TiSesiModel, ti2_id)
+    ti2.cabang = None  # sengaja diubah lagi jadi NULL SETELAH create (simulasi legacy)
+    db_session.flush()
+
+    responden2 = client.get(f"{TI_SESI}/{ti2_id}/responden").json()["items"]
+    assert client.post(f"{TI_SESI}/{ti2_id}/mulai-tahap1").status_code == 200
+    for rsp in responden2:
+        assert (
+            client.put(
+                f"{TI_SESI}/responden/{rsp['id']}/seleksi", json={"task_kode": ctx1["kodes"]}
+            ).status_code
+            == 200
+        )
+        assert client.post(f"{TI_SESI}/responden/{rsp['id']}/seleksi/submit").status_code == 201
+    assert client.post(f"{TI_SESI}/{ti2_id}/mulai-tahap2").status_code == 200
+    assert client.post(f"{TI_SESI}/{ti2_id}/mulai-tahap3").status_code == 200
+
+    r2 = client.post(BASE, json=_payload(ctx1["jabatan_id"], ti2_id))
+    assert r2.status_code == 409, r2.text
+
+
+def test_create_sesi_ti_cabang_null_menghasilkan_opm_cabang_null(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    """Sesi TI sumber ber-`cabang IS NULL` (mis. sesi lama sebelum kolom ini ada) tetap
+    SAH jadi sumber sesi OPM — backend tidak mewajibkan cabang terisi."""
+    from anjab_abk_backend.models import TiSesiModel
+
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    ti = db_session.get(TiSesiModel, ctx["ti_sesi_id"])
+    ti.cabang = None
+    db_session.flush()
+
+    r = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"]))
+    assert r.status_code == 201, r.text
+    assert r.json()["cabang"] is None
+
+
+def test_create_sesi_payload_dengan_cabang_ditolak_422(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """`cabang` BUKAN input — payload create yang tetap mengirimnya ditolak `422`
+    (`OpmSesiCreate` ber-`extra=\"forbid\"`)."""
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    payload = _payload(ctx["jabatan_id"], ctx["ti_sesi_id"], cabang="Bandung")
+    r = client.post(BASE, json=payload)
+    assert r.status_code == 422, r.text
+
+
+def test_create_sesi_responden_hanya_submitter_tahap1_bukan_seluruh_panel(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Panel SME 3 anggota, hanya 2 yang submit Tahap 1 TI → responden OPM tepat 2
+    orang itu (submitter), BUKAN 3 (seluruh panel)."""
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    par3 = _buat_partisipan(client, ctx["jabatan_id"], "Panel3")
+    r = client.post(f"{SME_BASE}/{ctx['panel_id']}/anggota", json={"partisipan_id": par3})
+    assert r.status_code == 200, r.text  # par3 masuk panel TAPI TIDAK submit Tahap 1
+
+    r = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"]))
+    assert r.status_code == 201, r.text
+    rr = client.get(f"{BASE}/{r.json()['id']}/responden")
+    partisipan_ids = {x["partisipan_id"] for x in rr.json()["items"]}
+    assert partisipan_ids == set(ctx["partisipan_ids"])
+    assert par3 not in partisipan_ids
+
+
+def test_create_sesi_max_responden_dibandingkan_ke_submitter_bukan_panel(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Panel besar (>`max_responden`) TIDAK lagi memicu 422 selama jumlah submitter
+    Tahap 1 (calon responden OPM yang sesungguhnya) tetap <= `max_responden`."""
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    # Tambah anggota panel sampai melebihi max_responden=1 di payload — anggota
+    # TAMBAHAN ini tidak submit Tahap 1, jadi tidak ikut dihitung.
+    for suffix in ("Extra1", "Extra2", "Extra3"):
+        pid = _buat_partisipan(client, ctx["jabatan_id"], suffix)
+        r = client.post(f"{SME_BASE}/{ctx['panel_id']}/anggota", json={"partisipan_id": pid})
+        assert r.status_code == 200, r.text
+
+    payload = _payload(ctx["jabatan_id"], ctx["ti_sesi_id"], max_responden=2)
+    r = client.post(BASE, json=payload)
+    assert r.status_code == 201, r.text
+    assert r.json() is not None
+
+
+def test_create_sesi_nol_submitter_tahap1_sesi_dibuat_kosong_tanpa_error(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    """Sesi TI sumber tanpa satu pun submitter Tahap 1 → sesi OPM tetap `201` dengan
+    NOL responden, bukan error (mis. edge-case data: seluruh baris `tahap1_submit`
+    dibalik manual setelah freeze)."""
+    from anjab_abk_backend.models import TiRespondenModel
+
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    rows = db_session.scalars(
+        select(TiRespondenModel).where(TiRespondenModel.sesi_id == ctx["ti_sesi_id"])
+    ).all()
+    for row in rows:
+        row.tahap1_submit = False
+    db_session.flush()
+
+    r = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"]))
+    assert r.status_code == 201, r.text
+    rr = client.get(f"{BASE}/{r.json()['id']}/responden")
+    assert rr.json()["items"] == []
+
+
+def test_get_hasil_dan_kuesioner_saya_ekspos_cabang(
+    client: TestClient, client_as, jabatan_id_tk: str, db_session
+) -> None:
+    """`GET .../sesi/{id}`, `.../hasil`, dan `.../kuesioner/saya` mengembalikan
+    `cabang`/`sesi_cabang`."""
+    from anjab_abk_backend.models import PartisipanModel
+
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk, cabang="Semarang")
+    sesi = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"])).json()
+    sid = sesi["id"]
+    assert sesi["cabang"] == "Semarang"
+
+    r_get = client.get(f"{BASE}/{sid}")
+    assert r_get.status_code == 200, r_get.text
+    assert r_get.json()["cabang"] == "Semarang"
+
+    # /kuesioner/saya: tautkan salah satu responden ke subject login. `buka` (admin)
+    # WAJIB dipanggil SEBELUM `client_as(...)` — factory itu mengoverride verifier
+    # token pada `app` yang dipakai BERSAMA oleh semua client termasuk `client`
+    # (lihat docstring fixture `client_as`), jadi memanggilnya lebih dulu membuat
+    # `client.post(buka)` berikutnya tanpa sadar berjalan sebagai subject non-admin
+    # dan ditolak 403 — sesi tetap DRAFT, membuat `/kuesioner/saya` di bawah kosong.
+    par_id = ctx["partisipan_ids"][0]
+    par = db_session.get(PartisipanModel, par_id)
+    par.authentik_user_id = "opm-cabang-kuesioner-saya"
+    db_session.flush()
+    r_buka = client.post(f"{BASE}/{sid}/buka")
+    assert r_buka.status_code == 200, r_buka.text
+
+    as_par = client_as("opm-cabang-kuesioner-saya")
+    r_kues = as_par.get("/api/v1/opm/kuesioner/saya")
+    assert r_kues.status_code == 200, r_kues.text
+    item = next(x for x in r_kues.json() if x["sesi_id"] == sid)
+    assert item["sesi_cabang"] == "Semarang"
+
+
 def test_create_sesi_tanpa_autoflush_seperti_produksi(
     client: TestClient, jabatan_id_tk: str, db_session
 ) -> None:
@@ -373,6 +607,35 @@ def test_search_domain(client: TestClient, jabatan_id_tk: str) -> None:
     assert r.status_code == 200, r.text
     data = r.json()
     assert any(item["id"] == sesi["id"] for item in data["items"])
+
+
+def test_search_domain_cabang(client: TestClient, jabatan_id_tk: str) -> None:
+    """`POST .../opm/sesi/search` menerima domain pada field `cabang` (backlog #37)."""
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk, cabang="Semarang")
+    sesi = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"])).json()
+    assert sesi["cabang"] == "Semarang"
+
+    r = client.post(
+        f"{BASE}/search",
+        json={"domain": [["cabang", "=", "Semarang"]], "limit": 50, "offset": 0},
+    )
+    assert r.status_code == 200, r.text
+    assert any(item["id"] == sesi["id"] for item in r.json()["items"])
+
+    r_lain = client.post(
+        f"{BASE}/search",
+        json={"domain": [["cabang", "=", "Bandung"]], "limit": 50, "offset": 0},
+    )
+    assert r_lain.status_code == 200, r_lain.text
+    assert all(item["id"] != sesi["id"] for item in r_lain.json()["items"])
+
+
+def test_search_domain_field_asing_422(client: TestClient) -> None:
+    r = client.post(
+        f"{BASE}/search",
+        json={"domain": [["field_tidak_ada", "=", "x"]], "limit": 10, "offset": 0},
+    )
+    assert r.status_code == 422, r.text
 
 
 def test_get_sesi_not_found(client: TestClient) -> None:

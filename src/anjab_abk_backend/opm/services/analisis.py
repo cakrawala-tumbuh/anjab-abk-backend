@@ -87,6 +87,7 @@ def compute_hasil_sesi(
         sesi_id=sesi.id,
         jabatan_id=sesi.jabatan_id,
         jabatan_nama=sesi.jabatan_nama,
+        cabang=sesi.cabang,
         periode=sesi.periode,
         n_responden_submit=len(responden_raw),
         tasks=task_results,

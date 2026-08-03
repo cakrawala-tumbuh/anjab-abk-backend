@@ -64,6 +64,7 @@ def kuesioner_saya(
                 id=rsp.id,
                 sesi_id=rsp.sesi_id,
                 sesi_catatan=sesi.catatan,
+                sesi_cabang=sesi.cabang,
                 sudah_submit=rsp.sudah_submit,
                 submitted_at=rsp.submitted_at,
                 created_at=rsp.created_at,

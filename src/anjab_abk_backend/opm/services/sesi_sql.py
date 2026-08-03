@@ -2,9 +2,16 @@
 
 `create()` melakukan validasi lintas-domain (Jabatan, SME panel, Task Inventory)
 lalu men-snapshot task terpilih TI ke `opm_sesi_task` dan membuat responden
-otomatis dari seluruh anggota SME panel — semuanya dalam SATU transaksi (pola
-`taskinv/services/sesi_sql.py::_jabatan_map`, `anjab/services/sme_panel_sql.py`
-untuk pre-check `ConflictError` + backstop `IntegrityError`).
+otomatis dari responden sesi TI sumber yang sudah submit Tahap 1 — semuanya
+dalam SATU transaksi (pola `taskinv/services/sesi_sql.py::_jabatan_map`,
+`anjab/services/sme_panel_sql.py` untuk pre-check `ConflictError` + backstop
+`IntegrityError`).
+
+**`cabang` diturunkan, bukan input** (backlog `anjab-abk-backend#37`):
+`OpmSesiModel.cabang` disalin dari `ti_sesi.cabang` sesi TI sumber saat sesi OPM
+dibuat, dan uniqueness sesi berubah dari `jabatan_id` global menjadi
+`(jabatan_id, cabang)` — ditegakkan di APLIKASI (bukan constraint DB) karena
+`cabang` nullable.
 """
 
 from __future__ import annotations
@@ -23,9 +30,9 @@ from ...models import (
     OpmRespondenModel,
     OpmSesiModel,
     OpmSesiTaskModel,
-    PartisipanModel,
     SMEPanelModel,
     TiDetilTugasModel,
+    TiRespondenModel,
     TiSesiModel,
     TiTugasPokokModel,
     TiUraianTugasJabatanModel,
@@ -45,6 +52,7 @@ def _sesi_field_map() -> FieldMap:
         "id": FieldSpec(column=OpmSesiModel.id),
         "jabatan_id": FieldSpec(column=OpmSesiModel.jabatan_id),
         "ti_sesi_id": FieldSpec(column=OpmSesiModel.ti_sesi_id),
+        "cabang": FieldSpec(column=OpmSesiModel.cabang),
         "periode": FieldSpec(column=OpmSesiModel.periode),
         "status": FieldSpec(column=OpmSesiModel.status),
         "created_at": FieldSpec(
@@ -75,6 +83,7 @@ def _to_read(rec: OpmSesiModel, jabatan_nama: str | None = None) -> OpmSesiRead:
         jabatan_id=rec.jabatan_id,
         jabatan_nama=jabatan_nama,
         ti_sesi_id=rec.ti_sesi_id,
+        cabang=rec.cabang,  # type: ignore[arg-type]
         periode=rec.periode,
         status=rec.status,  # type: ignore[arg-type]
         min_responden=rec.min_responden,
@@ -145,7 +154,9 @@ class SqlOpmSesiService:
         if data.min_responden > data.max_responden:
             raise ValidationAppError("min_responden tidak boleh lebih besar dari max_responden.")
 
-        # 3. Jabatan wajib punya SME panel dengan anggota.
+        # 3. Jabatan wajib punya SME panel dengan anggota. Gate keanggotaan ini TETAP
+        # ada apa adanya (turunan aturan #37) — yang berubah hanya SUMBER baris
+        # responden di langkah 6, bukan gerbang keberadaan panel ini.
         panel = self._s.scalar(
             select(SMEPanelModel).where(SMEPanelModel.jabatan_id == data.jabatan_id)
         )
@@ -154,14 +165,9 @@ class SqlOpmSesiService:
                 "Jabatan ini belum memiliki SME panel / panel belum punya anggota."
             )
 
-        # 4. Pre-check satu sesi OPM per jabatan (backstop unique constraint di bawah).
-        exists = self._s.scalar(
-            select(OpmSesiModel.id).where(OpmSesiModel.jabatan_id == data.jabatan_id)
-        )
-        if exists is not None:
-            raise ConflictError(f"Sesi OPM untuk jabatan '{data.jabatan_id}' sudah ada.")
-
-        # 5. TiSesi sumber wajib ada, milik jabatan yang sama, dan sudah frozen.
+        # 4. TiSesi sumber wajib ada, milik jabatan yang sama, dan sudah frozen.
+        # Dipindah SEBELUM pre-check konflik (langkah 5) karena `cabang` OPM
+        # DITURUNKAN dari `ti.cabang` — pre-check butuh nilai ini lebih dulu.
         ti = self._s.get(TiSesiModel, data.ti_sesi_id)
         if ti is None:
             raise ValidationAppError(f"Sesi Task Inventory '{data.ti_sesi_id}' tidak ditemukan.")
@@ -176,20 +182,50 @@ class SqlOpmSesiService:
             raise ValidationAppError(
                 "Sesi Task Inventory tidak memiliki task terpilih untuk dijadikan snapshot."
             )
+        cabang = ti.cabang
 
-        anggota_ids = panel.partisipan_ids
-        if len(anggota_ids) > data.max_responden:
-            raise ValidationAppError(
-                f"Jumlah anggota SME panel ({len(anggota_ids)}) melebihi"
-                f" max_responden ({data.max_responden})."
+        # 5. Pre-check satu sesi OPM per (jabatan_id, cabang) — backstop unique index
+        # `jabatan_id` di bawah tidak lagi cukup (langkah 4 di migrasi `981b2e1945b0`
+        # melepas `unique=True`-nya). Dicek di lapisan APLIKASI, BUKAN via `WHERE
+        # cabang = :cabang` di SQL: `cabang` nullable, dan PostgreSQL memperlakukan
+        # NULL sebagai distinct pada unique constraint MAUPUN pada operator `=` (
+        # `NULL = NULL` bernilai UNKNOWN, bukan TRUE) — comparison Python di bawah
+        # (`None == None` bernilai True) yang menutup celah dua sesi ber-`cabang
+        # IS NULL` untuk jabatan yang sama.
+        existing = self._s.scalars(
+            select(OpmSesiModel).where(OpmSesiModel.jabatan_id == data.jabatan_id)
+        ).all()
+        if any(r.cabang == cabang for r in existing):
+            raise ConflictError(
+                f"Sesi OPM untuk jabatan '{jabatan.nama}' cabang '{cabang}' sudah ada."
             )
 
-        konflik = f"Sesi OPM untuk jabatan '{data.jabatan_id}' sudah ada."
+        # 6. Calon responden = responden sesi TI SUMBER yang SUDAH submit Tahap 1 —
+        # BUKAN seluruh anggota SME panel (backlog #37). Himpunan task terpilih
+        # berbeda antar cabang, jadi penilai OPM harus orang yang benar-benar
+        # mengerjakan sesi TI ini. `nama`/`partisipan_id` diambil LANGSUNG dari
+        # baris `TiRespondenModel` (sudah diresolusi saat responden TI dibuat/
+        # di-auto-populate) — tidak perlu query `PartisipanModel` tambahan.
+        # `max_responden` dibandingkan ke himpunan INI, bukan ke `panel.anggota`.
+        ti_submitters = self._s.scalars(
+            select(TiRespondenModel).where(
+                TiRespondenModel.sesi_id == data.ti_sesi_id,
+                TiRespondenModel.tahap1_submit.is_(True),
+            )
+        ).all()
+        if len(ti_submitters) > data.max_responden:
+            raise ValidationAppError(
+                f"Jumlah responden sesi Task Inventory yang sudah submit Tahap 1"
+                f" ({len(ti_submitters)}) melebihi max_responden ({data.max_responden})."
+            )
+
+        konflik = f"Sesi OPM untuk jabatan '{jabatan.nama}' cabang '{cabang}' sudah ada."
 
         rec = OpmSesiModel(
             id=f"opses_{uuid.uuid4().hex[:8]}",
             jabatan_id=data.jabatan_id,
             ti_sesi_id=data.ti_sesi_id,
+            cabang=cabang,
             periode=data.periode,
             status="DRAFT",
             min_responden=data.min_responden,
@@ -198,19 +234,20 @@ class SqlOpmSesiService:
         )
         self._s.add(rec)
         # Flush sesi TERLEBIH DAHULU, sebelum insert responden auto-populate di
-        # langkah 7. `OpmRespondenModel.sesi_id` adalah FK murni tanpa
+        # langkah 8. `OpmRespondenModel.sesi_id` adalah FK murni tanpa
         # `relationship()` ORM ke `OpmSesiModel` — tanpa flush eksplisit ini, urutan
         # INSERT saat flush gabungan TIDAK terjamin (unit-of-work SQLAlchemy
         # mengurutkan INSERT berdasar `relationship()` yang dikonfigurasi, bukan
         # sekadar FK kolom mentah), sehingga bisa mencoba INSERT responden sebelum
         # sesi ada → `ForeignKeyViolation`. Pola sama dengan `SqlTiSesiService.create()`.
-        # Tetap lewat `_flush_checked` agar unique constraint `jabatan_id` tetap jadi
-        # backstop 409 untuk race dua create bersamaan (pre-check langkah 4 lolos di
-        # keduanya). `rec.task_links` (langkah 6) TIDAK terpengaruh — itu relationship,
-        # urutannya memang dijamin.
+        # Tetap lewat `_flush_checked` — kini backstop-nya bukan lagi unique index
+        # `jabatan_id` (sudah dilepas), melainkan pre-check Python langkah 5; race dua
+        # create bersamaan untuk `(jabatan_id, cabang)` yang sama bisa lolos keduanya
+        # (diterima, identik dengan perilaku TI). `rec.task_links` (langkah 7) TIDAK
+        # terpengaruh — itu relationship, urutannya memang dijamin.
         self._flush_checked(on_conflict=konflik)
 
-        # 6. Snapshot task terpilih TI → opm_sesi_task. `kode`/`tugas_pokok_id`/
+        # 7. Snapshot task terpilih TI → opm_sesi_task. `kode`/`tugas_pokok_id`/
         # `detil_tugas_id`/`urutan` kini hidup di `TiUraianTugasJabatanModel` (link
         # per-jabatan); `uraian` tetap di kanonik `TiUraianTugasModel` — join keduanya.
         ut_rows = self._s.execute(
@@ -260,24 +297,18 @@ class SqlOpmSesiService:
                 )
             )
 
-        # 7. Auto-responden dari anggota SME panel.
-        par_map = (
-            self._s.scalars(
-                select(PartisipanModel).where(PartisipanModel.id.in_(anggota_ids))
-            ).all()
-            if anggota_ids
-            else []
-        )
-        par_by_id = {p.id: p for p in par_map}
-        for pid in anggota_ids:
-            par = par_by_id.get(pid)
+        # 8. Auto-responden dari submitter Tahap 1 sesi TI sumber (langkah 6) — bukan
+        # anggota SME panel. `nama`/`partisipan_id` disalin langsung dari baris
+        # `TiRespondenModel`; nol submitter → sesi tetap dibuat kosong tanpa error
+        # (konsisten dengan perilaku "panel kosong" yang sudah ada sebelumnya).
+        for r in ti_submitters:
             self._s.add(
                 OpmRespondenModel(
                     id=f"oprs_{uuid.uuid4().hex[:8]}",
                     sesi_id=rec.id,
-                    nama=par.nama if par else None,
+                    nama=r.nama,
                     jabatan_label=jabatan.nama,
-                    partisipan_id=pid,
+                    partisipan_id=r.partisipan_id,
                     sudah_submit=False,
                 )
             )

@@ -345,7 +345,13 @@ def test_kuesioner_saya_tanpa_partisipan(client: TestClient) -> None:
 
 def test_kuesioner_saya_hanya_open(client: TestClient, jabatan_id_tk: str, db_session) -> None:
     """Assignment-based: kuesioner OPM hanya muncul untuk partisipan yang terhubung
-    dan hanya saat sesi berstatus OPEN."""
+    dan hanya saat sesi berstatus OPEN.
+
+    Sejak backlog `anjab-abk-backend#37`, keterhubungan responden OPM berasal dari
+    partisipan yang BENAR-BENAR submit Tahap 1 sesi TI sumbernya — bukan lagi cukup
+    jadi anggota SME panel. Panel di sini dibuat SEBELUM sesi TI agar auto-populate
+    TI (item 005) mendaftarkan `par` otomatis sebagai responden TI.
+    """
     from anjab_abk_backend.core.schemas.partisipan import PartisipanCreate
     from anjab_abk_backend.core.services.partisipan_sql import SqlPartisipanService
 
@@ -366,25 +372,23 @@ def test_kuesioner_saya_hanya_open(client: TestClient, jabatan_id_tk: str, db_se
     )
     kodes = [it["kode"] for it in r_catalog.json()["items"][:2]]
 
+    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id_tk})
+    panel_id = r.json()["id"]
+    client.post(f"{SME_BASE}/{panel_id}/anggota", json={"partisipan_id": par.id})
+
     r_ti = client.post(
         TI_SESI,
         json={"jabatan_id": jabatan_id_tk, "cabang": "Bandung"},
     )
     ti_sesi_id = r_ti.json()["id"]
-    r_rsp = client.post(f"{TI_SESI}/{ti_sesi_id}/responden", json={"nama": "R1"})
+    responden = client.get(f"{TI_SESI}/{ti_sesi_id}/responden").json()["items"]
+    r_rsp_id = next(x["id"] for x in responden if x["partisipan_id"] == par.id)
+
     client.post(f"{TI_SESI}/{ti_sesi_id}/mulai-tahap1")
-    r_rsp_id = r_rsp.json()["id"]
     client.put(f"{TI_SESI}/responden/{r_rsp_id}/seleksi", json={"task_kode": kodes})
     client.post(f"{TI_SESI}/responden/{r_rsp_id}/seleksi/submit")
     client.post(f"{TI_SESI}/{ti_sesi_id}/mulai-tahap2")
     client.post(f"{TI_SESI}/{ti_sesi_id}/mulai-tahap3")
-
-    # Panel dibuat SETELAH sesi TI dibekukan (menghindari auto-populate TI dari
-    # item 005 menambah responden yang belum submit seleksi) — OPM tetap butuh
-    # panel ada saat sesi OPM dibuat di bawah ini.
-    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id_tk})
-    panel_id = r.json()["id"]
-    client.post(f"{SME_BASE}/{panel_id}/anggota", json={"partisipan_id": par.id})
 
     r_sesi = client.post(
         SESI_BASE,
