@@ -179,6 +179,42 @@ class SqlTiSesiService:
         jab = self._s.get(JabatanModel, rec.jabatan_id)
         return _to_read(rec, jab.nama if jab else None)
 
+    def batalkan_tahap3(self, sesi_id: str, alasan: str) -> TiSesiRead:
+        """Balikkan sesi TAHAP3 ke TAHAP2 (unfreeze), membatalkan pembekuan task.
+
+        Menghapus seluruh baris `rec.task_terpilih_links` (tabel anak
+        `ti_sesi_task_terpilih`), lalu mengembalikan `task_frozen` ke `False` dan
+        `status` ke `"TAHAP2"`. Tidak menyentuh `TiRespondenModel`
+        (`tahap1_submit`/`tahap3_submit` tetap apa adanya) maupun baris
+        `ti_seleksi`/`ti_detail`/`ti_usulan_task` — hanya status sesi dan link task
+        terpilih yang dibalik.
+
+        Args:
+            sesi_id: ID sesi Task Inventory.
+            alasan: Alasan pembatalan (dipakai pemanggil untuk audit log; method ini
+                sendiri tidak mencatatnya — audit terjadi di lapisan endpoint).
+
+        Returns:
+            `TiSesiRead` sesi setelah `status` kembali ke `"TAHAP2"` dan
+            `jumlah_task_terpilih` menjadi `None`.
+
+        Raises:
+            NotFoundError: `sesi_id` tidak ditemukan.
+            ValidationAppError: `status` sesi saat ini bukan `"TAHAP3"`.
+        """
+        rec = self._get_model(sesi_id)
+        if rec.status != "TAHAP3":
+            raise ValidationAppError(
+                "Hanya sesi berstatus TAHAP3 yang dapat dibatalkan ke TAHAP2"
+                f" (saat ini: {rec.status})."
+            )
+        rec.task_terpilih_links.clear()
+        rec.task_frozen = False
+        rec.status = "TAHAP2"
+        self._s.flush()
+        jab = self._s.get(JabatanModel, rec.jabatan_id)
+        return _to_read(rec, jab.nama if jab else None)
+
     def get_task_terpilih(
         self, sesi_id: str, *, limit: int | None = None, offset: int = 0
     ) -> tuple[list[str], int]:

@@ -44,6 +44,18 @@ class TiSesiUpdate(BaseModel):
     catatan: str | None = Field(default=None, max_length=500)
 
 
+class TiSesiBatalkanTahap3(BaseModel):
+    """Payload pembatalan freeze Tahap 3 (revert TAHAP3 → TAHAP2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    alasan: str = Field(
+        min_length=1,
+        description="Alasan pembatalan freeze, dicatat di audit log (wajib diisi).",
+        examples=["Sesi ter-freeze prematur, Tahap 1 baru 3/7 responden submit."],
+    )
+
+
 class TiSesiRead(BaseModel):
     """Representasi sesi Task Inventory yang dikembalikan API."""
 

@@ -30,7 +30,12 @@ from ...errors import ConflictError, ValidationAppError
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
 from ...security import Principal
-from ...taskinv.schemas.sesi import TiSesiCreate, TiSesiRead, TiSesiUpdate
+from ...taskinv.schemas.sesi import (
+    TiSesiBatalkanTahap3,
+    TiSesiCreate,
+    TiSesiRead,
+    TiSesiUpdate,
+)
 from ...taskinv.services.catalog import TiCatalogService
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.seleksi import TiSeleksiService
@@ -337,6 +342,62 @@ def mulai_tahap3(
     usulan_kodes = usulan_service.materialize_approved(sesi_id, sesi.jabatan_id)
     final_kodes = sorted(set(final_kodes) | set(usulan_kodes))
     return service.freeze_task_terpilih(sesi_id, final_kodes)
+
+
+@router.post(
+    "/{sesi_id}/batalkan-tahap3",
+    response_model=TiSesiRead,
+    summary="Batalkan freeze Tahap 3 — kembalikan sesi ke TAHAP2 (unfreeze) (admin)",
+    operation_id="taskinv_sesi_batalkan_tahap3",
+    dependencies=[Depends(rate_limit)],
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOT_FOUND,
+        422: {
+            "model": ErrorResponse,
+            "description": "Sesi tidak berstatus TAHAP3, atau alasan kosong.",
+        },
+    },
+)
+def batalkan_tahap3(
+    sesi_id: Annotated[str, Path(description="ID sesi.")],
+    payload: TiSesiBatalkanTahap3,
+    service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    principal: Annotated[Principal, Depends(require_admin)],
+) -> TiSesiRead:
+    """Kembalikan sebuah sesi Task Inventory dari TAHAP3 ke TAHAP2 (unfreeze).
+
+    Membalik pembekuan task terpilih (`freeze_task_terpilih`) tanpa kehilangan data
+    seleksi Tahap 1 responden maupun keputusan koordinator Tahap 2 yang sudah
+    tersimpan — hanya status sesi dan link task terpilih yang dibalik. Setiap
+    pemanggilan dicatat via `logger.warning` terstruktur (siapa, sesi mana, kapan,
+    alasan apa) untuk audit, mengikuti pola `paksa=true` pada `delete_sesi`.
+
+    Args:
+        sesi_id: ID sesi Task Inventory yang akan dibatalkan freeze-nya.
+        payload: Alasan pembatalan (`alasan`, wajib diisi, dicatat di audit log).
+        service: Seam `TiSesiService` yang menjalankan efek balik status + link task.
+        principal: Principal admin yang memanggil endpoint ini (dari `require_admin`).
+
+    Returns:
+        `TiSesiRead` sesi setelah `status` kembali ke `"TAHAP2"`.
+
+    Raises:
+        NotFoundError: `sesi_id` tidak ditemukan (404).
+        ValidationAppError: status sesi saat ini bukan `"TAHAP3"` (422).
+    """
+    logger.warning(
+        "ti_sesi_batalkan_tahap3",
+        extra={
+            "modul": "taskinv",
+            "sesi_id": sesi_id,
+            "aktor": principal.subject,
+            "alasan": payload.alasan,
+        },
+    )
+    return service.batalkan_tahap3(sesi_id, payload.alasan)
 
 
 @router.post(

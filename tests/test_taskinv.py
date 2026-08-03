@@ -390,6 +390,133 @@ def test_mulai_tahap3_unanimous_otomatis(client: TestClient, jabatan_id_tk: str)
 
 
 # --------------------------------------------------------------------------- #
+# Batalkan Tahap 3 (unfreeze, backlog #35)
+# --------------------------------------------------------------------------- #
+
+
+def test_batalkan_tahap3_sukses(client: TestClient, jabatan_id_tk: str, db_session) -> None:
+    """Sesi TAHAP3 dengan 2 task terpilih dibekukan → batalkan-tahap3 → TAHAP2,
+    baris link task terpilih terhapus dari DB, baris responden (termasuk flag
+    submit) tidak berubah.
+
+    Catatan kontrak: setelah kembali ke TAHAP2, `GET .../task-terpilih` menolak
+    dengan `422` — bukan `200` berisi daftar kosong — karena endpoint itu sejak awal
+    hanya melayani status `TAHAP3`/`CLOSED`/`ANALYZED` (`taskinv_hasil.py`).
+    Kosongnya himpunan diverifikasi langsung di tabel `ti_sesi_task_terpilih`.
+    """
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, jabatan_id_tk, 2)
+
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    rb = _add_responden(client, sid, "B")
+    _seleksi_submit(client, ra["id"], kodes)
+    _seleksi_submit(client, rb["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+
+    r3 = client.post(f"{SESI}/{sid}/mulai-tahap3")
+    assert r3.status_code == 200, r3.text
+    assert r3.json()["jumlah_task_terpilih"] == 2
+
+    responden_sebelum = client.get(f"{SESI}/{sid}/responden").json()["items"]
+
+    r = client.post(f"{SESI}/{sid}/batalkan-tahap3", json={"alasan": "sesi ter-freeze prematur"})
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "TAHAP2"
+    assert r.json()["jumlah_task_terpilih"] is None
+
+    tt = client.get(f"{SESI}/{sid}/task-terpilih")
+    assert tt.status_code == 422, tt.text
+
+    from sqlalchemy import func, select
+
+    from anjab_abk_backend.models import TiSesiTaskTerpilihModel
+
+    sisa = db_session.scalar(
+        select(func.count())
+        .select_from(TiSesiTaskTerpilihModel)
+        .where(TiSesiTaskTerpilihModel.sesi_id == sid)
+    )
+    assert sisa == 0
+
+    responden_sesudah = client.get(f"{SESI}/{sid}/responden").json()["items"]
+    assert responden_sesudah == responden_sebelum
+
+    # Round-trip: sesi yang sudah di-unfreeze bisa dibekukan ulang (inti fitur ini) —
+    # himpunan final dihitung lagi dari seleksi Tahap 1 yang memang tidak dihapus.
+    r3b = client.post(f"{SESI}/{sid}/mulai-tahap3")
+    assert r3b.status_code == 200, r3b.text
+    assert r3b.json()["jumlah_task_terpilih"] == 2
+    tt2 = client.get(f"{SESI}/{sid}/task-terpilih")
+    assert tt2.status_code == 200, tt2.text
+    assert tt2.json()["total"] == 2
+
+
+@pytest.mark.parametrize("status_target", ["TAHAP1", "TAHAP2", "CLOSED"])
+def test_batalkan_tahap3_status_selain_tahap3_422(
+    client: TestClient, jabatan_id_tk: str, status_target: str
+) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    if status_target in ("TAHAP2", "CLOSED"):
+        rsp = _add_responden(client, sid, "A")
+        _seleksi_submit(client, rsp["id"], kodes)
+        client.post(f"{SESI}/{sid}/mulai-tahap2")
+    if status_target == "CLOSED":
+        client.post(f"{SESI}/{sid}/mulai-tahap3")
+        client.post(f"{SESI}/{sid}/tutup")
+
+    assert client.get(f"{SESI}/{sid}").json()["status"] == status_target
+
+    r = client.post(f"{SESI}/{sid}/batalkan-tahap3", json={"alasan": "coba unfreeze"})
+    assert r.status_code == 422, r.text
+
+
+def test_batalkan_tahap3_tanpa_alasan_422(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    assert client.post(f"{SESI}/{sid}/batalkan-tahap3", json={}).status_code == 422
+    assert client.post(f"{SESI}/{sid}/batalkan-tahap3", json={"alasan": ""}).status_code == 422
+
+
+def test_batalkan_tahap3_non_admin_403(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    sesi = _create_sesi(client, jabatan_id_tk)
+    as_p = client_as("ti-guard-batalkan-tahap3")
+    r = as_p.post(f"{SESI}/{sesi['id']}/batalkan-tahap3", json={"alasan": "coba"})
+    assert r.status_code == 403
+
+
+def test_batalkan_tahap3_tanpa_token_401(anon_client: TestClient) -> None:
+    r = anon_client.post(f"{SESI}/tises_xxx/batalkan-tahap3", json={"alasan": "coba"})
+    assert r.status_code == 401
+
+
+def test_batalkan_tahap3_sesi_tidak_dikenal_404(client: TestClient) -> None:
+    r = client.post(f"{SESI}/tises_tidakada/batalkan-tahap3", json={"alasan": "coba"})
+    assert r.status_code == 404
+
+
+def test_batalkan_tahap3_inmemory_parity() -> None:
+    """Paritas Protocol: seam in-memory juga mengimplementasikan `batalkan_tahap3`."""
+    from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
+    from anjab_abk_backend.taskinv.services.sesi import InMemoryTiSesiService
+
+    svc = InMemoryTiSesiService()
+    sesi = svc.create(TiSesiCreate(jabatan_id="jbt_dummy", cabang="Bandung"))
+    svc.transition(sesi.id, "TAHAP1")
+    svc.transition(sesi.id, "TAHAP2")
+    svc.freeze_task_terpilih(sesi.id, ["K001", "K002"])
+
+    result = svc.batalkan_tahap3(sesi.id, "alasan uji")
+    assert result.status == "TAHAP2"
+    assert result.jumlah_task_terpilih is None
+
+
+# --------------------------------------------------------------------------- #
 # Seleksi Tahap 1
 # --------------------------------------------------------------------------- #
 

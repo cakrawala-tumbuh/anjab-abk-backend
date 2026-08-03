@@ -51,6 +51,7 @@ class TiSesiService(Protocol):
     def delete(self, sesi_id: str, *, paksa: bool = False) -> None: ...
     def transition(self, sesi_id: str, target: StatusSesi) -> TiSesiRead: ...
     def freeze_task_terpilih(self, sesi_id: str, kodes: list[str]) -> TiSesiRead: ...
+    def batalkan_tahap3(self, sesi_id: str, alasan: str) -> TiSesiRead: ...
     def get_task_terpilih(
         self, sesi_id: str, *, limit: int | None = None, offset: int = 0
     ) -> tuple[list[str], int]: ...
@@ -169,6 +170,35 @@ class InMemoryTiSesiService:
                 raise ValidationAppError("Tidak ada task relevan; tidak dapat masuk TAHAP3.")
             rec.task_terpilih = sorted(set(kodes))
             rec.status = "TAHAP3"
+            return self._to_read(rec)
+
+    def batalkan_tahap3(self, sesi_id: str, alasan: str) -> TiSesiRead:
+        """Balikkan sesi TAHAP3 ke TAHAP2 (unfreeze), membatalkan pembekuan task.
+
+        Args:
+            sesi_id: ID sesi Task Inventory.
+            alasan: Alasan pembatalan (dipakai pemanggil untuk audit log; seam ini
+                sendiri tidak mencatatnya — audit terjadi di lapisan endpoint).
+
+        Returns:
+            `TiSesiRead` sesi setelah `status` kembali ke `"TAHAP2"` dan
+            `jumlah_task_terpilih` menjadi `None`.
+
+        Raises:
+            NotFoundError: `sesi_id` tidak ditemukan.
+            ValidationAppError: `status` sesi saat ini bukan `"TAHAP3"`.
+        """
+        with self._lock:
+            rec = self._data.get(sesi_id)
+            if rec is None:
+                raise NotFoundError(f"Sesi Task Inventory '{sesi_id}' tidak ditemukan.")
+            if rec.status != "TAHAP3":
+                raise ValidationAppError(
+                    "Hanya sesi berstatus TAHAP3 yang dapat dibatalkan ke TAHAP2"
+                    f" (saat ini: {rec.status})."
+                )
+            rec.task_terpilih = None
+            rec.status = "TAHAP2"
             return self._to_read(rec)
 
     def get_task_terpilih(

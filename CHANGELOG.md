@@ -7,6 +7,30 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Ditambahkan
+
+- **Batalkan freeze Tahap 3 sesi Task Inventory (`TAHAP3` → `TAHAP2`)** (backlog #35) —
+  endpoint baru `POST /api/v1/task-inventory/sesi/{sesi_id}/batalkan-tahap3` (admin-only,
+  body `{"alasan": "<min 1 karakter>"}`). Sebelumnya `mulai-tahap3` membekukan himpunan
+  task secara permanen tanpa jalan keluar: sesi yang ter-freeze prematur (mis. Tahap 1
+  baru sebagian responden submit) hanya bisa dihapus lalu dibuat ulang, kehilangan
+  seluruh seleksi Tahap 1 & keputusan koordinator Tahap 2. Endpoint ini menghapus baris
+  `ti_sesi_task_terpilih` sesi tersebut, mengembalikan `task_frozen` ke `false` dan
+  `status` ke `TAHAP2` — **tanpa** menyentuh `ti_responden` (`tahap1_submit`/
+  `tahap3_submit` tetap apa adanya), `ti_seleksi`, `ti_detail`, maupun `ti_usulan_task`,
+  sehingga sesi dapat dibekukan ulang lewat `mulai-tahap3` dengan data yang sama.
+  Setiap pemanggilan dicatat `logger.warning` terstruktur (aktor, sesi, alasan) untuk
+  audit, mengikuti pola `paksa=true` pada `delete_sesi`. `422` bila status bukan
+  `TAHAP3` atau `alasan` kosong; `403` non-admin; `401` tanpa token; `404` sesi tak
+  dikenal. `openapi.json` bertambah satu operasi (`taskinv_sesi_batalkan_tahap3`) —
+  breaking-additive; tool MCP `ti_batalkan_tahap3` menyusul di
+  `cakrawala-tumbuh/anjab-abk-mcp#9`.
+
+  Catatan kontrak: setelah sesi kembali ke `TAHAP2`,
+  `GET /sesi/{id}/task-terpilih` menolak dengan `422` (bukan `200` berisi daftar
+  kosong) — endpoint itu sejak awal hanya melayani `TAHAP3`/`CLOSED`/`ANALYZED`, dan
+  revisi ini **tidak** mengubah gerbang tersebut.
+
 ## [0.43.0] - 2026-07-29
 
 ### Ditambahkan
