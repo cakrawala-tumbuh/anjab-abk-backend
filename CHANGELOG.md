@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-08-05
+
 ### Ditambahkan
 
 - **Sesi OPM dipisah per cabang** (backlog #37, menyerap #18) — kolom baru
