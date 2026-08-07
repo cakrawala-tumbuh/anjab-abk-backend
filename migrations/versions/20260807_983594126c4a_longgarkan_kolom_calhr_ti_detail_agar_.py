@@ -12,7 +12,7 @@ ber-NULL pada salah satu kolom — disengaja, mengikuti konvensi downgrade best-
 repo ini (bandingkan `fd3dd550aa99`, `08b6b999ee05`).
 
 Revision ID: 983594126c4a
-Revises: 5f9c20955d88
+Revises: 25dba11a0c55
 Create Date: 2026-08-07 06:27:49.528945
 """
 
@@ -24,7 +24,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "983594126c4a"
-down_revision: str | None = "5f9c20955d88"
+down_revision: str | None = "25dba11a0c55"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
