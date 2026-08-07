@@ -8,10 +8,10 @@ jadi tidak ada baris `opm_jawaban` existing yang perlu di-backfill.
 
 `downgrade()` mengembalikan `NOT NULL` apa adanya dan akan GAGAL bila saat itu ada baris
 ber-NULL pada salah satu kolom — disengaja, mengikuti konvensi downgrade best-effort
-repo ini (bandingkan `983594126c4a`, `fd3dd550aa99`).
+repo ini (bandingkan `fd3dd550aa99`).
 
 Revision ID: 25dba11a0c55
-Revises: 983594126c4a
+Revises: 5f9c20955d88
 Create Date: 2026-08-07 06:28:21.102215
 """
 
@@ -23,7 +23,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "25dba11a0c55"
-down_revision: str | None = "983594126c4a"
+down_revision: str | None = "5f9c20955d88"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
