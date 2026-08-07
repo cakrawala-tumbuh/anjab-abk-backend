@@ -280,12 +280,13 @@ def test_submit_skor_di_luar_rentang_422(client: TestClient, jabatan_id_tk: str)
     assert r.status_code == 422, r.text
 
 
-def test_save_draft_dimensi_hilang_422_meski_nilai_standar_tersedia(
+def test_save_draft_dimensi_hilang_200_tersimpan_null_lalu_submit_422(
     client: TestClient, jabatan_id_tk: str, db_session
 ) -> None:
-    """Nilai standar (`std_*`, backlog #34) adalah SARAN untuk klien, bukan default
-    otomatis untuk jawaban — payload yang tidak mengisi salah satu dimensi tetap
-    ditolak 422 walau task itu punya nilai standar lengkap di snapshot."""
+    """Backlog #39 membalik keputusan #34: draft rating parsial (dimensi hilang dari
+    payload) kini DITERIMA apa adanya dan tersimpan `null` — nilai standar (`std_*`)
+    tetap sekadar SARAN untuk klien, bukan default otomatis. Kelengkapan ketiga
+    dimensi baru digerbang saat submit, dengan pesan yang menyebut `task_kode`-nya."""
     from anjab_abk_backend.models import TiUraianTugasJabatanModel
 
     sesi, ctx = _build_sesi(client, jabatan_id_tk)
@@ -303,7 +304,117 @@ def test_save_draft_dimensi_hilang_422_meski_nilai_standar_tersedia(
     payload = _bulk_payload(ctx["kodes"])
     del payload["jawaban"][0]["frequency"]  # dimensi hilang dari payload
     r = _save_draft(client, rid, payload)
-    assert r.status_code == 422, r.text
+    assert r.status_code == 200, r.text
+    saved = next(j for j in r.json() if j["task_kode"] == ctx["kodes"][0])
+    assert saved["frequency"] is None
+    assert saved["importance"] == 4  # dimensi lain yang dikirim tetap tersimpan
+
+    r_submit = client.post(f"{SESI_BASE}/responden/{rid}/jawaban/submit")
+    assert r_submit.status_code == 422, r_submit.text
+    assert ctx["kodes"][0] in r_submit.json()["message"]
+
+
+def test_save_draft_satu_dimensi_lalu_dilengkapi_bertahap_submit_ok(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Draft boleh dimulai dari satu dimensi saja lalu dilengkapi bertahap — submit
+    ditolak selama masih ada dimensi `null`, dan berhasil begitu semuanya terisi."""
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    client.post(f"{SESI_BASE}/{sesi['id']}/buka")
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    rid = responden[0]["id"]
+
+    r1 = _save_draft(client, rid, {"jawaban": [{"task_kode": ctx["kodes"][0], "importance": 4}]})
+    assert r1.status_code == 200, r1.text
+    assert r1.json()[0]["frequency"] is None
+    assert r1.json()[0]["criticality"] is None
+
+    r_submit_prematur = client.post(f"{SESI_BASE}/responden/{rid}/jawaban/submit")
+    assert r_submit_prematur.status_code == 422, r_submit_prematur.text
+
+    r2 = _save_draft(
+        client,
+        rid,
+        {"jawaban": [{"task_kode": ctx["kodes"][0], "importance": 4, "frequency": 3}]},
+    )
+    assert r2.status_code == 200, r2.text
+
+    r3 = _save_draft(client, rid, _bulk_payload(ctx["kodes"]))
+    assert r3.status_code == 200, r3.text
+
+    r_submit = client.post(f"{SESI_BASE}/responden/{rid}/jawaban/submit")
+    assert r_submit.status_code == 201, r_submit.text
+    assert len(r_submit.json()) == 2
+
+
+def test_save_draft_overwrite_hapus_dimensi_jadi_null(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Entri yang sebelumnya lengkap, di-`PUT` ulang tanpa `criticality`, membuat
+    dimensi itu `null` — upsert menulis apa adanya, termasuk menimpa nilai lama."""
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    client.post(f"{SESI_BASE}/{sesi['id']}/buka")
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    rid = responden[0]["id"]
+
+    r1 = _save_draft(client, rid, _bulk_payload(ctx["kodes"]))
+    assert r1.status_code == 200, r1.text
+    assert all(j["criticality"] is not None for j in r1.json())
+
+    payload = _bulk_payload(ctx["kodes"][:1])
+    del payload["jawaban"][0]["criticality"]
+    r2 = _save_draft(client, rid, payload)
+    assert r2.status_code == 200, r2.text
+    updated = next(j for j in r2.json() if j["task_kode"] == ctx["kodes"][0])
+    assert updated["criticality"] is None
+    assert updated["importance"] == 4  # dimensi lain tidak ikut ter-null-kan
+
+
+def test_get_raw_by_responden_menyaring_baris_parsial(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    """Unit (tanpa lewat endpoint): `get_raw_by_responden()` menyaring baris ber-
+    dimensi `NULL` sehingga `compute_hasil_sesi` tidak pernah menerima entri parsial —
+    dari 3 baris tersimpan (2 lengkap, 1 parsial) hanya 2 yang dikembalikan."""
+    from anjab_abk_backend.models import OpmJawabanModel
+    from anjab_abk_backend.opm.services.jawaban_sql import SqlOpmJawabanService
+
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    rid = responden[0]["id"]
+
+    db_session.add_all(
+        [
+            OpmJawabanModel(
+                id="opjw_unit1",
+                responden_id=rid,
+                task_kode="UNITK1",
+                importance=4,
+                frequency=3,
+                criticality=5,
+            ),
+            OpmJawabanModel(
+                id="opjw_unit2",
+                responden_id=rid,
+                task_kode="UNITK2",
+                importance=2,
+                frequency=2,
+                criticality=2,
+            ),
+            OpmJawabanModel(
+                id="opjw_unit3",
+                responden_id=rid,
+                task_kode="UNITK3",
+                importance=4,
+                frequency=None,
+                criticality=5,
+            ),
+        ]
+    )
+    db_session.flush()
+
+    raw = SqlOpmJawabanService(db_session).get_raw_by_responden(rid)
+    assert raw == {"UNITK1": (4, 3, 5), "UNITK2": (2, 2, 2)}
 
 
 def test_save_draft_jawaban_parsial_lalu_lengkap(client: TestClient, jabatan_id_tk: str) -> None:

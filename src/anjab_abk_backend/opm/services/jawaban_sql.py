@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from ...models import OpmJawabanModel
 from ..schemas.jawaban import OpmJawabanRead, OpmJawabanUpsert
-from .jawaban import _validate_task_set, _validate_task_subset
+from .jawaban import _validate_complete, _validate_task_set, _validate_task_subset
 
 
 def _to_read(rec: OpmJawabanModel) -> OpmJawabanRead:
@@ -51,7 +51,12 @@ class SqlOpmJawabanService:
                 OpmJawabanModel.importance,
                 OpmJawabanModel.frequency,
                 OpmJawabanModel.criticality,
-            ).where(OpmJawabanModel.responden_id == responden_id)
+            ).where(
+                OpmJawabanModel.responden_id == responden_id,
+                OpmJawabanModel.importance.is_not(None),
+                OpmJawabanModel.frequency.is_not(None),
+                OpmJawabanModel.criticality.is_not(None),
+            )
         ).all()
         return {kode: (imp, freq, crit) for kode, imp, freq, crit in rows}
 
@@ -95,6 +100,7 @@ class SqlOpmJawabanService:
             .where(OpmJawabanModel.responden_id == responden_id)
             .order_by(OpmJawabanModel.task_kode)
         ).all()
+        _validate_complete([(r.task_kode, r.importance, r.frequency, r.criticality) for r in rows])
         _validate_task_set([r.task_kode for r in rows], valid_task_kodes)
         return [_to_read(r) for r in rows]
 

@@ -762,7 +762,7 @@ class OpmJawabanModel(Base):
         ForeignKey("opm_responden.id", ondelete="CASCADE"), nullable=False, index=True
     )
     task_kode: Mapped[str] = mapped_column(String(20), nullable=False)
-    importance: Mapped[int] = mapped_column(Integer, nullable=False)
-    frequency: Mapped[int] = mapped_column(Integer, nullable=False)
-    criticality: Mapped[int] = mapped_column(Integer, nullable=False)
+    importance: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    frequency: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    criticality: Mapped[int | None] = mapped_column(Integer, nullable=True)
     catatan: Mapped[str | None] = mapped_column(Text, nullable=True)

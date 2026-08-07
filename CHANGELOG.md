@@ -7,6 +7,17 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diubah
+
+- **OPM: draft rating parsial diterima; kelengkapan tiga dimensi digerbang saat
+  submit** (backlog #39) — `PUT /api/v1/opm/sesi/responden/{id}/jawaban` tidak lagi
+  menuntut `importance`/`frequency`/`criticality` terisi sekaligus; ketiganya boleh
+  `null` pada draft dan disimpan apa adanya (kolom `opm_jawaban` jadi nullable,
+  migrasi `25dba11a0c55`). Kelengkapan ketiga dimensi kini ditegakkan **hanya** di
+  `POST .../jawaban/submit` (422, pesan menyebut `task_kode` yang belum lengkap).
+  `GET .../hasil` tidak berubah angkanya — baris parsial disaring sebelum masuk
+  agregasi.
+
 ## [0.44.0] - 2026-08-05
 
 ### Ditambahkan

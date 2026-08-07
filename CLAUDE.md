@@ -82,6 +82,42 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-08-07] OPM: terima draft rating parsial; kelengkapan tiga dimensi digerbang saat submit
+
+Backlog `#39`. `OpmJawabanItem` mewajibkan ketiga dimensi (`importance`/`frequency`/
+`criticality`) pada setiap entri, juga pada jalur draft
+(`PUT /api/v1/opm/sesi/responden/{id}/jawaban`), dan `OpmJawabanModel` memaku
+ketiganya `nullable=False`. Konsekuensinya task yang baru dinilai sebagian **tidak
+bisa disimpan**: klien membuang task semacam itu dari payload dan penilaian
+separuh jalan hilang setiap kali partisipan meninggalkan halaman. Pembatasan ini
+pernah ditegaskan sebagai keputusan sadar (entri `[2026-07-29]` di bawah, dijaga
+test `test_save_draft_dimensi_hilang_422_meski_nilai_standar_tersedia`); keputusan
+itu **dicabut** oleh item ini.
+
+- **`OpmJawabanItem`/`OpmJawabanRead`**: `importance`/`frequency`/`criticality`
+  menjadi `int | None` (default `None`); batas `ge=1, le=5` tetap berlaku untuk
+  nilai non-null. `task_kode` tetap wajib (kunci upsert).
+- **DB**: kolom `opm_jawaban.importance`/`.frequency`/`.criticality` jadi
+  nullable (migrasi `25dba11a0c55`, `ALTER COLUMN ... DROP NOT NULL`, tanpa
+  migrasi data — `opm_sesi` produksi nol baris). `downgrade()` best-effort:
+  gagal bila ada baris ber-`NULL` saat itu.
+- **`upsert()`** (in-memory + SQL) menulis `None` apa adanya, termasuk saat
+  menimpa nilai yang sebelumnya terisi — draft tidak lagi digerbang di `PUT`.
+- **Gerbang kelengkapan pindah ke `submit()`** (in-memory + SQL, paritas):
+  sebelum pengecekan kesamaan himpunan `task_kode` yang sudah ada, tolak
+  (`ValidationAppError` → 422) bila ada baris tersimpan dengan salah satu
+  dimensi `NULL`, pesan menyebut `task_kode`-nya (maksimum 5, lalu `...`).
+- **`get_raw_by_responden()`** (in-memory + SQL) melewatkan baris yang salah
+  satu dimensinya `NULL`, sehingga tipe kembaliannya tetap
+  `dict[str, tuple[int, int, int]]` dan `compute_hasil_sesi` tidak perlu
+  diubah sama sekali.
+- Test lama `test_save_draft_dimensi_hilang_422_meski_nilai_standar_tersedia`
+  **dibalik** (`test_save_draft_dimensi_hilang_200_tersimpan_null_lalu_submit_422`):
+  payload yang tidak mengisi salah satu dimensi kini `200` dan tersimpan
+  sebagai `null`, sementara submit-nya yang menolak `422`.
+- Tidak menyentuh Task Inventory Tahap 3 (`#38`, area terpisah) maupun
+  klien/web app (`anjab-abk-web-app#56`, item lintas-project terpisah).
+
 ### [2026-07-29] OPM: bawa nilai standar ke snapshot task sesi & respons API
 
 Backlog `#34`, lanjutan langsung `#33` (entri di bawah). Snapshot task sesi OPM

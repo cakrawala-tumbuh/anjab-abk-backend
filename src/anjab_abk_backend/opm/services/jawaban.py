@@ -16,9 +16,9 @@ class _Record:
     id: str
     responden_id: str
     task_kode: str
-    importance: int
-    frequency: int
-    criticality: int
+    importance: int | None = None
+    frequency: int | None = None
+    criticality: int | None = None
     catatan: str | None = None
 
 
@@ -46,6 +46,34 @@ def _validate_task_subset(kodes_list: list[str], valid_task_kodes: set[str]) -> 
     unknown = set(kodes_list) - valid_task_kodes
     if unknown:
         raise ValidationAppError(f"Kode task tidak dikenal: {', '.join(sorted(unknown))}.")
+
+
+def _validate_complete(rows: list[tuple[str, int | None, int | None, int | None]]) -> None:
+    """Tolak finalisasi bila ada baris tersimpan dengan dimensi yang masih `null`.
+
+    Draft (`PUT .../jawaban`) sengaja menerima rating parsial — kelengkapan ketiga
+    dimensi (`importance`/`frequency`/`criticality`) baru digerbang di sini, saat
+    finalisasi (`POST .../jawaban/submit`), bukan lagi di titik simpan draft.
+
+    Args:
+        rows: baris tersimpan milik responden sebagai
+            `(task_kode, importance, frequency, criticality)`, dibaca dari DB —
+            bukan dari payload request.
+
+    Raises:
+        ValidationAppError: bila ≥1 baris punya salah satu dimensi `None`, pesan
+            menyebut `task_kode`-nya (maksimum 5, sisanya diringkas `...`).
+    """
+    incomplete = sorted(
+        kode for kode, imp, freq, crit in rows if imp is None or freq is None or crit is None
+    )
+    if incomplete:
+        shown = ", ".join(incomplete[:5])
+        raise ValidationAppError(
+            "Tidak dapat submit: task berikut belum dinilai pada ketiga dimensi: "
+            + shown
+            + ("..." if len(incomplete) > 5 else ".")
+        )
 
 
 class OpmJawabanService(Protocol):
@@ -85,6 +113,9 @@ class InMemoryOpmJawabanService:
                 r.task_kode: (r.importance, r.frequency, r.criticality)
                 for r in self._data.values()
                 if r.responden_id == responden_id
+                and r.importance is not None
+                and r.frequency is not None
+                and r.criticality is not None
             }
 
     def upsert(
@@ -129,6 +160,7 @@ class InMemoryOpmJawabanService:
                 (r for r in self._data.values() if r.responden_id == responden_id),
                 key=lambda r: r.task_kode,
             )
+        _validate_complete([(r.task_kode, r.importance, r.frequency, r.criticality) for r in rows])
         _validate_task_set([r.task_kode for r in rows], valid_task_kodes)
         return [self._to_read(r) for r in rows]
 
