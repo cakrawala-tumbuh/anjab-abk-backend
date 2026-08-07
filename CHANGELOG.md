@@ -17,6 +17,20 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
   `POST .../jawaban/submit` (422, pesan menyebut `task_kode` yang belum lengkap).
   `GET .../hasil` tidak berubah angkanya — baris parsial disaring sebelum masuk
   agregasi.
+- **Draft Tahap 3 Task Inventory kini menerima isian parsial; kelengkapan digerbang
+  saat submit** (backlog #38). `PUT .../detail` sebelumnya mewajibkan kelima field
+  CalHR (`sumber_bukti`/`kondisi`/`frekuensi_teks`/`durasi_per_kali`/`va_type`) penuh
+  di setiap baris — partisipan yang menandai 30 tugas dan baru mengisi 10 kehilangan
+  seluruh progres karena draft-save ikut ditolak `422`. Kelima field itu kini
+  `| None` (opsional) di `TiDetailItem`/`TiDetailRead` dan kolom `ti_detail`
+  terkait (migrasi `983594126c4a`); `PUT .../detail` menyimpan `null` apa adanya,
+  termasuk saat menimpa nilai yang sebelumnya terisi. `jam_per_minggu` diberi
+  `default=0.0` (bukan opsional — field ini memang tidak lagi diisi partisipan).
+  Gerbang kelengkapan **baru** ada di `POST .../detail/submit`: menolak `422` bila
+  ada baris tersimpan dengan salah satu field masih `null`, pesan menyebut
+  `task_kode`-nya. `compute_hasil_sesi` (dipakai `GET .../hasil`) mengabaikan entri
+  parsial dari `fmean`/`va_type_dist`/`n_detail` agar draft yang belum di-submit
+  tidak mencemari agregasi ABK.
 
 ## [0.44.0] - 2026-08-05
 

@@ -118,6 +118,48 @@ itu **dicabut** oleh item ini.
 - Tidak menyentuh Task Inventory Tahap 3 (`#38`, area terpisah) maupun
   klien/web app (`anjab-abk-web-app#56`, item lintas-project terpisah).
 
+### [2026-08-07] TI Tahap 3: terima draft parsial; kelengkapan digerbang saat submit
+
+Backlog #38. Draft/submit sudah dipisah sejak revisi `[2026-07-08]` di bawah, tetapi
+pemisahan itu hanya berlaku pada **jumlah entri** (boleh 0..N baris), bukan
+**kelengkapan tiap entri** — `TiDetailItem` masih mewajibkan kelima field CalHR
+(`sumber_bukti`/`kondisi`/`frekuensi_teks`/`durasi_per_kali`/`va_type`) penuh, dan
+`TiDetailModel` memaku kelimanya `nullable=False`. Partisipan yang menandai 30 tugas
+dan baru sempat mengisi 10 kehilangan seluruh progres karena `PUT .../detail` ikut
+menolak baris yang belum lengkap.
+
+- **`TiDetailItem`/`TiDetailRead`**: kelima field CalHR jadi `| None` (default
+  `None`); batas nilai yang ada (`min_length`/`ge`) tetap berlaku untuk nilai
+  non-null. `jam_per_minggu` diberi `default=0.0` (tetap wajib, bukan opsional) —
+  partisipan memang tidak lagi mengisinya (lihat entri `[2026-07-15]` di bawah soal
+  `ai_mode`/`dcs_flag`; field ini bukan dihapus, hanya tidak lagi wajib diisi UI).
+  `task_kode` tetap wajib (kunci upsert).
+- **DB**: lima kolom `ti_detail` terkait jadi nullable (migrasi `983594126c4a`,
+  `ALTER COLUMN ... DROP NOT NULL`, tanpa migrasi data — seluruh baris existing
+  sudah terisi penuh). `downgrade()` mengembalikan `NOT NULL` apa adanya dan GAGAL
+  bila saat itu ada baris ber-`NULL` — disengaja, konvensi downgrade best-effort
+  repo ini.
+- **`upsert()`** (seam in-memory `services/detail.py` + SQL `services/detail_sql.py`)
+  tidak berubah perilakunya — ia sudah menulis apa pun yang dikirim payload; yang
+  berubah murni skema di atasnya (field yang tadinya wajib kini boleh `None`,
+  termasuk saat menimpa baris yang sebelumnya lengkap).
+- **Gerbang kelengkapan baru di `submit()`** (in-memory + SQL, paritas): gerbang
+  ke-2, di antara gerbang "minimal 1 entri" (sudah ada) dan gerbang
+  `"Context-Dependent"` (entri `[2026-07-26]` di bawah) — tolak `ValidationAppError`
+  (422) bila ada baris tersimpan dengan salah satu dari lima field `NULL`. Pesan:
+  `"Tidak dapat submit: task berikut belum lengkap isiannya: <kode1>, <kode2>..."`
+  (maksimum 5 kode, lalu `...`), sejalan bentuk pesan gerbang `"Context-Dependent"`.
+- **`compute_hasil_sesi`** (`taskinv/services/analisis.py`) mengabaikan entri
+  ber-`jam_per_minggu`/`durasi_per_kali`/`va_type` `NULL` — tidak ikut `fmean`
+  (jam/durasi/peak), tidak masuk `va_type_dist`, tidak dihitung pada `n_detail`.
+  Diperlukan karena `GET .../hasil` memanggil `detail_service.list_by_sesi()` tanpa
+  menyaring status submit responden, sehingga draft parsial (responden yang belum
+  submit Tahap 3) tetap sampai ke agregasi. `n_setuju_standar`/`n_ubah_standar`
+  sengaja TIDAK ikut difilter — independen dari kelima field yang boleh kosong.
+- Breaking-additive murni (payload lama yang lengkap tetap sah): `openapi.json`
+  (gitignored) lima field jadi nullable di dua skema. Klien
+  (`anjab-abk-web-app#55`) menyusul di item terpisah setelah kontrak ini live.
+
 ### [2026-07-29] OPM: bawa nilai standar ke snapshot task sesi & respons API
 
 Backlog `#34`, lanjutan langsung `#33` (entri di bawah). Snapshot task sesi OPM

@@ -999,6 +999,130 @@ def test_submit_detail_rejected_when_empty(client: TestClient, jabatan_id_tk: st
 
 
 # --------------------------------------------------------------------------- #
+# Draft parsial Tahap 3 (backlog `anjab-abk-backend#38`): kelengkapan digerbang
+# di submit, bukan lagi di setiap PUT.
+# --------------------------------------------------------------------------- #
+
+
+def test_save_draft_detail_hanya_task_kode_diterima(client: TestClient, jabatan_id_tk: str) -> None:
+    """`PUT .../detail` dengan entri hanya ber-`task_kode` → 200, kelima field CalHR
+    lain tersimpan `null` (belum digerbang di sini)."""
+    responden_id, kode = _setup_responden_di_tahap3(client, jabatan_id_tk)
+
+    res = client.put(
+        f"{SESI}/responden/{responden_id}/detail", json={"detail": [{"task_kode": kode}]}
+    )
+    assert res.status_code == 200, res.text
+    item = res.json()[0]
+    assert item["task_kode"] == kode
+    for field in ("sumber_bukti", "kondisi", "frekuensi_teks", "durasi_per_kali", "va_type"):
+        assert item[field] is None, field
+    assert item["jam_per_minggu"] == 0.0
+
+    det = client.get(f"{SESI}/responden/{responden_id}/detail")
+    assert det.status_code == 200
+    assert det.json()["items"][0]["sumber_bukti"] is None
+
+
+def test_save_draft_detail_menimpa_lengkap_dengan_parsial(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Entri lengkap yang di-`PUT` ulang dengan payload parsial → field yang tak
+    disertakan tergantikan `null`, BUKAN dipertahankan diam-diam."""
+    responden_id, kode = _setup_responden_di_tahap3(client, jabatan_id_tk)
+
+    r1 = client.put(
+        f"{SESI}/responden/{responden_id}/detail", json={"detail": [_detail_item(kode)]}
+    )
+    assert r1.status_code == 200, r1.text
+    assert r1.json()[0]["durasi_per_kali"] == 30
+
+    r2 = client.put(
+        f"{SESI}/responden/{responden_id}/detail", json={"detail": [{"task_kode": kode}]}
+    )
+    assert r2.status_code == 200, r2.text
+    assert r2.json()[0]["durasi_per_kali"] is None
+    assert r2.json()[0]["va_type"] is None
+
+    det = client.get(f"{SESI}/responden/{responden_id}/detail")
+    assert det.json()["items"][0]["durasi_per_kali"] is None
+
+
+def test_submit_detail_ditolak_saat_entri_belum_lengkap(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """`POST .../detail/submit` ditolak 422 selama ada baris tersimpan dengan salah
+    satu field CalHR masih `null`; pesan menyebut `task_kode`-nya; responden TIDAK
+    berubah menjadi ter-submit."""
+    responden_id, kode = _setup_responden_di_tahap3(client, jabatan_id_tk)
+
+    client.put(f"{SESI}/responden/{responden_id}/detail", json={"detail": [{"task_kode": kode}]})
+
+    res = client.post(f"{SESI}/responden/{responden_id}/detail/submit")
+    assert res.status_code == 422, res.text
+    assert kode in res.json()["message"]
+    assert "belum lengkap" in res.json()["message"]
+
+    assert client.get(f"{SESI}/responden/{responden_id}").json()["tahap3_submit"] is False
+
+
+def test_submit_detail_setelah_dilengkapi_bertahap_sukses(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Draft parsial yang dilengkapi bertahap (beberapa kali PUT) lalu submit → 201."""
+    responden_id, kode = _setup_responden_di_tahap3(client, jabatan_id_tk)
+
+    client.put(f"{SESI}/responden/{responden_id}/detail", json={"detail": [{"task_kode": kode}]})
+    r2 = client.put(
+        f"{SESI}/responden/{responden_id}/detail", json={"detail": [_detail_item(kode)]}
+    )
+    assert r2.status_code == 200, r2.text
+    assert r2.json()[0]["durasi_per_kali"] == 30
+
+    res = client.post(f"{SESI}/responden/{responden_id}/detail/submit")
+    assert res.status_code == 201, res.text
+    assert client.get(f"{SESI}/responden/{responden_id}").json()["tahap3_submit"] is True
+
+
+def test_hasil_mengabaikan_entri_parsial(client: TestClient, jabatan_id_tk: str) -> None:
+    """`GET .../hasil` pada sesi yang punya campuran baris lengkap & parsial → 200,
+    angka (jam/durasi mean, n_detail) dihitung hanya dari baris lengkap."""
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    ra = _add_responden(client, sid, "A")
+    rb = _add_responden(client, sid, "B")
+    _seleksi_submit(client, ra["id"], kodes)
+    _seleksi_submit(client, rb["id"], kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    client.post(f"{SESI}/{sid}/mulai-tahap3")
+
+    # A: entri lengkap & submit final.
+    _detail_submit(client, ra["id"], [_detail_item(kodes[0], jpm=6.0)])
+    # B: draft parsial (hanya task_kode), TIDAK submit — tetap tersimpan di DB dan
+    # ikut terbaca `list_by_sesi()`, tapi harus diabaikan dari agregasi.
+    r_partial = client.put(
+        f"{SESI}/responden/{rb['id']}/detail", json={"detail": [{"task_kode": kodes[0]}]}
+    )
+    assert r_partial.status_code == 200, r_partial.text
+
+    assert client.post(f"{SESI}/{sid}/tutup").json()["status"] == "CLOSED"
+    an = client.post(f"{SESI}/{sid}/analisis")
+    assert an.status_code == 200, an.text
+    task = next(t for t in an.json()["tasks"] if t["kode"] == kodes[0])
+    assert task["n_detail"] == 1
+    assert task["jam_per_minggu_mean"] == 6.0
+    assert task["va_type_dist"] == {"VA-Core": 1}
+
+    hasil = client.get(f"{SESI}/{sid}/hasil")
+    assert hasil.status_code == 200
+    task_get = next(t for t in hasil.json()["tasks"] if t["kode"] == kodes[0])
+    assert task_get["n_detail"] == 1
+    assert task_get["jam_per_minggu_mean"] == 6.0
+
+
+# --------------------------------------------------------------------------- #
 # va_type "Context-Dependent" (prefill/draft) & "Needs Validation" (dihapus)
 # --------------------------------------------------------------------------- #
 

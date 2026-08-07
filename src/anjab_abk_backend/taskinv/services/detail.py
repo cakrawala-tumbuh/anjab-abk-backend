@@ -17,13 +17,13 @@ class _Record:
     responden_id: str
     sesi_id: str
     task_kode: str
-    sumber_bukti: str
-    kondisi: str
-    frekuensi_teks: str
-    durasi_per_kali: int
+    sumber_bukti: str | None
+    kondisi: str | None
+    frekuensi_teks: str | None
+    durasi_per_kali: int | None
     jam_per_minggu: float
     peak4w_hours: float
-    va_type: str
+    va_type: str | None
     setuju_standar: bool = True
     catatan: str | None = None
 
@@ -109,11 +109,14 @@ class InMemoryTiDetailService:
     def submit(self, responden_id: str) -> list[TiDetailRead]:
         """Finalisasi entri detail Tahap 3 milik satu responden.
 
-        Memvalidasi dari baris yang sudah tersimpan di DB (tanpa payload): minimal 1
-        entri harus ada, dan tidak boleh ada entri ber-`va_type` `"Context-Dependent"`
-        — nilai itu hanya diterima sebagai prefill/draft (lihat `upsert`), bukan
-        jawaban final. Tidak mengubah data; flag submit di-set caller (endpoint)
-        setelah pemanggilan ini berhasil tanpa exception.
+        Memvalidasi dari baris yang sudah tersimpan di DB (tanpa payload), tiga gerbang
+        berurutan: (1) minimal 1 entri harus ada; (2) setiap baris tersimpan harus lengkap
+        kelima field CalHR-nya (`sumber_bukti`/`kondisi`/`frekuensi_teks`/`durasi_per_kali`/
+        `va_type`) — draft parsial (lihat `upsert`, backlog `anjab-abk-backend#38`) ditolak
+        di sini, bukan saat disimpan; (3) tidak boleh ada entri ber-`va_type`
+        `"Context-Dependent"` — nilai itu hanya diterima sebagai prefill/draft, bukan
+        jawaban final. Tidak mengubah data; flag submit di-set caller (endpoint) setelah
+        pemanggilan ini berhasil tanpa exception.
 
         Args:
             responden_id: ID responden yang akan difinalisasi.
@@ -122,13 +125,29 @@ class InMemoryTiDetailService:
             Seluruh baris `TiDetailRead` milik responden tersebut.
 
         Raises:
-            ValidationAppError: bila belum ada entri tersimpan, atau masih ada entri
-                ber-`va_type` `"Context-Dependent"` (pesan menyebut `task_kode`-nya).
+            ValidationAppError: bila belum ada entri tersimpan, ada entri belum lengkap
+                (pesan menyebut `task_kode`-nya), atau masih ada entri ber-`va_type`
+                `"Context-Dependent"` (pesan menyebut `task_kode`-nya).
         """
         rows, _ = self.list_by_responden(responden_id)
         if not rows:
             raise ValidationAppError(
                 "Responden harus mengisi minimal 1 entri detail sebelum submit Tahap 3."
+            )
+        incomplete = sorted(
+            r.task_kode
+            for r in rows
+            if r.sumber_bukti is None
+            or r.kondisi is None
+            or r.frekuensi_teks is None
+            or r.durasi_per_kali is None
+            or r.va_type is None
+        )
+        if incomplete:
+            shown = ", ".join(incomplete[:5])
+            raise ValidationAppError(
+                f"Tidak dapat submit: task berikut belum lengkap isiannya: {shown}"
+                + ("..." if len(incomplete) > 5 else ".")
             )
         context_dependent = sorted(r.task_kode for r in rows if r.va_type == "Context-Dependent")
         if context_dependent:

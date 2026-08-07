@@ -65,7 +65,16 @@ def compute_hasil_sesi(
     detail_records: list[TiDetailRead],
     n_tahap3: int,
 ) -> TiHasilSesiRead:
-    """Hitung agregasi lengkap satu sesi Task Inventory."""
+    """Hitung agregasi lengkap satu sesi Task Inventory.
+
+    `GET .../hasil` memanggil `detail_service.list_by_sesi()` tanpa menyaring status
+    submit responden, jadi `detail_records` bisa berisi draft parsial (backlog
+    `anjab-abk-backend#38`) — entri ber-`jam_per_minggu`/`durasi_per_kali`/`va_type`
+    `None` diabaikan di sini: tidak ikut `fmean` (jam/durasi/peak), tidak masuk
+    `va_type_dist`, dan tidak dihitung pada `n_detail`. `n_setuju_standar`/
+    `n_ubah_standar` sengaja tetap dihitung dari SELURUH entri (termasuk parsial) —
+    `setuju_standar` independen dari kelima field CalHR yang boleh kosong.
+    """
     by_kode: dict[str, list[TiDetailRead]] = {}
     for d in detail_records:
         by_kode.setdefault(d.task_kode, []).append(d)
@@ -75,17 +84,24 @@ def compute_hasil_sesi(
     for kode in kodes:
         cat = catalog_map.get(kode)
         entries = by_kode.get(kode, [])
-        n_detail = len({d.responden_id for d in entries})
+        complete = [
+            d
+            for d in entries
+            if d.jam_per_minggu is not None
+            and d.durasi_per_kali is not None
+            and d.va_type is not None
+        ]
+        n_detail = len({d.responden_id for d in complete})
 
-        if entries:
-            jpm_mean = round(statistics.fmean(d.jam_per_minggu for d in entries), 2)
-            durasi_mean = round(statistics.fmean(d.durasi_per_kali for d in entries), 2)
-            peak_mean = round(statistics.fmean(d.peak4w_hours for d in entries), 2)
+        if complete:
+            jpm_mean = round(statistics.fmean(d.jam_per_minggu for d in complete), 2)
+            durasi_mean = round(statistics.fmean(d.durasi_per_kali for d in complete), 2)
+            peak_mean = round(statistics.fmean(d.peak4w_hours for d in complete), 2)
         else:
             jpm_mean = durasi_mean = peak_mean = 0.0
 
         va_dist: dict[str, int] = {}
-        for d in entries:
+        for d in complete:
             va_dist[d.va_type] = va_dist.get(d.va_type, 0) + 1
 
         n_setuju = sum(1 for d in entries if d.setuju_standar)

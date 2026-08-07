@@ -577,13 +577,16 @@ class TiDetailModel(Base):
         ForeignKey("ti_sesi.id", ondelete="CASCADE"), nullable=False, index=True
     )
     task_kode: Mapped[str] = mapped_column(String(20), nullable=False)
-    sumber_bukti: Mapped[str] = mapped_column(String(20), nullable=False)
-    kondisi: Mapped[str] = mapped_column(String(20), nullable=False)
-    frekuensi_teks: Mapped[str] = mapped_column(String(100), nullable=False)
-    durasi_per_kali: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Lima kolom CalHR inti berikut nullable sejak backlog #38: draft parsial (PUT
+    # .../detail) menyimpan baris sebelum seluruh field terisi; kelengkapan digerbang di
+    # submit() (services/detail.py + detail_sql.py), bukan di sini.
+    sumber_bukti: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    kondisi: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    frekuensi_teks: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    durasi_per_kali: Mapped[int | None] = mapped_column(Integer, nullable=True)
     jam_per_minggu: Mapped[float] = mapped_column(Float, nullable=False)
     peak4w_hours: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    va_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    va_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # True = partisipan menerima nilai standar master apa adanya.
     # False = ia mengubah minimal satu komponen. Task yang masternya tidak punya
     # nilai standar tetap True (tidak ada standar untuk dibantah).
