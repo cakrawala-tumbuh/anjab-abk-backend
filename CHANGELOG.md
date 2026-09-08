@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-09-08
+
 ### Diubah
 
 - **OPM: draft rating parsial diterima; kelengkapan tiga dimensi digerbang saat
