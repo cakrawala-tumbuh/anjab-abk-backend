@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-09-09
+
 ### Diubah
 
 - **Auto-populate responden & koordinator sesi Task Inventory kini menyaring
