@@ -231,14 +231,31 @@ def get_ti_catalog_service(session: SessionDep) -> TiCatalogService:
 # --- Task Inventory services ---
 
 
-def get_ti_sesi_service(session: SessionDep) -> TiSesiService:
-    """SEAM: implementasi `TiSesiService` berbasis PostgreSQL."""
-    return SqlTiSesiService(session)
+def get_ti_sesi_service(
+    session: SessionDep,
+    partisipan_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    sekolah_service: Annotated[SekolahService, Depends(get_sekolah_service)],
+) -> TiSesiService:
+    """SEAM: implementasi `TiSesiService` berbasis PostgreSQL.
+
+    `partisipan_service`/`sekolah_service` disuntik untuk gerbang cabang
+    koordinator & penyaringan cabang auto-populate responden
+    (backlog `anjab-abk-backend#41`).
+    """
+    return SqlTiSesiService(session, partisipan_service, sekolah_service)
 
 
-def get_ti_responden_service(session: SessionDep) -> TiRespondenService:
-    """SEAM: implementasi `TiRespondenService` berbasis PostgreSQL."""
-    return SqlTiRespondenService(session)
+def get_ti_responden_service(
+    session: SessionDep,
+    partisipan_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    sekolah_service: Annotated[SekolahService, Depends(get_sekolah_service)],
+) -> TiRespondenService:
+    """SEAM: implementasi `TiRespondenService` berbasis PostgreSQL.
+
+    `partisipan_service`/`sekolah_service` disuntik untuk gerbang cabang pada
+    penambahan responden tunggal (backlog `anjab-abk-backend#41`).
+    """
+    return SqlTiRespondenService(session, partisipan_service, sekolah_service)
 
 
 def get_ti_seleksi_service(session: SessionDep) -> TiSeleksiService:

@@ -7,6 +7,35 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diubah
+
+- **Auto-populate responden & koordinator sesi Task Inventory kini menyaring
+  cabang** (backlog #41, lanjutan #37/#40). Sebelumnya `SqlTiSesiService.create()`
+  mencari SME panel hanya lewat `jabatan_id` lalu meng-assign SELURUH anggotanya
+  sebagai responden tanpa menyaring cabang — karena satu panel dipakai kedua
+  cabang, sesi Bandung dan Semarang untuk jabatan yang sama mendapat daftar
+  responden identik (audit produksi 2026-09-08: 7/7 sesi TI tercampur).
+  `assign_ti_responden_banyak()` bertambah parameter `cabang`: partisipan yang
+  cabang sekolahnya diketahui dan berbeda dilewati (`BulkAssignResult.skipped`
+  beralasan baru `beda_cabang`), partisipan bercabang sama atau tidak diketahui
+  tetap masuk ("tidak tahu ≠ salah"). `POST .../sesi/{id}/responden`
+  (single-add) dan `POST .../sesi` (create, termasuk `koordinator_id`)/`PATCH
+  .../sesi/{id}` kini menolak `422` untuk kombinasi cabang yang diketahui dan
+  berbeda.
+- **Pewarisan `koordinator_id` sesi dari `SMEPanelModel.koordinator_id`
+  dihentikan** (backlog #41, keputusan pemilik proses: koordinator ditentukan
+  di sesi, bukan di master data SME panel) — `koordinator_id` kini murni
+  berasal dari payload `POST .../sesi`. `SMEPanelModel.koordinator_id` sendiri
+  **tidak dihapus** dari model maupun DB, hanya berhenti dibaca jalur ini.
+- **Gerbang cabang di atas HANYA berlaku di jalur penambahan** (`create()`/
+  auto-populate) — `mark_tahap1()`, `mark_tahap3()`, `delete()`, dan seluruh
+  `list_*`/`get`/`count_*` tidak disentuh: responden beda cabang yang sudah
+  terdaftar sebelum revisi ini tetap bisa mengisi & submit seperti biasa.
+- Tidak ada migrasi Alembic (skema tidak berubah — `beda_cabang` hanya nilai
+  string baru di field `alasan` yang sudah bertipe `str` bebas). Data existing
+  yang sudah tercampur **tidak** dibersihkan oleh revisi ini (pekerjaan
+  data-ops terpisah, di luar lingkup).
+
 ## [0.45.0] - 2026-09-08
 
 ### Diubah

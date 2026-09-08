@@ -18,13 +18,15 @@ from datetime import UTC
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ...core.services.partisipan import PartisipanService
+from ...core.services.sekolah import SekolahService
 from ...errors import ConflictError, NotFoundError, ValidationAppError
 from ...models import JabatanModel, SMEPanelModel, TiSesiModel, TiSesiTaskTerpilihModel
 from ...schemas.search import Domain, Order
 from ...services.domain import validate_searchable_fields
 from ...services.domain_sql import FieldMap, FieldSpec, compile_domain, order_by_columns
 from ..schemas.sesi import StatusSesi, TiSesiCreate, TiSesiRead, TiSesiUpdate
-from .responden_sql import assign_ti_responden_banyak
+from .responden_sql import _resolve_cabang_partisipan, assign_ti_responden_banyak
 
 # Sumber tunggal whitelist & state machine.
 from .sesi import _ERR_NON_DRAFT, _VALID_TRANSITIONS, SEARCHABLE_FIELDS
@@ -61,8 +63,15 @@ def _to_read(rec: TiSesiModel, jabatan_nama: str | None = None) -> TiSesiRead:
 class SqlTiSesiService:
     """`TiSesiService` berbasis PostgreSQL. Terikat pada satu `Session` per request."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(
+        self,
+        session: Session,
+        partisipan_service: PartisipanService,
+        sekolah_service: SekolahService,
+    ) -> None:
         self._s = session
+        self._par = partisipan_service
+        self._sek = sekolah_service
 
     def _get_model(self, sesi_id: str) -> TiSesiModel:
         rec = self._s.get(TiSesiModel, sesi_id)
@@ -90,6 +99,36 @@ class SqlTiSesiService:
         return _to_read(rec, jab.nama if jab else None)
 
     def create(self, data: TiSesiCreate) -> TiSesiRead:
+        """Buat sesi Task Inventory baru untuk `data.jabatan_id` + `data.cabang`.
+
+        Auto-populate responden (backlog `anjab-abk-backend#41`, lanjutan
+        `#37`/`#40`): anggota SME panel jabatan ini yang cabang sekolahnya
+        **diketahui dan berbeda** dari `data.cabang` dilewati (`skipped`
+        beralasan `beda_cabang`, lihat `assign_ti_responden_banyak`) —
+        anggota bercabang sama atau tidak diketahui tetap masuk ("tidak tahu
+        ≠ salah"). Sesi tanpa `cabang` (`data.cabang is None`) tetap mendapat
+        SELURUH anggota panel seperti perilaku sebelum #41.
+
+        `koordinator_id` **murni dari payload** — pewarisan dari
+        `SMEPanelModel.koordinator_id` (entri Revisi Desain `[2026-07-13]`)
+        **dihentikan** oleh #41; kolom `SMEPanelModel.koordinator_id` sendiri
+        tidak dihapus, hanya berhenti dibaca di jalur ini. Bila
+        `data.koordinator_id` diisi, ditolak (`ValidationAppError`, 422) bila
+        cabang sekolahnya diketahui dan berbeda dari `data.cabang` (keduanya
+        diketahui) — pesan menyebut kedua nilainya.
+
+        Args:
+            data: payload pembuatan sesi (`jabatan_id`, `cabang`,
+                `koordinator_id` opsional, `catatan` opsional).
+
+        Returns:
+            Sesi yang baru dibuat (`status="DRAFT"`).
+
+        Raises:
+            ConflictError: sesi untuk `(jabatan_id, cabang)` ini sudah ada.
+            ValidationAppError: `koordinator_id` bercabang beda dari `cabang`
+                sesi (keduanya diketahui).
+        """
         dup = self._s.scalar(
             select(TiSesiModel.id).where(
                 TiSesiModel.jabatan_id == data.jabatan_id,
@@ -101,25 +140,28 @@ class SqlTiSesiService:
                 f"Sesi untuk jabatan '{data.jabatan_id}' cabang '{data.cabang}' sudah ada."
             )
         # Panel unik per jabatan (SMEPanelModel.jabatan_id unique) → satu lookup,
-        # dua keperluan: mewarisi koordinator (di bawah) + auto-assign anggota
-        # sebagai responden (setelah rec di-flush). Best-effort: panel tidak
-        # ada/kosong → sesi tetap dibuat (tidak error).
+        # dipakai HANYA untuk auto-assign anggota sebagai responden (setelah rec
+        # di-flush). Pewarisan koordinator dari panel DIHENTIKAN (backlog #41) —
+        # koordinator_id murni dari payload, digerbang di bawah. Best-effort:
+        # panel tidak ada/kosong → sesi tetap dibuat (tidak error).
         panel = self._s.scalar(
             select(SMEPanelModel).where(SMEPanelModel.jabatan_id == data.jabatan_id)
         )
 
-        # Payload menang atas panel; panel hanya dipakai bila pemanggil tidak
-        # menentukan koordinator secara eksplisit.
-        koordinator_id = data.koordinator_id
-        if koordinator_id is None and panel is not None:
-            koordinator_id = panel.koordinator_id
+        if data.koordinator_id is not None and data.cabang is not None:
+            kor_cabang = _resolve_cabang_partisipan(self._par, self._sek, data.koordinator_id)
+            if kor_cabang is not None and kor_cabang != data.cabang:
+                raise ValidationAppError(
+                    f"Koordinator bercabang '{kor_cabang}' tidak dapat ditugaskan"
+                    f" ke sesi bercabang '{data.cabang}'."
+                )
 
         rec = TiSesiModel(
             id=f"tises_{uuid.uuid4().hex[:8]}",
             jabatan_id=data.jabatan_id,
             cabang=data.cabang,
             status="DRAFT",
-            koordinator_id=koordinator_id,
+            koordinator_id=data.koordinator_id,
             catatan=data.catatan,
         )
         self._s.add(rec)
@@ -134,18 +176,60 @@ class SqlTiSesiService:
         self._s.flush()
 
         # Auto-populate best-effort: anggota SME panel jabatan ini langsung jadi
-        # responden, tanpa batas atas. Panel tidak ada/kosong → sesi tetap dibuat
-        # kosong (tidak error).
+        # responden, tanpa batas atas, disaring cabang (backlog #41). Panel
+        # tidak ada/kosong → sesi tetap dibuat kosong (tidak error).
         if panel is not None and panel.anggota:
-            assign_ti_responden_banyak(self._s, rec.id, panel.partisipan_ids)
+            assign_ti_responden_banyak(
+                self._s,
+                rec.id,
+                panel.partisipan_ids,
+                cabang=data.cabang,
+                sekolah_service=self._sek,
+            )
         jab = self._s.get(JabatanModel, rec.jabatan_id)
         return _to_read(rec, jab.nama if jab else None)
 
     def update(self, sesi_id: str, data: TiSesiUpdate) -> TiSesiRead:
+        """Perbarui sesi Task Inventory (field apa pun hanya saat `DRAFT`,
+        kecuali `koordinator_id` yang dapat diperbarui kapan pun).
+
+        **Gerbang cabang koordinator** (backlog `anjab-abk-backend#41`): bila
+        payload mengisi `koordinator_id` non-null, ditolak (`ValidationAppError`,
+        422) bila cabang target sesi (`data.cabang` bila ikut diubah pada
+        payload yang sama, selain itu `rec.cabang` saat ini) **diketahui** dan
+        cabang sekolah koordinator (`_resolve_cabang_partisipan`) juga
+        **diketahui** tapi berbeda. Salah satu cabang tidak diketahui →
+        diloloskan ("tidak tahu ≠ salah").
+
+        Args:
+            sesi_id: ID sesi Task Inventory.
+            data: field yang diperbarui (`exclude_unset` — hanya field yang
+                dikirim yang diterapkan).
+
+        Returns:
+            Sesi setelah pembaruan.
+
+        Raises:
+            NotFoundError: `sesi_id` tidak ditemukan.
+            ValidationAppError: sesi bukan `DRAFT` dan ada field selain
+                `koordinator_id` yang diubah; atau `koordinator_id` bercabang
+                beda dari cabang target sesi (keduanya diketahui).
+        """
         rec = self._get_model(sesi_id)
         changes = data.model_dump(exclude_unset=True)
         if rec.status != "DRAFT" and any(k != "koordinator_id" for k in changes):
             raise ValidationAppError("Sesi hanya dapat diperbarui saat berstatus DRAFT.")
+        if "koordinator_id" in changes and changes["koordinator_id"] is not None:
+            target_cabang = changes.get("cabang", rec.cabang)
+            if target_cabang is not None:
+                kor_cabang = _resolve_cabang_partisipan(
+                    self._par, self._sek, changes["koordinator_id"]
+                )
+                if kor_cabang is not None and kor_cabang != target_cabang:
+                    raise ValidationAppError(
+                        f"Koordinator bercabang '{kor_cabang}' tidak dapat ditugaskan"
+                        f" ke sesi bercabang '{target_cabang}'."
+                    )
         for key, value in changes.items():
             setattr(rec, key, value)
         self._s.flush()

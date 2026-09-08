@@ -11,8 +11,10 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ...core.services.partisipan import PartisipanService
+from ...core.services.sekolah import SekolahService
 from ...errors import ConflictError, NotFoundError, ValidationAppError
-from ...models import PartisipanModel, TiRespondenModel
+from ...models import PartisipanModel, TiRespondenModel, TiSesiModel
 from ...schemas.common import BulkAssignResult, BulkSkipped
 from ..schemas.responden import TiRespondenCreate, TiRespondenRead
 
@@ -40,16 +42,77 @@ def _to_read(rec: TiRespondenModel) -> TiRespondenRead:
     )
 
 
+def _resolve_cabang_partisipan(
+    partisipan_service: PartisipanService,
+    sekolah_service: SekolahService,
+    partisipan_id: str,
+) -> str | None:
+    """Cabang seorang partisipan, ditentukan lewat sekolahnya (`schemas/common.py::Cabang`).
+
+    Sumber tunggal cabang partisipan (backlog `anjab-abk-backend#41`) — dibaca lewat
+    seam `core` (`PartisipanService` → `sekolah_id` → `SekolahService` → `cabang`),
+    **bukan** query ORM lintas domain langsung (konvensi `CLAUDE.md` repo ini).
+
+    Mengembalikan `None` ("tidak tahu") bila partisipan atau sekolahnya tidak
+    ditemukan (data inkonsisten lintas domain), **atau** bila `sekolah.cabang`
+    memang `NULL` — kedua kasus diperlakukan sama, sejalan aturan "tidak tahu ≠
+    salah" yang menjaga seluruh gerbang cabang di modul ini tetap longgar untuk
+    data yang belum lengkap. Tidak pernah melempar exception.
+
+    Args:
+        partisipan_service: seam `core` untuk resolusi `sekolah_id` partisipan.
+        sekolah_service: seam `core` untuk resolusi `cabang` sekolah.
+        partisipan_id: ID partisipan yang cabangnya hendak ditentukan.
+
+    Returns:
+        Nilai `Cabang` (`"Bandung"`/`"Semarang"`) bila diketahui, selain itu `None`.
+    """
+    try:
+        partisipan = partisipan_service.get(partisipan_id)
+    except NotFoundError:
+        return None
+    try:
+        sekolah = sekolah_service.get(partisipan.sekolah_id)
+    except NotFoundError:
+        return None
+    return sekolah.cabang
+
+
 def assign_ti_responden_banyak(
     session: Session,
     sesi_id: str,
     partisipan_ids: list[str],
+    *,
+    cabang: str | None = None,
+    sekolah_service: SekolahService | None = None,
 ) -> BulkAssignResult[TiRespondenRead]:
     """Assign banyak partisipan sekaligus sebagai responden Task Inventory.
 
     Dipakai baik oleh auto-populate saat sesi dibuat (`SqlTiSesiService.create()`)
     maupun endpoint bulk manual — **tidak** memvalidasi keanggotaan SME panel;
     pemanggil wajib menyaring `partisipan_ids` sebelum memanggil fungsi ini.
+
+    Penyaringan cabang (backlog `anjab-abk-backend#41`) hanya aktif bila **kedua**
+    `cabang` dan `sekolah_service` diberikan (non-`None`) — dipakai oleh
+    `SqlTiSesiService.create()` untuk auto-populate; endpoint bulk manual
+    (`SqlTiRespondenService.assign_banyak()`) sengaja memanggil fungsi ini TANPA
+    kedua argumen ini, sehingga perilakunya tidak berubah. Saat aktif, partisipan
+    yang cabang sekolahnya **diketahui dan berbeda** dari `cabang` dilewati dengan
+    alasan `beda_cabang` (`sekolah.cabang` `NULL` → "tidak tahu", tetap
+    diloloskan). `sekolah.cabang` dicache per `sekolah_id` dalam satu pemanggilan
+    agar partisipan satu sekolah tidak memicu lookup berulang.
+
+    Args:
+        session: sesi SQLAlchemy aktif (satu per request).
+        sesi_id: ID sesi Task Inventory tujuan.
+        partisipan_ids: daftar ID partisipan yang hendak di-assign.
+        cabang: cabang sesi tujuan; `None` menonaktifkan penyaringan cabang.
+        sekolah_service: seam resolusi cabang sekolah; wajib diisi bersama
+            `cabang` agar penyaringan berjalan.
+
+    Returns:
+        `BulkAssignResult` — baris yang berhasil dibuat + yang dilewati beserta
+        alasannya (`duplikat_input` | `sudah_terdaftar` | `beda_cabang`).
     """
     skipped: list[BulkSkipped] = []
     seen: set[str] = set()
@@ -80,12 +143,28 @@ def assign_ti_responden_banyak(
         ).all()
         par_map = {p.id: p for p in par_rows}
 
+    cabang_filtering = cabang is not None and sekolah_service is not None
+    sekolah_cabang_cache: dict[str, str | None] = {}
+
+    def _cabang_sekolah(sekolah_id: str) -> str | None:
+        if sekolah_id not in sekolah_cabang_cache:
+            try:
+                sekolah_cabang_cache[sekolah_id] = sekolah_service.get(sekolah_id).cabang  # type: ignore[union-attr]
+            except NotFoundError:
+                sekolah_cabang_cache[sekolah_id] = None
+        return sekolah_cabang_cache[sekolah_id]
+
     created: list[TiRespondenRead] = []
     for partisipan_id in candidates:
         if partisipan_id in existing_ids:
             skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="sudah_terdaftar"))
             continue
         par = par_map.get(partisipan_id)
+        if cabang_filtering and par is not None:
+            par_cabang = _cabang_sekolah(par.sekolah_id)
+            if par_cabang is not None and par_cabang != cabang:
+                skipped.append(BulkSkipped(partisipan_id=partisipan_id, alasan="beda_cabang"))
+                continue
         rec = TiRespondenModel(
             id=f"trsp_{uuid.uuid4().hex[:8]}",
             sesi_id=sesi_id,
@@ -104,8 +183,15 @@ def assign_ti_responden_banyak(
 class SqlTiRespondenService:
     """`TiRespondenService` berbasis PostgreSQL. Terikat pada satu `Session` per request."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(
+        self,
+        session: Session,
+        partisipan_service: PartisipanService,
+        sekolah_service: SekolahService,
+    ) -> None:
         self._s = session
+        self._par = partisipan_service
+        self._sek = sekolah_service
 
     def _get_model(self, responden_id: str) -> TiRespondenModel:
         rec = self._s.get(TiRespondenModel, responden_id)
@@ -183,6 +269,16 @@ class SqlTiRespondenService:
         `partisipan_id = NULL` (responden manual tanpa partisipan) TIDAK
         dicek — boleh berulang.
 
+        **Gerbang cabang** (backlog `anjab-abk-backend#41`), diletakkan
+        **setelah** gerbang duplikat di atas agar `409` tetap menang untuk
+        kasus yang sama: menolak (`ValidationAppError`, 422) bila
+        `data.partisipan_id` non-null, sesi ini punya `cabang` yang diketahui,
+        dan cabang sekolah partisipan (`_resolve_cabang_partisipan`) juga
+        diketahui tapi **berbeda** dari cabang sesi. Sesi tanpa `cabang`, atau
+        partisipan yang cabangnya tidak diketahui (sekolah belum diisi
+        `cabang`, atau partisipan/sekolah tidak ditemukan), **diloloskan** —
+        aturan "tidak tahu ≠ salah".
+
         Args:
             sesi_id: ID sesi Task Inventory tujuan.
             data: payload pembuatan responden (`nama`, `partisipan_id` opsional).
@@ -193,6 +289,8 @@ class SqlTiRespondenService:
         Raises:
             ConflictError: `data.partisipan_id` non-null sudah terdaftar sebagai
                 responden pada `sesi_id` ini.
+            ValidationAppError: cabang sekolah partisipan diketahui dan berbeda
+                dari cabang sesi (keduanya diketahui).
         """
         if data.partisipan_id is not None:
             sudah_ada = self._s.scalar(
@@ -205,6 +303,15 @@ class SqlTiRespondenService:
                 raise ConflictError(
                     "Partisipan ini sudah terdaftar sebagai responden pada sesi ini."
                 )
+            sesi_rec = self._s.get(TiSesiModel, sesi_id)
+            sesi_cabang = sesi_rec.cabang if sesi_rec is not None else None
+            if sesi_cabang is not None:
+                par_cabang = _resolve_cabang_partisipan(self._par, self._sek, data.partisipan_id)
+                if par_cabang is not None and par_cabang != sesi_cabang:
+                    raise ValidationAppError(
+                        f"Partisipan bercabang '{par_cabang}' tidak dapat ditambahkan"
+                        f" ke sesi bercabang '{sesi_cabang}'."
+                    )
         rec = TiRespondenModel(
             id=f"trsp_{uuid.uuid4().hex[:8]}",
             sesi_id=sesi_id,

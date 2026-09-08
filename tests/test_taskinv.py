@@ -30,6 +30,22 @@ def _sesi_payload(jabatan_id: str, cabang: str = "Bandung", **over) -> dict:
     return payload
 
 
+def _sesi_svc(db_session):
+    """`SqlTiSesiService` terikat `db_session`, lengkap dengan `PartisipanService`/
+    `SekolahService` (dibutuhkan sejak backlog `anjab-abk-backend#41` untuk gerbang
+    cabang koordinator & penyaringan cabang auto-populate) — helper agar test yang
+    menginstansiasi service secara langsung (bypass HTTP) tidak mengulang boilerplate
+    ketiga argumen di tiap pemanggilan.
+    """
+    from anjab_abk_backend.core.services.partisipan_sql import SqlPartisipanService
+    from anjab_abk_backend.core.services.sekolah_sql import SqlSekolahService
+    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
+
+    return SqlTiSesiService(
+        db_session, SqlPartisipanService(db_session), SqlSekolahService(db_session)
+    )
+
+
 def _catalog_kodes(client: TestClient, jabatan_id: str, n: int) -> list[str]:
     r = client.get(BASE + "/catalog", params={"unit": UNIT, "jabatan_id": jabatan_id})
     assert r.status_code == 200
@@ -1257,7 +1273,6 @@ def test_kuesioner_saya_hanya_sesi_yang_terdaftar(
     from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
     from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
     from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
-    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
     jabatan_x = jabatan_id_tk
     jabatan_y = f"jbt_{uuid.uuid4().hex[:8]}"
@@ -1271,7 +1286,7 @@ def test_kuesioner_saya_hanya_sesi_yang_terdaftar(
     panel_y = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_y))
     sme_svc.add_anggota(panel_y.id, par_lain)
 
-    sesi_svc = SqlTiSesiService(db_session)
+    sesi_svc = _sesi_svc(db_session)
     sesi_x = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_x, cabang="Bandung"))
     sesi_svc.transition(sesi_x.id, "TAHAP1")
     sesi_y = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_y, cabang="Bandung"))
@@ -1319,7 +1334,6 @@ def test_kuesioner_saya_saring_status_nonaktif(
     from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
     from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
     from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
-    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
     par_a = partisipan_factory("ti-status-nonaktif-a", jabatan_utama_id=jabatan_id_tk)
 
@@ -1327,7 +1341,7 @@ def test_kuesioner_saya_saring_status_nonaktif(
     panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_tk))
     sme_svc.add_anggota(panel.id, par_a)
 
-    sesi_svc = SqlTiSesiService(db_session)
+    sesi_svc = _sesi_svc(db_session)
     sesi_draft = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id_tk, cabang="Bandung"))
     assert sesi_draft.status == "DRAFT"
 
@@ -1340,23 +1354,25 @@ def test_kuesioner_saya_saring_status_nonaktif(
 def test_kuesioner_saya_is_koordinator(
     client: TestClient, client_as, partisipan_factory, jabatan_id_tk: str, db_session
 ) -> None:
-    """Koordinator panel tetap melihat sesinya dengan `is_koordinator = true` setelah
-    pengetatan enrollment — ia otomatis ter-enroll sebagai anggota panel (bukan lewat
+    """Koordinator SESI (bukan lagi koordinator panel — pewarisan dari panel
+    dihentikan backlog #41, `koordinator_id` kini murni dari payload) tetap
+    melihat sesinya dengan `is_koordinator = true` setelah pengetatan
+    enrollment — ia otomatis ter-enroll sebagai anggota panel (bukan lewat
     auto-enroll universal yang sudah dihapus)."""
-    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate, SMEPanelUpdate
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
     from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
     from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
-    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
     par_koord = partisipan_factory("ti-koordinator-saya", jabatan_utama_id=jabatan_id_tk)
 
     sme_svc = SqlSMEPanelService(db_session)
     panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_tk))
     sme_svc.add_anggota(panel.id, par_koord)
-    sme_svc.update(panel.id, SMEPanelUpdate(koordinator_id=par_koord))
 
-    sesi_svc = SqlTiSesiService(db_session)
-    sesi = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id_tk, cabang="Bandung"))
+    sesi_svc = _sesi_svc(db_session)
+    sesi = sesi_svc.create(
+        TiSesiCreate(jabatan_id=jabatan_id_tk, cabang="Bandung", koordinator_id=par_koord)
+    )
     assert sesi.koordinator_id == par_koord
     sesi_svc.transition(sesi.id, "TAHAP1")
 
@@ -1450,9 +1466,8 @@ def test_responden_sme_panel_check(client: TestClient, db_session) -> None:
     # manual di bawah ini benar-benar jadi pendaftaran PERTAMA-nya (bukan duplikat
     # atas auto-populate, yang sejak backlog #29 ditolak 409).
     from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
-    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
-    sesi_svc = SqlTiSesiService(db_session)
+    sesi_svc = _sesi_svc(db_session)
     sesi_obj = sesi_svc.create(
         TiSesiCreate(
             jabatan_id=jabatan_id,
@@ -1487,10 +1502,9 @@ def test_responden_tanpa_jabatan_id_bebas(
 
     # Buat jabatan baru tanpa SME panel
     from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
-    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
     jabatan_baru_id = f"jbt_{uuid.uuid4().hex[:8]}"
-    sesi_svc = SqlTiSesiService(db_session)
+    sesi_svc = _sesi_svc(db_session)
     sesi_obj = sesi_svc.create(
         TiSesiCreate(
             jabatan_id=jabatan_baru_id,
@@ -1595,7 +1609,9 @@ def test_create_sesi_panel_tanpa_anggota_tetap_kosong(
 
 
 # --------------------------------------------------------------------------- #
-# Item 008: koordinator_id sesi diwarisi dari SmePanel.koordinator_id
+# Item 008 (dicabut backlog #41): koordinator_id sesi TIDAK LAGI diwarisi dari
+# SmePanel.koordinator_id — koordinator kini murni ditentukan di sesi (payload),
+# bukan di master data SME panel (keputusan pemilik proses, backlog #41).
 # --------------------------------------------------------------------------- #
 
 
@@ -1624,25 +1640,30 @@ def _setup_panel_dengan_koordinator(client: TestClient, jabatan_id: str) -> tupl
     return panel_id, par_id
 
 
-def test_create_sesi_mewarisi_koordinator_dari_panel(
+def test_create_sesi_tidak_lagi_mewarisi_koordinator_dari_panel(
     client: TestClient, jabatan_id_tk: str
 ) -> None:
-    """Panel punya koordinator; sesi dibuat tanpa `koordinator_id` di payload →
-    koordinator diwarisi dari panel."""
-    _panel_id, koordinator_id = _setup_panel_dengan_koordinator(client, jabatan_id_tk)
+    """Backlog #41: pewarisan koordinator dari `SMEPanelModel.koordinator_id`
+    DIHENTIKAN. Panel punya koordinator; sesi dibuat tanpa `koordinator_id` di
+    payload → `koordinator_id` sesi tetap `null` (BUKAN lagi diwarisi dari panel).
+    `SMEPanelModel.koordinator_id` sendiri tidak dihapus — hanya berhenti dibaca
+    jalur ini (diverifikasi terpisah lewat `_setup_panel_dengan_koordinator` yang
+    tetap berhasil men-`PATCH` koordinator panel)."""
+    _panel_id, koordinator_panel = _setup_panel_dengan_koordinator(client, jabatan_id_tk)
     sesi = _create_sesi(client, jabatan_id_tk)
-    assert sesi["koordinator_id"] == koordinator_id
+    assert sesi["koordinator_id"] is None
+    assert sesi["koordinator_id"] != koordinator_panel
 
 
 def test_create_sesi_koordinator_payload_menang_atas_panel(
     client: TestClient, jabatan_id_tk: str
 ) -> None:
-    """Payload mengirim `koordinator_id` eksplisit → nilai payload dipakai, TIDAK ditimpa
-    koordinator panel."""
+    """Payload mengirim `koordinator_id` eksplisit (cabang sama dengan sekolah
+    partisipan) → nilai payload dipakai — panel tidak lagi pernah dikonsultasikan
+    sejak backlog #41, jadi ini murni menegaskan payload diterima apa adanya."""
     _panel_id, koordinator_panel = _setup_panel_dengan_koordinator(client, jabatan_id_tk)
-    sesi = _create_sesi(client, jabatan_id_tk, koordinator_id="p_koordinator_lain")
-    assert sesi["koordinator_id"] == "p_koordinator_lain"
-    assert sesi["koordinator_id"] != koordinator_panel
+    sesi = _create_sesi(client, jabatan_id_tk, koordinator_id=koordinator_panel)
+    assert sesi["koordinator_id"] == koordinator_panel
 
 
 def test_create_sesi_panel_tanpa_koordinator_tetap_none(
@@ -1661,6 +1682,262 @@ def test_create_sesi_tanpa_panel_koordinator_none(client: TestClient, jabatan_id
     tidak error."""
     sesi = _create_sesi(client, jabatan_id_tk)
     assert sesi["koordinator_id"] is None
+
+
+# --------------------------------------------------------------------------- #
+# Backlog #41: penyaringan cabang responden/koordinator sesi Task Inventory
+# --------------------------------------------------------------------------- #
+
+
+def _sekolah(client: TestClient, cabang: str | None = None, **over) -> str:
+    """Buat sekolah baru (opsional dengan `cabang`); kembalikan `sekolah_id`."""
+    npsn = str(uuid.uuid4().int)[:8]
+    payload = {
+        "nama": f"SD Cabang Test {npsn}",
+        "npsn": npsn,
+        "jenjang_pendidikan_id": "jp_dummy_cabang",
+        "cabang": cabang,
+    }
+    payload.update(over)
+    r = client.post("/api/v1/sekolah", json=payload)
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+def _partisipan_di_sekolah(client: TestClient, jabatan_id: str, sekolah_id: str, **over) -> str:
+    """Buat partisipan baru terikat `sekolah_id` (sumber tunggal cabangnya, backlog
+    `anjab-abk-backend#40`); kembalikan `partisipan_id`."""
+    payload = {
+        "nama": f"TI Cabang {uuid.uuid4().hex[:4]}",
+        "email": f"ti.cabang.{uuid.uuid4().hex[:6]}@test.id",
+        "sekolah_id": sekolah_id,
+        "jabatan_utama_id": jabatan_id,
+        "masa_kerja_tahun": 1,
+    }
+    payload.update(over)
+    r = client.post(PAR_BASE, json=payload)
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+def test_create_sesi_panel_campur_cabang_hanya_dapat_responden_sama_cabang(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Panel berisi anggota Bandung + Semarang + sekolah tanpa cabang; sesi cabang
+    Bandung hanya mendapat responden Bandung DAN yang cabangnya tidak diketahui
+    ("tidak tahu ≠ salah") — anggota Semarang TIDAK ikut ter-assign."""
+    skl_bdg = _sekolah(client, cabang="Bandung")
+    skl_smg = _sekolah(client, cabang="Semarang")
+    skl_none = _sekolah(client, cabang=None)
+
+    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id_tk})
+    assert r.status_code == 201, r.text
+    panel_id = r.json()["id"]
+
+    par_bdg = _partisipan_di_sekolah(client, jabatan_id_tk, skl_bdg)
+    par_smg = _partisipan_di_sekolah(client, jabatan_id_tk, skl_smg)
+    par_none = _partisipan_di_sekolah(client, jabatan_id_tk, skl_none)
+    for pid in (par_bdg, par_smg, par_none):
+        r2 = client.post(f"{SME_BASE}/{panel_id}/anggota", json={"partisipan_id": pid})
+        assert r2.status_code == 200, r2.text
+
+    sesi = _create_sesi(client, jabatan_id_tk, cabang="Bandung")
+    r = client.get(f"{SESI}/{sesi['id']}/responden")
+    assert r.status_code == 200, r.text
+    ids = {row["partisipan_id"] for row in r.json()["items"]}
+    assert ids == {par_bdg, par_none}
+    assert par_smg not in ids
+
+
+def test_assign_ti_responden_banyak_tanpa_cabang_tidak_menyaring(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    """`assign_ti_responden_banyak(..., cabang=None)` — jalur dipakai bila sesi
+    TIDAK punya `cabang` (baris lama pra-#37 pada produksi) — tidak menyaring
+    partisipan sama sekali, identik dengan perilaku sebelum backlog #41."""
+    from anjab_abk_backend.core.services.sekolah_sql import SqlSekolahService
+    from anjab_abk_backend.taskinv.services.responden_sql import assign_ti_responden_banyak
+
+    skl_bdg = _sekolah(client, cabang="Bandung")
+    skl_smg = _sekolah(client, cabang="Semarang")
+    par_bdg = _partisipan_di_sekolah(client, jabatan_id_tk, skl_bdg)
+    par_smg = _partisipan_di_sekolah(client, jabatan_id_tk, skl_smg)
+
+    sesi = _create_sesi(client, jabatan_id_tk, cabang="Bandung")
+    sekolah_svc = SqlSekolahService(db_session)
+    result = assign_ti_responden_banyak(
+        db_session, sesi["id"], [par_bdg, par_smg], cabang=None, sekolah_service=sekolah_svc
+    )
+    assert {r.partisipan_id for r in result.created} == {par_bdg, par_smg}
+    assert result.skipped == []
+
+
+def test_assign_ti_responden_banyak_beda_cabang_dilewati_dengan_alasan(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    """`BulkAssignResult.skipped` melaporkan alasan `beda_cabang` (bukan diam-diam
+    dibuang) untuk partisipan yang cabang sekolahnya diketahui berbeda; partisipan
+    bercabang sama atau tidak diketahui tetap masuk `created`."""
+    from anjab_abk_backend.core.services.sekolah_sql import SqlSekolahService
+    from anjab_abk_backend.taskinv.services.responden_sql import assign_ti_responden_banyak
+
+    skl_bdg = _sekolah(client, cabang="Bandung")
+    skl_smg = _sekolah(client, cabang="Semarang")
+    skl_none = _sekolah(client, cabang=None)
+    par_bdg = _partisipan_di_sekolah(client, jabatan_id_tk, skl_bdg)
+    par_smg = _partisipan_di_sekolah(client, jabatan_id_tk, skl_smg)
+    par_none = _partisipan_di_sekolah(client, jabatan_id_tk, skl_none)
+
+    sesi = _create_sesi(client, jabatan_id_tk, cabang="Bandung")
+    sekolah_svc = SqlSekolahService(db_session)
+    result = assign_ti_responden_banyak(
+        db_session,
+        sesi["id"],
+        [par_bdg, par_smg, par_none],
+        cabang="Bandung",
+        sekolah_service=sekolah_svc,
+    )
+    assert {r.partisipan_id for r in result.created} == {par_bdg, par_none}
+    skipped_map = {s.partisipan_id: s.alasan for s in result.skipped}
+    assert skipped_map == {par_smg: "beda_cabang"}
+
+
+def test_responden_beda_cabang_existing_tetap_bisa_submit_tahap1_dan_tahap3(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    """Regresi kunci backlog #41: gerbang cabang HANYA di jalur penambahan
+    (`create()`/auto-populate) — `mark_tahap1()`/`mark_tahap3()` sama sekali
+    tidak disentuh. Responden beda cabang yang SUDAH terdaftar (disimulasikan
+    lewat INSERT langsung, melewati gerbang single-add — merepresentasikan
+    baris existing produksi dari sebelum gerbang ini dipasang) tetap bisa
+    mengisi & submit Tahap 1 dan Tahap 3 sampai tuntas."""
+    from anjab_abk_backend.models import TiRespondenModel
+
+    skl_smg = _sekolah(client, cabang="Semarang")
+    par_smg = _partisipan_di_sekolah(client, jabatan_id_tk, skl_smg)
+
+    sesi = _create_sesi(client, jabatan_id_tk, cabang="Bandung")
+    sid = sesi["id"]
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+
+    rec = TiRespondenModel(
+        id=f"trsp_{uuid.uuid4().hex[:8]}",
+        sesi_id=sid,
+        nama="Regresi Beda Cabang",
+        partisipan_id=par_smg,
+        tahap1_submit=False,
+        tahap3_submit=False,
+    )
+    db_session.add(rec)
+    db_session.flush()
+
+    _seleksi_submit(client, rec.id, [kodes[0]])
+
+    r2 = client.post(f"{SESI}/{sid}/mulai-tahap2")
+    assert r2.status_code == 200, r2.text
+    r3 = client.post(f"{SESI}/{sid}/mulai-tahap3")
+    assert r3.status_code == 200, r3.text
+    assert r3.json()["jumlah_task_terpilih"] == 1
+
+    detail = {
+        "task_kode": kodes[0],
+        "sumber_bukti": "Aktual",
+        "kondisi": "Baseline",
+        "frekuensi_teks": "Mingguan",
+        "durasi_per_kali": 60,
+        "jam_per_minggu": 3.0,
+        "peak4w_hours": 0,
+        "va_type": "VA-Core",
+    }
+    _detail_submit(client, rec.id, [detail])
+
+    r = client.get(f"{SESI}/{sid}/responden")
+    row = next(x for x in r.json()["items"] if x["id"] == rec.id)
+    assert row["tahap1_submit"] is True
+    assert row["tahap3_submit"] is True
+
+
+def test_add_responden_beda_cabang_ditolak_422(client: TestClient, jabatan_id_tk: str) -> None:
+    """`POST .../sesi/{id}/responden` untuk partisipan bercabang sekolah berbeda
+    dari cabang sesi → `422`, pesan menyebut kedua cabang."""
+    skl_smg = _sekolah(client, cabang="Semarang")
+    par_smg = _partisipan_di_sekolah(client, jabatan_id_tk, skl_smg)
+    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id_tk})
+    assert r.status_code == 201, r.text
+    r2 = client.post(f"{SME_BASE}/{r.json()['id']}/anggota", json={"partisipan_id": par_smg})
+    assert r2.status_code == 200, r2.text
+
+    sesi = _create_sesi(client, jabatan_id_tk, cabang="Bandung")
+    r3 = client.post(f"{SESI}/{sesi['id']}/responden", json={"partisipan_id": par_smg})
+    assert r3.status_code == 422, r3.text
+    msg = r3.json()["message"]
+    assert "Bandung" in msg
+    assert "Semarang" in msg
+
+
+def test_add_responden_sama_cabang_diterima(client: TestClient, jabatan_id_tk: str) -> None:
+    """Partisipan bercabang sekolah SAMA dengan cabang sesi → tetap `201`.
+
+    Panel dibuat KOSONG dulu, sesi dibuat (auto-populate tidak mendapat apa
+    pun), baru `par_bdg` ditambahkan ke panel — urutan ini sengaja mencegah
+    auto-populate lebih dulu mendaftarkan `par_bdg` sehingga single-add di
+    bawah tidak bentrok dengan gerbang `409` "sudah terdaftar" (backlog #29)
+    yang tidak berkaitan dengan gerbang cabang yang sedang diuji di sini."""
+    skl_bdg = _sekolah(client, cabang="Bandung")
+    par_bdg = _partisipan_di_sekolah(client, jabatan_id_tk, skl_bdg)
+    r = client.post(SME_BASE, json={"jabatan_id": jabatan_id_tk})
+    assert r.status_code == 201, r.text
+    panel_id = r.json()["id"]
+
+    sesi = _create_sesi(client, jabatan_id_tk, cabang="Bandung")
+
+    r2 = client.post(f"{SME_BASE}/{panel_id}/anggota", json={"partisipan_id": par_bdg})
+    assert r2.status_code == 200, r2.text
+    r3 = client.post(f"{SESI}/{sesi['id']}/responden", json={"partisipan_id": par_bdg})
+    assert r3.status_code == 201, r3.text
+
+
+def test_create_sesi_koordinator_beda_cabang_ditolak_422(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """`POST .../sesi` dengan `koordinator_id` bercabang beda dari `cabang` sesi
+    → `422`, pesan menyebut kedua cabang."""
+    skl_smg = _sekolah(client, cabang="Semarang")
+    kor_smg = _partisipan_di_sekolah(client, jabatan_id_tk, skl_smg)
+    payload = _sesi_payload(jabatan_id_tk, cabang="Bandung", koordinator_id=kor_smg)
+    r = client.post(SESI, json=payload)
+    assert r.status_code == 422, r.text
+    msg = r.json()["message"]
+    assert "Bandung" in msg
+    assert "Semarang" in msg
+
+
+def test_create_sesi_koordinator_sama_cabang_diterima(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """`koordinator_id` bercabang SAMA dengan `cabang` sesi → sesi tetap terbuat
+    dengan koordinator itu."""
+    skl_bdg = _sekolah(client, cabang="Bandung")
+    kor_bdg = _partisipan_di_sekolah(client, jabatan_id_tk, skl_bdg)
+    sesi = _create_sesi(client, jabatan_id_tk, cabang="Bandung", koordinator_id=kor_bdg)
+    assert sesi["koordinator_id"] == kor_bdg
+
+
+def test_patch_koordinator_beda_cabang_saat_draft_ditolak_422(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """`PATCH .../sesi/{id}` dengan `koordinator_id` bercabang beda dari cabang
+    sesi saat `DRAFT` → `422`, pesan menyebut kedua cabang."""
+    skl_smg = _sekolah(client, cabang="Semarang")
+    kor_smg = _partisipan_di_sekolah(client, jabatan_id_tk, skl_smg)
+    sesi = _create_sesi(client, jabatan_id_tk, cabang="Bandung")
+    assert sesi["status"] == "DRAFT"
+    r = client.patch(f"{SESI}/{sesi['id']}", json={"koordinator_id": kor_smg})
+    assert r.status_code == 422, r.text
+    msg = r.json()["message"]
+    assert "Bandung" in msg
+    assert "Semarang" in msg
 
 
 def test_responden_bulk_happy_path(client: TestClient, jabatan_id_tk: str) -> None:
@@ -1818,7 +2095,6 @@ def test_get_responden_forbidden_for_non_owner(
     from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
     from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
     from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
-    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
     jabatan_id = f"jbt_{uuid.uuid4().hex[:8]}"
     par_a = partisipan_factory("ti-bola-a", jabatan_utama_id=jabatan_id)
@@ -1829,7 +2105,7 @@ def test_get_responden_forbidden_for_non_owner(
     sme_svc.add_anggota(panel.id, par_a)
     sme_svc.add_anggota(panel.id, par_b)
 
-    sesi_svc = SqlTiSesiService(db_session)
+    sesi_svc = _sesi_svc(db_session)
     sesi_obj = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id, cabang="Bandung"))
     # par_a/par_b sudah anggota panel SEBELUM sesi dibuat → auto-populate
     # (`SqlTiSesiService.create()`) sudah mendaftarkan keduanya sebagai responden;
@@ -2005,7 +2281,6 @@ def test_get_sesi_peserta_boleh(
     from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
     from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
     from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
-    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
     jabatan_id = f"jbt_{uuid.uuid4().hex[:8]}"
     par_a = partisipan_factory("ti-akses-peserta", jabatan_utama_id=jabatan_id)
@@ -2014,7 +2289,7 @@ def test_get_sesi_peserta_boleh(
     panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id))
     sme_svc.add_anggota(panel.id, par_a)
 
-    sesi_svc = SqlTiSesiService(db_session)
+    sesi_svc = _sesi_svc(db_session)
     sesi_obj = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id, cabang="Bandung"))
     # auto-populate dari panel: par_a otomatis jadi responden sesi ini.
 
@@ -2029,7 +2304,6 @@ def test_get_sesi_bukan_peserta_403(
     from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
     from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
     from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
-    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
     jabatan_id_x = f"jbt_{uuid.uuid4().hex[:8]}"
     jabatan_id_y = f"jbt_{uuid.uuid4().hex[:8]}"
@@ -2040,7 +2314,7 @@ def test_get_sesi_bukan_peserta_403(
     panel_y = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_y))
     sme_svc.add_anggota(panel_y.id, par_y)
 
-    sesi_svc = SqlTiSesiService(db_session)
+    sesi_svc = _sesi_svc(db_session)
     sesi_x = sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id_x, cabang="Bandung"))
     sesi_svc.create(TiSesiCreate(jabatan_id=jabatan_id_y, cabang="Bandung"))
 
@@ -2054,7 +2328,6 @@ def test_get_tahap2_koordinator_boleh(
     client: TestClient, client_as, partisipan_factory, jabatan_id_tk: str, db_session
 ) -> None:
     from anjab_abk_backend.taskinv.schemas.sesi import TiSesiCreate
-    from anjab_abk_backend.taskinv.services.sesi_sql import SqlTiSesiService
 
     koordinator_id = partisipan_factory("ti-koord-tahap2", jabatan_utama_id=jabatan_id_tk)
 
@@ -2062,7 +2335,7 @@ def test_get_tahap2_koordinator_boleh(
     # tidak menerima `koordinator_id` tanpa SME panel) — `db_session` di sini adalah
     # sesi TRANSAKSI YANG SAMA yang dipakai `client`/`client_as` (lihat fixture `app`
     # di conftest.py, `get_session` di-override ke `db_session`).
-    sesi_obj = SqlTiSesiService(db_session).create(
+    sesi_obj = _sesi_svc(db_session).create(
         TiSesiCreate(
             jabatan_id=jabatan_id_tk,
             cabang="Bandung",

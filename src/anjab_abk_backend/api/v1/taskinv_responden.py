@@ -89,7 +89,10 @@ def list_responden(
         },
         422: {
             "model": ErrorResponse,
-            "description": "Partisipan bukan anggota SME panel jabatan sesi ini.",
+            "description": (
+                "Partisipan bukan anggota SME panel jabatan sesi ini, atau cabang"
+                " sekolah partisipan berbeda dari cabang sesi."
+            ),
         },
     },
 )
@@ -102,11 +105,15 @@ def create_responden(
 ) -> TiRespondenRead:
     """Daftarkan satu responden ke sesi Task Inventory `sesi_id` (admin).
 
-    Menolak `422` bila sesi bukan `DRAFT`/`TAHAP1`, atau bila `payload.partisipan_id`
-    diisi tapi bukan anggota SME panel jabatan sesi ini. Menolak `409` bila
-    `payload.partisipan_id` non-null sudah terdaftar sebagai responden di sesi ini
-    (`SqlTiRespondenService.create()`, backlog `anjab-abk-backend#29`) —
-    `partisipan_id` kosong (responden manual tanpa partisipan) boleh berulang.
+    Menolak `422` bila sesi bukan `DRAFT`/`TAHAP1`, bila `payload.partisipan_id`
+    diisi tapi bukan anggota SME panel jabatan sesi ini, atau bila cabang sekolah
+    partisipan diketahui dan berbeda dari cabang sesi
+    (`SqlTiRespondenService.create()`, backlog `anjab-abk-backend#41` — "tidak
+    tahu ≠ salah": cabang sesi/partisipan yang tidak diketahui diloloskan).
+    Menolak `409` bila `payload.partisipan_id` non-null sudah terdaftar sebagai
+    responden di sesi ini (`SqlTiRespondenService.create()`, backlog
+    `anjab-abk-backend#29`) — `partisipan_id` kosong (responden manual tanpa
+    partisipan) boleh berulang.
     """
     sesi = sesi_service.get(sesi_id)
     if sesi.status not in ("DRAFT", "TAHAP1"):

@@ -85,6 +85,10 @@ def list_sesi(
         **_RATE,
         **_FORBIDDEN,
         409: {"model": ErrorResponse, "description": "Sesi untuk jabatan+cabang sudah ada."},
+        422: {
+            "model": ErrorResponse,
+            "description": "Koordinator bercabang berbeda dari cabang sesi.",
+        },
     },
 )
 def create_sesi(
@@ -173,7 +177,19 @@ def get_sesi(
     summary="Perbarui sesi Task Inventory (hanya saat DRAFT) (admin)",
     operation_id="taskinv_sesi_update",
     dependencies=_ADMIN_GUARDS,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOT_FOUND,
+        422: {
+            "model": ErrorResponse,
+            "description": (
+                "Sesi bukan DRAFT dengan perubahan selain koordinator, atau koordinator"
+                " bercabang berbeda dari cabang sesi."
+            ),
+        },
+    },
 )
 def update_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi.")],

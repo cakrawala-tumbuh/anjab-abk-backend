@@ -44,7 +44,10 @@ class BulkSkipped(BaseModel):
     alasan: str = Field(
         description=(
             "Kode alasan dilewati: 'sudah_terdaftar' | 'duplikat_input' |"
-            " 'bukan_anggota_sme_panel' | 'kapasitas_penuh'."
+            " 'bukan_anggota_sme_panel' | 'kapasitas_penuh' | 'beda_cabang'"
+            " (backlog `anjab-abk-backend#41` — partisipan bercabang sekolah"
+            " berbeda dari cabang sesi; hanya dipakai auto-populate responden"
+            " sesi Task Inventory)."
         ),
         examples=["sudah_terdaftar"],
     )
