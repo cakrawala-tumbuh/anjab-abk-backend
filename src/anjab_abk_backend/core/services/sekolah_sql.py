@@ -33,6 +33,7 @@ def _field_map() -> FieldMap:
         "jenjang_pendidikan_id": FieldSpec(column=m.jenjang_pendidikan_id),
         "kota": FieldSpec(column=m.kota),
         "provinsi": FieldSpec(column=m.provinsi),
+        "cabang": FieldSpec(column=m.cabang),
         "aktif": FieldSpec(column=m.aktif),
         "created_at": FieldSpec(column=m.created_at, order_column=m.created_at),
     }
@@ -49,6 +50,7 @@ def _to_read(rec: SekolahModel) -> SekolahRead:
         jenjang_pendidikan_id=rec.jenjang_pendidikan_id,
         kota=rec.kota,
         provinsi=rec.provinsi,
+        cabang=rec.cabang,
         aktif=rec.aktif,
         created_at=created,
     )
@@ -94,6 +96,7 @@ class SqlSekolahService:
             jenjang_pendidikan_id=data.jenjang_pendidikan_id,
             kota=data.kota,
             provinsi=data.provinsi,
+            cabang=data.cabang,
             aktif=data.aktif,
         )
         self._s.add(rec)

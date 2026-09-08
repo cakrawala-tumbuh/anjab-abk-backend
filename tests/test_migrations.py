@@ -29,6 +29,10 @@ Yang dijamin:
    dari `ti_sesi.cabang` sumber, backlog `#37`) TIDAK mengurangi baris `opm_sesi`/
    `opm_responden`/`opm_jawaban`, idempoten, dan tidak menimpa `cabang` yang sudah
    terisi.
+10. ``test_sekolah_cabang_*`` — revisi DDL `3ae579a1e435` (tambah `sekolah.cabang`)
+    + revisi data `dd4050714517` (backfill `cabang` dari `sekolah.provinsi`:
+    Jawa Barat->Bandung, Jawa Tengah->Semarang, provinsi lain dibiarkan `NULL`,
+    backlog `#40`) idempoten dan tidak menimpa `cabang` yang sudah terisi.
 
 Test berbasis-DB membangun **database sekali-pakai** terpisah dari DB test utama agar
 tidak mengganggu fixtur ``engine`` (yang sudah di-seed). Database itu dibuat & dihapus
@@ -1023,3 +1027,118 @@ def test_opm_sesi_cabang_database_kosong_tanpa_error(fresh_db_url: str) -> None:
     upgrade(fresh_db_url, _OPM_CABANG_DDL_REVISION)
     upgrade(fresh_db_url, "head")
     downgrade(fresh_db_url, _OPM_CABANG_DDL_REVISION)
+
+
+# --------------------------------------------------------------------------- #
+# backlog #40 — sekolah.cabang: DDL `3ae579a1e435` + backfill `dd4050714517`
+# --------------------------------------------------------------------------- #
+
+_SEKOLAH_CABANG_DDL_REVISION = "3ae579a1e435"
+
+
+def _insert_sekolah_mig(conn, *, sekolah_id: str, provinsi: str | None, cabang: str | None) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO sekolah "
+            "(id, nama, jenjang_pendidikan_id, provinsi, cabang, aktif, created_at) "
+            "VALUES (:id, 'Sekolah Migrasi', 'jp_mig_x', :provinsi, :cabang, true, now())"
+        ),
+        {"id": sekolah_id, "provinsi": provinsi, "cabang": cabang},
+    )
+
+
+def _baca_cabang_sekolah(engine, sekolah_id: str) -> str | None:
+    with engine.connect() as conn:
+        return conn.execute(
+            text("SELECT cabang FROM sekolah WHERE id = :id"), {"id": sekolah_id}
+        ).scalar_one()
+
+
+def test_sekolah_cabang_upgrade_backfill_dari_provinsi(fresh_db_url: str) -> None:
+    """Revisi `dd4050714517`: `provinsi='Jawa Barat'`->`cabang='Bandung'`,
+    `provinsi='Jawa Tengah'`->`cabang='Semarang'`; provinsi lain (mis. Bali) tetap
+    `NULL` — tidak ditebak."""
+    upgrade(fresh_db_url, _SEKOLAH_CABANG_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            _insert_sekolah_mig(conn, sekolah_id="skl_mig01", provinsi="Jawa Barat", cabang=None)
+            _insert_sekolah_mig(conn, sekolah_id="skl_mig02", provinsi="Jawa Tengah", cabang=None)
+            _insert_sekolah_mig(conn, sekolah_id="skl_mig03", provinsi="Bali", cabang=None)
+
+        upgrade(fresh_db_url, "head")
+
+        assert _baca_cabang_sekolah(engine, "skl_mig01") == "Bandung"
+        assert _baca_cabang_sekolah(engine, "skl_mig02") == "Semarang"
+        assert _baca_cabang_sekolah(engine, "skl_mig03") is None
+    finally:
+        engine.dispose()
+
+
+def test_sekolah_cabang_tidak_menimpa_yang_sudah_terisi(fresh_db_url: str) -> None:
+    """Baris `sekolah.cabang` yang SUDAH terisi (mis. diisi manual lewat API) tidak
+    ditimpa, meski `provinsi`-nya cocok dengan pemetaan."""
+    upgrade(fresh_db_url, _SEKOLAH_CABANG_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            _insert_sekolah_mig(
+                conn, sekolah_id="skl_mig04", provinsi="Jawa Barat", cabang="Semarang"
+            )
+
+        upgrade(fresh_db_url, "head")
+
+        assert _baca_cabang_sekolah(engine, "skl_mig04") == "Semarang"
+    finally:
+        engine.dispose()
+
+
+def test_sekolah_cabang_downgrade_lalu_upgrade_ulang_idempoten(fresh_db_url: str) -> None:
+    """`downgrade()` mengosongkan kembali HANYA baris yang nilainya masih persis sama
+    dengan hasil pemetaan provinsi->cabang; `upgrade()` berikutnya membackfill nilai
+    yang sama lagi — aman dijalankan berulang (roundtrip)."""
+    upgrade(fresh_db_url, _SEKOLAH_CABANG_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            _insert_sekolah_mig(conn, sekolah_id="skl_mig05", provinsi="Jawa Barat", cabang=None)
+
+        upgrade(fresh_db_url, "head")
+        assert _baca_cabang_sekolah(engine, "skl_mig05") == "Bandung"
+
+        downgrade(fresh_db_url, _SEKOLAH_CABANG_DDL_REVISION)
+        assert _baca_cabang_sekolah(engine, "skl_mig05") is None
+
+        upgrade(fresh_db_url, "head")
+        assert _baca_cabang_sekolah(engine, "skl_mig05") == "Bandung"
+    finally:
+        engine.dispose()
+
+
+def test_sekolah_cabang_downgrade_tidak_menimpa_yang_diubah_manual(fresh_db_url: str) -> None:
+    """`downgrade()` TIDAK mengosongkan baris yang nilainya sudah diubah manual setelah
+    migrasi berjalan (nilainya kini tidak lagi persis sama dengan hasil backfill)."""
+    upgrade(fresh_db_url, _SEKOLAH_CABANG_DDL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            _insert_sekolah_mig(conn, sekolah_id="skl_mig06", provinsi="Jawa Barat", cabang=None)
+
+        upgrade(fresh_db_url, "head")
+        assert _baca_cabang_sekolah(engine, "skl_mig06") == "Bandung"
+
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE sekolah SET cabang = 'Semarang' WHERE id = 'skl_mig06'"))
+
+        downgrade(fresh_db_url, _SEKOLAH_CABANG_DDL_REVISION)
+        assert _baca_cabang_sekolah(engine, "skl_mig06") == "Semarang"
+    finally:
+        engine.dispose()
+
+
+def test_sekolah_cabang_database_kosong_tanpa_error(fresh_db_url: str) -> None:
+    """Upgrade & downgrade revisi `dd4050714517` pada database TANPA baris `sekolah`
+    manapun selesai tanpa error (0 baris terpengaruh)."""
+    upgrade(fresh_db_url, _SEKOLAH_CABANG_DDL_REVISION)
+    upgrade(fresh_db_url, "head")
+    downgrade(fresh_db_url, _SEKOLAH_CABANG_DDL_REVISION)

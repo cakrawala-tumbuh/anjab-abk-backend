@@ -6,6 +6,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ...schemas.common import Cabang
+
 
 class SekolahCreate(BaseModel):
     """Payload pembuatan sekolah / satuan pendidikan."""
@@ -42,6 +44,15 @@ class SekolahCreate(BaseModel):
         description="Provinsi lokasi sekolah.",
         examples=["Jawa Barat"],
     )
+    cabang: Cabang | None = Field(
+        default=None,
+        description=(
+            "Cabang lokasi sekolah — penanda cabang bagi partisipan sekolah ini "
+            "(lewat `partisipan.sekolah_id`). `null` bila belum diketahui; nilai di "
+            "luar Bandung/Semarang ditolak (422)."
+        ),
+        examples=["Bandung"],
+    )
     aktif: bool = Field(default=True, description="Status aktif sekolah.")
 
 
@@ -63,6 +74,7 @@ class SekolahUpdate(BaseModel):
     )
     kota: str | None = Field(default=None, max_length=100, description="Kota baru.")
     provinsi: str | None = Field(default=None, max_length=100, description="Provinsi baru.")
+    cabang: Cabang | None = Field(default=None, description="Cabang lokasi sekolah baru.")
     aktif: bool | None = Field(default=None, description="Status aktif baru.")
 
 
@@ -77,5 +89,6 @@ class SekolahRead(BaseModel):
     jenjang_pendidikan_id: str = Field(description="ID jenjang pendidikan.")
     kota: str | None = Field(default=None, description="Kota.")
     provinsi: str | None = Field(default=None, description="Provinsi.")
+    cabang: Cabang | None = Field(default=None, description="Cabang lokasi sekolah.")
     aktif: bool = Field(description="Status aktif.")
     created_at: datetime = Field(description="Waktu pembuatan (UTC, ISO-8601).")

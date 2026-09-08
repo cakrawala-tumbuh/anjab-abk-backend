@@ -19,7 +19,17 @@ from ...services.domain import run_search, validate_searchable_fields
 from ..schemas.sekolah import SekolahCreate, SekolahRead, SekolahUpdate
 
 SEARCHABLE_FIELDS = frozenset(
-    {"id", "nama", "npsn", "jenjang_pendidikan_id", "kota", "provinsi", "aktif", "created_at"}
+    {
+        "id",
+        "nama",
+        "npsn",
+        "jenjang_pendidikan_id",
+        "kota",
+        "provinsi",
+        "cabang",
+        "aktif",
+        "created_at",
+    }
 )
 
 
@@ -45,6 +55,7 @@ class _Record:
     npsn: str | None = None
     kota: str | None = None
     provinsi: str | None = None
+    cabang: str | None = None
     aktif: bool = True
 
 
@@ -83,6 +94,7 @@ class InMemorySekolahService:
                 jenjang_pendidikan_id=data.jenjang_pendidikan_id,
                 kota=data.kota,
                 provinsi=data.provinsi,
+                cabang=data.cabang,
                 aktif=data.aktif,
                 created_at=datetime.now(UTC),
             )

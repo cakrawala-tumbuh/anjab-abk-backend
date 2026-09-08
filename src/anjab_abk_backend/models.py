@@ -114,6 +114,11 @@ class SekolahModel(Base):
     npsn: Mapped[str | None] = mapped_column(String(8), nullable=True, unique=True)
     kota: Mapped[str | None] = mapped_column(String(100), nullable=True)
     provinsi: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Cabang (Bandung/Semarang) — enum aplikasi, bukan FK, nullable disengaja:
+    # "belum diketahui" tidak boleh tertukar dengan "salah cabang" (backlog
+    # `anjab-abk-backend#40`). Sumber tunggal cabang seorang PARTISIPAN, lewat
+    # `partisipan.sekolah_id` — lihat `schemas/common.py::Cabang`.
+    cabang: Mapped[str | None] = mapped_column(String(20), nullable=True)
     aktif: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = _ts(index=True)
 

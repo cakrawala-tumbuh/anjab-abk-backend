@@ -1,4 +1,4 @@
-"""Skema lintas-resource: Health, Message, Page[T], CabangSesi, dan amplop error."""
+"""Skema lintas-resource: Health, Message, Page[T], Cabang, dan amplop error."""
 
 from __future__ import annotations
 
@@ -8,13 +8,19 @@ from pydantic import BaseModel, Field
 
 T = TypeVar("T")
 
-CabangSesi = Literal["Bandung", "Semarang"]
-"""Cabang lokasi kajian sesi (Task Inventory & OPM).
+Cabang = Literal["Bandung", "Semarang"]
+"""Cabang lokasi (yayasan) — enum aplikasi, bukan FK, tanpa tabel master.
 
-Sumber tunggal — `taskinv/schemas/sesi.py` mengimpor & me-re-export nama ini
-(backlog `anjab-abk-backend#37`) agar `from .sesi import CabangSesi` yang sudah
-dipakai `taskinv/schemas/hasil.py`/`kuesioner.py` tetap jalan tanpa perubahan.
+Sumber tunggal. Dipakai baik oleh entitas SESI (Task Inventory & OPM, sejak
+backlog `anjab-abk-backend#37`) maupun entitas SEKOLAH (`sekolah.cabang`, sejak
+backlog `anjab-abk-backend#40` — penanda cabang partisipan lewat sekolahnya).
 """
+
+CabangSesi = Cabang
+"""Alias historis untuk `Cabang`, dipertahankan agar `from .sesi import
+CabangSesi` yang sudah dipakai `taskinv/schemas/sesi.py`, `taskinv/schemas/
+hasil.py`, `taskinv/schemas/kuesioner.py`, dan modul `opm/schemas/*` tetap jalan
+tanpa perubahan (backlog `anjab-abk-backend#40`)."""
 
 
 class Health(BaseModel):
