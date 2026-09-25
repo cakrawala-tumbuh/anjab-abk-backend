@@ -7,6 +7,22 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Ditambahkan
+
+- **Endpoint admin untuk mengalihkan responden TI/OPM ke partisipan lain**
+  (backlog #47, asal `ypii-support#73`): `POST /api/v1/task-inventory/sesi/responden/{responden_id}/alihkan`
+  dan `POST /api/v1/opm/sesi/responden/{responden_id}/alihkan`. Memindahkan
+  kepemilikan satu baris responden (mengubah `partisipan_id`/`nama`) tanpa
+  mengisi ulang jawaban — status kirim (`tahap1_submit`/`tahap3_submit`/
+  `sudah_submit`) dan timestamp-nya tetap utuh, termasuk untuk sesi TI yang
+  sudah TAHAP3 dan sesi OPM yang kuotanya penuh. Body
+  `{"dari_partisipan_id": "...", "ke_partisipan_id": "..."}` — `dari_partisipan_id`
+  adalah guard eksplisit agar tidak menimpa kepemilikan responden yang salah
+  secara diam-diam. Menolak `404` (responden/partisipan tujuan tidak ada),
+  `422` (asal=tujuan, responden bukan milik `dari_partisipan_id`, atau
+  partisipan tujuan nonaktif), `409` (partisipan tujuan sudah jadi responden
+  di sesi yang sama).
+
 ## [0.46.0] - 2026-09-09
 
 ### Diubah

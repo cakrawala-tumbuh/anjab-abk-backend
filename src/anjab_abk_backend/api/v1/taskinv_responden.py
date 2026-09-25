@@ -25,7 +25,12 @@ from ...dependencies import (
 from ...errors import ValidationAppError
 from ...schemas.common import BulkAssignResult, BulkSkipped, ErrorResponse, Page
 from ...security import Principal
-from ...taskinv.schemas.responden import TiRespondenBulkCreate, TiRespondenCreate, TiRespondenRead
+from ...taskinv.schemas.responden import (
+    TiRespondenAlihkan,
+    TiRespondenBulkCreate,
+    TiRespondenCreate,
+    TiRespondenRead,
+)
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.sesi import TiSesiService
 from ..pagination import set_pagination_links
@@ -233,3 +238,69 @@ def delete_responden(
 ) -> Response:
     rsp_service.delete(responden_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/responden/{responden_id}/alihkan",
+    response_model=TiRespondenRead,
+    summary="Alihkan responden ke partisipan lain (admin; jawaban & status kirim tetap utuh)",
+    operation_id="taskinv_responden_alihkan",
+    dependencies=_ADMIN_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        404: {
+            "model": ErrorResponse,
+            "description": "Responden atau partisipan tujuan tidak ditemukan.",
+        },
+        409: {
+            "model": ErrorResponse,
+            "description": "Partisipan tujuan sudah terdaftar sebagai responden pada sesi ini.",
+        },
+        422: {
+            "model": ErrorResponse,
+            "description": (
+                "`dari_partisipan_id` sama dengan `ke_partisipan_id`, responden bukan"
+                " milik `dari_partisipan_id` saat ini, atau partisipan tujuan tidak aktif."
+            ),
+        },
+    },
+)
+def alihkan_responden(
+    responden_id: Annotated[str, Path(description="ID responden.")],
+    payload: TiRespondenAlihkan,
+    rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+) -> TiRespondenRead:
+    """Alihkan kepemilikan responden `responden_id` dari `dari_partisipan_id` ke
+    `ke_partisipan_id` (admin).
+
+    Seluruh jawaban (`ti_detail`/`ti_seleksi`/`ti_usulan_task`, yang merujuk
+    `responden_id`, bukan `partisipan_id`) dan status/timestamp kirim
+    (`tahap1_submit`/`tahap3_submit` beserta timestamp-nya) tetap utuh — hanya
+    `partisipan_id`/`nama` pada baris responden yang berubah (backlog `#47`,
+    asal `ypii-support#73`). Sah dipanggil di sesi status apa pun; keanggotaan
+    SME panel partisipan tujuan TIDAK diperiksa (ini koreksi kepemilikan oleh
+    admin, bukan pendaftaran baru).
+
+    Urutan validasi (`## Keputusan Desain` `anjab-abk-backend#47`): responden
+    tidak ada → 404; `dari_partisipan_id == ke_partisipan_id` → 422; responden
+    bukan milik `dari_partisipan_id` saat ini → 422 (pesan menyebut pemilik
+    aktual); partisipan tujuan tidak ada → 404; partisipan tujuan nonaktif →
+    422; partisipan tujuan sudah jadi responden di sesi yang sama → 409
+    (`TiRespondenService.alihkan()`).
+    """
+    responden = rsp_service.get(responden_id)
+    if payload.dari_partisipan_id == payload.ke_partisipan_id:
+        raise ValidationAppError("Partisipan asal dan tujuan tidak boleh sama.")
+    if responden.partisipan_id != payload.dari_partisipan_id:
+        raise ValidationAppError(
+            "Responden ini bukan milik partisipan"
+            f" '{payload.dari_partisipan_id}' (pemilik saat ini:"
+            f" {responden.partisipan_id!r})."
+        )
+    partisipan_b = par_service.get(payload.ke_partisipan_id)
+    if not partisipan_b.aktif:
+        raise ValidationAppError(f"Partisipan '{payload.ke_partisipan_id}' tidak aktif.")
+    return rsp_service.alihkan(responden_id, payload.ke_partisipan_id, partisipan_b.nama)

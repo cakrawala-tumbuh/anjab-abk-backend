@@ -2468,3 +2468,235 @@ def test_admin_semua_endpoint_boleh(client: TestClient, jabatan_id_tk: str) -> N
     assert client.post(f"{SESI}/{sid}/tutup").status_code == 200
     assert client.post(f"{SESI}/{sid}/analisis").status_code == 200
     assert client.get(f"{SESI}/{sid}/hasil").status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# Alihkan responden ke partisipan lain (admin) — backlog #47, asal ypii-support#73
+# --------------------------------------------------------------------------- #
+
+
+def test_alihkan_ti_tahap3_tersubmit_sukses(
+    client: TestClient, client_as, partisipan_factory, jabatan_id_tk: str, db_session
+) -> None:
+    """Responden TI TAHAP3 tersubmit dialihkan ke partisipan lain: flag/timestamp
+    submit dan jawaban (`ti_detail`/`ti_seleksi`) tetap utuh; kuesioner/saya
+    berpindah dari pemilik lama ke pemilik baru."""
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+
+    par_a = partisipan_factory("ti-alihkan-a", jabatan_utama_id=jabatan_id_tk)
+    par_b = partisipan_factory("ti-alihkan-b", jabatan_utama_id=jabatan_id_tk)
+
+    sme_svc = SqlSMEPanelService(db_session)
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_tk))
+    # Hanya par_a anggota panel — par_b SENGAJA bukan anggota (backlog #47:
+    # keanggotaan SME panel partisipan tujuan tidak diperiksa saat alihkan).
+    sme_svc.add_anggota(panel.id, par_a)
+
+    sesi = _create_sesi(client, jabatan_id_tk)
+    sid = sesi["id"]
+    items = client.get(f"{SESI}/{sid}/responden").json()["items"]
+    rsp = next(r for r in items if r["partisipan_id"] == par_a)
+    rid = rsp["id"]
+
+    kodes = _catalog_kodes(client, jabatan_id_tk, 1)
+    client.post(f"{SESI}/{sid}/mulai-tahap1")
+    _seleksi_submit(client, rid, kodes)
+    client.post(f"{SESI}/{sid}/mulai-tahap2")
+    client.post(f"{SESI}/{sid}/mulai-tahap3")
+    _detail_submit(client, rid, [_detail_item(kodes[0])])
+
+    before = client.get(f"{SESI}/responden/{rid}").json()
+    assert before["tahap1_submit"] is True
+    assert before["tahap3_submit"] is True
+    seleksi_before = client.get(f"{SESI}/responden/{rid}/seleksi").json()
+    detail_before = client.get(f"{SESI}/responden/{rid}/detail").json()
+
+    r = client.post(
+        f"{SESI}/responden/{rid}/alihkan",
+        json={"dari_partisipan_id": par_a, "ke_partisipan_id": par_b},
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["id"] == rid
+    assert data["partisipan_id"] == par_b
+    assert data["nama"] == "Partisipan ti-alihkan-b"
+    assert data["tahap1_submit"] is True
+    assert data["tahap1_submitted_at"] == before["tahap1_submitted_at"]
+    assert data["tahap3_submit"] is True
+    assert data["tahap3_submitted_at"] == before["tahap3_submitted_at"]
+    assert data["created_at"] == before["created_at"]
+
+    # Jawaban tetap terhubung ke responden_id yang sama, tidak berubah/hilang.
+    assert client.get(f"{SESI}/responden/{rid}/seleksi").json() == seleksi_before
+    assert client.get(f"{SESI}/responden/{rid}/detail").json() == detail_before
+
+    # kuesioner/saya: berpindah dari A ke B.
+    as_b = client_as("ti-alihkan-b")
+    kues_b = as_b.get(f"{BASE}/kuesioner/saya").json()
+    assert any(k["id"] == rid for k in kues_b)
+
+    as_a = client_as("ti-alihkan-a")
+    kues_a = as_a.get(f"{BASE}/kuesioner/saya").json()
+    assert all(k["id"] != rid for k in kues_a)
+
+
+def test_alihkan_ti_dari_ke_sama_422(
+    client: TestClient, partisipan_factory, jabatan_id_tk: str, db_session
+) -> None:
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+
+    par_a = partisipan_factory("ti-alihkan-samadari", jabatan_utama_id=jabatan_id_tk)
+    sme_svc = SqlSMEPanelService(db_session)
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_tk))
+    sme_svc.add_anggota(panel.id, par_a)
+
+    sesi = _create_sesi(client, jabatan_id_tk)
+    items = client.get(f"{SESI}/{sesi['id']}/responden").json()["items"]
+    rid = items[0]["id"]
+
+    r = client.post(
+        f"{SESI}/responden/{rid}/alihkan",
+        json={"dari_partisipan_id": par_a, "ke_partisipan_id": par_a},
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_alihkan_ti_dari_bukan_pemilik_aktual_422(
+    client: TestClient, partisipan_factory, jabatan_id_tk: str, db_session
+) -> None:
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+
+    par_a = partisipan_factory("ti-alihkan-owner-a", jabatan_utama_id=jabatan_id_tk)
+    par_b = partisipan_factory("ti-alihkan-owner-b", jabatan_utama_id=jabatan_id_tk)
+    par_lain = partisipan_factory("ti-alihkan-owner-lain", jabatan_utama_id=jabatan_id_tk)
+    sme_svc = SqlSMEPanelService(db_session)
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_tk))
+    sme_svc.add_anggota(panel.id, par_a)
+
+    sesi = _create_sesi(client, jabatan_id_tk)
+    items = client.get(f"{SESI}/{sesi['id']}/responden").json()["items"]
+    rid = next(r for r in items if r["partisipan_id"] == par_a)["id"]
+
+    r = client.post(
+        f"{SESI}/responden/{rid}/alihkan",
+        json={"dari_partisipan_id": par_lain, "ke_partisipan_id": par_b},
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_alihkan_ti_responden_tidak_ada_404(client: TestClient, partisipan_factory) -> None:
+    par_x = partisipan_factory("ti-alihkan-404-x")
+    par_y = partisipan_factory("ti-alihkan-404-y")
+    r = client.post(
+        f"{SESI}/responden/trsp_tidakada/alihkan",
+        json={"dari_partisipan_id": par_x, "ke_partisipan_id": par_y},
+    )
+    assert r.status_code == 404, r.text
+
+
+def test_alihkan_ti_partisipan_tujuan_tidak_ada_404(
+    client: TestClient, partisipan_factory, jabatan_id_tk: str, db_session
+) -> None:
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+
+    par_a = partisipan_factory("ti-alihkan-parb404", jabatan_utama_id=jabatan_id_tk)
+    sme_svc = SqlSMEPanelService(db_session)
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_tk))
+    sme_svc.add_anggota(panel.id, par_a)
+
+    sesi = _create_sesi(client, jabatan_id_tk)
+    items = client.get(f"{SESI}/{sesi['id']}/responden").json()["items"]
+    rid = items[0]["id"]
+
+    r = client.post(
+        f"{SESI}/responden/{rid}/alihkan",
+        json={"dari_partisipan_id": par_a, "ke_partisipan_id": "par_tidakada"},
+    )
+    assert r.status_code == 404, r.text
+
+
+def test_alihkan_ti_partisipan_tujuan_nonaktif_422(
+    client: TestClient, partisipan_factory, jabatan_id_tk: str, db_session
+) -> None:
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+
+    par_a = partisipan_factory("ti-alihkan-nonaktif-a", jabatan_utama_id=jabatan_id_tk)
+    par_b = partisipan_factory("ti-alihkan-nonaktif-b", jabatan_utama_id=jabatan_id_tk, aktif=False)
+    sme_svc = SqlSMEPanelService(db_session)
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_tk))
+    sme_svc.add_anggota(panel.id, par_a)
+
+    sesi = _create_sesi(client, jabatan_id_tk)
+    items = client.get(f"{SESI}/{sesi['id']}/responden").json()["items"]
+    rid = next(r for r in items if r["partisipan_id"] == par_a)["id"]
+
+    r = client.post(
+        f"{SESI}/responden/{rid}/alihkan",
+        json={"dari_partisipan_id": par_a, "ke_partisipan_id": par_b},
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_alihkan_ti_tujuan_sudah_responden_409(
+    client: TestClient, partisipan_factory, jabatan_id_tk: str, db_session
+) -> None:
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+
+    par_a = partisipan_factory("ti-alihkan-dup-a", jabatan_utama_id=jabatan_id_tk)
+    par_b = partisipan_factory("ti-alihkan-dup-b", jabatan_utama_id=jabatan_id_tk)
+    sme_svc = SqlSMEPanelService(db_session)
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_tk))
+    sme_svc.add_anggota(panel.id, par_a)
+    sme_svc.add_anggota(panel.id, par_b)
+
+    sesi = _create_sesi(client, jabatan_id_tk)
+    items = client.get(f"{SESI}/{sesi['id']}/responden").json()["items"]
+    rid_a = next(r for r in items if r["partisipan_id"] == par_a)["id"]
+
+    r = client.post(
+        f"{SESI}/responden/{rid_a}/alihkan",
+        json={"dari_partisipan_id": par_a, "ke_partisipan_id": par_b},
+    )
+    assert r.status_code == 409, r.text
+
+    # Baris tidak berubah setelah 409.
+    unchanged = client.get(f"{SESI}/responden/{rid_a}").json()
+    assert unchanged["partisipan_id"] == par_a
+
+
+def test_alihkan_ti_non_admin_403(
+    client: TestClient, client_as, partisipan_factory, jabatan_id_tk: str, db_session
+) -> None:
+    from anjab_abk_backend.anjab.schemas.sme_panel import SMEPanelCreate
+    from anjab_abk_backend.anjab.services.sme_panel_sql import SqlSMEPanelService
+
+    par_a = partisipan_factory("ti-alihkan-403-a", jabatan_utama_id=jabatan_id_tk)
+    par_b = partisipan_factory("ti-alihkan-403-b", jabatan_utama_id=jabatan_id_tk)
+    sme_svc = SqlSMEPanelService(db_session)
+    panel = sme_svc.create(SMEPanelCreate(jabatan_id=jabatan_id_tk))
+    sme_svc.add_anggota(panel.id, par_a)
+
+    sesi = _create_sesi(client, jabatan_id_tk)
+    items = client.get(f"{SESI}/{sesi['id']}/responden").json()["items"]
+    rid = items[0]["id"]
+
+    as_partisipan = client_as("ti-alihkan-403-caller")
+    r = as_partisipan.post(
+        f"{SESI}/responden/{rid}/alihkan",
+        json={"dari_partisipan_id": par_a, "ke_partisipan_id": par_b},
+    )
+    assert r.status_code == 403, r.text
+
+
+def test_alihkan_ti_tanpa_token_401(anon_client: TestClient) -> None:
+    r = anon_client.post(
+        f"{SESI}/responden/trsp_x/alihkan",
+        json={"dari_partisipan_id": "par_a", "ke_partisipan_id": "par_b"},
+    )
+    assert r.status_code == 401, r.text

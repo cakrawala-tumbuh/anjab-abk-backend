@@ -9,6 +9,7 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ...core.services.partisipan import PartisipanService
@@ -199,6 +200,19 @@ class SqlTiRespondenService:
             raise NotFoundError(f"Responden Task Inventory '{responden_id}' tidak ditemukan.")
         return rec
 
+    def _flush_checked(self, *, on_conflict: str) -> None:
+        """Flush dalam SAVEPOINT; petakan `IntegrityError` (duplikat unik) → 409.
+
+        Backstop untuk `uq_ti_responden_sesi_partisipan` pada race dua request
+        `alihkan()` bersamaan menuju partisipan tujuan yang sama — cek eksplisit
+        di `alihkan()` menutup jalur normal, ini menutup jalur balapan.
+        """
+        try:
+            with self._s.begin_nested():
+                self._s.flush()
+        except IntegrityError as exc:
+            raise ConflictError(on_conflict) from exc
+
     def list_by_sesi(
         self, sesi_id: str, *, limit: int | None = None, offset: int = 0
     ) -> tuple[list[TiRespondenRead], int]:
@@ -345,6 +359,55 @@ class SqlTiRespondenService:
         rec.tahap3_submit = True
         rec.tahap3_submitted_at = datetime.now(UTC)
         self._s.flush()
+        return _to_read(rec)
+
+    def alihkan(
+        self, responden_id: str, ke_partisipan_id: str, nama_baru: str | None
+    ) -> TiRespondenRead:
+        """Alihkan kepemilikan responden `responden_id` ke `ke_partisipan_id`.
+
+        Backlog `anjab-abk-backend#47`, asal `ypii-support#73`. Router
+        (`api/v1/taskinv_responden.py::alihkan_responden`) sudah memvalidasi
+        `dari_partisipan_id` (pemilik saat ini via `TiRespondenRead.partisipan_id`),
+        `dari != ke`, dan keberadaan/status aktif partisipan tujuan (lewat seam
+        `PartisipanService`) **sebelum** memanggil method ini — method ini murni
+        mengeksekusi mutasi + gerbang duplikat sesi. Hanya `partisipan_id` dan
+        `nama` yang berubah; kolom lain (`tahap1_submit`/`tahap1_submitted_at`/
+        `tahap3_submit`/`tahap3_submitted_at`/`created_at`) TIDAK disentuh, dan
+        baris `ti_detail`/`ti_seleksi`/`ti_usulan_task` (yang merujuk
+        `responden_id`, bukan `partisipan_id`) tetap terhubung tanpa disalin.
+        Tidak ada pembatasan status sesi — sah dipanggil di sesi status apa pun.
+
+        Args:
+            responden_id: ID baris responden yang dialihkan.
+            ke_partisipan_id: ID partisipan tujuan (sudah diverifikasi ada & aktif
+                oleh pemanggil).
+            nama_baru: nama partisipan tujuan, ditulis ke kolom `nama` responden.
+
+        Returns:
+            Responden dengan `partisipan_id`/`nama` yang sudah diperbarui.
+
+        Raises:
+            NotFoundError: `responden_id` tidak ditemukan.
+            ConflictError: partisipan tujuan sudah terdaftar sebagai responden lain
+                pada sesi yang sama — dicek eksplisit sebelum mutasi;
+                `uq_ti_responden_sesi_partisipan` tetap jadi backstop lapisan DB
+                untuk race dua request bersamaan (lihat `_flush_checked`).
+        """
+        rec = self._get_model(responden_id)
+        sudah_ada = self._s.scalar(
+            select(TiRespondenModel.id).where(
+                TiRespondenModel.sesi_id == rec.sesi_id,
+                TiRespondenModel.partisipan_id == ke_partisipan_id,
+            )
+        )
+        if sudah_ada is not None:
+            raise ConflictError("Partisipan ini sudah terdaftar sebagai responden pada sesi ini.")
+        rec.partisipan_id = ke_partisipan_id
+        rec.nama = nama_baru
+        self._flush_checked(
+            on_conflict="Partisipan ini sudah terdaftar sebagai responden pada sesi ini."
+        )
         return _to_read(rec)
 
     def delete(self, responden_id: str) -> None:

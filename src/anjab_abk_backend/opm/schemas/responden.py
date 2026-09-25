@@ -51,6 +51,30 @@ class OpmRespondenBulkCreate(BaseModel):
     )
 
 
+class OpmRespondenAlihkan(BaseModel):
+    """Payload pengalihan kepemilikan responden OPM ke partisipan lain (admin).
+
+    Backlog `anjab-abk-backend#47` — memindahkan baris responden (beserta seluruh
+    jawaban `opm_jawaban` yang merujuk `responden_id`, bukan `partisipan_id`) dari
+    `dari_partisipan_id` ke `ke_partisipan_id` tanpa mengisi ulang.
+    `dari_partisipan_id` adalah guard eksplisit: request ditolak (422) bila bukan
+    pemilik aktual responden ini saat ini.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    dari_partisipan_id: str = Field(
+        min_length=1,
+        description="ID partisipan pemilik responden saat ini (guard eksplisit).",
+        examples=["par_5c0a6908"],
+    )
+    ke_partisipan_id: str = Field(
+        min_length=1,
+        description="ID partisipan tujuan pengalihan.",
+        examples=["par_f57e0ceb"],
+    )
+
+
 class OpmRespondenRead(BaseModel):
     """Representasi responden yang dikembalikan API."""
 

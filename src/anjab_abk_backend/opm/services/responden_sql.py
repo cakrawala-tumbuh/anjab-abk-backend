@@ -210,6 +210,57 @@ class SqlOpmRespondenService:
 
         return BulkAssignResult(created=created, skipped=skipped)
 
+    def alihkan(
+        self, responden_id: str, ke_partisipan_id: str, nama_baru: str | None
+    ) -> OpmRespondenRead:
+        """Alihkan kepemilikan responden `responden_id` ke `ke_partisipan_id`.
+
+        Backlog `anjab-abk-backend#47`, asal `ypii-support#73`. Router
+        (`api/v1/opm_responden.py::alihkan_responden`) sudah memvalidasi
+        `dari_partisipan_id` (pemilik saat ini via `OpmRespondenRead.partisipan_id`),
+        `dari != ke`, dan keberadaan/status aktif partisipan tujuan (lewat seam
+        `PartisipanService`) **sebelum** memanggil method ini — method ini murni
+        mengeksekusi mutasi + gerbang duplikat sesi. Hanya `partisipan_id` dan
+        `nama` yang berubah; kolom lain (`jabatan_label`/`sudah_submit`/
+        `submitted_at`/`created_at`) TIDAK disentuh, dan baris `opm_jawaban`
+        (yang merujuk `responden_id`, bukan `partisipan_id`) tetap terhubung
+        tanpa disalin. Tidak ada pembatasan status sesi maupun kuota
+        `max_responden` — jumlah responden sesi tetap sama (mutasi, bukan
+        penambahan), sah dipanggil di sesi status apa pun.
+
+        Args:
+            responden_id: ID baris responden yang dialihkan.
+            ke_partisipan_id: ID partisipan tujuan (sudah diverifikasi ada & aktif
+                oleh pemanggil).
+            nama_baru: nama partisipan tujuan, ditulis ke kolom `nama` responden.
+
+        Returns:
+            Responden dengan `partisipan_id`/`nama` yang sudah diperbarui.
+
+        Raises:
+            NotFoundError: `responden_id` tidak ditemukan.
+            ConflictError: partisipan tujuan sudah terdaftar sebagai responden OPM
+                lain pada sesi yang sama — dicek murni di lapisan aplikasi (tabel
+                `opm_responden` tidak punya `UniqueConstraint` DB untuk
+                `(sesi_id, partisipan_id)`, pola sama dengan `create()` di atas).
+        """
+        rec = self._get_model(responden_id)
+        already = self._s.scalar(
+            select(OpmRespondenModel.id).where(
+                OpmRespondenModel.sesi_id == rec.sesi_id,
+                OpmRespondenModel.partisipan_id == ke_partisipan_id,
+            )
+        )
+        if already is not None:
+            raise ConflictError(
+                f"Partisipan '{ke_partisipan_id}' sudah terdaftar sebagai responden"
+                " OPM di sesi ini."
+            )
+        rec.partisipan_id = ke_partisipan_id
+        rec.nama = nama_baru
+        self._s.flush()
+        return _to_read(rec)
+
     def mark_submitted(self, responden_id: str) -> OpmRespondenRead:
         rec = self._get_model(responden_id)
         if rec.sudah_submit:

@@ -601,3 +601,169 @@ def test_admin_can_access_any_responden(
 
     as_admin = client_as("opm-bola-other-admin", groups=["admin"])
     assert as_admin.get(f"{SESI_BASE}/responden/{rsp_a['id']}").status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# Alihkan responden ke partisipan lain (admin) — backlog #47, asal ypii-support#73
+# --------------------------------------------------------------------------- #
+
+
+def test_alihkan_opm_kuota_penuh_tersubmit_sukses(
+    client: TestClient, client_as, jabatan_id_tk: str, db_session
+) -> None:
+    """Sesi OPM di kuota (`max_responden`) dengan responden milik A sudah submit:
+    dialihkan ke C (di luar sesi & bukan anggota panel) tanpa menambah jumlah
+    responden; jawaban dan status/timestamp kirim tetap utuh; kuesioner/saya
+    berpindah dari A ke C."""
+    sesi, ctx = _build_sesi(client, jabatan_id_tk, max_responden=2)
+    par_a, par_b = ctx["partisipan_ids"]
+    par_c = _buat_partisipan(client, ctx["jabatan_id"], "AlihkanC")
+    _link_authentik_user(db_session, par_a, "opm-alihkan-a")
+    _link_authentik_user(db_session, par_c, "opm-alihkan-c")
+
+    client.post(f"{SESI_BASE}/{sesi['id']}/buka")
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    rsp_a = next(r for r in responden if r["partisipan_id"] == par_a)
+    rid = rsp_a["id"]
+    count_before = len(responden)
+    assert count_before == 2  # kuota penuh (max_responden=2)
+
+    _submit(client, rid, ctx["kodes"])
+    before = client.get(f"{SESI_BASE}/responden/{rid}").json()
+    assert before["sudah_submit"] is True
+    jawaban_before = client.get(f"{SESI_BASE}/responden/{rid}/jawaban").json()
+
+    r = client.post(
+        f"{SESI_BASE}/responden/{rid}/alihkan",
+        json={"dari_partisipan_id": par_a, "ke_partisipan_id": par_c},
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["id"] == rid
+    assert data["partisipan_id"] == par_c
+    assert data["nama"] == "OPM Test AlihkanC"
+    assert data["jabatan_label"] == before["jabatan_label"]
+    assert data["sudah_submit"] is True
+    assert data["submitted_at"] == before["submitted_at"]
+    assert data["created_at"] == before["created_at"]
+
+    assert client.get(f"{SESI_BASE}/responden/{rid}/jawaban").json() == jawaban_before
+
+    count_after = len(client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"])
+    assert count_after == count_before
+
+    as_c = client_as("opm-alihkan-c")
+    kues_c = as_c.get(f"{KUESIONER_BASE}/kuesioner/saya").json()
+    assert any(k["id"] == rid for k in kues_c)
+
+    as_a = client_as("opm-alihkan-a")
+    kues_a = as_a.get(f"{KUESIONER_BASE}/kuesioner/saya").json()
+    assert all(k["id"] != rid for k in kues_a)
+
+
+def test_alihkan_opm_dari_ke_sama_422(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    par_a, _ = ctx["partisipan_ids"]
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    rid = next(r for r in responden if r["partisipan_id"] == par_a)["id"]
+
+    r = client.post(
+        f"{SESI_BASE}/responden/{rid}/alihkan",
+        json={"dari_partisipan_id": par_a, "ke_partisipan_id": par_a},
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_alihkan_opm_dari_bukan_pemilik_aktual_422(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    par_a, par_b = ctx["partisipan_ids"]
+    par_lain = _buat_partisipan(client, ctx["jabatan_id"], "AlihkanOwnerLain")
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    rid = next(r for r in responden if r["partisipan_id"] == par_a)["id"]
+
+    r = client.post(
+        f"{SESI_BASE}/responden/{rid}/alihkan",
+        json={"dari_partisipan_id": par_lain, "ke_partisipan_id": par_b},
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_alihkan_opm_responden_tidak_ada_404(client: TestClient, jabatan_id_tk: str) -> None:
+    par_x = _buat_partisipan(client, jabatan_id_tk, "AlihkanX")
+    par_y = _buat_partisipan(client, jabatan_id_tk, "AlihkanY")
+    r = client.post(
+        f"{SESI_BASE}/responden/oprs_tidakada/alihkan",
+        json={"dari_partisipan_id": par_x, "ke_partisipan_id": par_y},
+    )
+    assert r.status_code == 404, r.text
+
+
+def test_alihkan_opm_partisipan_tujuan_tidak_ada_404(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    par_a, _ = ctx["partisipan_ids"]
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    rid = next(r for r in responden if r["partisipan_id"] == par_a)["id"]
+
+    r = client.post(
+        f"{SESI_BASE}/responden/{rid}/alihkan",
+        json={"dari_partisipan_id": par_a, "ke_partisipan_id": "par_tidakada"},
+    )
+    assert r.status_code == 404, r.text
+
+
+def test_alihkan_opm_partisipan_tujuan_nonaktif_422(
+    client: TestClient, jabatan_id_tk: str, partisipan_factory
+) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    par_a, _ = ctx["partisipan_ids"]
+    par_c = partisipan_factory(
+        "opm-alihkan-nonaktif-c", jabatan_utama_id=ctx["jabatan_id"], aktif=False
+    )
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    rid = next(r for r in responden if r["partisipan_id"] == par_a)["id"]
+
+    r = client.post(
+        f"{SESI_BASE}/responden/{rid}/alihkan",
+        json={"dari_partisipan_id": par_a, "ke_partisipan_id": par_c},
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_alihkan_opm_tujuan_sudah_responden_409(client: TestClient, jabatan_id_tk: str) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    par_a, par_b = ctx["partisipan_ids"]
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    rid_a = next(r for r in responden if r["partisipan_id"] == par_a)["id"]
+
+    r = client.post(
+        f"{SESI_BASE}/responden/{rid_a}/alihkan",
+        json={"dari_partisipan_id": par_a, "ke_partisipan_id": par_b},
+    )
+    assert r.status_code == 409, r.text
+
+    unchanged = client.get(f"{SESI_BASE}/responden/{rid_a}").json()
+    assert unchanged["partisipan_id"] == par_a
+
+
+def test_alihkan_opm_non_admin_403(client: TestClient, client_as, jabatan_id_tk: str) -> None:
+    sesi, ctx = _build_sesi(client, jabatan_id_tk)
+    par_a, par_b = ctx["partisipan_ids"]
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    rid = next(r for r in responden if r["partisipan_id"] == par_a)["id"]
+
+    as_partisipan = client_as("opm-alihkan-403-caller")
+    r = as_partisipan.post(
+        f"{SESI_BASE}/responden/{rid}/alihkan",
+        json={"dari_partisipan_id": par_a, "ke_partisipan_id": par_b},
+    )
+    assert r.status_code == 403, r.text
+
+
+def test_alihkan_opm_tanpa_token_401(anon_client: TestClient) -> None:
+    r = anon_client.post(
+        f"{SESI_BASE}/responden/oprs_x/alihkan",
+        json={"dari_partisipan_id": "par_a", "ke_partisipan_id": "par_b"},
+    )
+    assert r.status_code == 401, r.text

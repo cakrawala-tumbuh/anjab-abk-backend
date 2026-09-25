@@ -22,7 +22,12 @@ from ...dependencies import (
 )
 from ...errors import ValidationAppError
 from ...opm.schemas.jawaban import OpmJawabanRead, OpmJawabanUpsert
-from ...opm.schemas.responden import OpmRespondenBulkCreate, OpmRespondenCreate, OpmRespondenRead
+from ...opm.schemas.responden import (
+    OpmRespondenAlihkan,
+    OpmRespondenBulkCreate,
+    OpmRespondenCreate,
+    OpmRespondenRead,
+)
 from ...opm.services.jawaban import OpmJawabanService
 from ...opm.services.responden import OpmRespondenService
 from ...opm.services.sesi import OpmSesiService
@@ -171,6 +176,72 @@ def delete_responden(
 ) -> Response:
     rsp_service.delete(responden_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/responden/{responden_id}/alihkan",
+    response_model=OpmRespondenRead,
+    summary="Alihkan responden OPM ke partisipan lain (admin; jawaban & status kirim tetap utuh)",
+    operation_id="opm_responden_alihkan",
+    dependencies=_ADMIN_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        404: {
+            "model": ErrorResponse,
+            "description": "Responden atau partisipan tujuan tidak ditemukan.",
+        },
+        409: {
+            "model": ErrorResponse,
+            "description": "Partisipan tujuan sudah terdaftar sebagai responden OPM pada sesi ini.",
+        },
+        422: {
+            "model": ErrorResponse,
+            "description": (
+                "`dari_partisipan_id` sama dengan `ke_partisipan_id`, responden bukan"
+                " milik `dari_partisipan_id` saat ini, atau partisipan tujuan tidak aktif."
+            ),
+        },
+    },
+)
+def alihkan_responden(
+    responden_id: Annotated[str, Path(description="ID responden.")],
+    payload: OpmRespondenAlihkan,
+    rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+) -> OpmRespondenRead:
+    """Alihkan kepemilikan responden OPM `responden_id` dari `dari_partisipan_id`
+    ke `ke_partisipan_id` (admin).
+
+    Seluruh jawaban `opm_jawaban` (yang merujuk `responden_id`, bukan
+    `partisipan_id`) dan status/timestamp kirim (`sudah_submit`/`submitted_at`)
+    tetap utuh — hanya `partisipan_id`/`nama` pada baris responden yang berubah
+    (backlog `#47`, asal `ypii-support#73`). Sah dipanggil di sesi status apa pun
+    dan tanpa memeriksa kuota `max_responden` (mutasi, bukan penambahan — jumlah
+    responden sesi tetap sama); keanggotaan SME panel partisipan tujuan TIDAK
+    diperiksa (ini koreksi kepemilikan oleh admin, bukan pendaftaran baru).
+
+    Urutan validasi (`## Keputusan Desain` `anjab-abk-backend#47`): responden
+    tidak ada → 404; `dari_partisipan_id == ke_partisipan_id` → 422; responden
+    bukan milik `dari_partisipan_id` saat ini → 422 (pesan menyebut pemilik
+    aktual); partisipan tujuan tidak ada → 404; partisipan tujuan nonaktif →
+    422; partisipan tujuan sudah jadi responden OPM di sesi yang sama → 409
+    (`OpmRespondenService.alihkan()`).
+    """
+    responden = rsp_service.get(responden_id)
+    if payload.dari_partisipan_id == payload.ke_partisipan_id:
+        raise ValidationAppError("Partisipan asal dan tujuan tidak boleh sama.")
+    if responden.partisipan_id != payload.dari_partisipan_id:
+        raise ValidationAppError(
+            "Responden ini bukan milik partisipan"
+            f" '{payload.dari_partisipan_id}' (pemilik saat ini:"
+            f" {responden.partisipan_id!r})."
+        )
+    partisipan_b = par_service.get(payload.ke_partisipan_id)
+    if not partisipan_b.aktif:
+        raise ValidationAppError(f"Partisipan '{payload.ke_partisipan_id}' tidak aktif.")
+    return rsp_service.alihkan(responden_id, payload.ke_partisipan_id, partisipan_b.nama)
 
 
 @router.put(

@@ -37,6 +37,30 @@ class TiRespondenBulkCreate(BaseModel):
     )
 
 
+class TiRespondenAlihkan(BaseModel):
+    """Payload pengalihan kepemilikan responden ke partisipan lain (admin).
+
+    Backlog `anjab-abk-backend#47` — memindahkan baris responden (beserta seluruh
+    jawaban `ti_detail`/`ti_seleksi`/`ti_usulan_task` yang merujuk `responden_id`,
+    bukan `partisipan_id`) dari `dari_partisipan_id` ke `ke_partisipan_id` tanpa
+    mengisi ulang. `dari_partisipan_id` adalah guard eksplisit: request ditolak
+    (422) bila bukan pemilik aktual responden ini saat ini.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    dari_partisipan_id: str = Field(
+        min_length=1,
+        description="ID partisipan pemilik responden saat ini (guard eksplisit).",
+        examples=["par_5c0a6908"],
+    )
+    ke_partisipan_id: str = Field(
+        min_length=1,
+        description="ID partisipan tujuan pengalihan.",
+        examples=["par_f57e0ceb"],
+    )
+
+
 class TiRespondenRead(BaseModel):
     """Representasi responden yang dikembalikan API."""
 
