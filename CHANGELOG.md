@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-09-25
+
 ### Ditambahkan
 
 - **Endpoint admin untuk mengalihkan responden TI/OPM ke partisipan lain**
