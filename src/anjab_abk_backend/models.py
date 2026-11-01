@@ -920,3 +920,61 @@ class RedesainMasalahUraianTugasModel(Base):
         primary_key=True,
         index=True,
     )
+
+
+class RedesainProsesModel(Base):
+    """Proses kerja (Process_ID, sheet ALUR) untuk satu masalah di SATU sekolah.
+
+    `kode` dibangkitkan sistem secara global (`P-001`). `sekolah_id` wajib: proses
+    sekolah B tidak boleh dicatat sebagai fakta dari catatan sekolah A (`ALUR!A3`).
+    Tidak ada operasi hapus.
+    """
+
+    __tablename__ = "redesain_proses"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kode: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    masalah_id: Mapped[str] = mapped_column(
+        ForeignKey("redesain_masalah.id"), nullable=False, index=True
+    )
+    sekolah_id: Mapped[str] = mapped_column(ForeignKey("sekolah.id"), nullable=False, index=True)
+    periode: Mapped[str] = mapped_column(String(100), nullable=False)
+    nama_proses: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+
+class RedesainLangkahModel(Base):
+    """Langkah (Step_ID) sebuah proses redesain; kode `<kode proses>-S01`, `-S02`, ...
+
+    `pelaksana`/`pemeriksa_pemutus` berisi jabatan/peran, bukan nama orang (validasi
+    manusia). `status_langkah` bertipe `String(40)` tanpa CHECK (divalidasi skema
+    `StatusLangkah`). Langkah yang tak berlaku diberi status `Tidak berlaku`, tidak dihapus.
+    """
+
+    __tablename__ = "redesain_langkah"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    proses_id: Mapped[str] = mapped_column(
+        ForeignKey("redesain_proses.id"), nullable=False, index=True
+    )
+    kode: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    urutan: Mapped[int] = mapped_column(Integer, nullable=False)
+    tahap: Mapped[str] = mapped_column(String(200), nullable=False)
+    pemicu_input: Mapped[str] = mapped_column(Text, nullable=False)
+    pelaksana: Mapped[str] = mapped_column(String(200), nullable=False)
+    pekerjaan_sistem: Mapped[str] = mapped_column(Text, nullable=False)
+    keluaran_penerima: Mapped[str] = mapped_column(Text, nullable=False)
+    pemeriksa_pemutus: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    hambatan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status_langkah: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )

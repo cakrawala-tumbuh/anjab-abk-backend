@@ -24,6 +24,16 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
   DELETE). `GET /api/v1/redesain/kode-orang/saya` (grup `tim-kajian` atau `sekolah-pengisi`)
   mengembalikan `{kode}` milik pemanggil tanpa `partisipan_id`. Dependency
   `get_kode_orang_pemanggil` menjadi sumber `pelaku_kode_orang` bagi riwayat.
+- **Alur redesain: proses & langkah** (backlog #52, butir BE-5a): tabel `redesain_proses`
+  dan `redesain_langkah` (migrasi `c5d9f13a7b42`). Tim Kajian mencatat proses per
+  masalah × sekolah berkode global `P-001` beserta langkahnya berkode `P-001-S01`, `-S02`, …
+  dengan status langkah baku (`StatusLangkah`, termasuk "Diperkuat untuk klaim" dan
+  "Tidak berlaku"). Endpoint khusus `tim-kajian`: `GET/POST /api/v1/redesain/proses`,
+  `POST .../search` (field `masalah_id`, `sekolah_id`, `kode`), `GET/PATCH .../{id}`
+  (detail memuat `langkah` terurut `urutan`), `POST .../{id}/langkah`, dan
+  `PATCH /api/v1/redesain/langkah/{id}`; tanpa DELETE. Sekolah proses wajib sama dengan
+  sekolah masalah bila masalah sudah bersekolah (selisih → 422). Setiap create/update
+  dicatat di riwayat (`entitas="proses"`/`"langkah"`).
 
 ## [0.47.0] - 2026-09-25
 

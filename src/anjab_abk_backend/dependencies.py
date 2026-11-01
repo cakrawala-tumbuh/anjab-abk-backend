@@ -55,6 +55,8 @@ from .redesain.services.konteks import KonteksService
 from .redesain.services.konteks_sql import SqlKonteksService
 from .redesain.services.masalah import MasalahService
 from .redesain.services.masalah_sql import SqlMasalahService
+from .redesain.services.proses import ProsesService
+from .redesain.services.proses_sql import SqlProsesService
 from .redesain.services.riwayat import RiwayatService
 from .redesain.services.riwayat_sql import SqlRiwayatService
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
@@ -346,6 +348,11 @@ def get_masalah_service(session: SessionDep) -> MasalahService:
         SqlUraianTugasService(session),
         SqlSekolahService(session),
     )
+
+
+def get_proses_service(session: SessionDep) -> ProsesService:
+    """SEAM: `ProsesService` PostgreSQL (proses & langkah); rujukan sekolah lewat seam core."""
+    return SqlProsesService(session, SqlRiwayatService(session), SqlSekolahService(session))
 
 
 def get_kode_orang_service(session: SessionDep) -> KodeOrangService:
