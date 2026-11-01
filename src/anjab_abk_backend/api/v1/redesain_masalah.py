@@ -11,6 +11,7 @@ from ...dependencies import (
     Pagination,
     get_kode_orang_pemanggil,
     get_masalah_service,
+    get_penilaian_service,
     pagination_params,
     rate_limit,
     require_tim_kajian,
@@ -21,7 +22,9 @@ from ...redesain.schemas.masalah import (
     MasalahStatusKonfirmasi,
     MasalahUpdate,
 )
+from ...redesain.schemas.penilaian import SebaranK
 from ...redesain.services.masalah import MasalahService
+from ...redesain.services.penilaian import PenilaianService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
 
@@ -172,3 +175,19 @@ def status_konfirmasi_masalah(
 ) -> MasalahRead:
     """Set `dibuka_untuk_konfirmasi` sesuai `dibuka` dan catat riwayat."""
     return service.set_status_konfirmasi(masalah_id, data.dibuka, pelaku_kode_orang=pelaku)
+
+
+@router.get(
+    "/{masalah_id}/sebaran-k",
+    response_model=SebaranK,
+    summary="Sebaran jawaban K1-K4 konfirmasi sekolah (tim-kajian)",
+    operation_id="redesain_masalah_sebaran_k",
+    dependencies=_READ,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
+)
+def sebaran_k_masalah(
+    masalah_id: str,
+    service: Annotated[PenilaianService, Depends(get_penilaian_service)],
+) -> SebaranK:
+    """Hitungan jawaban K1-K4 dari konfirmasi terkirim yang belum digantikan (tanpa skor)."""
+    return service.sebaran_k(masalah_id)

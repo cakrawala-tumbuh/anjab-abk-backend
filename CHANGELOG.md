@@ -9,6 +9,15 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Prioritas final beralasan, status penilaian, agenda yayasan, sebaran K** (backlog #58, butir
+  BE-8b): migrasi `d8a3e5b7c9f2` menambah kolom keputusan pada `redesain_penilaian`.
+  `POST /api/v1/redesain/penilaian/{id}/putuskan` (tim-kajian) mencatat prioritas final, alasan
+  (selalu wajib), pemutus (kode orang + jabatan), dan tanggal (tidak di masa depan, acuan WIB);
+  `PenilaianRead.peringatan` memuat `PRIORITAS_TANPA_BUKTI` / `BERBEDA_DARI_SARAN` (tidak
+  memblokir). `POST .../{id}/status` mengatur empat status selain `Telah diputuskan`.
+  `GET .../penilaian/agenda-yayasan` memuat penilaian berstatus `Siap untuk telaah yayasan`;
+  `GET /api/v1/redesain/masalah/{id}/sebaran-k` menghitung jawaban K1-K4 konfirmasi terkirim
+  yang belum digantikan ralat (tanpa skor).
 - **Penilaian redesain + saran triase otomatis** (backlog #57, butir BE-8a): tabel
   `redesain_penilaian` (migrasi `c7f2a9d4e1b3`, satu penilaian per masalah) dan endpoint
   `tim-kajian` `GET/POST /api/v1/redesain/penilaian`, `POST .../search`

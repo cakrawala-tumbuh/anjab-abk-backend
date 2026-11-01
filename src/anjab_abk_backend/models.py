@@ -1126,7 +1126,9 @@ class RedesainPenilaianModel(Base):
     `status_bukti`/`gap_material`/`indikasi_kritis`/`k1`…`k4` bertipe `String(40)` tanpa
     CHECK (divalidasi skema). `saran_otomatis` & `versi_aturan_triase` read-only: dihitung
     ulang service lewat `redesain.triase.hitung_saran` pada setiap create/update. K1–K4 diisi
-    Tim (tidak diagregasi dari konfirmasi). Tidak ada operasi hapus.
+    Tim (tidak diagregasi dari konfirmasi). Kolom keputusan (`prioritas_final`, `alasan_final`,
+    `pemutus_*`, `tanggal_keputusan`, `saran_saat_keputusan`) diisi hanya lewat aksi putuskan;
+    `status_penilaian` dikelola aksi putuskan/status. Tidak ada operasi hapus.
     """
 
     __tablename__ = "redesain_penilaian"
@@ -1151,6 +1153,18 @@ class RedesainPenilaianModel(Base):
     catatan_sumber_versi: Mapped[str | None] = mapped_column(Text, nullable=True)
     saran_otomatis: Mapped[str | None] = mapped_column(String(20), nullable=True)
     versi_aturan_triase: Mapped[str] = mapped_column(String(10), nullable=False)
+    prioritas_final: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    alasan_final: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pemutus_kode_orang: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    pemutus_jabatan: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    tanggal_keputusan: Mapped[date | None] = mapped_column(Date, nullable=True)
+    saran_saat_keputusan: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    status_penilaian: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+        default="Belum ditelaah",
+        server_default=text("'Belum ditelaah'"),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )

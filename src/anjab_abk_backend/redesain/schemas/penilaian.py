@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, date, datetime, timedelta, timezone
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .kosakata import Indikasi, Skala, StatusBukti, YaTidak
+from .kosakata import (
+    Indikasi,
+    PrioritasFinal,
+    Skala,
+    StatusBukti,
+    StatusPenilaian,
+    StatusPenilaianManual,
+    YaTidak,
+)
+
+_WIB = timezone(timedelta(hours=7))
 
 _FIELD_READ_ONLY = ("saran_otomatis", "versi_aturan_triase")
 
@@ -89,6 +99,76 @@ class PenilaianUpdate(BaseModel):
         return _buang_field_read_only(data)
 
 
+def hari_ini_wib() -> date:
+    """Tanggal hari ini menurut WIB (UTC+7), acuan batas "tanggal keputusan tak di masa depan"."""
+    return datetime.now(UTC).astimezone(_WIB).date()
+
+
+class Peringatan(BaseModel):
+    """Satu peringatan hitungan (tidak disimpan) atas keputusan prioritas final."""
+
+    kode: str = Field(description="Kode peringatan.", examples=["PRIORITAS_TANPA_BUKTI"])
+    pesan: str = Field(description="Penjelasan untuk Tim Kajian.")
+
+
+class PenilaianPutuskan(BaseModel):
+    """Payload keputusan prioritas final oleh Tim Kajian (boleh diulang).
+
+    Alasan selalu wajib (kosong/spasi → 422), baik prioritas final sama maupun beda dari
+    saran. Tanggal keputusan tidak boleh di masa depan (acuan WIB).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    prioritas_final: PrioritasFinal = Field(description="Prioritas final keputusan Tim Kajian.")
+    alasan_final: str = Field(min_length=1, description="Alasan keputusan (wajib).")
+    pemutus_kode_orang: str = Field(
+        min_length=1, max_length=20, description="Kode orang pemutus (mis. `O-0001`)."
+    )
+    pemutus_jabatan: str = Field(min_length=1, max_length=200, description="Jabatan pemutus.")
+    tanggal_keputusan: date = Field(description="Tanggal keputusan; tidak di masa depan.")
+
+    @field_validator("alasan_final", "pemutus_kode_orang", "pemutus_jabatan")
+    @classmethod
+    def tidak_kosong(cls, v: str) -> str:
+        """Tolak teks yang hanya berisi spasi; kembalikan teks yang sudah di-strip."""
+        v = v.strip()
+        if not v:
+            raise ValueError("Tidak boleh kosong.")
+        return v
+
+    @field_validator("tanggal_keputusan")
+    @classmethod
+    def bukan_masa_depan(cls, v: date) -> date:
+        """Tolak tanggal setelah hari ini (WIB)."""
+        if v > hari_ini_wib():
+            raise ValueError("Tanggal keputusan tidak boleh di masa depan.")
+        return v
+
+
+class PenilaianStatus(BaseModel):
+    """Payload ubah status penilaian; `Telah diputuskan` hanya lewat aksi putuskan (422)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status_penilaian: StatusPenilaianManual = Field(description="Status baru penilaian.")
+
+
+class SebaranK(BaseModel):
+    """Sebaran jawaban K1–K4 konfirmasi terkirim (tak digantikan) atas satu masalah.
+
+    Tiap `k1`…`k4` memetakan `Tinggi`/`Sedang`/`Rendah`/`Belum tahu`/`kosong` ke hitungan.
+    Sengaja tanpa rata-rata atau skor.
+    """
+
+    masalah_id: str
+    jumlah_konfirmasi: int = Field(description="Jumlah konfirmasi terkirim yang dihitung.")
+    k1: dict[str, int]
+    k2: dict[str, int]
+    k3: dict[str, int]
+    k4: dict[str, int]
+
+
 class PenilaianRead(BaseModel):
     """Satu penilaian redesain beserta saran triase hasil hitungan sistem."""
 
@@ -110,5 +190,17 @@ class PenilaianRead(BaseModel):
         description="Saran triase otomatis (read-only).", examples=["P1 - Utama"]
     )
     versi_aturan_triase: str = Field(description="Versi aturan triase.", examples=["v1.3"])
+    prioritas_final: PrioritasFinal | None = None
+    alasan_final: str | None = None
+    pemutus_kode_orang: str | None = None
+    pemutus_jabatan: str | None = None
+    tanggal_keputusan: date | None = None
+    saran_saat_keputusan: str | None = Field(
+        default=None, description="`saran_otomatis` pada saat keputusan terakhir dibuat."
+    )
+    status_penilaian: StatusPenilaian = "Belum ditelaah"
+    peringatan: list[Peringatan] = Field(
+        default_factory=list, description="Peringatan hitungan (tidak disimpan, tidak memblokir)."
+    )
     created_at: datetime
     updated_at: datetime

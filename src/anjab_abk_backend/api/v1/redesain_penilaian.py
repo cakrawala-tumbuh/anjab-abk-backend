@@ -15,7 +15,13 @@ from ...dependencies import (
     rate_limit,
     require_tim_kajian,
 )
-from ...redesain.schemas.penilaian import PenilaianCreate, PenilaianRead, PenilaianUpdate
+from ...redesain.schemas.penilaian import (
+    PenilaianCreate,
+    PenilaianPutuskan,
+    PenilaianRead,
+    PenilaianStatus,
+    PenilaianUpdate,
+)
 from ...redesain.services.penilaian import PenilaianService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
@@ -96,6 +102,23 @@ def search_penilaian(
 
 
 @router.get(
+    "/agenda-yayasan",
+    response_model=Page[PenilaianRead],
+    summary="Agenda telaah yayasan: penilaian berstatus siap (tim-kajian)",
+    operation_id="redesain_penilaian_agenda_yayasan",
+    dependencies=_READ,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN},
+)
+def agenda_yayasan(
+    page: Annotated[Pagination, Depends(pagination_params)],
+    service: Annotated[PenilaianService, Depends(get_penilaian_service)],
+) -> Page[PenilaianRead]:
+    """Daftar penilaian berstatus `Siap untuk telaah yayasan` (bahan ekspor ringkasan)."""
+    items, total = service.agenda_yayasan(limit=page.limit, offset=page.offset)
+    return Page[PenilaianRead](items=items, total=total, limit=page.limit, offset=page.offset)
+
+
+@router.get(
     "/{penilaian_id}",
     response_model=PenilaianRead,
     summary="Detail penilaian redesain (tim-kajian)",
@@ -127,3 +150,51 @@ def update_penilaian(
 ) -> PenilaianRead:
     """Ubah parsial penilaian; `saran_otomatis` dihitung ulang, `masalah_id` tetap."""
     return service.update(penilaian_id, data, pelaku_kode_orang=pelaku)
+
+
+@router.post(
+    "/{penilaian_id}/putuskan",
+    response_model=PenilaianRead,
+    summary="Putuskan prioritas final penilaian (tim-kajian)",
+    operation_id="redesain_penilaian_putuskan",
+    dependencies=_WRITE,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOTFOUND,
+        422: {"model": ErrorResponse, "description": "Alasan/pemutus/tanggal tidak valid."},
+    },
+)
+def putuskan_penilaian(
+    penilaian_id: str,
+    data: PenilaianPutuskan,
+    service: Annotated[PenilaianService, Depends(get_penilaian_service)],
+    pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+) -> PenilaianRead:
+    """Catat prioritas final beserta alasan, pemutus, dan tanggal; peringatan tidak memblokir."""
+    return service.putuskan(penilaian_id, data, pelaku_kode_orang=pelaku)
+
+
+@router.post(
+    "/{penilaian_id}/status",
+    response_model=PenilaianRead,
+    summary="Ubah status penilaian (tim-kajian)",
+    operation_id="redesain_penilaian_status",
+    dependencies=_WRITE,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOTFOUND,
+        422: {"model": ErrorResponse, "description": "Status tidak valid (mis. Telah diputuskan)."},
+    },
+)
+def ubah_status_penilaian(
+    penilaian_id: str,
+    data: PenilaianStatus,
+    service: Annotated[PenilaianService, Depends(get_penilaian_service)],
+    pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+) -> PenilaianRead:
+    """Ubah `status_penilaian` ke salah satu dari empat status selain `Telah diputuskan`."""
+    return service.set_status(penilaian_id, data, pelaku_kode_orang=pelaku)

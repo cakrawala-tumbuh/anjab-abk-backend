@@ -76,3 +76,22 @@ StatusPemeriksaanBukti = Literal[
     "Diperselisihkan",
 ]
 """Status pemeriksaan sebuah bukti (istilah "Diperiksa sesuai klaim" dipertahankan apa adanya)."""
+
+PrioritasFinal = Literal[
+    "P0 - Eskalasi", "K - Klarifikasi", "P1 - Utama", "P2 - Berikutnya", "P3 - Pantau", "Ditunda"
+]
+"""Prioritas final keputusan Tim Kajian (sheet PENILAIAN); boleh beda dari saran otomatis."""
+
+StatusPenilaian = Literal[
+    "Belum ditelaah",
+    "Perlu klarifikasi",
+    "Siap untuk telaah yayasan",
+    "Telah diputuskan",
+    "Ditunda",
+]
+"""Status alur sebuah penilaian; `Telah diputuskan` hanya diset aksi putuskan."""
+
+StatusPenilaianManual = Literal[
+    "Belum ditelaah", "Perlu klarifikasi", "Siap untuk telaah yayasan", "Ditunda"
+]
+"""Status yang boleh diset langsung lewat aksi status (tanpa `Telah diputuskan`)."""
