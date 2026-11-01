@@ -49,6 +49,8 @@ from .opm.services.responden_sql import SqlOpmRespondenService
 from .opm.services.sesi import OpmSesiService
 from .opm.services.sesi_sql import SqlOpmSesiService
 from .redesain.schemas.kosakata import GRUP_SEKOLAH_PENGISI, GRUP_TIM_KAJIAN
+from .redesain.services.alternatif import AlternatifService
+from .redesain.services.alternatif_sql import SqlAlternatifService
 from .redesain.services.bukti import BuktiService
 from .redesain.services.bukti_sql import SqlBuktiService
 from .redesain.services.kode_orang import KodeOrangService
@@ -356,6 +358,11 @@ def get_masalah_service(session: SessionDep) -> MasalahService:
         SqlUraianTugasService(session),
         SqlSekolahService(session),
     )
+
+
+def get_alternatif_service(session: SessionDep) -> AlternatifService:
+    """SEAM: `AlternatifService` PostgreSQL (riwayat sesi yang sama; jabatan via seam anjab)."""
+    return SqlAlternatifService(session, SqlRiwayatService(session), SqlJabatanService(session))
 
 
 def get_bukti_service(session: SessionDep) -> BuktiService:

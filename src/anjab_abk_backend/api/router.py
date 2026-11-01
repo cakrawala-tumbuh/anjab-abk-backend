@@ -18,6 +18,7 @@ from .v1 import (
     opm_responden,
     opm_sesi,
     partisipan,
+    redesain_alternatif,
     redesain_bukti,
     redesain_kode_orang,
     redesain_konfirmasi,
@@ -252,6 +253,11 @@ api_router.include_router(
 api_router.include_router(
     redesain_masalah.router,
     prefix="/redesain/masalah",
+    tags=["redesain"],
+)
+api_router.include_router(
+    redesain_alternatif.router,
+    prefix="/redesain/alternatif",
     tags=["redesain"],
 )
 api_router.include_router(

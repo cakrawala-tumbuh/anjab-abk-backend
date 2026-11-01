@@ -95,3 +95,24 @@ StatusPenilaianManual = Literal[
     "Belum ditelaah", "Perlu klarifikasi", "Siap untuk telaah yayasan", "Ditunda"
 ]
 """Status yang boleh diset langsung lewat aksi status (tanpa `Telah diputuskan`)."""
+
+OpsiAlternatif = Literal[
+    "Pertahankan",
+    "Sederhanakan",
+    "Hilangkan pengulangan terbukti",
+    "Perjelas kewenangan",
+    "Perbaiki alat/dukungan",
+    "Uji terbatas",
+    "Alihkan tugas bersyarat",
+]
+"""Opsi alternatif redesain (sheet ALTERNATIF); BUKAN bagian dari skor K1-K4."""
+
+StatusTelaahAlternatif = Literal[
+    "Belum ditelaah",
+    "Siap telaah",
+    "Bersyarat",
+    "Tunda gap material",
+    "Ditolak",
+    "Uji disetujui terpisah",
+]
+"""Status telaah alternatif; hanya berubah lewat payload eksplisit Tim (bukan dari prioritas)."""

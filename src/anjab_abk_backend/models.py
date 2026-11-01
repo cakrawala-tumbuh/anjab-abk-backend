@@ -1034,6 +1034,55 @@ class RedesainBuktiModel(Base):
     )
 
 
+class RedesainAlternatifModel(Base):
+    """Alternatif redesain untuk satu masalah (sheet ALTERNATIF; BUKAN bagian skor K1-K4).
+
+    `kode` dibangkitkan sistem (`U-001`, global). Pihak asal/penerima berupa jabatan (FK
+    `jabatan.id`), bukan orang. `status_telaah` hanya berubah lewat payload eksplisit Tim.
+    `opsi`/`gap_penerima`/`status_telaah` bertipe `String(40)` tanpa CHECK (divalidasi skema).
+    `pemutus_kode_orang` adalah pseudonim (bukan FK). Tidak ada operasi hapus.
+    """
+
+    __tablename__ = "redesain_alternatif"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kode: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    masalah_id: Mapped[str] = mapped_column(
+        ForeignKey("redesain_masalah.id", name="fk_redesain_alternatif_masalah"),
+        nullable=False,
+        index=True,
+    )
+    opsi: Mapped[str] = mapped_column(String(40), nullable=False)
+    alur_kini_vs_usulan: Mapped[str] = mapped_column(Text, nullable=False)
+    pihak_asal_jabatan_id: Mapped[str | None] = mapped_column(
+        ForeignKey("jabatan.id", name="fk_redesain_alternatif_pihak_asal"), nullable=True
+    )
+    pihak_penerima_jabatan_id: Mapped[str | None] = mapped_column(
+        ForeignKey("jabatan.id", name="fk_redesain_alternatif_pihak_penerima"), nullable=True
+    )
+    komitmen_penerima: Mapped[str | None] = mapped_column(Text, nullable=True)
+    jadwal_puncak: Mapped[str | None] = mapped_column(Text, nullable=True)
+    keterampilan_akses: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tambahan_bersih: Mapped[str | None] = mapped_column(Text, nullable=True)
+    risiko_layanan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    gap_penerima: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="Belum tahu", server_default="Belum tahu"
+    )
+    status_telaah: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="Belum ditelaah", server_default="Belum ditelaah"
+    )
+    pemutus_kode_orang: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    keputusan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prasyarat_monitoring: Mapped[str | None] = mapped_column(Text, nullable=True)
+    catatan_versi_bukti: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+
 class RedesainKoreksiLangkahModel(Base):
     """Koreksi pihak pemeriksa atas satu langkah ALUR (append-only; sheet ALUR!N).
 

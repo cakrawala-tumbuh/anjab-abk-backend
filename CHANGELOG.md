@@ -9,6 +9,13 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Alternatif redesain** (backlog #59, butir BE-9a): tabel `redesain_alternatif` (migrasi
+  `a9d4c6e2b8f3`) dan endpoint `tim-kajian` `GET/POST /api/v1/redesain/alternatif`,
+  `POST .../search` (`masalah_id`, `opsi`, `status_telaah`), `GET/PATCH .../alternatif/{id}`.
+  Kode `U-001` dst.; pihak asal/penerima berupa jabatan (divalidasi lewat seam anjab, tak dikenal
+  -> 422). `status_telaah` (default `Belum ditelaah`) hanya berubah lewat payload eksplisit dan
+  tidak pernah diturunkan dari prioritas penilaian. `Alihkan tugas bersyarat` mewajibkan penerima;
+  `Uji disetujui terpisah` mewajibkan `keputusan` dan `pemutus_kode_orang` (juga dicek pada PATCH).
 - **Prioritas final beralasan, status penilaian, agenda yayasan, sebaran K** (backlog #58, butir
   BE-8b): migrasi `d8a3e5b7c9f2` menambah kolom keputusan pada `redesain_penilaian`.
   `POST /api/v1/redesain/penilaian/{id}/putuskan` (tim-kajian) mencatat prioritas final, alasan
