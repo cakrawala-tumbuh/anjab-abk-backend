@@ -73,6 +73,8 @@ from .redesain.services.riwayat import RiwayatService
 from .redesain.services.riwayat_sql import SqlRiwayatService
 from .redesain.services.sesi import SesiService
 from .redesain.services.sesi_sql import SqlSesiService
+from .redesain.services.yayasan import RingkasanYayasanService
+from .redesain.services.yayasan_sql import SqlRingkasanYayasanService
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
 from .services.authentik_provisioner import (
     AuthentikProvisioner,
@@ -387,6 +389,11 @@ def get_bukti_service(session: SessionDep) -> BuktiService:
 def get_penilaian_service(session: SessionDep) -> PenilaianService:
     """SEAM: `PenilaianService` PostgreSQL (riwayat sesi yang sama)."""
     return SqlPenilaianService(session, SqlRiwayatService(session))
+
+
+def get_ringkasan_yayasan_service(session: SessionDep) -> RingkasanYayasanService:
+    """SEAM: `RingkasanYayasanService` PostgreSQL (read-model masalah + penilaian)."""
+    return SqlRingkasanYayasanService(session)
 
 
 def get_proses_service(session: SessionDep) -> ProsesService:

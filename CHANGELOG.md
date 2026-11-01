@@ -9,6 +9,12 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Ringkasan yayasan redesain** (backlog #62, butir BE-10a): read-model `RingkasanYayasanRow`
+  (sheet YAYASAN) dihitung langsung dari masalah LEFT JOIN penilaian, tanpa tabel/migrasi baru.
+  Endpoint khusus `tim-kajian`: `GET /api/v1/redesain/yayasan`, `POST .../yayasan/search`
+  (field `konteks_kode`, `status_bukti`, `saran_otomatis`, `prioritas_final`, `status_penilaian`),
+  `GET .../yayasan/{masalah_id}`. Masalah tanpa penilaian tetap muncul dengan field penilaian
+  `null`; `pemutus` = kode orang + jabatan (tanpa nama); tanpa isi konfirmasi per orang.
 - **Cakupan jabatan redesain** (backlog #61, butir BE-9c): tabel `redesain_cakupan_jabatan`
   (satu baris = entri x cabang, pasangan `role_kode`+`cabang` unik; migrasi `c6f9a2d4e8b1`),
   ter-seed 19 jabatan awal J-01..J-19 x {Bandung, Semarang} = 38 baris (`jabatan_id` NULL).
