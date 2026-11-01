@@ -3,16 +3,23 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from ..models import RedesainCakupanJabatanModel, RedesainKonteksModel, RedesainMasalahModel
+from ..models import (
+    RedesainCakupanJabatanModel,
+    RedesainKonteksModel,
+    RedesainMasalahModel,
+    RedesainVersiMetodeModel,
+)
 from .services.cakupan_jabatan_sql import ENTITAS as ENTITAS_CAKUPAN
 from .services.konteks_sql import ENTITAS
 from .services.masalah_sql import ENTITAS as ENTITAS_MASALAH
 from .services.riwayat_sql import SqlRiwayatService
+from .services.versi_metode_sql import ENTITAS as ENTITAS_VERSI
 
 # (kode, tema, gelombang, ruang_dugaan, sumber_draft, batas_pemeriksaan)
 KONTEKS: tuple[tuple[str, str, str, str, str, str], ...] = (
@@ -376,4 +383,94 @@ def seed_cakupan_jabatan(session: Session) -> int:
             if new_id is not None:
                 riwayat.catat(ENTITAS_CAKUPAN, new_id, "create", None, nilai, None)
                 baru += 1
+    return baru
+
+
+VERSI_METODE: tuple[tuple[str, str, str, str, str], ...] = (
+    (
+        "Model kegiatan",
+        "Tim menyiapkan; sekolah memberi cerita bebas sebelum dugaan lalu memeriksa; yayasan "
+        "menetapkan prioritas dengan alasan.",
+        "Mengurangi beban dan bias persetujuan semu.",
+        "Prototipe; pengujian pengguna belum dilakukan.",
+        "Pimpinan metode",
+    ),
+    (
+        "Formulir sekolah",
+        "Lembar sebelumnya menjadi lembar konfirmasi pra-isi; status Ya/Sebagian/Tidak/Belum, "
+        "koreksi dan masalah lain.",
+        "Koreksi substantif lebih mudah; tidak perlu survei massal.",
+        "DOCX harus diuji dengan pengguna nyata setelah izin.",
+        "PIC sekolah",
+    ),
+    (
+        "Register",
+        "Memisahkan MASALAH, KONFIRMASI, BUKTI, ALUR, PENILAIAN, YAYASAN.",
+        "Jawaban asal dan analisis tidak tertimpa; ringkasan yayasan tidak diisi ulang.",
+        "Uji formula dan relasi di workbook.",
+        "QA tim",
+    ),
+    (
+        "Batas keputusan",
+        "P0 eskalasi, K klarifikasi, P1\u2013P3 prioritas masalah; keputusan alternatif terpisah.",
+        "Menghindari angka tunggal mengesahkan pengalihan.",
+        "Aturan operasional usulan bukan skala tervalidasi.",
+        "Sponsor/pemutus",
+    ),
+    (
+        "Jejak historis",
+        "14 konteks dan 8 masalah draft tetap HIPOTESIS, tanpa rating final.",
+        "Tidak menaikkan dugaan menjadi temuan.",
+        "Audit sumber 619 catatan belum dilaksanakan.",
+        "Tim data",
+    ),
+)
+"""Lima catatan perubahan metode v1.3 (`PERUBAHAN!A5:G9`): (bagian, apa, alasan, uji, pemutus)."""
+
+VERSI_SEED = "v1.3"
+TANGGAL_SEED = date(2026, 10, 31)
+
+
+def seed_versi_metode(session: Session) -> int:
+    """Isi 5 catatan perubahan metode v1.3 secara idempoten.
+
+    Kunci (`versi`, `bagian`), `INSERT ... ON CONFLICT DO NOTHING`: baris yang sudah ada
+    (termasuk suntingan Tim) tidak ditimpa. Tiap baris baru dicatat riwayatnya dengan
+    `pelaku_kode_orang=NULL` (sistem).
+
+    Args:
+        session: Sesi aktif; pemanggil yang commit.
+
+    Returns:
+        Jumlah baris yang baru disisipkan pada pemanggilan ini.
+    """
+    riwayat = SqlRiwayatService(session)
+    baru = 0
+    for bagian, apa, alasan, uji, pemutus in VERSI_METODE:
+        nilai = {
+            "versi": VERSI_SEED,
+            "tanggal": TANGGAL_SEED,
+            "bagian": bagian,
+            "apa_diperbarui": apa,
+            "alasan_risiko": alasan,
+            "status_hasil_uji": uji,
+            "pemeriksa_pemutus": pemutus,
+        }
+        stmt = (
+            insert(RedesainVersiMetodeModel)
+            .values(id=str(uuid.uuid4()), **nilai)
+            .on_conflict_do_nothing(constraint="uq_redesain_versi_metode_versi_bagian")
+            .returning(RedesainVersiMetodeModel.id)
+        )
+        new_id = session.execute(stmt).scalar_one_or_none()
+        if new_id is not None:
+            riwayat.catat(
+                ENTITAS_VERSI,
+                new_id,
+                "create",
+                None,
+                {**nilai, "tanggal": TANGGAL_SEED.isoformat()},
+                None,
+            )
+            baru += 1
     return baru

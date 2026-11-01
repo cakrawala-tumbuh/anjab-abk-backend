@@ -26,7 +26,12 @@ from .db import session_scope
 from .dcs.seed import ITEM as DCS_ITEM
 from .dcs.seed import SUB_SKALA as DCS_SUB_SKALA
 from .models import DcsItemModel, DcsSubSkalaModel, WcpDimensiModel, WcpItemModel
-from .redesain.seed import seed_cakupan_jabatan, seed_konteks, seed_masalah
+from .redesain.seed import (
+    seed_cakupan_jabatan,
+    seed_konteks,
+    seed_masalah,
+    seed_versi_metode,
+)
 from .wcp.seed import DIMENSI as WCP_DIMENSI
 from .wcp.seed import ITEM as WCP_ITEM
 
@@ -117,6 +122,7 @@ def seed_all(session: Session) -> None:
     seed_konteks(session)
     seed_masalah(session)
     seed_cakupan_jabatan(session)
+    seed_versi_metode(session)
 
 
 def main() -> None:

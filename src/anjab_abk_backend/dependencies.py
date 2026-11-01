@@ -73,6 +73,8 @@ from .redesain.services.riwayat import RiwayatService
 from .redesain.services.riwayat_sql import SqlRiwayatService
 from .redesain.services.sesi import SesiService
 from .redesain.services.sesi_sql import SqlSesiService
+from .redesain.services.versi_metode import VersiMetodeService
+from .redesain.services.versi_metode_sql import SqlVersiMetodeService
 from .redesain.services.yayasan import RingkasanYayasanService
 from .redesain.services.yayasan_sql import SqlRingkasanYayasanService
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
@@ -374,6 +376,11 @@ def get_alternatif_service(session: SessionDep) -> AlternatifService:
 def get_cakupan_jabatan_service(session: SessionDep) -> CakupanJabatanService:
     """SEAM: `CakupanJabatanService` PostgreSQL (riwayat sesi yang sama; jabatan via seam anjab)."""
     return SqlCakupanJabatanService(session, SqlRiwayatService(session), SqlJabatanService(session))
+
+
+def get_versi_metode_service(session: SessionDep) -> VersiMetodeService:
+    """SEAM: `VersiMetodeService` PostgreSQL (riwayat sesi yang sama)."""
+    return SqlVersiMetodeService(session, SqlRiwayatService(session))
 
 
 def get_sesi_service(session: SessionDep) -> SesiService:

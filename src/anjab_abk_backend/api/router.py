@@ -30,6 +30,7 @@ from .v1 import (
     redesain_proses,
     redesain_riwayat,
     redesain_sesi,
+    redesain_versi_metode,
     redesain_yayasan,
     sekolah,
     sme_panel,
@@ -267,6 +268,11 @@ api_router.include_router(
 api_router.include_router(
     redesain_cakupan_jabatan.router,
     prefix="/redesain/cakupan-jabatan",
+    tags=["redesain"],
+)
+api_router.include_router(
+    redesain_versi_metode.router,
+    prefix="/redesain/versi-metode",
     tags=["redesain"],
 )
 api_router.include_router(

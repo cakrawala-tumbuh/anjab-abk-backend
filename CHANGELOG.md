@@ -9,6 +9,12 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Log versi metode redesain** (backlog #64, butir BE-11a): tabel `redesain_versi_metode`
+  (migrasi `d7a3b5e9f2c4`, unik `versi`+`bagian`) berisi 5 catatan perubahan metode v1.3
+  (sheet PERUBAHAN) hasil seed idempoten. Endpoint khusus `tim-kajian`:
+  `GET/POST /api/v1/redesain/versi-metode`, `POST .../search` (field `versi`, `bagian`),
+  `GET/PATCH .../versi-metode/{id}`; pasangan ganda 409, tanpa DELETE, perubahan tercatat di riwayat.
+
 - **Ekspor DOCX redesain** (backlog #63, butir BE-10b): dependensi `python-docx>=1.1,<2.0`; modul
   `redesain/ekspor_docx.py` membangun dokumen dari kode. Endpoint khusus `tim-kajian`:
   `GET /api/v1/redesain/ekspor/ringkasan-yayasan/{masalah_id}` (satu halaman),

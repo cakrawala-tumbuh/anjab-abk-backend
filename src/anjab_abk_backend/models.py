@@ -1326,3 +1326,31 @@ class RedesainCakupanJabatanModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
     )
+
+
+class RedesainVersiMetodeModel(Base):
+    """Catatan versi metode redesain (sheet PERUBAHAN paket v1.3), satu baris = versi x bagian.
+
+    Pasangan (`versi`, `bagian`) unik. `pemeriksa_pemutus` berisi peran/jabatan, bukan nama
+    orang. Tidak ada operasi hapus.
+    """
+
+    __tablename__ = "redesain_versi_metode"
+    __table_args__ = (
+        UniqueConstraint("versi", "bagian", name="uq_redesain_versi_metode_versi_bagian"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    versi: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    tanggal: Mapped[date] = mapped_column(Date, nullable=False)
+    bagian: Mapped[str] = mapped_column(String(200), nullable=False)
+    apa_diperbarui: Mapped[str] = mapped_column(Text, nullable=False)
+    alasan_risiko: Mapped[str] = mapped_column(Text, nullable=False)
+    status_hasil_uji: Mapped[str] = mapped_column(Text, nullable=False)
+    pemeriksa_pemutus: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
