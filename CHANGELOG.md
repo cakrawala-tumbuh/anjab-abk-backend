@@ -9,6 +9,14 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Ekspor DOCX redesain** (backlog #63, butir BE-10b): dependensi `python-docx>=1.1,<2.0`; modul
+  `redesain/ekspor_docx.py` membangun dokumen dari kode. Endpoint khusus `tim-kajian`:
+  `GET /api/v1/redesain/ekspor/ringkasan-yayasan/{masalah_id}` (satu halaman),
+  `GET .../ekspor/ringkasan-yayasan?status_penilaian=Siap untuk telaah yayasan` (satu berkas,
+  satu masalah per halaman, urut kode; tanpa hasil 404), dan
+  `GET .../ekspor/lembar-konfirmasi/{masalah_id}` (bagian A terisi, B-E kosong). Isi ringkasan
+  hanya dari read-model yayasan: tanpa nama orang maupun isi konfirmasi per orang.
+
 - **Ringkasan yayasan redesain** (backlog #62, butir BE-10a): read-model `RingkasanYayasanRow`
   (sheet YAYASAN) dihitung langsung dari masalah LEFT JOIN penilaian, tanpa tabel/migrasi baru.
   Endpoint khusus `tim-kajian`: `GET /api/v1/redesain/yayasan`, `POST .../yayasan/search`
