@@ -7,8 +7,14 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.48.1] - 2026-11-02
+
 ### Diperbaiki
 
+- **Sebaran-K tidak lagi membuang versi terkirim saat ralat masih draf** (backlog #66):
+  `GET /api/v1/redesain/masalah/{id}/sebaran-k` kini menganggap sebuah konfirmasi digantikan
+  hanya bila penggantinya berstatus `terkirim`; selama ralat masih draf, versi terkirim
+  sebelumnya tetap dihitung. Skema respons tidak berubah, tanpa migrasi.
 - **Search masalah redesain menerima `id`** (backlog #67): `POST /api/v1/redesain/masalah/search`
   kini mengizinkan field `id` di domain dan order (mis. `[["id","in",[...]]]`), sehingga halaman
   agenda yayasan tidak lagi 422 `not_allowed`. Tanpa migrasi.
