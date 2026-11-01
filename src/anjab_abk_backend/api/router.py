@@ -20,6 +20,7 @@ from .v1 import (
     partisipan,
     redesain_kode_orang,
     redesain_konteks,
+    redesain_masalah,
     redesain_riwayat,
     sekolah,
     sme_panel,
@@ -242,5 +243,10 @@ api_router.include_router(
 api_router.include_router(
     redesain_konteks.router,
     prefix="/redesain/konteks",
+    tags=["redesain"],
+)
+api_router.include_router(
+    redesain_masalah.router,
+    prefix="/redesain/masalah",
     tags=["redesain"],
 )

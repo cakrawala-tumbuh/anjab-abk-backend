@@ -851,3 +851,72 @@ class RedesainKonteksModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
     )
+
+
+class RedesainMasalahModel(Base):
+    """Hipotesis masalah lokal per sekolah/periode (sheet MASALAH paket v1.3).
+
+    `kode` dibangkitkan sistem (`M-K01-01`). `sekolah_id` NULL = "Belum ditetapkan"
+    (teks bebasnya di `keterangan_sekolah`). `status_awal` membeku begitu
+    `status_awal_dibekukan_pada` terisi (diisi alur konfirmasi sekolah, BE-6a).
+    `status_awal`/`gelombang` bertipe `String(40)` tanpa CHECK (divalidasi skema).
+    Tidak ada operasi hapus.
+    """
+
+    __tablename__ = "redesain_masalah"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kode: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    konteks_id: Mapped[str] = mapped_column(
+        ForeignKey("redesain_konteks.id"), nullable=False, index=True
+    )
+    sekolah_id: Mapped[str | None] = mapped_column(
+        ForeignKey("sekolah.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    keterangan_sekolah: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    periode_acuan: Mapped[str] = mapped_column(String(100), nullable=False)
+    periode_pasti: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    rumusan_hipotesis: Mapped[str] = mapped_column(Text, nullable=False)
+    sumber_awal_keterbatasan: Mapped[str] = mapped_column(Text, nullable=False)
+    status_awal: Mapped[str] = mapped_column(String(40), nullable=False)
+    gelombang: Mapped[str] = mapped_column(String(40), nullable=False)
+    penjelasan_alternatif: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pic_kode_orang: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    dibuka_untuk_konfirmasi: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    status_awal_dibekukan_pada: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+
+class RedesainMasalahUraianTugasModel(Base):
+    """Tautan masalah redesain ↔ uraian tugas katalog Task Inventory (PK gabungan).
+
+    Kedua FK `ON DELETE CASCADE`: masalah atau uraian tugas yang terhapus ikut
+    melepaskan tautannya.
+    """
+
+    __tablename__ = "redesain_masalah_uraian_tugas"
+
+    masalah_id: Mapped[str] = mapped_column(
+        ForeignKey("redesain_masalah.id", ondelete="CASCADE"), primary_key=True
+    )
+    uraian_tugas_id: Mapped[str] = mapped_column(
+        # Nama eksplisit: hasil naming_convention (64 karakter) melewati batas 63 PostgreSQL.
+        ForeignKey(
+            "ti_uraian_tugas.id",
+            ondelete="CASCADE",
+            name="fk_redesain_masalah_ut_uraian_tugas_id_ti_uraian_tugas",
+        ),
+        primary_key=True,
+        index=True,
+    )
