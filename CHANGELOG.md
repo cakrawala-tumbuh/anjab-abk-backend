@@ -9,6 +9,15 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Sesi partisipasi redesain** (backlog #60, butir BE-9b): tabel `redesain_sesi` (satu baris =
+  satu orang x satu sesi, pasangan `kode_sesi`+`kode_orang` unik) dan `redesain_sesi_masalah`
+  (migrasi `b5e8f1c3d7a2`). Endpoint `tim-kajian` `GET/POST /api/v1/redesain/sesi`,
+  `POST .../search` (`kode_sesi`, `kode_orang`, `jenis_kegiatan`, `status_izin`),
+  `GET/PATCH .../sesi/{id}` (`masalah_ids` ganti-penuh), dan read-model
+  `GET .../sesi/rekap-orang` (jumlah sesi berbeda + total menit rencana/disepakati per orang; NULL
+  diabaikan, semua NULL -> null). `status_izin` hanya informasi dan tidak memblokir apa pun
+  (termasuk `Tidak diotorisasi`). Pasangan ganda -> 409; menit negatif, kode orang/PIC, sekolah,
+  atau masalah tak dikenal -> 422. Bukan Time Study.
 - **Alternatif redesain** (backlog #59, butir BE-9a): tabel `redesain_alternatif` (migrasi
   `a9d4c6e2b8f3`) dan endpoint `tim-kajian` `GET/POST /api/v1/redesain/alternatif`,
   `POST .../search` (`masalah_id`, `opsi`, `status_telaah`), `GET/PATCH .../alternatif/{id}`.

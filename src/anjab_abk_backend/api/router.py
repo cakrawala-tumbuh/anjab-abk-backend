@@ -27,6 +27,7 @@ from .v1 import (
     redesain_penilaian,
     redesain_proses,
     redesain_riwayat,
+    redesain_sesi,
     sekolah,
     sme_panel,
     system,
@@ -258,6 +259,11 @@ api_router.include_router(
 api_router.include_router(
     redesain_alternatif.router,
     prefix="/redesain/alternatif",
+    tags=["redesain"],
+)
+api_router.include_router(
+    redesain_sesi.router,
+    prefix="/redesain/sesi",
     tags=["redesain"],
 )
 api_router.include_router(

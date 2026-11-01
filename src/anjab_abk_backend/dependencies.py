@@ -69,6 +69,8 @@ from .redesain.services.proses import ProsesService
 from .redesain.services.proses_sql import SqlProsesService
 from .redesain.services.riwayat import RiwayatService
 from .redesain.services.riwayat_sql import SqlRiwayatService
+from .redesain.services.sesi import SesiService
+from .redesain.services.sesi_sql import SqlSesiService
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
 from .services.authentik_provisioner import (
     AuthentikProvisioner,
@@ -363,6 +365,11 @@ def get_masalah_service(session: SessionDep) -> MasalahService:
 def get_alternatif_service(session: SessionDep) -> AlternatifService:
     """SEAM: `AlternatifService` PostgreSQL (riwayat sesi yang sama; jabatan via seam anjab)."""
     return SqlAlternatifService(session, SqlRiwayatService(session), SqlJabatanService(session))
+
+
+def get_sesi_service(session: SessionDep) -> SesiService:
+    """SEAM: `SesiService` PostgreSQL (riwayat sesi yang sama; sekolah via seam core)."""
+    return SqlSesiService(session, SqlRiwayatService(session), SqlSekolahService(session))
 
 
 def get_bukti_service(session: SessionDep) -> BuktiService:

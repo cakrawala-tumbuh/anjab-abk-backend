@@ -116,3 +116,22 @@ StatusTelaahAlternatif = Literal[
     "Uji disetujui terpisah",
 ]
 """Status telaah alternatif; hanya berubah lewat payload eksplisit Tim (bukan dari prioritas)."""
+
+JenisKegiatanSesi = Literal[
+    "Klarifikasi",
+    "Serah terima",
+    "Telaah sumber",
+    "Pemeriksaan pimpinan",
+    "Forum bersama",
+    "Telaah yayasan",
+    "Lainnya",
+]
+"""Jenis kegiatan sebuah sesi partisipasi (sheet SESI)."""
+
+StatusIzinSesi = Literal[
+    "Belum ditetapkan",
+    "Sudah sesuai izin",
+    "Perlu peninjauan izin",
+    "Tidak diotorisasi",
+]
+"""Status izin kegiatan & waktu sebuah sesi; HANYA informasi, tidak pernah memblokir."""

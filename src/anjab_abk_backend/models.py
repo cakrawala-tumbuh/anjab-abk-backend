@@ -1083,6 +1083,67 @@ class RedesainAlternatifModel(Base):
     )
 
 
+class RedesainSesiModel(Base):
+    """Keterlibatan satu orang pada satu sesi kegiatan redesain (sheet SESI; BUKAN Time Study).
+
+    Satu baris = satu orang (`kode_orang`, pseudonim) × satu sesi (`kode_sesi`, dibagi
+    semua peserta satu kegiatan, diisi Tim). Pasangan keduanya unik. Menit dicatat sekali
+    per baris. `status_izin` hanya informasi — tidak memblokir apa pun, termasuk
+    `Tidak diotorisasi`. `jenis_kegiatan`/`status_izin` bertipe `String(40)` tanpa CHECK
+    (divalidasi skema). `kode_orang`/`pic_kode_orang` bukan FK. Tidak ada operasi hapus.
+    """
+
+    __tablename__ = "redesain_sesi"
+    __table_args__ = (
+        UniqueConstraint("kode_sesi", "kode_orang", name="uq_redesain_sesi_kode_sesi_kode_orang"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kode_sesi: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    kode_orang: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    sekolah_id: Mapped[str | None] = mapped_column(
+        ForeignKey("sekolah.id", ondelete="SET NULL", name="fk_redesain_sesi_sekolah"),
+        nullable=True,
+        index=True,
+    )
+    peran: Mapped[str] = mapped_column(String(200), nullable=False)
+    jenis_kegiatan: Mapped[str] = mapped_column(String(40), nullable=False)
+    menit_rencana: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    menit_disepakati: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    waktu_kalender: Mapped[str | None] = mapped_column(Text, nullable=True)
+    catatan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status_izin: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="Belum ditetapkan", server_default="Belum ditetapkan"
+    )
+    versi_izin: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    pic_kode_orang: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    tindak_lanjut: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+
+class RedesainSesiMasalahModel(Base):
+    """Tautan sesi partisipasi ↔ masalah redesain (PK gabungan; kedua FK `ON DELETE CASCADE`)."""
+
+    __tablename__ = "redesain_sesi_masalah"
+
+    sesi_id: Mapped[str] = mapped_column(
+        ForeignKey("redesain_sesi.id", ondelete="CASCADE", name="fk_redesain_sesi_masalah_sesi"),
+        primary_key=True,
+    )
+    masalah_id: Mapped[str] = mapped_column(
+        ForeignKey(
+            "redesain_masalah.id", ondelete="CASCADE", name="fk_redesain_sesi_masalah_masalah"
+        ),
+        primary_key=True,
+        index=True,
+    )
+
+
 class RedesainKoreksiLangkahModel(Base):
     """Koreksi pihak pemeriksa atas satu langkah ALUR (append-only; sheet ALUR!N).
 
