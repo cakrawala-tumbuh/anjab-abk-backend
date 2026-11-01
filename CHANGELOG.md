@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.48.0] - 2026-11-01
+
 ### Ditambahkan
 
 - **Ekspor register XLSX 14 sheet** (backlog #65, butir BE-11b): `GET
