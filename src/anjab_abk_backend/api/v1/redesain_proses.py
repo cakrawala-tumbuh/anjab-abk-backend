@@ -14,11 +14,15 @@ from ...dependencies import (
     READ_GUARDS,
     Pagination,
     get_kode_orang_pemanggil,
+    get_koreksi_service,
     get_proses_service,
     pagination_params,
     rate_limit,
     require_tim_kajian,
+    require_tim_kajian_atau_pengisi,
 )
+from ...redesain.schemas.koreksi import KoreksiCreate, KoreksiRead
+from ...redesain.schemas.kosakata import GRUP_TIM_KAJIAN
 from ...redesain.schemas.proses import (
     LangkahCreate,
     LangkahRead,
@@ -27,9 +31,11 @@ from ...redesain.schemas.proses import (
     ProsesRead,
     ProsesUpdate,
 )
+from ...redesain.services.koreksi import KoreksiService
 from ...redesain.services.proses import ProsesService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ...security import Principal
 
 router = APIRouter()
 router_langkah = APIRouter()
@@ -195,3 +201,69 @@ def update_langkah(
 ) -> LangkahRead:
     """Ubah parsial langkah; `kode`/`proses_id` read-only. Riwayat dicatat."""
     return service.update_langkah(langkah_id, data, pelaku_kode_orang=pelaku)
+
+
+@router_langkah.post(
+    "/{langkah_id}/koreksi",
+    response_model=KoreksiRead,
+    status_code=201,
+    summary="Tulis koreksi untuk satu langkah (tim-kajian atau sekolah-pengisi)",
+    operation_id="redesain_langkah_koreksi_create",
+    dependencies=[Depends(rate_limit)],
+    responses={
+        **_AUTH,
+        **_RATE,
+        403: {
+            "model": ErrorResponse,
+            "description": (
+                "Tanpa `konfirmasi_id` (pengisi), konfirmasi bukan milik pemanggil, atau "
+                "langkah di luar masalah/sekolah konfirmasi."
+            ),
+        },
+        404: {"model": ErrorResponse, "description": "Langkah/konfirmasi tidak ditemukan."},
+        409: {
+            "model": ErrorResponse,
+            "description": "Dugaan belum ditampilkan (`DUGAAN_BELUM_DITAMPILKAN`).",
+        },
+        422: {"model": ErrorResponse, "description": "`isi` kosong."},
+    },
+)
+def create_koreksi_langkah(
+    langkah_id: str,
+    data: KoreksiCreate,
+    principal: Annotated[Principal, Depends(require_tim_kajian_atau_pengisi)],
+    pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    service: Annotated[KoreksiService, Depends(get_koreksi_service)],
+) -> KoreksiRead:
+    """Tambah koreksi append-only; isi langkah TIDAK berubah.
+
+    `tim-kajian` boleh tanpa `konfirmasi_id` (tersimpan NULL). `sekolah-pengisi` wajib
+    menyertakan `konfirmasi_id` miliknya yang dugaannya sudah tampil, untuk masalah dan
+    sekolah yang sama dengan proses langkah itu. Riwayat `entitas="koreksi_langkah"`.
+    """
+    if GRUP_TIM_KAJIAN in principal.groups:
+        return service.tambah_oleh_tim(langkah_id, data.isi, kode_orang=pelaku)
+    return service.tambah_oleh_pengisi(langkah_id, data.isi, data.konfirmasi_id, kode_orang=pelaku)
+
+
+@router_langkah.get(
+    "/{langkah_id}/koreksi",
+    response_model=Page[KoreksiRead],
+    summary="Daftar koreksi sebuah langkah (tim-kajian)",
+    operation_id="redesain_langkah_koreksi_list",
+    dependencies=_READ,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        404: {"model": ErrorResponse, "description": "Langkah tidak ditemukan."},
+    },
+)
+def list_koreksi_langkah(
+    langkah_id: str,
+    page: Annotated[Pagination, Depends(pagination_params)],
+    service: Annotated[KoreksiService, Depends(get_koreksi_service)],
+) -> Page[KoreksiRead]:
+    """Seluruh koreksi langkah (Tim maupun sekolah) terurut `waktu`."""
+    items, total = service.list_by_langkah(langkah_id, limit=page.limit, offset=page.offset)
+    return Page[KoreksiRead](items=items, total=total, limit=page.limit, offset=page.offset)

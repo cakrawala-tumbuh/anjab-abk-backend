@@ -19,6 +19,7 @@ from ...dependencies import (
     Pagination,
     get_kode_orang_service,
     get_konfirmasi_service,
+    get_koreksi_service,
     get_partisipan_service,
     pagination_params,
     rate_limit,
@@ -33,9 +34,11 @@ from ...redesain.schemas.konfirmasi import (
     KonfirmasiUpdate,
     MasalahSekolahRead,
 )
+from ...redesain.schemas.koreksi import AlurRead
 from ...redesain.schemas.kosakata import GRUP_TIM_KAJIAN
 from ...redesain.services.kode_orang import KodeOrangService
 from ...redesain.services.konfirmasi import KonfirmasiService
+from ...redesain.services.koreksi import KoreksiService
 from ...schemas.common import ErrorResponse, Page
 from ...security import Principal
 
@@ -267,3 +270,33 @@ def kirim_konfirmasi(
     bila `indikasi_risiko="Ada indikasi"`. Riwayat `aksi="kirim"` dicatat.
     """
     return service.kirim(konfirmasi_id, kode_orang=pengisi.kode_orang)
+
+
+@router.get(
+    "/{konfirmasi_id}/alur",
+    response_model=AlurRead,
+    summary="Peta langkah alur sekolah Anda setelah dugaan tampil (sekolah-pengisi)",
+    operation_id="redesain_konfirmasi_alur",
+    dependencies=READ_GUARDS,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOTFOUND,
+        409: {
+            "model": ErrorResponse,
+            "description": "Dugaan belum ditampilkan (`DUGAAN_BELUM_DITAMPILKAN`).",
+        },
+    },
+)
+def get_alur_konfirmasi(
+    konfirmasi_id: str,
+    pengisi: PengisiDep,
+    service: Annotated[KoreksiService, Depends(get_koreksi_service)],
+) -> AlurRead:
+    """Proses dengan `masalah_id` dan `sekolah_id` sama dengan konfirmasi, beserta langkahnya.
+
+    Hanya pemilik konfirmasi; proses sekolah lain tidak pernah ikut. Sebelum dugaan
+    ditampilkan → 409.
+    """
+    return service.alur_untuk_konfirmasi(konfirmasi_id, kode_orang=pengisi.kode_orang)

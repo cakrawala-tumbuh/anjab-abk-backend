@@ -24,6 +24,13 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
   DELETE). `GET /api/v1/redesain/kode-orang/saya` (grup `tim-kajian` atau `sekolah-pengisi`)
   mengembalikan `{kode}` milik pemanggil tanpa `partisipan_id`. Dependency
   `get_kode_orang_pemanggil` menjadi sumber `pelaku_kode_orang` bagi riwayat.
+- **Alur untuk sekolah & koreksi langkah** (backlog #54, butir BE-5b): tabel append-only
+  `redesain_koreksi_langkah` (migrasi `f4c7d2a9b6e1`). `GET /api/v1/redesain/konfirmasi/{id}/alur`
+  (`sekolah-pengisi` pemilik) menampilkan proses sekolah & masalah konfirmasi itu beserta
+  langkahnya, hanya setelah dugaan ditampilkan (sebelumnya 409 `DUGAAN_BELUM_DITAMPILKAN`).
+  `POST /api/v1/redesain/langkah/{id}/koreksi` menyimpan koreksi per langkah tanpa mengubah
+  langkah (pengisi wajib `konfirmasi_id` miliknya; `tim-kajian` boleh tanpa), dan
+  `GET .../koreksi` (hanya `tim-kajian`) membacanya terurut waktu. Tanpa PATCH/PUT/DELETE.
 - **Alur redesain: proses & langkah** (backlog #52, butir BE-5a): tabel `redesain_proses`
   dan `redesain_langkah` (migrasi `c5d9f13a7b42`). Tim Kajian mencatat proses per
   masalah × sekolah berkode global `P-001` beserta langkahnya berkode `P-001-S01`, `-S02`, …

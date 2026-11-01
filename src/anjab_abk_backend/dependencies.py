@@ -55,6 +55,8 @@ from .redesain.services.konfirmasi import KonfirmasiService
 from .redesain.services.konfirmasi_sql import SqlKonfirmasiService
 from .redesain.services.konteks import KonteksService
 from .redesain.services.konteks_sql import SqlKonteksService
+from .redesain.services.koreksi import KoreksiService
+from .redesain.services.koreksi_sql import SqlKoreksiService
 from .redesain.services.masalah import MasalahService
 from .redesain.services.masalah_sql import SqlMasalahService
 from .redesain.services.proses import ProsesService
@@ -360,6 +362,11 @@ def get_proses_service(session: SessionDep) -> ProsesService:
 def get_konfirmasi_service(session: SessionDep) -> KonfirmasiService:
     """SEAM: `KonfirmasiService` PostgreSQL (riwayat sesi yang sama)."""
     return SqlKonfirmasiService(session, SqlRiwayatService(session))
+
+
+def get_koreksi_service(session: SessionDep) -> KoreksiService:
+    """SEAM: `KoreksiService` PostgreSQL (koreksi langkah append-only; riwayat sesi yang sama)."""
+    return SqlKoreksiService(session, SqlRiwayatService(session))
 
 
 def get_kode_orang_service(session: SessionDep) -> KodeOrangService:

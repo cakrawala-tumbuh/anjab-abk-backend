@@ -983,6 +983,33 @@ class RedesainLangkahModel(Base):
     )
 
 
+class RedesainKoreksiLangkahModel(Base):
+    """Koreksi pihak pemeriksa atas satu langkah ALUR (append-only; sheet ALUR!N).
+
+    Disimpan terpisah dari langkah sehingga keterangan tiap pihak tidak saling menimpa.
+    `konfirmasi_id` NULL bila ditulis Tim Kajian. `kode_orang` adalah pseudonim penulis
+    (bukan FK). Tidak ada operasi ubah/hapus.
+    """
+
+    __tablename__ = "redesain_koreksi_langkah"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    langkah_id: Mapped[str] = mapped_column(
+        ForeignKey("redesain_langkah.id", name="fk_redesain_koreksi_langkah_langkah"),
+        nullable=False,
+        index=True,
+    )
+    konfirmasi_id: Mapped[str | None] = mapped_column(
+        ForeignKey("redesain_konfirmasi.id", name="fk_redesain_koreksi_langkah_konfirmasi"),
+        nullable=True,
+    )
+    kode_orang: Mapped[str] = mapped_column(String(20), nullable=False)
+    isi: Mapped[str] = mapped_column(Text, nullable=False)
+    waktu: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+
+
 class RedesainKonfirmasiModel(Base):
     """Konfirmasi sekolah satu orang atas satu masalah (sheet KONFIRMASI, Lembar Konfirmasi).
 
