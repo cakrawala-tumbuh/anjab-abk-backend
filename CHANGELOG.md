@@ -9,6 +9,13 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Bukti redesain** (backlog #56, butir BE-7): tabel `redesain_bukti` (migrasi `b6e1d9f4a2c7`)
+  dan endpoint `tim-kajian` `GET/POST /api/v1/redesain/bukti`, `POST .../search`,
+  `GET/PATCH .../bukti/{id}`. Bukti berkode `B-NNNN`, berupa rujukan teks per klaim (tanpa
+  unggah berkas), opsional menunjuk satu langkah ALUR milik proses masalah yang sama (selain itu
+  422); pembuat/pemeriksa dirujuk lewat kode orang yang harus dikenal (422). Kosakata baru
+  `JenisBukti` dan `StatusPemeriksaanBukti` (default `Belum diperiksa`); perubahan dicatat di
+  riwayat (`entitas="bukti"`). Tidak ada DELETE.
 - **Ralat konfirmasi, daftar Tim, angkat masalah baru, dan isian luring** (backlog #55, butir
   BE-6b): kolom `redesain_masalah.sumber_konfirmasi_id` (migrasi `a5d8c3e7b2f9`).
   `POST /api/v1/redesain/konfirmasi/{id}/ralat` (`sekolah-pengisi` pemilik) membuat draf versi

@@ -989,6 +989,51 @@ class RedesainLangkahModel(Base):
     )
 
 
+class RedesainBuktiModel(Base):
+    """Bukti per klaim untuk satu masalah redesain (sheet BUKTI), opsional menunjuk satu langkah.
+
+    Bukti berupa rujukan teks (lokasi/nama dokumen), bukan berkas unggahan. `kode`
+    dibangkitkan sistem (`B-0001`, global). `jenis`/`independen`/`status_pemeriksaan` bertipe
+    `String(40)` tanpa CHECK (divalidasi skema). `*_kode_orang` adalah pseudonim (bukan FK).
+    Tidak ada operasi hapus.
+    """
+
+    __tablename__ = "redesain_bukti"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kode: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    masalah_id: Mapped[str] = mapped_column(
+        ForeignKey("redesain_masalah.id", name="fk_redesain_bukti_masalah"),
+        nullable=False,
+        index=True,
+    )
+    langkah_id: Mapped[str | None] = mapped_column(
+        ForeignKey("redesain_langkah.id", name="fk_redesain_bukti_langkah"),
+        nullable=True,
+        index=True,
+    )
+    unit_periode: Mapped[str] = mapped_column(String(200), nullable=False)
+    jenis: Mapped[str] = mapped_column(String(40), nullable=False)
+    pembuat_kode_orang: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    pembuat_peran: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    independen: Mapped[str] = mapped_column(String(40), nullable=False)
+    klaim_didukung: Mapped[str] = mapped_column(Text, nullable=False)
+    klaim_tidak_didukung: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tanggal_versi_lokasi: Mapped[str] = mapped_column(Text, nullable=False)
+    status_pemeriksaan: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="Belum diperiksa", server_default="Belum diperiksa"
+    )
+    pemeriksa_kode_orang: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    alasan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    catatan_privasi_gap: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+
 class RedesainKoreksiLangkahModel(Base):
     """Koreksi pihak pemeriksa atas satu langkah ALUR (append-only; sheet ALUR!N).
 

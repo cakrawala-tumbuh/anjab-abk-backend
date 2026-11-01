@@ -57,3 +57,22 @@ SumberKonfirmasi = Literal["daring", "luring"]
 
 StatusKonfirmasi = Literal["draf", "terkirim"]
 """Status konfirmasi; `terkirim` tidak dapat diubah lagi."""
+
+JenisBukti = Literal[
+    "SK/aturan",
+    "Keterangan pemegang",
+    "Pihak serah terima",
+    "Jadwal",
+    "Jejak sistem",
+    "Keluaran/dokumen",
+    "Lainnya",
+]
+"""Jenis sumber sebuah bukti (sheet BUKTI)."""
+
+StatusPemeriksaanBukti = Literal[
+    "Belum diperiksa",
+    "Diperiksa terbatas",
+    "Diperiksa sesuai klaim",
+    "Diperselisihkan",
+]
+"""Status pemeriksaan sebuah bukti (istilah "Diperiksa sesuai klaim" dipertahankan apa adanya)."""
