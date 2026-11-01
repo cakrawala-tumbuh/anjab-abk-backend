@@ -860,6 +860,8 @@ class RedesainMasalahModel(Base):
     (teks bebasnya di `keterangan_sekolah`). `status_awal` membeku begitu
     `status_awal_dibekukan_pada` terisi (diisi alur konfirmasi sekolah, BE-6a).
     `status_awal`/`gelombang` bertipe `String(40)` tanpa CHECK (divalidasi skema).
+    `eskalasi_pada` diisi saat konfirmasi pertama ber-`indikasi_risiko="Ada indikasi"`
+    terkirim (penanda untuk Tim; tidak ada notifikasi keluar sistem).
     Tidak ada operasi hapus.
     """
 
@@ -890,6 +892,7 @@ class RedesainMasalahModel(Base):
     status_awal_dibekukan_pada: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    eskalasi_pada: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )
@@ -972,6 +975,65 @@ class RedesainLangkahModel(Base):
     pemeriksa_pemutus: Mapped[str | None] = mapped_column(String(200), nullable=True)
     hambatan: Mapped[str | None] = mapped_column(Text, nullable=True)
     status_langkah: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+
+class RedesainKonfirmasiModel(Base):
+    """Konfirmasi sekolah satu orang atas satu masalah (sheet KONFIRMASI, Lembar Konfirmasi).
+
+    Urutan anti-persetujuan-semu ditegakkan lewat tiga stempel waktu: `cerita_dikunci_pada`
+    (cerita bebas dikunci) → `dugaan_ditampilkan_pada` (rumusan hipotesis diperlihatkan)
+    → `dikirim_pada` (status `terkirim`, tidak dapat diubah lagi). `kode_orang` adalah
+    pseudonim pengisi (bukan FK — sama seperti `pelaku_kode_orang` riwayat). Kolom pilihan
+    (`sumber`, `kesesuaian`, `k1`…`k4`, `indikasi_risiko`, `status`) bertipe `String(40)`
+    tanpa CHECK (divalidasi skema). `menggantikan_id` disiapkan untuk ralat (BE-6b).
+    """
+
+    __tablename__ = "redesain_konfirmasi"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    masalah_id: Mapped[str] = mapped_column(
+        ForeignKey("redesain_masalah.id"), nullable=False, index=True
+    )
+    kode_orang: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    sekolah_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    sumber: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="daring", server_default=text("'daring'")
+    )
+    peran: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    tanggal: Mapped[date] = mapped_column(Date, nullable=False)
+    cerita_sebelum: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cerita_dikunci_pada: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    dugaan_ditampilkan_pada: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    dikirim_pada: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    kesesuaian: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    koreksi: Mapped[str | None] = mapped_column(Text, nullable=True)
+    masalah_baru: Mapped[str | None] = mapped_column(Text, nullable=True)
+    alasan_k: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bukti_dapat_diperiksa: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hal_belum_jelas: Mapped[str | None] = mapped_column(Text, nullable=True)
+    catatan_independensi: Mapped[str | None] = mapped_column(Text, nullable=True)
+    catatan_akses: Mapped[str | None] = mapped_column(Text, nullable=True)
+    k1: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    k2: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    k3: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    k4: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    indikasi_risiko: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="draf", server_default=text("'draf'")
+    )
+    menggantikan_id: Mapped[str | None] = mapped_column(
+        ForeignKey("redesain_konfirmasi.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )

@@ -19,6 +19,7 @@ from .v1 import (
     opm_sesi,
     partisipan,
     redesain_kode_orang,
+    redesain_konfirmasi,
     redesain_konteks,
     redesain_masalah,
     redesain_proses,
@@ -259,5 +260,15 @@ api_router.include_router(
 api_router.include_router(
     redesain_proses.router_langkah,
     prefix="/redesain/langkah",
+    tags=["redesain"],
+)
+api_router.include_router(
+    redesain_konfirmasi.router_sekolah,
+    prefix="/redesain/sekolah",
+    tags=["redesain"],
+)
+api_router.include_router(
+    redesain_konfirmasi.router,
+    prefix="/redesain/konfirmasi",
     tags=["redesain"],
 )

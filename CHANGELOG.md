@@ -34,6 +34,19 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
   `PATCH /api/v1/redesain/langkah/{id}`; tanpa DELETE. Sekolah proses wajib sama dengan
   sekolah masalah bila masalah sudah bersekolah (selisih → 422). Setiap create/update
   dicatat di riwayat (`entitas="proses"`/`"langkah"`).
+- **Konfirmasi sekolah redesain** (backlog #53, butir BE-6a): tabel `redesain_konfirmasi` dan
+  kolom `redesain_masalah.eskalasi_pada` (migrasi `e3b9a6c2f1d8`). Pengguna grup
+  `sekolah-pengisi` mengisi sendiri konfirmasi masalah sekolahnya dengan urutan yang
+  ditegakkan sistem: `GET /api/v1/redesain/sekolah/masalah` (masalah yang dibuka, tanpa
+  `rumusan_hipotesis`), `POST /api/v1/redesain/konfirmasi` (draf), `PATCH .../{id}`,
+  `POST .../{id}/kunci-cerita`, `POST .../{id}/tampilkan-dugaan` (rumusan hipotesis baru
+  terbuka setelah cerita dikunci; sebelumnya 409 `CERITA_BELUM_DIKUNCI`), dan
+  `POST .../{id}/kirim` (wajib `peran`, `kesesuaian`, `k1`…`k4`, `indikasi_risiko`).
+  `GET .../{id}` untuk pemilik atau `tim-kajian` (field `dugaan_diperlihatkan`). Penilaian
+  bagian C–E baru bisa diisi setelah dugaan tampil (`DUGAAN_BELUM_DITAMPILKAN`), cerita tak
+  bisa diubah setelah dikunci (`CERITA_SUDAH_DIKUNCI`), dan konfirmasi terkirim tak dapat
+  diubah. Kirim membekukan status awal masalah dan, bila `indikasi_risiko="Ada indikasi"`,
+  menandai `eskalasi_pada`. Sekolah lain / masalah belum dibuka → 403; tanpa PUT/DELETE.
 
 ## [0.47.0] - 2026-09-25
 

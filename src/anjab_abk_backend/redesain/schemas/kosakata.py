@@ -48,3 +48,12 @@ Indikasi = Literal["Ada indikasi", "Tidak terlihat", "Belum tahu"]
 
 YaTidak = Literal["Ya", "Tidak", "Belum tahu"]
 """Pilihan untuk field ya/tidak selain indikasi risiko (jangan pakai `Indikasi`)."""
+
+Kesesuaian = Literal["Ya", "Sebagian", "Tidak", "Belum bisa memastikan"]
+"""Kesesuaian dugaan Tim dengan keadaan sekolah (Lembar Konfirmasi bagian C)."""
+
+SumberKonfirmasi = Literal["daring", "luring"]
+"""Asal isian konfirmasi: diisi sendiri lewat aplikasi (`daring`) atau isian kertas (`luring`)."""
+
+StatusKonfirmasi = Literal["draf", "terkirim"]
+"""Status konfirmasi; `terkirim` tidak dapat diubah lagi."""

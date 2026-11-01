@@ -51,6 +51,8 @@ from .opm.services.sesi_sql import SqlOpmSesiService
 from .redesain.schemas.kosakata import GRUP_SEKOLAH_PENGISI, GRUP_TIM_KAJIAN
 from .redesain.services.kode_orang import KodeOrangService
 from .redesain.services.kode_orang_sql import SqlKodeOrangService
+from .redesain.services.konfirmasi import KonfirmasiService
+from .redesain.services.konfirmasi_sql import SqlKonfirmasiService
 from .redesain.services.konteks import KonteksService
 from .redesain.services.konteks_sql import SqlKonteksService
 from .redesain.services.masalah import MasalahService
@@ -355,6 +357,11 @@ def get_proses_service(session: SessionDep) -> ProsesService:
     return SqlProsesService(session, SqlRiwayatService(session), SqlSekolahService(session))
 
 
+def get_konfirmasi_service(session: SessionDep) -> KonfirmasiService:
+    """SEAM: `KonfirmasiService` PostgreSQL (riwayat sesi yang sama)."""
+    return SqlKonfirmasiService(session, SqlRiwayatService(session))
+
+
 def get_kode_orang_service(session: SessionDep) -> KodeOrangService:
     """SEAM: implementasi `KodeOrangService` berbasis PostgreSQL (riwayat sesi yang sama)."""
     return SqlKodeOrangService(session, SqlRiwayatService(session))
@@ -440,6 +447,19 @@ def require_tim_kajian(
     """
     if GRUP_TIM_KAJIAN not in principal.groups:
         raise ForbiddenError("Akses ditolak: hanya Tim Kajian yang dapat mengakses data redesain.")
+    return principal
+
+
+def require_sekolah_pengisi(
+    principal: Annotated[Principal, Depends(get_current_principal)],
+) -> Principal:
+    """Guard otorisasi: hanya anggota grup `sekolah-pengisi` (pengisi konfirmasi sekolah).
+
+    `tim-kajian` maupun `admin` TIDAK otomatis lolos — isian konfirmasi adalah suara
+    sekolah sendiri, bukan diisikan Tim.
+    """
+    if GRUP_SEKOLAH_PENGISI not in principal.groups:
+        raise ForbiddenError("Akses ditolak: hanya sekolah pengisi yang dapat mengisi konfirmasi.")
     return principal
 
 
