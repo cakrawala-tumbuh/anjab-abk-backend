@@ -824,3 +824,30 @@ class RedesainKodeOrangModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )
+
+
+class RedesainKonteksModel(Base):
+    """Katalog konteks usulan redesain (K-01...K-14 paket v1.3).
+
+    Tidak pernah dihapus; konteks dinonaktifkan lewat `aktif=False`. `gelombang`
+    bertipe `String(40)` tanpa CHECK (divalidasi skema `Gelombang`).
+    """
+
+    __tablename__ = "redesain_konteks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kode: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
+    tema: Mapped[str] = mapped_column(String(200), nullable=False)
+    gelombang: Mapped[str] = mapped_column(String(40), nullable=False)
+    ruang_dugaan: Mapped[str] = mapped_column(Text, nullable=False)
+    sumber_draft: Mapped[str] = mapped_column(Text, nullable=False)
+    batas_pemeriksaan: Mapped[str] = mapped_column(Text, nullable=False)
+    aktif: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )

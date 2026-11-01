@@ -51,6 +51,8 @@ from .opm.services.sesi_sql import SqlOpmSesiService
 from .redesain.schemas.kosakata import GRUP_SEKOLAH_PENGISI, GRUP_TIM_KAJIAN
 from .redesain.services.kode_orang import KodeOrangService
 from .redesain.services.kode_orang_sql import SqlKodeOrangService
+from .redesain.services.konteks import KonteksService
+from .redesain.services.konteks_sql import SqlKonteksService
 from .redesain.services.riwayat import RiwayatService
 from .redesain.services.riwayat_sql import SqlRiwayatService
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
@@ -327,6 +329,11 @@ def get_opm_jawaban_service(session: SessionDep) -> OpmJawabanService:
 def get_riwayat_service(session: SessionDep) -> RiwayatService:
     """SEAM: implementasi `RiwayatService` berbasis PostgreSQL."""
     return SqlRiwayatService(session)
+
+
+def get_konteks_service(session: SessionDep) -> KonteksService:
+    """SEAM: implementasi `KonteksService` berbasis PostgreSQL (riwayat sesi yang sama)."""
+    return SqlKonteksService(session, SqlRiwayatService(session))
 
 
 def get_kode_orang_service(session: SessionDep) -> KodeOrangService:
