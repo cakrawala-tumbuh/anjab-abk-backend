@@ -1281,3 +1281,48 @@ class RedesainPenilaianModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
     )
+
+
+class RedesainCakupanJabatanModel(Base):
+    """Cakupan jabatan awal paket v1.3 (sheet CAKUPAN_19), satu baris = entri x cabang.
+
+    `role_kode` berpola `J-NN` dan `cabang` (`Bandung`/`Semarang`) membentuk pasangan unik.
+    `nama_jabatan` adalah teks paket; `jabatan_id` (FK `jabatan.id`) dipetakan manual oleh Tim
+    dan NULL pada seed. Kolom status bertipe `String(40)` tanpa CHECK (divalidasi skema).
+    `pic_kode_orang` adalah pseudonim (bukan FK). Tidak ada operasi hapus.
+    """
+
+    __tablename__ = "redesain_cakupan_jabatan"
+    __table_args__ = (
+        UniqueConstraint("role_kode", "cabang", name="uq_redesain_cakupan_jabatan_role_cabang"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    role_kode: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    nama_jabatan: Mapped[str] = mapped_column(String(200), nullable=False)
+    jabatan_id: Mapped[str | None] = mapped_column(
+        ForeignKey("jabatan.id", name="fk_redesain_cakupan_jabatan_jabatan"),
+        nullable=True,
+        index=True,
+    )
+    cabang: Mapped[str] = mapped_column(String(20), nullable=False)
+    status_unit: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="Belum diperiksa", server_default="Belum diperiksa"
+    )
+    pemegang_diperiksa: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="Belum diperiksa", server_default="Belum diperiksa"
+    )
+    inventori_ditinjau: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="Belum diperiksa", server_default="Belum diperiksa"
+    )
+    peta_diperkuat: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="Belum diperiksa", server_default="Belum diperiksa"
+    )
+    gap_variasi: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pic_kode_orang: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )

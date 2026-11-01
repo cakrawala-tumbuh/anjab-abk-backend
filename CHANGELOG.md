@@ -9,6 +9,12 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Cakupan jabatan redesain** (backlog #61, butir BE-9c): tabel `redesain_cakupan_jabatan`
+  (satu baris = entri x cabang, pasangan `role_kode`+`cabang` unik; migrasi `c6f9a2d4e8b1`),
+  ter-seed 19 jabatan awal J-01..J-19 x {Bandung, Semarang} = 38 baris (`jabatan_id` NULL).
+  Endpoint `tim-kajian` `GET/POST /api/v1/redesain/cakupan-jabatan`, `POST .../search`
+  (`role_kode`, `cabang`, `status_unit`, `jabatan_id`), `GET/PATCH .../{id}`. Tim memetakan entri ke
+  master jabatan secara manual lewat `jabatan_id` (tak dikenal -> 422); pasangan ganda -> 409.
 - **Sesi partisipasi redesain** (backlog #60, butir BE-9b): tabel `redesain_sesi` (satu baris =
   satu orang x satu sesi, pasangan `kode_sesi`+`kode_orang` unik) dan `redesain_sesi_masalah`
   (migrasi `b5e8f1c3d7a2`). Endpoint `tim-kajian` `GET/POST /api/v1/redesain/sesi`,

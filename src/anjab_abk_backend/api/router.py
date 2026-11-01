@@ -20,6 +20,7 @@ from .v1 import (
     partisipan,
     redesain_alternatif,
     redesain_bukti,
+    redesain_cakupan_jabatan,
     redesain_kode_orang,
     redesain_konfirmasi,
     redesain_konteks,
@@ -259,6 +260,11 @@ api_router.include_router(
 api_router.include_router(
     redesain_alternatif.router,
     prefix="/redesain/alternatif",
+    tags=["redesain"],
+)
+api_router.include_router(
+    redesain_cakupan_jabatan.router,
+    prefix="/redesain/cakupan-jabatan",
     tags=["redesain"],
 )
 api_router.include_router(

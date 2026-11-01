@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from ..models import RedesainKonteksModel, RedesainMasalahModel
+from ..models import RedesainCakupanJabatanModel, RedesainKonteksModel, RedesainMasalahModel
+from .services.cakupan_jabatan_sql import ENTITAS as ENTITAS_CAKUPAN
 from .services.konteks_sql import ENTITAS
 from .services.masalah_sql import ENTITAS as ENTITAS_MASALAH
 from .services.riwayat_sql import SqlRiwayatService
@@ -316,4 +317,63 @@ def seed_masalah(session: Session) -> int:
                 ENTITAS_MASALAH, new_id, "create", None, {**nilai, "uraian_tugas_ids": []}, None
             )
             baru += 1
+    return baru
+
+
+CAKUPAN: tuple[tuple[str, str], ...] = (
+    ("J-01", "Kepala Sekolah"),
+    ("J-02", "Wakasek Kurikulum"),
+    ("J-03", "Staf Wakasek Kurikulum"),
+    ("J-04", "Wakasek Kesiswaan"),
+    ("J-05", "Staf Wakasek Kesiswaan"),
+    ("J-06", "Wakasek Sarpras"),
+    ("J-07", "Wakasek Humas"),
+    ("J-08", "Koordinator Sarpras"),
+    ("J-09", "Koordinator Humas"),
+    ("J-10", "Pembina OSIS"),
+    ("J-11", "Koordinator Ekstrakurikuler"),
+    ("J-12", "Koordinator Pramuka"),
+    ("J-13", "Wali Kelas"),
+    ("J-14", "Guru Kelas SD"),
+    ("J-15", "Guru Kelas TK"),
+    ("J-16", "Guru Mapel SMP"),
+    ("J-17", "Guru Mapel SMA"),
+    ("J-18", "Guru BK"),
+    ("J-19", "Operator Dapodik"),
+)
+"""Sembilan belas jabatan awal sheet CAKUPAN_19 paket v1.3 (`CAKUPAN_19!A5:B23`)."""
+
+CABANG_CAKUPAN: tuple[str, ...] = ("Bandung", "Semarang")
+"""Cabang yang masing-masing mendapat satu baris per entri cakupan."""
+
+
+def seed_cakupan_jabatan(session: Session) -> int:
+    """Isi 19 entri cakupan x 2 cabang (38 baris) secara idempoten.
+
+    Kunci (`role_kode`, `cabang`), `INSERT ... ON CONFLICT DO NOTHING`: baris yang sudah
+    ada (termasuk suntingan Tim) tidak ditimpa. `jabatan_id` selalu NULL dan semua status
+    memakai default; pemetaan ke master jabatan dilakukan manual oleh Tim. Tiap baris baru
+    dicatat riwayatnya dengan `pelaku_kode_orang=NULL` (sistem).
+
+    Args:
+        session: Sesi aktif; pemanggil yang commit.
+
+    Returns:
+        Jumlah baris yang baru disisipkan pada pemanggilan ini.
+    """
+    riwayat = SqlRiwayatService(session)
+    baru = 0
+    for role_kode, nama in CAKUPAN:
+        for cabang in CABANG_CAKUPAN:
+            nilai = {"role_kode": role_kode, "nama_jabatan": nama, "cabang": cabang}
+            stmt = (
+                insert(RedesainCakupanJabatanModel)
+                .values(id=str(uuid.uuid4()), **nilai)
+                .on_conflict_do_nothing(constraint="uq_redesain_cakupan_jabatan_role_cabang")
+                .returning(RedesainCakupanJabatanModel.id)
+            )
+            new_id = session.execute(stmt).scalar_one_or_none()
+            if new_id is not None:
+                riwayat.catat(ENTITAS_CAKUPAN, new_id, "create", None, nilai, None)
+                baru += 1
     return baru

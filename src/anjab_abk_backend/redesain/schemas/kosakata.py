@@ -135,3 +135,17 @@ StatusIzinSesi = Literal[
     "Tidak diotorisasi",
 ]
 """Status izin kegiatan & waktu sebuah sesi; HANYA informasi, tidak pernah memblokir."""
+
+StatusUnitCakupan = Literal[
+    "Belum diperiksa",
+    "Ada",
+    "Tidak ada sesuai bukti",
+    "Dilebur",
+    "Diperselisihkan",
+]
+"""Status keberadaan sebuah jabatan pada satu cabang (sheet CAKUPAN_19, kolom Bandung/Semarang)."""
+
+StatusPemeriksaanCakupan = Literal[
+    "Belum diperiksa", "Sebagian", "Ya", "Tidak relevan berdasarkan bukti"
+]
+"""Status pemeriksaan pemegang/inventori/peta sebuah entri cakupan jabatan."""

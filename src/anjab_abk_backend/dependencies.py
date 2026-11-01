@@ -53,6 +53,8 @@ from .redesain.services.alternatif import AlternatifService
 from .redesain.services.alternatif_sql import SqlAlternatifService
 from .redesain.services.bukti import BuktiService
 from .redesain.services.bukti_sql import SqlBuktiService
+from .redesain.services.cakupan_jabatan import CakupanJabatanService
+from .redesain.services.cakupan_jabatan_sql import SqlCakupanJabatanService
 from .redesain.services.kode_orang import KodeOrangService
 from .redesain.services.kode_orang_sql import SqlKodeOrangService
 from .redesain.services.konfirmasi import KonfirmasiService
@@ -365,6 +367,11 @@ def get_masalah_service(session: SessionDep) -> MasalahService:
 def get_alternatif_service(session: SessionDep) -> AlternatifService:
     """SEAM: `AlternatifService` PostgreSQL (riwayat sesi yang sama; jabatan via seam anjab)."""
     return SqlAlternatifService(session, SqlRiwayatService(session), SqlJabatanService(session))
+
+
+def get_cakupan_jabatan_service(session: SessionDep) -> CakupanJabatanService:
+    """SEAM: `CakupanJabatanService` PostgreSQL (riwayat sesi yang sama; jabatan via seam anjab)."""
+    return SqlCakupanJabatanService(session, SqlRiwayatService(session), SqlJabatanService(session))
 
 
 def get_sesi_service(session: SessionDep) -> SesiService:
