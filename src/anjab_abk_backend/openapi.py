@@ -72,6 +72,13 @@ TAGS_METADATA = [
         "description": "Analisis OPM: jalankan kalkulasi dan ambil hasil per sesi (mean/SD/flag).",
     },
     {
+        "name": "redesain",
+        "description": (
+            "Register Redesain Pekerjaan (khusus grup tim-kajian) — saat ini riwayat"
+            " perubahan append-only."
+        ),
+    },
+    {
         "name": "dcs.sub-skala",
         "description": "Master data 3 sub-skala DCS dan 42 item pernyataan (read-only).",
     },

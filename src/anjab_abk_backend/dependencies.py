@@ -48,6 +48,9 @@ from .opm.services.responden import OpmRespondenService
 from .opm.services.responden_sql import SqlOpmRespondenService
 from .opm.services.sesi import OpmSesiService
 from .opm.services.sesi_sql import SqlOpmSesiService
+from .redesain.schemas.kosakata import GRUP_SEKOLAH_PENGISI, GRUP_TIM_KAJIAN
+from .redesain.services.riwayat import RiwayatService
+from .redesain.services.riwayat_sql import SqlRiwayatService
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
 from .services.authentik_provisioner import (
     AuthentikProvisioner,
@@ -316,6 +319,14 @@ def get_opm_jawaban_service(session: SessionDep) -> OpmJawabanService:
     return SqlOpmJawabanService(session)
 
 
+# --- Redesain services ---
+
+
+def get_riwayat_service(session: SessionDep) -> RiwayatService:
+    """SEAM: implementasi `RiwayatService` berbasis PostgreSQL."""
+    return SqlRiwayatService(session)
+
+
 # --- Backup & restore (backlog 025) ---
 
 
@@ -385,6 +396,39 @@ def require_admin(
     if "admin" not in principal.groups:
         raise ForbiddenError("Akses ditolak: hanya admin yang dapat mengubah master data.")
     return principal
+
+
+def require_tim_kajian(
+    principal: Annotated[Principal, Depends(get_current_principal)],
+) -> Principal:
+    """Guard otorisasi: hanya anggota grup `tim-kajian` (data register redesain).
+
+    Grup `admin` TIDAK otomatis lolos — data keterangan sekolah bersifat sensitif.
+    """
+    if GRUP_TIM_KAJIAN not in principal.groups:
+        raise ForbiddenError("Akses ditolak: hanya Tim Kajian yang dapat mengakses data redesain.")
+    return principal
+
+
+def authorize_sekolah_scope(
+    principal: Principal,
+    sekolah_id: str,
+    par_service: PartisipanService,
+) -> None:
+    """Guard object-level lingkup sekolah: `tim-kajian` selalu lolos; `sekolah-pengisi`
+    hanya untuk sekolah partisipannya sendiri.
+
+    Raises:
+        ForbiddenError: Grup lain, partisipan tak ditemukan, atau `sekolah_id` partisipan
+            kosong/berbeda dari `sekolah_id` yang diakses.
+    """
+    if GRUP_TIM_KAJIAN in principal.groups:
+        return
+    if GRUP_SEKOLAH_PENGISI in principal.groups:
+        par = par_service.get_by_subject(principal.subject)
+        if par is not None and par.sekolah_id is not None and par.sekolah_id == sekolah_id:
+            return
+    raise ForbiddenError("Akses ditolak: di luar lingkup sekolah Anda.")
 
 
 def authorize_responden_access(

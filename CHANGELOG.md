@@ -7,6 +7,17 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Ditambahkan
+
+- **Fondasi domain Redesain Pekerjaan** (backlog #48, pelacak `ypii-support#424`, butir BE-1):
+  paket `redesain/` dengan kosakata baku (`Gelombang`, `StatusAwal`, `StatusBukti`,
+  `StatusLangkah`, `Skala`, `Indikasi`, `YaTidak`), dua grup peran baru `tim-kajian` dan
+  `sekolah-pengisi` beserta guard `require_tim_kajian` dan `authorize_sekolah_scope`
+  (grup `admin` TIDAK otomatis mendapat akses data redesain), tabel `redesain_riwayat`
+  append-only (migrasi `d2f7e45a1e23`), serta endpoint baca khusus `tim-kajian`:
+  `GET /api/v1/redesain/riwayat` dan `POST /api/v1/redesain/riwayat/search`.
+  Grup Authentik terkait perlu dibuat admin di IdP.
+
 ## [0.47.0] - 2026-09-25
 
 ### Ditambahkan

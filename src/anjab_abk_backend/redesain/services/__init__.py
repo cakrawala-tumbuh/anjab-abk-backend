@@ -1,0 +1,1 @@
+"""Seam service domain redesain."""

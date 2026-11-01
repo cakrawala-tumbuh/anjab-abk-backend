@@ -18,6 +18,7 @@ from .v1 import (
     opm_responden,
     opm_sesi,
     partisipan,
+    redesain_riwayat,
     sekolah,
     sme_panel,
     system,
@@ -225,4 +226,9 @@ api_router.include_router(
     taskinv_uraian_tugas.router,
     prefix="/task-inventory/uraian-tugas",
     tags=["taskinv.uraian-tugas"],
+)
+api_router.include_router(
+    redesain_riwayat.router,
+    prefix="/redesain/riwayat",
+    tags=["redesain"],
 )

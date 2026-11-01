@@ -774,3 +774,29 @@ class OpmJawabanModel(Base):
     frequency: Mapped[int | None] = mapped_column(Integer, nullable=True)
     criticality: Mapped[int | None] = mapped_column(Integer, nullable=True)
     catatan: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+# ======================================================================================
+# Redesain Pekerjaan
+# ======================================================================================
+
+
+class RedesainRiwayatModel(Base):
+    """Riwayat perubahan append-only seluruh entitas redesain.
+
+    Tidak ada jalur update/delete di service maupun API. `pelaku_kode_orang` NULL
+    hanya untuk seed/sistem (diisi mulai item pemilik kode orang).
+    """
+
+    __tablename__ = "redesain_riwayat"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    entitas: Mapped[str] = mapped_column(String(40), nullable=False)
+    entitas_id: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    aksi: Mapped[str] = mapped_column(String(40), nullable=False)
+    nilai_sebelum: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    nilai_sesudah: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    pelaku_kode_orang: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    waktu: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, index=True
+    )
