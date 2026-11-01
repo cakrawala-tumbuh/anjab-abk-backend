@@ -17,6 +17,13 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
   append-only (migrasi `d2f7e45a1e23`), serta endpoint baca khusus `tim-kajian`:
   `GET /api/v1/redesain/riwayat` dan `POST /api/v1/redesain/riwayat/search`.
   Grup Authentik terkait perlu dibuat admin di IdP.
+- **Kode orang (pseudonim) Redesain** (backlog #49, butir BE-2): tabel `redesain_kode_orang`
+  beserta sequence `redesain_kode_orang_seq` (migrasi `05fdd35204c5`) yang memberi tiap orang
+  kode stabil `O-0001`, dan peta kode ke partisipan yang hanya terbaca `tim-kajian`
+  (`GET/POST /api/v1/redesain/kode-orang`, `POST .../search`, `GET/PATCH .../{id}`; tanpa
+  DELETE). `GET /api/v1/redesain/kode-orang/saya` (grup `tim-kajian` atau `sekolah-pengisi`)
+  mengembalikan `{kode}` milik pemanggil tanpa `partisipan_id`. Dependency
+  `get_kode_orang_pemanggil` menjadi sumber `pelaku_kode_orang` bagi riwayat.
 
 ## [0.47.0] - 2026-09-25
 

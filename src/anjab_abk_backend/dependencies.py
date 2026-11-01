@@ -49,6 +49,8 @@ from .opm.services.responden_sql import SqlOpmRespondenService
 from .opm.services.sesi import OpmSesiService
 from .opm.services.sesi_sql import SqlOpmSesiService
 from .redesain.schemas.kosakata import GRUP_SEKOLAH_PENGISI, GRUP_TIM_KAJIAN
+from .redesain.services.kode_orang import KodeOrangService
+from .redesain.services.kode_orang_sql import SqlKodeOrangService
 from .redesain.services.riwayat import RiwayatService
 from .redesain.services.riwayat_sql import SqlRiwayatService
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
@@ -327,6 +329,11 @@ def get_riwayat_service(session: SessionDep) -> RiwayatService:
     return SqlRiwayatService(session)
 
 
+def get_kode_orang_service(session: SessionDep) -> KodeOrangService:
+    """SEAM: implementasi `KodeOrangService` berbasis PostgreSQL (riwayat sesi yang sama)."""
+    return SqlKodeOrangService(session, SqlRiwayatService(session))
+
+
 # --- Backup & restore (backlog 025) ---
 
 
@@ -408,6 +415,39 @@ def require_tim_kajian(
     if GRUP_TIM_KAJIAN not in principal.groups:
         raise ForbiddenError("Akses ditolak: hanya Tim Kajian yang dapat mengakses data redesain.")
     return principal
+
+
+def require_tim_kajian_atau_pengisi(
+    principal: Annotated[Principal, Depends(get_current_principal)],
+) -> Principal:
+    """Guard otorisasi: anggota grup `tim-kajian` ATAU `sekolah-pengisi`."""
+    if GRUP_TIM_KAJIAN not in principal.groups and GRUP_SEKOLAH_PENGISI not in principal.groups:
+        raise ForbiddenError("Akses ditolak: hanya Tim Kajian atau sekolah pengisi.")
+    return principal
+
+
+def get_kode_orang_pemanggil(
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
+) -> str:
+    """Tentukan kode orang pemanggil (get-or-create) untuk pencatatan pelaku riwayat.
+
+    Args:
+        principal: Identitas token pemanggil.
+        par_service: Seam partisipan untuk resolusi `subject` -> partisipan.
+        ko_service: Seam kode orang.
+
+    Returns:
+        Kode pseudonim pemanggil (mis. `O-0001`).
+
+    Raises:
+        ForbiddenError: Pemanggil tidak punya record partisipan.
+    """
+    par = par_service.get_by_subject(principal.subject)
+    if par is None:
+        raise ForbiddenError("Akses ditolak: pemanggil tidak terdaftar sebagai partisipan.")
+    return ko_service.untuk_partisipan(par.id).kode
 
 
 def authorize_sekolah_scope(

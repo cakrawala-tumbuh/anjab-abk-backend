@@ -30,6 +30,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     MetaData,
+    Sequence,
     String,
     Text,
     UniqueConstraint,
@@ -799,4 +800,27 @@ class RedesainRiwayatModel(Base):
     pelaku_kode_orang: Mapped[str | None] = mapped_column(String(20), nullable=True)
     waktu: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, index=True
+    )
+
+
+KODE_ORANG_SEQ = Sequence("redesain_kode_orang_seq")
+"""Sequence PostgreSQL sumber nomor `kode` kode orang (dibuat di revisi Alembic)."""
+
+
+class RedesainKodeOrangModel(Base):
+    """Peta kode pseudonim (`O-0001`) ke partisipan; baris tanpa partisipan = narasumber.
+
+    Tidak pernah dihapus/didaur ulang. Hanya terbaca `tim-kajian`.
+    """
+
+    __tablename__ = "redesain_kode_orang"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kode: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    partisipan_id: Mapped[str | None] = mapped_column(
+        String(40), ForeignKey("partisipan.id"), nullable=True, unique=True
+    )
+    keterangan_peran: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
     )
