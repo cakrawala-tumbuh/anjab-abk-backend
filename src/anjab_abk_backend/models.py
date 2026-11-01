@@ -862,7 +862,8 @@ class RedesainMasalahModel(Base):
     `status_awal`/`gelombang` bertipe `String(40)` tanpa CHECK (divalidasi skema).
     `eskalasi_pada` diisi saat konfirmasi pertama ber-`indikasi_risiko="Ada indikasi"`
     terkirim (penanda untuk Tim; tidak ada notifikasi keluar sistem).
-    Tidak ada operasi hapus.
+    `sumber_konfirmasi_id` terisi bila masalah diangkat Tim dari `masalah_baru` sebuah
+    konfirmasi (BE-6b). Tidak ada operasi hapus.
     """
 
     __tablename__ = "redesain_masalah"
@@ -893,6 +894,11 @@ class RedesainMasalahModel(Base):
         DateTime(timezone=True), nullable=True
     )
     eskalasi_pada: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sumber_konfirmasi_id: Mapped[str | None] = mapped_column(
+        ForeignKey("redesain_konfirmasi.id", name="fk_redesain_masalah_sumber_konfirmasi"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )

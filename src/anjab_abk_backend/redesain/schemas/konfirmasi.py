@@ -135,3 +135,52 @@ class DugaanRead(BaseModel):
 
     rumusan_hipotesis: str
     dugaan_ditampilkan_pada: datetime
+
+
+class KonfirmasiDaftarRead(KonfirmasiRead):
+    """Konfirmasi pada daftar (`/saya`, daftar & search Tim): menambah penanda ralat."""
+
+    digantikan: bool = Field(
+        description="True bila ada versi ralat yang menunjuk record ini (`menggantikan_id`)."
+    )
+
+
+class AngkatMasalahCreate(BaseModel):
+    """Payload mengangkat `masalah_baru` sebuah konfirmasi menjadi masalah register."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    konteks_id: str = Field(description="ID konteks redesain tempat masalah baru dikelompokkan.")
+    rumusan_hipotesis: str = Field(
+        min_length=1, description="Rumusan hipotesis yang disusun Tim dari keterangan sekolah."
+    )
+
+
+class KonfirmasiLuringCreate(BaseModel):
+    """Payload Tim memasukkan isian kertas atas nama pemberi keterangan (sumber `luring`).
+
+    Field wajib sama dengan aksi `kirim` (`FIELD_WAJIB_KIRIM`); konfirmasi langsung
+    berstatus `terkirim` tanpa melewati urutan cerita-dugaan.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    masalah_id: str
+    kode_orang: str = Field(max_length=20, description="Kode pseudonim pemberi keterangan.")
+    sekolah_id: str
+    peran: str = Field(min_length=1, max_length=200)
+    tanggal: date | None = Field(default=None, description="Tanggal isian; default hari ini.")
+    cerita_sebelum: str | None = None
+    kesesuaian: Kesesuaian
+    koreksi: str | None = None
+    masalah_baru: str | None = None
+    alasan_k: str | None = None
+    bukti_dapat_diperiksa: str | None = None
+    hal_belum_jelas: str | None = None
+    catatan_independensi: str | None = None
+    catatan_akses: str | None = None
+    k1: Skala
+    k2: Skala
+    k3: Skala
+    k4: Skala
+    indikasi_risiko: Indikasi

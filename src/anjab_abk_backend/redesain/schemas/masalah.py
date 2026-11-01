@@ -95,6 +95,14 @@ class MasalahRead(BaseModel):
     status_awal_dibekukan_pada: datetime | None = Field(
         description="Saat status awal membeku (keterangan sekolah pertama); null = belum."
     )
+    eskalasi_pada: datetime | None = Field(
+        default=None,
+        description="Saat konfirmasi ber-indikasi risiko pertama terkirim; null = belum.",
+    )
+    sumber_konfirmasi_id: str | None = Field(
+        default=None,
+        description="ID konfirmasi asal bila masalah diangkat dari `masalah_baru`; null = bukan.",
+    )
     uraian_tugas_ids: list[str] = Field(description="ID uraian tugas tertaut, terurut.")
     created_at: datetime
     updated_at: datetime

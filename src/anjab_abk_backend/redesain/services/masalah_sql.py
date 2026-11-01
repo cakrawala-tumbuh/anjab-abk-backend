@@ -52,6 +52,7 @@ def _field_map() -> FieldMap:
         "status_awal": FieldSpec(column=m.status_awal),
         "gelombang": FieldSpec(column=m.gelombang),
         "dibuka_untuk_konfirmasi": FieldSpec(column=m.dibuka_untuk_konfirmasi),
+        "eskalasi_pada": FieldSpec(column=m.eskalasi_pada),
     }
 
 
@@ -176,6 +177,8 @@ class SqlMasalahService:
             pic_kode_orang=rec.pic_kode_orang,
             dibuka_untuk_konfirmasi=rec.dibuka_untuk_konfirmasi,
             status_awal_dibekukan_pada=_aware(rec.status_awal_dibekukan_pada),
+            eskalasi_pada=_aware(rec.eskalasi_pada),
+            sumber_konfirmasi_id=rec.sumber_konfirmasi_id,
             uraian_tugas_ids=self._uraian_ids(rec.id),
             created_at=_aware(rec.created_at),  # type: ignore[arg-type]
             updated_at=_aware(rec.updated_at),  # type: ignore[arg-type]
@@ -206,8 +209,16 @@ class SqlMasalahService:
 
     # ── kontrak ─────────────────────────────────────────────────────────────
 
-    def create(self, data: MasalahCreate, *, pelaku_kode_orang: str | None) -> MasalahRead:
+    def create(
+        self,
+        data: MasalahCreate,
+        *,
+        pelaku_kode_orang: str | None,
+        sumber_konfirmasi_id: str | None = None,
+    ) -> MasalahRead:
         """Buat masalah baru, tautkan uraian tugasnya, dan catat riwayat.
+
+        `sumber_konfirmasi_id` (opsional) menandai masalah yang diangkat dari konfirmasi.
 
         Seluruh rujukan divalidasi SEBELUM ada baris ditulis, sehingga ID tak dikenal
         tidak meninggalkan baris masalah maupun relasi.
@@ -226,6 +237,7 @@ class SqlMasalahService:
         rec = m(
             id=str(uuid.uuid4()),
             kode=kode,
+            sumber_konfirmasi_id=sumber_konfirmasi_id,
             **data.model_dump(exclude={"uraian_tugas_ids"}),
         )
         self._s.add(rec)

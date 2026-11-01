@@ -9,16 +9,30 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ...errors import ConflictError, ForbiddenError, NotFoundError, ValidationAppError
-from ...models import RedesainKonfirmasiModel, RedesainKonteksModel, RedesainMasalahModel
+from ...models import (
+    RedesainKodeOrangModel,
+    RedesainKonfirmasiModel,
+    RedesainKonteksModel,
+    RedesainMasalahModel,
+)
 from ...schemas.common import ErrorDetail
+from ...schemas.search import Domain, Order
+from ...services.domain import validate_searchable_fields
+from ...services.domain_sql import FieldMap, FieldSpec, compile_domain, order_by_columns
 from ..schemas.konfirmasi import (
     FIELD_BAGIAN_C_E,
     FIELD_WAJIB_KIRIM,
+    AngkatMasalahCreate,
     DugaanRead,
+    KonfirmasiDaftarRead,
+    KonfirmasiLuringCreate,
     KonfirmasiRead,
     KonfirmasiUpdate,
     MasalahSekolahRead,
 )
+from ..schemas.masalah import MasalahCreate, MasalahRead
+from .konfirmasi import SEARCHABLE_FIELDS
+from .masalah import MasalahService
 from .riwayat import RiwayatService
 
 ENTITAS_KONFIRMASI = "konfirmasi"
@@ -29,6 +43,12 @@ KODE_CERITA_BELUM_DIKUNCI = "CERITA_BELUM_DIKUNCI"
 KODE_DUGAAN_BELUM_DITAMPILKAN = "DUGAAN_BELUM_DITAMPILKAN"
 KODE_SUDAH_TERKIRIM = "KONFIRMASI_SUDAH_TERKIRIM"
 KODE_SUDAH_ADA = "KONFIRMASI_SUDAH_ADA"
+KODE_BELUM_TERKIRIM = "KONFIRMASI_BELUM_TERKIRIM"
+KODE_SUDAH_DIGANTIKAN = "KONFIRMASI_SUDAH_DIGANTIKAN"
+KODE_MASALAH_SUDAH_DIANGKAT = "MASALAH_SUDAH_DIANGKAT"
+
+_KOLOM_SALIN_RALAT = ("peran", "tanggal", "cerita_sebelum", *FIELD_BAGIAN_C_E)
+"""Kolom isi yang disalin apa adanya dari versi lama ke draf ralat."""
 
 _KOLOM_SNAPSHOT = ("peran", "cerita_sebelum", *FIELD_BAGIAN_C_E, "status")
 
@@ -77,9 +97,10 @@ class SqlKonfirmasiService:
     ditentukan oleh `kode_orang` pengisi: aksi tulis atas konfirmasi orang lain → 403.
     """
 
-    def __init__(self, session: Session, riwayat: RiwayatService) -> None:
+    def __init__(self, session: Session, riwayat: RiwayatService, masalah: MasalahService) -> None:
         self._s = session
         self._riwayat = riwayat
+        self._masalah = masalah
 
     # ── helper ──────────────────────────────────────────────────────────────
 
@@ -144,14 +165,64 @@ class SqlKonfirmasiService:
         return rec
 
     def _simpan(
-        self, rec: RedesainKonfirmasiModel, aksi: str, sebelum: dict[str, object] | None
+        self,
+        rec: RedesainKonfirmasiModel,
+        aksi: str,
+        sebelum: dict[str, object] | None,
+        *,
+        pelaku: str | None = None,
     ) -> KonfirmasiRead:
         self._s.flush()
         self._s.refresh(rec)
         self._riwayat.catat(
-            ENTITAS_KONFIRMASI, rec.id, aksi, sebelum, _snapshot(rec), rec.kode_orang
+            ENTITAS_KONFIRMASI, rec.id, aksi, sebelum, _snapshot(rec), pelaku or rec.kode_orang
         )
         return self._to_read(rec)
+
+    def _efek_terkirim(
+        self, rec: RedesainKonfirmasiModel, waktu: datetime, pelaku: str | None
+    ) -> None:
+        """Bekukan status awal masalah dan tandai eskalasi untuk konfirmasi yang terkirim.
+
+        Dipakai bersama oleh `kirim` dan `luring`. Masing-masing penanda hanya diisi bila
+        masih NULL dan dicatat di riwayat entitas `masalah`.
+        """
+        masalah = self._s.get(RedesainMasalahModel, rec.masalah_id)
+        assert masalah is not None  # FK menjamin
+        if masalah.status_awal_dibekukan_pada is None:
+            masalah.status_awal_dibekukan_pada = waktu
+            self._riwayat.catat(
+                ENTITAS_MASALAH,
+                masalah.id,
+                "bekukan_status_awal",
+                None,
+                {"status_awal": masalah.status_awal, "konfirmasi_id": rec.id},
+                pelaku,
+            )
+        if rec.indikasi_risiko == "Ada indikasi" and masalah.eskalasi_pada is None:
+            masalah.eskalasi_pada = waktu
+            self._riwayat.catat(
+                ENTITAS_MASALAH,
+                masalah.id,
+                "eskalasi",
+                None,
+                {"indikasi_risiko": rec.indikasi_risiko, "konfirmasi_id": rec.id},
+                pelaku,
+            )
+
+    def _digantikan_ids(self, ids: list[str]) -> set[str]:
+        """Himpunan `ids` yang sudah ditunjuk `menggantikan_id` oleh versi lain."""
+        if not ids:
+            return set()
+        k = RedesainKonfirmasiModel
+        return set(self._s.scalars(select(k.menggantikan_id).where(k.menggantikan_id.in_(ids))))
+
+    def _daftar(self, rows: list[RedesainKonfirmasiModel]) -> list[KonfirmasiDaftarRead]:
+        digantikan = self._digantikan_ids([r.id for r in rows])
+        return [
+            KonfirmasiDaftarRead(**self._to_read(r).model_dump(), digantikan=r.id in digantikan)
+            for r in rows
+        ]
 
     # ── kontrak ─────────────────────────────────────────────────────────────
 
@@ -341,26 +412,221 @@ class SqlKonfirmasiService:
         waktu = _now()
         rec.status = "terkirim"
         rec.dikirim_pada = waktu
-        masalah = self._s.get(RedesainMasalahModel, rec.masalah_id)
-        assert masalah is not None  # FK menjamin
-        if masalah.status_awal_dibekukan_pada is None:
-            masalah.status_awal_dibekukan_pada = waktu
-            self._riwayat.catat(
-                ENTITAS_MASALAH,
-                masalah.id,
-                "bekukan_status_awal",
-                None,
-                {"status_awal": masalah.status_awal, "konfirmasi_id": rec.id},
-                kode_orang,
-            )
-        if rec.indikasi_risiko == "Ada indikasi" and masalah.eskalasi_pada is None:
-            masalah.eskalasi_pada = waktu
-            self._riwayat.catat(
-                ENTITAS_MASALAH,
-                masalah.id,
-                "eskalasi",
-                None,
-                {"indikasi_risiko": rec.indikasi_risiko, "konfirmasi_id": rec.id},
-                kode_orang,
-            )
+        self._efek_terkirim(rec, waktu, kode_orang)
         return self._simpan(rec, "kirim", sebelum)
+
+    def ralat(self, konfirmasi_id: str, *, kode_orang: str) -> KonfirmasiRead:
+        """Buat draf ralat: salinan isi konfirmasi terkirim, `menggantikan_id` = id lama.
+
+        Stempel `cerita_dikunci_pada`/`dugaan_ditampilkan_pada` ikut disalin sehingga ralat
+        tidak membuka ulang cerita. Versi lama tidak diubah sama sekali. Riwayat `ralat`.
+
+        Raises:
+            ForbiddenError: konfirmasi milik orang lain.
+            KonfirmasiConflictError: `KONFIRMASI_BELUM_TERKIRIM` (masih draf),
+                `KONFIRMASI_SUDAH_DIGANTIKAN` (bukan versi terbaru), atau
+                `KONFIRMASI_SUDAH_ADA` (pasangan itu sudah punya draf).
+        """
+        lama = self._get_milik(konfirmasi_id, kode_orang)
+        if lama.status != "terkirim":
+            raise KonfirmasiConflictError(
+                KODE_BELUM_TERKIRIM, "Hanya konfirmasi yang sudah terkirim yang dapat diralat."
+            )
+        if self._digantikan_ids([lama.id]):
+            raise KonfirmasiConflictError(
+                KODE_SUDAH_DIGANTIKAN, "Konfirmasi ini sudah digantikan versi yang lebih baru."
+            )
+        k = RedesainKonfirmasiModel
+        draf = self._s.scalar(
+            select(func.count())
+            .select_from(k)
+            .where(k.masalah_id == lama.masalah_id, k.kode_orang == kode_orang, k.status == "draf")
+        )
+        if draf:
+            raise KonfirmasiConflictError(
+                KODE_SUDAH_ADA, "Anda sudah punya draf konfirmasi untuk masalah ini."
+            )
+        baru = k(
+            id=str(uuid.uuid4()),
+            masalah_id=lama.masalah_id,
+            kode_orang=kode_orang,
+            sekolah_id=lama.sekolah_id,
+            sumber="daring",
+            status="draf",
+            menggantikan_id=lama.id,
+            cerita_dikunci_pada=lama.cerita_dikunci_pada,
+            dugaan_ditampilkan_pada=lama.dugaan_ditampilkan_pada,
+            **{kol: getattr(lama, kol) for kol in _KOLOM_SALIN_RALAT},
+        )
+        self._s.add(baru)
+        self._s.flush()
+        self._s.refresh(baru)
+        self._riwayat.catat(
+            ENTITAS_KONFIRMASI,
+            baru.id,
+            "ralat",
+            None,
+            {**_snapshot(baru), "menggantikan_id": lama.id},
+            kode_orang,
+        )
+        return self._to_read(baru)
+
+    def list_saya(
+        self, kode_orang: str, *, limit: int, offset: int
+    ) -> tuple[list[KonfirmasiDaftarRead], int]:
+        """Seluruh versi (draf, terkirim, digantikan) milik `kode_orang`, terlama dulu."""
+        k = RedesainKonfirmasiModel
+        total = (
+            self._s.scalar(select(func.count()).select_from(k).where(k.kode_orang == kode_orang))
+            or 0
+        )
+        rows = self._s.scalars(
+            select(k)
+            .where(k.kode_orang == kode_orang)
+            .order_by(k.created_at, k.id)
+            .limit(limit)
+            .offset(offset)
+        ).all()
+        return self._daftar(list(rows)), int(total)
+
+    def list_semua(self, *, limit: int, offset: int) -> tuple[list[KonfirmasiDaftarRead], int]:
+        """Seluruh konfirmasi, terlama dulu."""
+        k = RedesainKonfirmasiModel
+        total = self._s.scalar(select(func.count()).select_from(k)) or 0
+        rows = self._s.scalars(
+            select(k).order_by(k.created_at, k.id).limit(limit).offset(offset)
+        ).all()
+        return self._daftar(list(rows)), int(total)
+
+    def search(
+        self, *, domain: Domain, order: Order, limit: int, offset: int
+    ) -> tuple[list[KonfirmasiDaftarRead], int]:
+        """Cari memakai domain ala Odoo (field di-whitelist, nilai bound parameter)."""
+        validate_searchable_fields(domain, order, SEARCHABLE_FIELDS)
+        k = RedesainKonfirmasiModel
+        field_map: FieldMap = {f: FieldSpec(column=getattr(k, f)) for f in SEARCHABLE_FIELDS}
+        cond = compile_domain(domain, field_map)
+        order_cols = order_by_columns(order, field_map) or [k.created_at, k.id]
+        total = self._s.scalar(select(func.count()).select_from(k).where(cond)) or 0
+        rows = self._s.scalars(
+            select(k).where(cond).order_by(*order_cols).limit(limit).offset(offset)
+        ).all()
+        return self._daftar(list(rows)), int(total)
+
+    def angkat_masalah(
+        self, konfirmasi_id: str, data: AngkatMasalahCreate, *, pelaku_kode_orang: str | None
+    ) -> MasalahRead:
+        """Angkat `masalah_baru` menjadi masalah `Keterangan kasus` di register.
+
+        Masalah dibuat lewat `MasalahService.create` (kode mengikuti konteks yang dipilih),
+        sekolah = sekolah konfirmasi, periode acuan disalin dari masalah asal. Teks
+        `masalah_baru` di konfirmasi tidak diubah. Riwayat `angkat_masalah` pada konfirmasi.
+
+        Raises:
+            NotFoundError: konfirmasi tak ada.
+            KonfirmasiConflictError: masih draf, atau sudah pernah diangkat.
+            ValidationAppError: `masalah_baru` kosong, atau konteks tak dikenal.
+        """
+        rec = self._get_model(konfirmasi_id)
+        if rec.status != "terkirim":
+            raise KonfirmasiConflictError(
+                KODE_BELUM_TERKIRIM, "Hanya konfirmasi yang sudah terkirim yang dapat diangkat."
+            )
+        if not (rec.masalah_baru or "").strip():
+            raise ValidationAppError(
+                "Konfirmasi ini tidak memuat masalah lain (`masalah_baru` kosong).",
+                details=[ErrorDetail(loc=["body"], msg="masalah_baru kosong.", type="missing")],
+            )
+        m = RedesainMasalahModel
+        sudah_diangkat = self._s.scalar(
+            select(func.count()).select_from(m).where(m.sumber_konfirmasi_id == rec.id)
+        )
+        if sudah_diangkat:
+            raise KonfirmasiConflictError(
+                KODE_MASALAH_SUDAH_DIANGKAT, "Masalah dari konfirmasi ini sudah diangkat."
+            )
+        asal = self._s.get(RedesainMasalahModel, rec.masalah_id)
+        assert asal is not None  # FK menjamin
+        baru = self._masalah.create(
+            MasalahCreate(
+                konteks_id=data.konteks_id,
+                sekolah_id=rec.sekolah_id,
+                periode_acuan=asal.periode_acuan,
+                rumusan_hipotesis=data.rumusan_hipotesis,
+                sumber_awal_keterbatasan=f"Disebut dalam konfirmasi {rec.id}",
+                status_awal="Keterangan kasus",
+                gelombang="Belum dijadwalkan",
+            ),
+            pelaku_kode_orang=pelaku_kode_orang,
+            sumber_konfirmasi_id=rec.id,
+        )
+        self._riwayat.catat(
+            ENTITAS_KONFIRMASI,
+            rec.id,
+            "angkat_masalah",
+            None,
+            {"masalah_id": baru.id, "masalah_kode": baru.kode},
+            pelaku_kode_orang,
+        )
+        return baru
+
+    def luring(
+        self, data: KonfirmasiLuringCreate, *, pelaku_kode_orang: str | None
+    ) -> KonfirmasiRead:
+        """Simpan isian kertas atas nama `data.kode_orang` sebagai konfirmasi `terkirim`.
+
+        `sumber="luring"`, cap waktu cerita/dugaan NULL; efek pembekuan status awal dan
+        eskalasi sama dengan `kirim`. Pelaku riwayat = Tim pemanggil.
+
+        Raises:
+            ValidationAppError: kode orang, masalah tak dikenal, atau masalah bukan milik
+                `sekolah_id` yang diberikan.
+            KonfirmasiConflictError: `KONFIRMASI_SUDAH_ADA` untuk pasangan (masalah, kode).
+        """
+        if (
+            self._s.scalar(
+                select(func.count())
+                .select_from(RedesainKodeOrangModel)
+                .where(RedesainKodeOrangModel.kode == data.kode_orang)
+            )
+            == 0
+        ):
+            raise ValidationAppError(f"Kode orang '{data.kode_orang}' tidak dikenal.")
+        masalah = self._s.get(RedesainMasalahModel, data.masalah_id)
+        if masalah is None:
+            raise ValidationAppError(f"Masalah '{data.masalah_id}' tidak ditemukan.")
+        if masalah.sekolah_id != data.sekolah_id:
+            raise ValidationAppError("Masalah ini bukan milik sekolah yang diberikan.")
+        k = RedesainKonfirmasiModel
+        sudah = self._s.scalar(
+            select(func.count())
+            .select_from(k)
+            .where(
+                k.masalah_id == data.masalah_id,
+                k.kode_orang == data.kode_orang,
+                k.status.in_(("draf", "terkirim")),
+            )
+        )
+        if sudah:
+            raise KonfirmasiConflictError(
+                KODE_SUDAH_ADA, "Kode orang ini sudah punya konfirmasi untuk masalah tersebut."
+            )
+        waktu = _now()
+        isi = data.model_dump(
+            exclude={"masalah_id", "kode_orang", "sekolah_id", "tanggal"}, exclude_unset=False
+        )
+        rec = k(
+            id=str(uuid.uuid4()),
+            masalah_id=data.masalah_id,
+            kode_orang=data.kode_orang,
+            sekolah_id=data.sekolah_id,
+            sumber="luring",
+            tanggal=data.tanggal or waktu.date(),
+            status="terkirim",
+            dikirim_pada=waktu,
+            **isi,
+        )
+        self._s.add(rec)
+        self._s.flush()
+        self._efek_terkirim(rec, waktu, pelaku_kode_orang)
+        return self._simpan(rec, "create", None, pelaku=pelaku_kode_orang)

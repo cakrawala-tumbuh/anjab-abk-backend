@@ -9,6 +9,16 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Ralat konfirmasi, daftar Tim, angkat masalah baru, dan isian luring** (backlog #55, butir
+  BE-6b): kolom `redesain_masalah.sumber_konfirmasi_id` (migrasi `a5d8c3e7b2f9`).
+  `POST /api/v1/redesain/konfirmasi/{id}/ralat` (`sekolah-pengisi` pemilik) membuat draf versi
+  baru yang menautkan versi lama lewat `menggantikan_id` tanpa mengubah yang lama;
+  `GET .../konfirmasi/saya` memuat seluruh versi milik pemanggil. `tim-kajian` mendapat
+  `GET .../konfirmasi`, `POST .../konfirmasi/search` (respons memuat `digantikan`),
+  `POST .../konfirmasi/{id}/angkat-masalah` (membuat masalah `Keterangan kasus` untuk sekolah
+  konfirmasi) dan `POST .../konfirmasi/luring` (isian kertas, langsung `terkirim`, membekukan
+  status awal dan menandai eskalasi seperti `kirim`). `MasalahRead` bertambah `eskalasi_pada` dan
+  `sumber_konfirmasi_id`; `eskalasi_pada` menjadi field search masalah.
 - **Fondasi domain Redesain Pekerjaan** (backlog #48, pelacak `ypii-support#424`, butir BE-1):
   paket `redesain/` dengan kosakata baku (`Gelombang`, `StatusAwal`, `StatusBukti`,
   `StatusLangkah`, `Skala`, `Indikasi`, `YaTidak`), dua grup peran baru `tim-kajian` dan

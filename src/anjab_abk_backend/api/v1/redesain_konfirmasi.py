@@ -17,6 +17,7 @@ from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
     Pagination,
+    get_kode_orang_pemanggil,
     get_kode_orang_service,
     get_konfirmasi_service,
     get_koreksi_service,
@@ -24,22 +25,28 @@ from ...dependencies import (
     pagination_params,
     rate_limit,
     require_sekolah_pengisi,
+    require_tim_kajian,
     require_tim_kajian_atau_pengisi,
 )
 from ...errors import ForbiddenError
 from ...redesain.schemas.konfirmasi import (
+    AngkatMasalahCreate,
     DugaanRead,
     KonfirmasiCreate,
+    KonfirmasiDaftarRead,
+    KonfirmasiLuringCreate,
     KonfirmasiRead,
     KonfirmasiUpdate,
     MasalahSekolahRead,
 )
 from ...redesain.schemas.koreksi import AlurRead
 from ...redesain.schemas.kosakata import GRUP_TIM_KAJIAN
+from ...redesain.schemas.masalah import MasalahRead
 from ...redesain.services.kode_orang import KodeOrangService
 from ...redesain.services.konfirmasi import KonfirmasiService
 from ...redesain.services.koreksi import KoreksiService
 from ...schemas.common import ErrorResponse, Page
+from ...schemas.search import SearchRequest
 from ...security import Principal
 
 router = APIRouter()
@@ -55,6 +62,9 @@ _FORBIDDEN = {
     }
 }
 _NOTFOUND = {404: {"model": ErrorResponse, "description": "Konfirmasi tidak ditemukan."}}
+_READ_TIM = [*READ_GUARDS, Depends(require_tim_kajian)]
+_WRITE_TIM = [Depends(require_tim_kajian), Depends(rate_limit)]
+_FORBIDDEN_TIM = {403: {"model": ErrorResponse, "description": "Bukan anggota grup tim-kajian."}}
 _TERKIRIM = {
     409: {
         "model": ErrorResponse,
@@ -145,6 +155,97 @@ def create_konfirmasi(
     return service.create(
         data.masalah_id, kode_orang=pengisi.kode_orang, sekolah_id=pengisi.sekolah_id
     )
+
+
+@router.get(
+    "/saya",
+    response_model=Page[KonfirmasiDaftarRead],
+    summary="Daftar konfirmasi milik saya, semua versi (sekolah-pengisi)",
+    operation_id="redesain_konfirmasi_saya",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN},
+)
+def list_konfirmasi_saya(
+    pengisi: PengisiDep,
+    page: Annotated[Pagination, Depends(pagination_params)],
+    service: ServiceDep,
+) -> Page[KonfirmasiDaftarRead]:
+    """Konfirmasi milik `kode_orang` pemanggil (draf, terkirim, dan yang sudah diralat)."""
+    items, total = service.list_saya(pengisi.kode_orang, limit=page.limit, offset=page.offset)
+    return Page[KonfirmasiDaftarRead](
+        items=items, total=total, limit=page.limit, offset=page.offset
+    )
+
+
+@router.get(
+    "",
+    response_model=Page[KonfirmasiDaftarRead],
+    summary="Daftar seluruh konfirmasi (tim-kajian)",
+    operation_id="redesain_konfirmasi_list",
+    dependencies=_READ_TIM,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN_TIM},
+)
+def list_konfirmasi(
+    page: Annotated[Pagination, Depends(pagination_params)], service: ServiceDep
+) -> Page[KonfirmasiDaftarRead]:
+    """Seluruh konfirmasi terlama dulu, dengan penanda `digantikan`."""
+    items, total = service.list_semua(limit=page.limit, offset=page.offset)
+    return Page[KonfirmasiDaftarRead](
+        items=items, total=total, limit=page.limit, offset=page.offset
+    )
+
+
+@router.post(
+    "/search",
+    response_model=Page[KonfirmasiDaftarRead],
+    summary="Cari konfirmasi (domain ala Odoo) (tim-kajian)",
+    operation_id="redesain_konfirmasi_search",
+    dependencies=_READ_TIM,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN_TIM,
+        422: {"model": ErrorResponse, "description": "Domain/field tidak valid."},
+    },
+)
+def search_konfirmasi(req: SearchRequest, service: ServiceDep) -> Page[KonfirmasiDaftarRead]:
+    """Cari dengan domain ala Odoo; field: masalah_id, sekolah_id, kode_orang, status, sumber,
+    indikasi_risiko."""
+    items, total = service.search(
+        domain=req.domain, order=req.order, limit=req.limit, offset=req.offset
+    )
+    return Page[KonfirmasiDaftarRead](items=items, total=total, limit=req.limit, offset=req.offset)
+
+
+@router.post(
+    "/luring",
+    response_model=KonfirmasiRead,
+    status_code=201,
+    summary="Catat isian luring (kertas) atas nama pemberi keterangan (tim-kajian)",
+    operation_id="redesain_konfirmasi_luring",
+    dependencies=_WRITE_TIM,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN_TIM,
+        409: {
+            "model": ErrorResponse,
+            "description": "Pasangan masalah & kode orang sudah punya konfirmasi.",
+        },
+        422: {
+            "model": ErrorResponse,
+            "description": "Field wajib kosong, kode orang/masalah tak dikenal, sekolah tak cocok.",
+        },
+    },
+)
+def create_konfirmasi_luring(
+    data: KonfirmasiLuringCreate,
+    service: ServiceDep,
+    pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+) -> KonfirmasiRead:
+    """Simpan langsung `terkirim` dengan `sumber="luring"`; membekukan status awal masalah
+    dan menandai eskalasi seperti `kirim`. Riwayat `create` oleh Tim pemanggil."""
+    return service.luring(data, pelaku_kode_orang=pelaku)
 
 
 @router.get(
@@ -300,3 +401,68 @@ def get_alur_konfirmasi(
     ditampilkan → 409.
     """
     return service.alur_untuk_konfirmasi(konfirmasi_id, kode_orang=pengisi.kode_orang)
+
+
+@router.post(
+    "/{konfirmasi_id}/ralat",
+    response_model=KonfirmasiRead,
+    status_code=201,
+    summary="Ralat konfirmasi terkirim: buat versi baru (sekolah-pengisi)",
+    operation_id="redesain_konfirmasi_ralat",
+    dependencies=_WRITE,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOTFOUND,
+        409: {
+            "model": ErrorResponse,
+            "description": (
+                "`KONFIRMASI_BELUM_TERKIRIM`, `KONFIRMASI_SUDAH_DIGANTIKAN`, atau "
+                "`KONFIRMASI_SUDAH_ADA` (sudah ada draf)."
+            ),
+        },
+    },
+)
+def ralat_konfirmasi(
+    konfirmasi_id: str, pengisi: PengisiDep, service: ServiceDep
+) -> KonfirmasiRead:
+    """Buat draf baru berisi salinan isi lama dengan `menggantikan_id` = id lama.
+
+    Versi lama tidak berubah; cerita tidak dibuka ulang. Draf ralat diedit lewat PATCH dan
+    dikirim lewat `kirim` seperti biasa.
+    """
+    return service.ralat(konfirmasi_id, kode_orang=pengisi.kode_orang)
+
+
+@router.post(
+    "/{konfirmasi_id}/angkat-masalah",
+    response_model=MasalahRead,
+    status_code=201,
+    summary="Angkat masalah baru dari konfirmasi menjadi masalah register (tim-kajian)",
+    operation_id="redesain_konfirmasi_angkat_masalah",
+    dependencies=_WRITE_TIM,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN_TIM,
+        **_NOTFOUND,
+        409: {
+            "model": ErrorResponse,
+            "description": ("`KONFIRMASI_BELUM_TERKIRIM` atau `MASALAH_SUDAH_DIANGKAT`."),
+        },
+        422: {
+            "model": ErrorResponse,
+            "description": "`masalah_baru` kosong atau konteks tak dikenal.",
+        },
+    },
+)
+def angkat_masalah(
+    konfirmasi_id: str,
+    data: AngkatMasalahCreate,
+    service: ServiceDep,
+    pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+) -> MasalahRead:
+    """Buat masalah `Keterangan kasus` untuk sekolah konfirmasi dengan `sumber_konfirmasi_id`
+    terisi; teks `masalah_baru` konfirmasi tidak diubah."""
+    return service.angkat_masalah(konfirmasi_id, data, pelaku_kode_orang=pelaku)

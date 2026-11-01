@@ -361,7 +361,7 @@ def get_proses_service(session: SessionDep) -> ProsesService:
 
 def get_konfirmasi_service(session: SessionDep) -> KonfirmasiService:
     """SEAM: `KonfirmasiService` PostgreSQL (riwayat sesi yang sama)."""
-    return SqlKonfirmasiService(session, SqlRiwayatService(session))
+    return SqlKonfirmasiService(session, SqlRiwayatService(session), get_masalah_service(session))
 
 
 def get_koreksi_service(session: SessionDep) -> KoreksiService:

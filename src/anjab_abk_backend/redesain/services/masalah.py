@@ -8,7 +8,15 @@ from ...schemas.search import Domain, Order
 from ..schemas.masalah import MasalahCreate, MasalahRead, MasalahUpdate
 
 SEARCHABLE_FIELDS = frozenset(
-    {"kode", "konteks_id", "sekolah_id", "status_awal", "gelombang", "dibuka_untuk_konfirmasi"}
+    {
+        "kode",
+        "konteks_id",
+        "sekolah_id",
+        "status_awal",
+        "gelombang",
+        "dibuka_untuk_konfirmasi",
+        "eskalasi_pada",
+    }
 )
 """Field yang boleh dipakai pada domain search masalah."""
 
@@ -16,8 +24,16 @@ SEARCHABLE_FIELDS = frozenset(
 class MasalahService(Protocol):
     """Kontrak masalah redesain. Sengaja TIDAK punya `delete`."""
 
-    def create(self, data: MasalahCreate, *, pelaku_kode_orang: str | None) -> MasalahRead:
+    def create(
+        self,
+        data: MasalahCreate,
+        *,
+        pelaku_kode_orang: str | None,
+        sumber_konfirmasi_id: str | None = None,
+    ) -> MasalahRead:
         """Buat masalah (kode dibangkitkan) beserta tautan uraian tugas, lalu catat riwayat.
+
+        `sumber_konfirmasi_id` diisi hanya oleh alur angkat-masalah dari konfirmasi.
 
         Raises:
             ValidationAppError: konteks/sekolah/uraian tugas tidak dikenal (422).
