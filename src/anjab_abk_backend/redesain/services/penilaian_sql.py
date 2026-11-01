@@ -304,8 +304,10 @@ class SqlPenilaianService:
     def sebaran_k(self, masalah_id: str) -> SebaranK:
         """Hitung sebaran K1–K4 konfirmasi `terkirim` yang belum digantikan ralat.
 
-        Draf dan konfirmasi yang sudah digantikan (ada baris lain dengan `menggantikan_id`
-        = id-nya) tidak ikut dihitung. Nilai `NULL` dihitung sebagai `kosong`.
+        Draf tidak ikut dihitung. Sebuah konfirmasi digantikan hanya bila ada baris lain
+        berstatus `terkirim` dengan `menggantikan_id` = id-nya; draf ralat tidak pernah
+        menggantikan, sehingga versi terkirim tetap terhitung sampai ralat dikirim.
+        Nilai `NULL` dihitung sebagai `kosong`.
 
         Raises:
             NotFoundError: masalah tidak ada (404).
@@ -313,7 +315,9 @@ class SqlPenilaianService:
         if self._s.get(RedesainMasalahModel, masalah_id) is None:
             raise NotFoundError(f"Masalah '{masalah_id}' tidak ditemukan.")
         k = RedesainKonfirmasiModel
-        pengganti = select(k.menggantikan_id).where(k.menggantikan_id.is_not(None))
+        pengganti = select(k.menggantikan_id).where(
+            k.menggantikan_id.is_not(None), k.status == "terkirim"
+        )
         rows = self._s.scalars(
             select(k).where(
                 k.masalah_id == masalah_id, k.status == "terkirim", k.id.not_in(pengganti)

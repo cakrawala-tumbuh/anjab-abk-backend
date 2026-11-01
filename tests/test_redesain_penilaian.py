@@ -277,6 +277,41 @@ def test_sebaran_k_abaikan_draf_dan_digantikan(client_as, partisipan_factory, db
     assert c.get("/api/v1/redesain/masalah/tidak-ada/sebaran-k").status_code == 404
 
 
+def test_sebaran_k_draf_ralat_tidak_menggantikan_terkirim(
+    client_as, partisipan_factory, db_session
+):
+    c = _tim(client_as, partisipan_factory, "pnl-14")
+    mid = _masalah_id(db_session)
+    url = f"/api/v1/redesain/masalah/{mid}/sebaran-k"
+    lama = _konf(db_session, mid, "terkirim", "Sedang")
+    ralat = _konf(db_session, mid, "draf", "Rendah", menggantikan=lama)
+    j = c.get(url).json()
+    assert j["jumlah_konfirmasi"] == 1
+    assert j["k1"]["Sedang"] == 1 and j["k1"]["Rendah"] == 0
+    # draf ralat dikirim -> menggantikan versi lama
+    db_session.get(RedesainKonfirmasiModel, ralat).status = "terkirim"
+    db_session.flush()
+    j = c.get(url).json()
+    assert j["jumlah_konfirmasi"] == 1
+    assert j["k1"]["Rendah"] == 1 and j["k1"]["Sedang"] == 0
+
+
+def test_sebaran_k_dua_rantai_satu_punya_draf_ralat(client_as, partisipan_factory, db_session):
+    c = _tim(client_as, partisipan_factory, "pnl-15")
+    mid = _masalah_id(db_session)
+    a = _konf(db_session, mid, "terkirim", "Sedang")
+    _konf(db_session, mid, "terkirim", "Tinggi")
+    _konf(db_session, mid, "draf", "Rendah", menggantikan=a)
+    assert c.get(f"/api/v1/redesain/masalah/{mid}/sebaran-k").json()["jumlah_konfirmasi"] == 2
+
+
+def test_sebaran_k_hanya_draf_nol(client_as, partisipan_factory, db_session):
+    c = _tim(client_as, partisipan_factory, "pnl-16")
+    mid = _masalah_id(db_session)
+    _konf(db_session, mid, "draf", "Rendah")
+    assert c.get(f"/api/v1/redesain/masalah/{mid}/sebaran-k").json()["jumlah_konfirmasi"] == 0
+
+
 def test_endpoint_baru_ditolak_untuk_sekolah_pengisi(client_as, partisipan_factory, db_session):
     partisipan_factory("pnl-13")
     kode = _kode_orang(db_session, "O-9002")

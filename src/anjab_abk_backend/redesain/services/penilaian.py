@@ -80,5 +80,8 @@ class PenilaianService(Protocol):
         ...
 
     def sebaran_k(self, masalah_id: str) -> SebaranK:
-        """Sebaran K1–K4 konfirmasi `terkirim` tak digantikan; 404 bila masalah tak ada."""
+        """Sebaran K1–K4 konfirmasi `terkirim` yang belum digantikan ralat `terkirim`.
+
+        Draf ralat tidak menggantikan. 404 bila masalah tak ada.
+        """
         ...
