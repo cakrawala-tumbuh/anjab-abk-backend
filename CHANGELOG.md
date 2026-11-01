@@ -9,6 +9,12 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Ekspor register XLSX 14 sheet** (backlog #65, butir BE-11b): `GET
+  /api/v1/redesain/ekspor/register.xlsx` (`tim-kajian`) mengunduh satu workbook bernama dan
+  berurutan seperti paket v1.3 (header baris 4, data mulai baris 5, urut kode), berisi nilai
+  tanpa rumus dan hanya kode orang (tidak pernah nama/email). Konfirmasi versi yang digantikan
+  diberi awalan `[digantikan]` pada catatan independensi; sheet MULAI, RUBRIK, UJI_RUMUS hanya
+  berisi judul dan penunjuk ke paket metode. Dependensi baru: `openpyxl`.
 - **Log versi metode redesain** (backlog #64, butir BE-11a): tabel `redesain_versi_metode`
   (migrasi `d7a3b5e9f2c4`, unik `versi`+`bagian`) berisi 5 catatan perubahan metode v1.3
   (sheet PERUBAHAN) hasil seed idempoten. Endpoint khusus `tim-kajian`:
