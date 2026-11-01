@@ -46,6 +46,7 @@ _KOLOM_NULLABLE = frozenset(
 def _field_map() -> FieldMap:
     m = RedesainMasalahModel
     return {
+        "id": FieldSpec(column=m.id),
         "kode": FieldSpec(column=m.kode),
         "konteks_id": FieldSpec(column=m.konteks_id),
         "sekolah_id": FieldSpec(column=m.sekolah_id),

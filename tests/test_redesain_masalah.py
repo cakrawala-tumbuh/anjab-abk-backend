@@ -176,3 +176,22 @@ def test_negatif_konteks_sekolah_404_dan_akses(client_as, partisipan_factory, db
     partisipan_factory("spm-1")
     assert client_as("spm-1", groups=["sekolah-pengisi"]).get(URL).status_code == 403
     assert client_as("spm-1", groups=["admin"]).get(URL).status_code == 403
+
+
+def test_search_id_in_eq_order_dan_negatif(client_as, partisipan_factory):
+    c = _tim(client_as, partisipan_factory, "tkm-id")
+    semua = c.post(f"{URL}/search", json={"domain": [], "limit": 100}).json()["items"]
+    m1, m2, m3 = (semua[0]["id"], semua[1]["id"], semua[2]["id"])
+    r = c.post(f"{URL}/search", json={"domain": [["id", "in", [m1, m3]]], "limit": 20})
+    assert r.status_code == 200
+    assert r.json()["total"] == 2
+    assert {i["id"] for i in r.json()["items"]} == {m1, m3}
+    r = c.post(f"{URL}/search", json={"domain": [["id", "=", m2]]})
+    assert [i["id"] for i in r.json()["items"]] == [m2]
+    r = c.post(f"{URL}/search", json={"domain": [], "order": [["id", "asc"]]})
+    assert r.status_code == 200
+    r = c.post(f"{URL}/search", json={"domain": [["id", "in", []]]})
+    assert r.status_code == 200 and r.json()["items"] == []
+    r = c.post(f"{URL}/search", json={"domain": [["rumusan", "=", "x"]]})
+    assert r.status_code == 422
+    assert "not_allowed" in r.text

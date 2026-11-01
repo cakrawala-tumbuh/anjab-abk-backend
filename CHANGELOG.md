@@ -7,6 +7,12 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diperbaiki
+
+- **Search masalah redesain menerima `id`** (backlog #67): `POST /api/v1/redesain/masalah/search`
+  kini mengizinkan field `id` di domain dan order (mis. `[["id","in",[...]]]`), sehingga halaman
+  agenda yayasan tidak lagi 422 `not_allowed`. Tanpa migrasi.
+
 ## [0.48.0] - 2026-11-01
 
 ### Ditambahkan

@@ -106,8 +106,8 @@ def search_masalah(
     req: SearchRequest,
     service: Annotated[MasalahService, Depends(get_masalah_service)],
 ) -> Page[MasalahRead]:
-    """Cari dengan domain ala Odoo; field: kode, konteks_id, sekolah_id, status_awal, eskalasi_pada,
-    gelombang, dibuka_untuk_konfirmasi."""
+    """Cari dengan domain ala Odoo; field: id, kode, konteks_id, sekolah_id, status_awal,
+    eskalasi_pada, gelombang, dibuka_untuk_konfirmasi."""
     items, total = service.search(
         domain=req.domain, order=req.order, limit=req.limit, offset=req.offset
     )

@@ -9,6 +9,7 @@ from ..schemas.masalah import MasalahCreate, MasalahRead, MasalahUpdate
 
 SEARCHABLE_FIELDS = frozenset(
     {
+        "id",
         "kode",
         "konteks_id",
         "sekolah_id",
@@ -18,7 +19,7 @@ SEARCHABLE_FIELDS = frozenset(
         "eskalasi_pada",
     }
 )
-"""Field yang boleh dipakai pada domain search masalah."""
+"""Field yang boleh dipakai pada domain/order search masalah (termasuk `id` untuk lookup massal)."""
 
 
 class MasalahService(Protocol):
