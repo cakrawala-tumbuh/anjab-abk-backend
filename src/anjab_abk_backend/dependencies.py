@@ -61,6 +61,8 @@ from .redesain.services.koreksi import KoreksiService
 from .redesain.services.koreksi_sql import SqlKoreksiService
 from .redesain.services.masalah import MasalahService
 from .redesain.services.masalah_sql import SqlMasalahService
+from .redesain.services.penilaian import PenilaianService
+from .redesain.services.penilaian_sql import SqlPenilaianService
 from .redesain.services.proses import ProsesService
 from .redesain.services.proses_sql import SqlProsesService
 from .redesain.services.riwayat import RiwayatService
@@ -359,6 +361,11 @@ def get_masalah_service(session: SessionDep) -> MasalahService:
 def get_bukti_service(session: SessionDep) -> BuktiService:
     """SEAM: `BuktiService` PostgreSQL (riwayat sesi yang sama)."""
     return SqlBuktiService(session, SqlRiwayatService(session))
+
+
+def get_penilaian_service(session: SessionDep) -> PenilaianService:
+    """SEAM: `PenilaianService` PostgreSQL (riwayat sesi yang sama)."""
+    return SqlPenilaianService(session, SqlRiwayatService(session))
 
 
 def get_proses_service(session: SessionDep) -> ProsesService:

@@ -9,6 +9,15 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Penilaian redesain + saran triase otomatis** (backlog #57, butir BE-8a): tabel
+  `redesain_penilaian` (migrasi `c7f2a9d4e1b3`, satu penilaian per masalah) dan endpoint
+  `tim-kajian` `GET/POST /api/v1/redesain/penilaian`, `POST .../search`
+  (`masalah_id`, `status_bukti`, `saran_otomatis`), `GET/PATCH .../penilaian/{id}`. Masalah yang
+  sudah berpenilaian → 409. `saran_otomatis` (P0/K/P1/P2/P3) dihitung ulang setiap create/update
+  oleh fungsi murni `redesain.triase.hitung_saran` (port rumus workbook `PENILAIAN!J5`, aturan
+  `v1.3`, diuji 13 kasus UJI_RUMUS); bila dikirim di payload, `saran_otomatis`/
+  `versi_aturan_triase` diabaikan. Perubahan dicatat di riwayat (`entitas="penilaian"`). Tidak
+  ada DELETE.
 - **Bukti redesain** (backlog #56, butir BE-7): tabel `redesain_bukti` (migrasi `b6e1d9f4a2c7`)
   dan endpoint `tim-kajian` `GET/POST /api/v1/redesain/bukti`, `POST .../search`,
   `GET/PATCH .../bukti/{id}`. Bukti berkode `B-NNNN`, berupa rujukan teks per klaim (tanpa

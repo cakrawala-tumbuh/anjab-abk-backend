@@ -23,6 +23,7 @@ from .v1 import (
     redesain_konfirmasi,
     redesain_konteks,
     redesain_masalah,
+    redesain_penilaian,
     redesain_proses,
     redesain_riwayat,
     sekolah,
@@ -256,6 +257,11 @@ api_router.include_router(
 api_router.include_router(
     redesain_bukti.router,
     prefix="/redesain/bukti",
+    tags=["redesain"],
+)
+api_router.include_router(
+    redesain_penilaian.router,
+    prefix="/redesain/penilaian",
     tags=["redesain"],
 )
 api_router.include_router(

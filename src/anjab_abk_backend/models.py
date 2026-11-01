@@ -1118,3 +1118,42 @@ class RedesainKonfirmasiModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
     )
+
+
+class RedesainPenilaianModel(Base):
+    """Penilaian Tim Kajian atas satu masalah redesain (sheet PENILAIAN), satu per masalah.
+
+    `status_bukti`/`gap_material`/`indikasi_kritis`/`k1`…`k4` bertipe `String(40)` tanpa
+    CHECK (divalidasi skema). `saran_otomatis` & `versi_aturan_triase` read-only: dihitung
+    ulang service lewat `redesain.triase.hitung_saran` pada setiap create/update. K1–K4 diisi
+    Tim (tidak diagregasi dari konfirmasi). Tidak ada operasi hapus.
+    """
+
+    __tablename__ = "redesain_penilaian"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    masalah_id: Mapped[str] = mapped_column(
+        ForeignKey("redesain_masalah.id", name="fk_redesain_penilaian_masalah"),
+        nullable=False,
+        unique=True,
+    )
+    status_bukti: Mapped[str] = mapped_column(String(40), nullable=False)
+    gap_material: Mapped[str] = mapped_column(String(40), nullable=False)
+    indikasi_kritis: Mapped[str] = mapped_column(String(40), nullable=False)
+    k1: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    k2: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    k3: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    k4: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    alasan_rentang_beda: Mapped[str | None] = mapped_column(Text, nullable=True)
+    diluruskan_sekolah: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pemeriksa_sekolah_konteks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tindak_lanjut: Mapped[str | None] = mapped_column(Text, nullable=True)
+    catatan_sumber_versi: Mapped[str | None] = mapped_column(Text, nullable=True)
+    saran_otomatis: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    versi_aturan_triase: Mapped[str] = mapped_column(String(10), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
