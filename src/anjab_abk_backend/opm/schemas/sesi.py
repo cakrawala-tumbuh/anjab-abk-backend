@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from ...schemas.common import CabangSesi
+from .pengecualian import StatusVerifikasi
 
 StatusSesi = Literal["DRAFT", "OPEN", "CLOSED", "ANALYZED"]
 
@@ -100,6 +101,16 @@ class OpmSesiRead(BaseModel):
     jumlah_task: int = Field(description="Jumlah task hasil snapshot Task Inventory.")
     catatan: str | None = Field(default=None, description="Catatan.")
     created_at: datetime = Field(description="Waktu pembuatan (UTC, ISO-8601).")
+    status_verifikasi: StatusVerifikasi = Field(
+        default="VERIFIED",
+        description=(
+            "Turunan dari register pengecualian: `UNVERIFIED` bila ada >= 1 pengecualian"
+            " berstatus `OPEN`, selain itu `VERIFIED`."
+        ),
+    )
+    jumlah_pengecualian: int = Field(
+        default=0, description="Jumlah baris register pengecualian sesi ini."
+    )
 
 
 class OpmSesiTaskRead(BaseModel):

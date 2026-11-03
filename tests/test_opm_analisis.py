@@ -5,7 +5,9 @@ from __future__ import annotations
 
 from _opm_common import _setup_jabatan_panel_ti, _uniq_periode
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
+from anjab_abk_backend.models import OpmJawabanModel, TiUraianTugasJabatanModel
 from anjab_abk_backend.opm.schemas.sesi import OpmSesiRead, OpmSesiTaskRead
 from anjab_abk_backend.opm.services.analisis import compute_hasil_sesi
 
@@ -251,3 +253,169 @@ def test_opm_admin_semua_endpoint_boleh(client: TestClient, jabatan_id_tk: str) 
     assert client.post(f"{SESI_BASE}/{sid}/tutup").status_code == 200
     assert client.post(f"{SESI_BASE}/{sid}/analisis").status_code == 200
     assert client.get(f"{SESI_BASE}/{sid}/hasil").status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# Register pengecualian TI-OPM (backlog #69, A9).
+# --------------------------------------------------------------------------- #
+
+
+def _buat_sesi_mentah(client: TestClient, ctx: dict, **over) -> dict:
+    payload = {
+        "jabatan_id": ctx["jabatan_id"],
+        "ti_sesi_id": ctx["ti_sesi_id"],
+        "periode": _uniq_periode(),
+        "min_responden": 1,
+        "max_responden": 10,
+    }
+    payload.update(over)
+    r = client.post(SESI_BASE, json=payload)
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def _set_std_penuh(db_session, kodes: list[str]) -> None:
+    for kode in kodes:
+        link = db_session.scalar(
+            select(TiUraianTugasJabatanModel).where(TiUraianTugasJabatanModel.kode == kode)
+        )
+        link.std_opm_importance, link.std_opm_frequency, link.std_opm_criticality = 3, 3, 3
+    db_session.flush()
+
+
+def test_sesi_bersih_verified_dan_register_kosong(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    _set_std_penuh(db_session, ctx["kodes"])
+    sesi = _buat_sesi_mentah(client, ctx)
+    assert sesi["status_verifikasi"] == "VERIFIED"
+    assert sesi["jumlah_pengecualian"] == 0
+    r = client.get(f"{SESI_BASE}/{sesi['id']}/pengecualian")
+    assert r.status_code == 200, r.text
+    assert r.json()["items"] == []
+    assert r.json()["total"] == 0
+
+
+def test_kode_terpilih_hilang_dari_katalog_dicatat_unmatched(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    hilang, ada = ctx["kodes"]
+    _set_std_penuh(db_session, [ada])
+    link = db_session.scalar(
+        select(TiUraianTugasJabatanModel).where(TiUraianTugasJabatanModel.kode == hilang)
+    )
+    db_session.delete(link)
+    db_session.flush()
+
+    sesi = _buat_sesi_mentah(client, ctx)
+    assert sesi["jumlah_task"] == 1
+    assert sesi["status_verifikasi"] == "UNVERIFIED"
+    assert sesi["jumlah_pengecualian"] == 1
+    items = client.get(f"{SESI_BASE}/{sesi['id']}/pengecualian").json()["items"]
+    assert [(i["task_kode"], i["alasan"], i["status"]) for i in items] == [
+        (hilang, "TI_DETAIL_UNMATCHED", "OPEN")
+    ]
+    # Terbaca juga lewat GET sesi dan daftar sesi.
+    assert client.get(f"{SESI_BASE}/{sesi['id']}").json()["status_verifikasi"] == "UNVERIFIED"
+
+
+def test_task_tanpa_nilai_standar_dicatat_std_missing_tanpa_isi_otomatis(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    kosong, penuh = ctx["kodes"]
+    _set_std_penuh(db_session, [penuh])
+    link = db_session.scalar(
+        select(TiUraianTugasJabatanModel).where(TiUraianTugasJabatanModel.kode == kosong)
+    )
+    link.std_opm_importance = link.std_opm_frequency = link.std_opm_criticality = None
+    db_session.flush()
+
+    sesi = _buat_sesi_mentah(client, ctx)
+    assert sesi["status_verifikasi"] == "UNVERIFIED"
+    items = client.get(f"{SESI_BASE}/{sesi['id']}/pengecualian").json()["items"]
+    assert [(i["task_kode"], i["alasan"]) for i in items] == [(kosong, "OPM_STD_MISSING")]
+    tasks = {
+        t["task_kode"]: t for t in client.get(f"{SESI_BASE}/{sesi['id']}/task").json()["items"]
+    }
+    assert tasks[kosong]["std_importance"] is None
+    assert tasks[kosong]["std_frequency"] is None
+    assert tasks[kosong]["std_criticality"] is None
+
+
+def test_analisis_task_tanpa_rating_null_orphan_dan_idempoten(
+    client: TestClient, jabatan_id_tk: str, db_session
+) -> None:
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    _set_std_penuh(db_session, ctx["kodes"])
+    sesi = _buat_sesi_mentah(client, ctx)
+    client.post(f"{SESI_BASE}/{sesi['id']}/buka")
+    responden = client.get(f"{SESI_BASE}/{sesi['id']}/responden").json()["items"]
+    _submit(client, responden[0]["id"], ctx["kodes"], 4, 3, 5)
+    client.post(f"{SESI_BASE}/{sesi['id']}/tutup")
+
+    # Kosongkan satu dimensi tersimpan -> baris dilewati get_raw_by_responden (n == 0).
+    tanpa_rating = ctx["kodes"][0]
+    jwb = db_session.scalar(
+        select(OpmJawabanModel).where(
+            OpmJawabanModel.responden_id == responden[0]["id"],
+            OpmJawabanModel.task_kode == tanpa_rating,
+        )
+    )
+    jwb.importance = None
+    db_session.flush()
+
+    r1 = client.post(f"{SESI_BASE}/{sesi['id']}/analisis")
+    assert r1.status_code == 200, r1.text
+    by_kode = {t["task_kode"]: t for t in r1.json()["tasks"]}
+    kosong = by_kode[tanpa_rating]
+    assert kosong["n"] == 0
+    assert kosong["mean_importance"] is None
+    assert kosong["mean_frequency"] is None
+    assert kosong["mean_criticality"] is None
+    assert kosong["selection_essential"] is None
+    assert kosong["workload_essential"] is None
+    assert kosong["orphan"] is True
+    ada = by_kode[ctx["kodes"][1]]
+    assert ada["orphan"] is False
+    assert ada["mean_importance"] == 4.0
+
+    r2 = client.post(f"{SESI_BASE}/{sesi['id']}/analisis")
+    assert r2.status_code == 200, r2.text
+    items = client.get(f"{SESI_BASE}/{sesi['id']}/pengecualian").json()
+    assert items["total"] == 1
+    assert [(i["task_kode"], i["alasan"]) for i in items["items"]] == [
+        (tanpa_rating, "OPM_RATING_MISSING")
+    ]
+    hasil = client.get(f"{SESI_BASE}/{sesi['id']}/hasil").json()
+    assert {t["task_kode"]: t["orphan"] for t in hasil["tasks"]}[tanpa_rating] is True
+    assert client.get(f"{SESI_BASE}/{sesi['id']}").json()["status_verifikasi"] == "UNVERIFIED"
+
+
+def test_compute_hasil_sesi_task_tanpa_rating_mean_dan_flag_none() -> None:
+    sesi = _sesi_read()
+    tasks = [_task_read()]
+    hasil = compute_hasil_sesi(sesi, tasks, [("r1", {})], orphan_kodes={"K001"})
+    t = hasil.tasks[0]
+    assert t.n == 0
+    assert t.mean_importance is None
+    assert t.mean_frequency is None
+    assert t.mean_criticality is None
+    assert t.selection_essential is None
+    assert t.workload_essential is None
+    assert t.orphan is True
+
+
+def test_pengecualian_sesi_tak_dikenal_404(client: TestClient) -> None:
+    assert client.get(f"{SESI_BASE}/opses_tidak_ada/pengecualian").status_code == 404
+
+
+def test_pengecualian_tanpa_token_401(anon_client: TestClient) -> None:
+    assert anon_client.get(f"{SESI_BASE}/{_DUMMY_SESI_ID}/pengecualian").status_code == 401
+
+
+def test_pengecualian_partisipan_403(client_as) -> None:
+    as_partisipan = client_as("partisipan-x", groups=["partisipan"])
+    assert as_partisipan.get(f"{SESI_BASE}/{_DUMMY_SESI_ID}/pengecualian").status_code == 403

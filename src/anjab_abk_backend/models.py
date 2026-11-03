@@ -747,6 +747,40 @@ class OpmSesiTaskModel(Base):
     sesi: Mapped[OpmSesiModel] = relationship(back_populates="task_links")
 
 
+class OpmSesiPengecualianModel(Base):
+    """Register pengecualian satu sesi OPM (backlog `anjab-abk-backend#69`, A9).
+
+    Mencatat ketidakcocokan TI-OPM berkode alasan alih-alih membuangnya diam-diam:
+    `TI_DETAIL_UNMATCHED` (kode terpilih TI tak ada di katalog saat snapshot),
+    `OPM_STD_MISSING` (task snapshot tanpa ketiga nilai standar) dan
+    `OPM_RATING_MISSING` (task tanpa satu pun rating saat analisis). Register hanya
+    MENCATAT — tidak pernah mengisi nilai standar/rating secara otomatis. Unik per
+    `(sesi_id, task_kode, alasan)` sehingga pencatatan ulang bersifat idempoten.
+    `status` selalu `OPEN` pada item ini (keputusan reviewer di luar lingkup).
+    """
+
+    __tablename__ = "opm_sesi_pengecualian"
+    __table_args__ = (
+        UniqueConstraint(
+            "sesi_id", "task_kode", "alasan", name="uq_opm_sesi_pengecualian_sesi_task_alasan"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    sesi_id: Mapped[str] = mapped_column(
+        ForeignKey("opm_sesi.id", ondelete="CASCADE", name="fk_opm_sesi_pengecualian_sesi"),
+        nullable=False,
+        index=True,
+    )
+    task_kode: Mapped[str] = mapped_column(String(20), nullable=False)
+    alasan: Mapped[str] = mapped_column(String(40), nullable=False)
+    keterangan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="OPEN", server_default="OPEN"
+    )
+    created_at: Mapped[datetime] = _ts()
+
+
 class OpmRespondenModel(Base):
     __tablename__ = "opm_responden"
 

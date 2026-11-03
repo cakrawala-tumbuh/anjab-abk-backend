@@ -29,6 +29,7 @@ from ...models import (
     JabatanModel,
     OpmRespondenModel,
     OpmSesiModel,
+    OpmSesiPengecualianModel,
     OpmSesiTaskModel,
     SMEPanelModel,
     TiDetilTugasModel,
@@ -41,6 +42,7 @@ from ...models import (
 from ...schemas.search import Domain, Order
 from ...services.domain import validate_searchable_fields
 from ...services.domain_sql import FieldMap, FieldSpec, compile_domain, order_by_columns
+from ..schemas.pengecualian import OpmPengecualianRead
 from ..schemas.sesi import OpmSesiCreate, OpmSesiRead, OpmSesiTaskRead, OpmSesiUpdate, StatusSesi
 
 # Sumber tunggal whitelist & state machine.
@@ -74,7 +76,52 @@ def _task_to_read(rec: OpmSesiTaskModel) -> OpmSesiTaskRead:
     )
 
 
-def _to_read(rec: OpmSesiModel, jabatan_nama: str | None = None) -> OpmSesiRead:
+def _pengecualian_to_read(rec: OpmSesiPengecualianModel) -> OpmPengecualianRead:
+    """Petakan baris register pengecualian ke skema baca API."""
+    created = rec.created_at
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=UTC)
+    return OpmPengecualianRead(
+        id=rec.id,
+        sesi_id=rec.sesi_id,
+        task_kode=rec.task_kode,
+        alasan=rec.alasan,  # type: ignore[arg-type]
+        keterangan=rec.keterangan,
+        status=rec.status,
+        created_at=created,
+    )
+
+
+def _baris_pengecualian(
+    sesi_id: str, task_kode: str, alasan: str, keterangan: str | None
+) -> OpmSesiPengecualianModel:
+    """Buat baris register `OPEN` baru dengan ID UUID v4 (belum di-`add`)."""
+    return OpmSesiPengecualianModel(
+        id=str(uuid.uuid4()),
+        sesi_id=sesi_id,
+        task_kode=task_kode,
+        alasan=alasan,
+        keterangan=keterangan,
+        status="OPEN",
+    )
+
+
+def _to_read(
+    rec: OpmSesiModel,
+    jabatan_nama: str | None = None,
+    ringkas: tuple[int, int] = (0, 0),
+) -> OpmSesiRead:
+    """Petakan `OpmSesiModel` ke `OpmSesiRead`.
+
+    Args:
+        rec: Baris sesi.
+        jabatan_nama: Nama jabatan ter-resolve, bila ada.
+        ringkas: Pasangan (jumlah seluruh pengecualian, jumlah yang berstatus `OPEN`)
+            untuk sesi ini; menurunkan `jumlah_pengecualian` dan `status_verifikasi`.
+
+    Returns:
+        Skema baca sesi.
+    """
     created = rec.created_at
     if created.tzinfo is None:
         created = created.replace(tzinfo=UTC)
@@ -91,6 +138,8 @@ def _to_read(rec: OpmSesiModel, jabatan_nama: str | None = None) -> OpmSesiRead:
         jumlah_task=len(rec.task_links),
         catatan=rec.catatan,
         created_at=created,
+        status_verifikasi="UNVERIFIED" if ringkas[1] > 0 else "VERIFIED",
+        jumlah_pengecualian=ringkas[0],
     )
 
 
@@ -111,6 +160,31 @@ class SqlOpmSesiService:
             return {}
         rows = self._s.scalars(select(JabatanModel).where(JabatanModel.id.in_(jabatan_ids))).all()
         return {j.id: j.nama for j in rows}
+
+    def _ringkas_map(self, sesi_ids: list[str]) -> dict[str, tuple[int, int]]:
+        """Hitung (total, OPEN) pengecualian per sesi dalam SATU query."""
+        if not sesi_ids:
+            return {}
+        rows = self._s.execute(
+            select(
+                OpmSesiPengecualianModel.sesi_id,
+                func.count(),
+                func.count().filter(OpmSesiPengecualianModel.status == "OPEN"),
+            )
+            .where(OpmSesiPengecualianModel.sesi_id.in_(sesi_ids))
+            .group_by(OpmSesiPengecualianModel.sesi_id)
+        ).all()
+        return {sid: (int(total), int(n_open)) for sid, total, n_open in rows}
+
+    def _read(self, rec: OpmSesiModel, jabatan_nama: str | None) -> OpmSesiRead:
+        """Bangun `OpmSesiRead` satu sesi, termasuk ringkasan register pengecualian."""
+        return _to_read(rec, jabatan_nama, self._ringkas_map([rec.id]).get(rec.id, (0, 0)))
+
+    def _reads(self, rows: list[OpmSesiModel]) -> list[OpmSesiRead]:
+        """Bangun daftar `OpmSesiRead` dengan resolusi jabatan & pengecualian batch."""
+        jmap = self._jabatan_map(list({r.jabatan_id for r in rows}))
+        rmap = self._ringkas_map([r.id for r in rows])
+        return [_to_read(r, jmap.get(r.jabatan_id), rmap.get(r.id, (0, 0))) for r in rows]
 
     def _flush_checked(self, *, on_conflict: str) -> None:
         """Flush dalam SAVEPOINT; petakan **hanya** `UniqueViolation` → 409.
@@ -136,13 +210,12 @@ class SqlOpmSesiService:
             .limit(limit)
             .offset(offset)
         ).all()
-        jmap = self._jabatan_map(list({r.jabatan_id for r in rows}))
-        return [_to_read(r, jmap.get(r.jabatan_id)) for r in rows], total
+        return self._reads(list(rows)), total
 
     def get(self, sesi_id: str) -> OpmSesiRead:
         rec = self._get_model(sesi_id)
         jab = self._s.get(JabatanModel, rec.jabatan_id)
-        return _to_read(rec, jab.nama if jab else None)
+        return self._read(rec, jab.nama if jab else None)
 
     def create(self, data: OpmSesiCreate) -> OpmSesiRead:
         # 1. Jabatan wajib ada.
@@ -278,7 +351,17 @@ class SqlOpmSesiService:
         for kode in sorted(terpilih):
             entry = ut_by_kode.get(kode)
             if entry is None:
-                continue  # tidak seharusnya terjadi; kode berasal dari snapshot TI valid
+                # Kode terpilih TI tak ditemukan di katalog: JANGAN dibuang diam-diam —
+                # catat di register pengecualian (backlog #69). Sesi tetap dibuat.
+                self._s.add(
+                    _baris_pengecualian(
+                        rec.id,
+                        kode,
+                        "TI_DETAIL_UNMATCHED",
+                        "Kode terpilih Task Inventory tidak ditemukan di katalog saat snapshot.",
+                    )
+                )
+                continue
             link, uraian_text = entry
             rec.task_links.append(
                 OpmSesiTaskModel(
@@ -296,6 +379,19 @@ class SqlOpmSesiService:
                     std_criticality=link.std_opm_criticality,
                 )
             )
+            if (
+                link.std_opm_importance is None
+                and link.std_opm_frequency is None
+                and link.std_opm_criticality is None
+            ):
+                self._s.add(
+                    _baris_pengecualian(
+                        rec.id,
+                        kode,
+                        "OPM_STD_MISSING",
+                        "Task snapshot tanpa nilai standar OPM; tidak diisi otomatis.",
+                    )
+                )
 
         # 8. Auto-responden dari submitter Tahap 1 sesi TI sumber (langkah 6) — bukan
         # anggota SME panel. `nama`/`partisipan_id` disalin langsung dari baris
@@ -314,7 +410,7 @@ class SqlOpmSesiService:
             )
 
         self._flush_checked(on_conflict=konflik)
-        return _to_read(rec, jabatan.nama)
+        return self._read(rec, jabatan.nama)
 
     def update(self, sesi_id: str, data: OpmSesiUpdate) -> OpmSesiRead:
         rec = self._get_model(sesi_id)
@@ -329,7 +425,7 @@ class SqlOpmSesiService:
             setattr(rec, key, value)
         self._s.flush()
         jab = self._s.get(JabatanModel, rec.jabatan_id)
-        return _to_read(rec, jab.nama if jab else None)
+        return self._read(rec, jab.nama if jab else None)
 
     def delete(self, sesi_id: str, *, paksa: bool = False) -> None:
         rec = self._get_model(sesi_id)
@@ -350,7 +446,7 @@ class SqlOpmSesiService:
         rec.status = target
         self._s.flush()
         jab = self._s.get(JabatanModel, rec.jabatan_id)
-        return _to_read(rec, jab.nama if jab else None)
+        return self._read(rec, jab.nama if jab else None)
 
     def list_task(
         self, sesi_id: str, *, limit: int | None = None, offset: int = 0
@@ -380,6 +476,78 @@ class SqlOpmSesiService:
         tasks, _ = self.list_task(sesi_id)
         return {t.task_kode for t in tasks}
 
+    def catat_pengecualian(self, sesi_id: str, items: list[tuple[str, str, str | None]]) -> int:
+        """Catat pengecualian ke register secara idempoten.
+
+        Args:
+            sesi_id: ID sesi OPM.
+            items: Daftar (task_kode, alasan, keterangan). Pasangan (task_kode, alasan)
+                yang sudah tercatat dilewati (kunci unik sesi+task+alasan).
+
+        Returns:
+            Jumlah baris baru yang benar-benar ditambahkan.
+
+        Raises:
+            NotFoundError: Sesi tidak ada.
+        """
+        self._get_model(sesi_id)
+        ada = set(
+            self._s.execute(
+                select(OpmSesiPengecualianModel.task_kode, OpmSesiPengecualianModel.alasan).where(
+                    OpmSesiPengecualianModel.sesi_id == sesi_id
+                )
+            )
+            .tuples()
+            .all()
+        )
+        baru = 0
+        for kode, alasan, ket in items:
+            if (kode, alasan) in ada:
+                continue
+            ada.add((kode, alasan))
+            self._s.add(_baris_pengecualian(sesi_id, kode, alasan, ket))
+            baru += 1
+        self._s.flush()
+        return baru
+
+    def list_pengecualian(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[OpmPengecualianRead], int]:
+        """Daftar register pengecualian sesi, urut waktu catat lalu kode task.
+
+        Raises:
+            NotFoundError: Sesi tidak ada.
+        """
+        self._get_model(sesi_id)
+        total = (
+            self._s.scalar(
+                select(func.count())
+                .select_from(OpmSesiPengecualianModel)
+                .where(OpmSesiPengecualianModel.sesi_id == sesi_id)
+            )
+            or 0
+        )
+        stmt = (
+            select(OpmSesiPengecualianModel)
+            .where(OpmSesiPengecualianModel.sesi_id == sesi_id)
+            .order_by(
+                OpmSesiPengecualianModel.created_at,
+                OpmSesiPengecualianModel.task_kode,
+                OpmSesiPengecualianModel.alasan,
+            )
+        )
+        if limit is not None:
+            stmt = stmt.limit(limit).offset(offset)
+        elif offset:
+            stmt = stmt.offset(offset)
+        rows = self._s.scalars(stmt).all()
+        return [_pengecualian_to_read(r) for r in rows], total
+
+    def get_pengecualian_kodes(self, sesi_id: str) -> set[str]:
+        """Himpunan `task_kode` yang punya baris register pada sesi ini."""
+        items, _ = self.list_pengecualian(sesi_id)
+        return {i.task_kode for i in items}
+
     def search(
         self, *, domain: Domain, order: Order, limit: int, offset: int
     ) -> tuple[list[OpmSesiRead], int]:
@@ -391,5 +559,4 @@ class SqlOpmSesiService:
         rows = self._s.scalars(
             select(OpmSesiModel).where(cond).order_by(*order_cols).limit(limit).offset(offset)
         ).all()
-        jmap = self._jabatan_map(list({r.jabatan_id for r in rows}))
-        return [_to_read(r, jmap.get(r.jabatan_id)) for r in rows], total
+        return self._reads(list(rows)), total

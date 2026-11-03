@@ -11,6 +11,7 @@ from typing import Protocol
 from ...errors import NotFoundError, ValidationAppError
 from ...schemas.search import Domain, Order
 from ...services.domain import run_search, validate_searchable_fields
+from ..schemas.pengecualian import OpmPengecualianRead
 from ..schemas.sesi import OpmSesiCreate, OpmSesiRead, OpmSesiTaskRead, OpmSesiUpdate, StatusSesi
 
 SEARCHABLE_FIELDS = frozenset(
@@ -57,6 +58,11 @@ class OpmSesiService(Protocol):
         self, sesi_id: str, *, limit: int | None = None, offset: int = 0
     ) -> tuple[list[OpmSesiTaskRead], int]: ...
     def get_task_kodes(self, sesi_id: str) -> set[str]: ...
+    def catat_pengecualian(self, sesi_id: str, items: list[tuple[str, str, str | None]]) -> int: ...
+    def list_pengecualian(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[OpmPengecualianRead], int]: ...
+    def get_pengecualian_kodes(self, sesi_id: str) -> set[str]: ...
     def search(
         self, *, domain: Domain, order: Order, limit: int, offset: int
     ) -> tuple[list[OpmSesiRead], int]: ...
@@ -178,6 +184,23 @@ class InMemoryOpmSesiService:
     def get_task_kodes(self, sesi_id: str) -> set[str]:
         tasks, _ = self.list_task(sesi_id)
         return {t.task_kode for t in tasks}
+
+    def catat_pengecualian(self, sesi_id: str, items: list[tuple[str, str, str | None]]) -> int:
+        """Placeholder: register pengecualian hanya diimplementasikan seam SQL."""
+        self.get(sesi_id)
+        return 0
+
+    def list_pengecualian(
+        self, sesi_id: str, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[OpmPengecualianRead], int]:
+        """Placeholder: register selalu kosong (hanya seam SQL yang mencatat)."""
+        self.get(sesi_id)
+        return [], 0
+
+    def get_pengecualian_kodes(self, sesi_id: str) -> set[str]:
+        """Placeholder: selalu himpunan kosong."""
+        self.get(sesi_id)
+        return set()
 
     def search(
         self, *, domain: Domain, order: Order, limit: int, offset: int

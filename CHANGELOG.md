@@ -9,6 +9,11 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Register pengecualian TI-OPM** (backlog #69): tabel `opm_sesi_pengecualian` (migrasi
+  `a9c4e7b2d6f1`) mencatat `TI_DETAIL_UNMATCHED`, `OPM_STD_MISSING`, `OPM_RATING_MISSING` tanpa
+  mengisi nilai otomatis. Endpoint admin `GET /api/v1/opm/sesi/{sesi_id}/pengecualian`;
+  `OpmSesiRead` bertambah `status_verifikasi` (`VERIFIED`/`UNVERIFIED`) dan `jumlah_pengecualian`;
+  `OpmHasilTaskRead`: `mean_*` dan flag esensial kini `null` bila `n == 0`, plus field `orphan`.
 - **Kerangka feature flag** (backlog #68): lima flag fungsional (`FEATURE_AI_NARRATIVE_DRAFT`,
   `FEATURE_PARTICIPANT_VALIDATION`, `FEATURE_WCP_DCS_SCORING`, `FEATURE_RESEARCH_EXPORT`,
   `FEATURE_CHANGE_AUTHORIZATION`), default mati, serta endpoint baca bertoken

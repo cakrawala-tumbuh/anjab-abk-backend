@@ -23,6 +23,7 @@ from ...dependencies import (
     require_admin,
 )
 from ...errors import ConflictError
+from ...opm.schemas.pengecualian import OpmPengecualianRead
 from ...opm.schemas.sesi import OpmSesiCreate, OpmSesiRead, OpmSesiTaskRead, OpmSesiUpdate
 from ...opm.services.responden import OpmRespondenService
 from ...opm.services.sesi import OpmSesiService
@@ -264,3 +265,27 @@ def list_task(
     items, total = service.list_task(sesi_id, limit=page.limit, offset=page.offset)
     set_pagination_links(response, request, total, page.limit, page.offset)
     return Page[OpmSesiTaskRead](items=items, total=total, limit=page.limit, offset=page.offset)
+
+
+@router.get(
+    "/{sesi_id}/pengecualian",
+    response_model=Page[OpmPengecualianRead],
+    summary="Register pengecualian TI-OPM sesi OPM (admin)",
+    operation_id="opm_pengecualian_list",
+    dependencies=_ADMIN_GUARDS,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
+)
+def list_pengecualian(
+    sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
+    request: Request,
+    response: Response,
+    page: Annotated[Pagination, Depends(pagination_params)],
+    service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
+) -> Page[OpmPengecualianRead]:
+    """Daftar ketidakcocokan TI-OPM sesi ini beserta kode alasannya.
+
+    Register hanya mencatat; tidak ada nilai standar/rating yang diisi otomatis.
+    """
+    items, total = service.list_pengecualian(sesi_id, limit=page.limit, offset=page.offset)
+    set_pagination_links(response, request, total, page.limit, page.offset)
+    return Page[OpmPengecualianRead](items=items, total=total, limit=page.limit, offset=page.offset)

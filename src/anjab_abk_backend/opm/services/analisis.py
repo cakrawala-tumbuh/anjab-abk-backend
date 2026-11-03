@@ -28,10 +28,24 @@ def compute_hasil_sesi(
     sesi: OpmSesiRead,
     tasks: list[OpmSesiTaskRead],
     responden_raw: list[tuple[str, dict[str, tuple[int, int, int]]]],
+    orphan_kodes: frozenset[str] | set[str] = frozenset(),
 ) -> OpmHasilSesiRead:
     """Hitung hasil agregat sesi OPM dari semua responden yang sudah submit.
 
-    ``responden_raw``: list of (responden_id, {task_kode: (importance, frequency, criticality)}).
+    Task tanpa satu pun rating (``n == 0``) TIDAK diberi angka: seluruh ``mean_*`` dan
+    kedua flag esensial bernilai ``None`` (bukan 0.0/False) agar kekosongan tidak terbaca
+    sebagai nilai (backlog ``#69``).
+
+    Args:
+        sesi: Sesi OPM yang dianalisis.
+        tasks: Snapshot task sesi.
+        responden_raw: List of (responden_id,
+            {task_kode: (importance, frequency, criticality)}).
+        orphan_kodes: Kode task yang punya baris di register pengecualian sesi; hanya
+            dipakai untuk menandai ``orphan`` pada hasil per task.
+
+    Returns:
+        Hasil agregat sesi beserta hasil per task.
     """
     task_results: list[OpmHasilTaskRead] = []
 
@@ -43,18 +57,24 @@ def compute_hasil_sesi(
         frequencies = [v[1] for v in nilai]
         criticalities = [v[2] for v in nilai]
 
-        mean_importance = round(statistics.mean(importances), 2) if importances else 0.0
-        mean_frequency = round(statistics.mean(frequencies), 2) if frequencies else 0.0
-        mean_criticality = round(statistics.mean(criticalities), 2) if criticalities else 0.0
+        mean_importance = round(statistics.mean(importances), 2) if n else None
+        mean_frequency = round(statistics.mean(frequencies), 2) if n else None
+        mean_criticality = round(statistics.mean(criticalities), 2) if n else None
 
         sd_importance = round(statistics.stdev(importances), 2) if n >= 2 else None
         sd_frequency = round(statistics.stdev(frequencies), 2) if n >= 2 else None
         sd_criticality = round(statistics.stdev(criticalities), 2) if n >= 2 else None
 
-        selection_essential = _selection_essential(mean_importance, mean_criticality)
-        workload_essential = _workload_essential(mean_importance, mean_frequency, mean_criticality)
-
+        selection_essential: bool | None = None
+        workload_essential: bool | None = None
         if n:
+            assert mean_importance is not None
+            assert mean_frequency is not None
+            assert mean_criticality is not None
+            selection_essential = _selection_essential(mean_importance, mean_criticality)
+            workload_essential = _workload_essential(
+                mean_importance, mean_frequency, mean_criticality
+            )
             n_sel = sum(1 for imp, _freq, crit in nilai if _selection_essential(imp, crit))
             n_wl = sum(1 for imp, freq, crit in nilai if _workload_essential(imp, freq, crit))
             prop_selection_essential = round(n_sel / n, 4)
@@ -80,6 +100,7 @@ def compute_hasil_sesi(
                 workload_essential=workload_essential,
                 prop_selection_essential=prop_selection_essential,
                 prop_workload_essential=prop_workload_essential,
+                orphan=task.task_kode in orphan_kodes,
             )
         )
 
