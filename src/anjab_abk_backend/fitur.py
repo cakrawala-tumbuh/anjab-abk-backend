@@ -12,7 +12,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from .config import Settings, get_settings
-from .errors import ConflictError
+from .errors import ConflictError, ScoringNotApprovedError
 from .schemas.common import FiturKode, FiturRead
 
 __all__ = [
@@ -21,6 +21,7 @@ __all__ = [
     "daftar_fitur",
     "fitur_aktif",
     "require_fitur",
+    "require_skor_disahkan",
 ]
 
 KETERANGAN: dict[FiturKode, str] = {
@@ -83,3 +84,18 @@ def require_fitur(kode: FiturKode) -> Callable[..., None]:
             raise FiturNonaktifError(kode)
 
     return _dependency
+
+
+def require_skor_disahkan(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> None:
+    """Dependency: tolak hasil per responden WCP/DCS bila `WCP_DCS_SCORING` mati.
+
+    Raises:
+        ScoringNotApprovedError: 409 `scoring_key_not_approved` saat flag mati.
+    """
+    if not fitur_aktif(FiturKode.WCP_DCS_SCORING, settings):
+        raise ScoringNotApprovedError(
+            "Skor per responden belum dapat ditampilkan: kunci skor belum disahkan."
+            " Jawaban raw tetap dapat dibaca lewat endpoint jawaban responden."
+        )

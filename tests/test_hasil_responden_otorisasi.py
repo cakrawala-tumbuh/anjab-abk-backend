@@ -13,6 +13,8 @@ import logging
 import pytest
 from fastapi.testclient import TestClient
 
+pytestmark = pytest.mark.usefixtures("skor_hidup")
+
 DCS_RSP = "/api/v1/dcs/responden"
 DCS_SUB = "/api/v1/dcs/sub-skala"
 DCS_HASIL_RSP = "/api/v1/dcs/hasil-responden"

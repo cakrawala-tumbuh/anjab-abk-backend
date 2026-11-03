@@ -97,3 +97,31 @@ class FiturRead(BaseModel):
 
 class FiturListRead(BaseModel):
     items: list[FiturRead] = Field(description="Selalu lima entri, urutan sesuai enum.")
+
+
+class HasilRawItemRead(BaseModel):
+    """Agregat deskriptif RAW satu item instrumen WCP/DCS (mode `RAW_ONLY`).
+
+    Nilai jawaban dipakai apa adanya: tanpa reverse scoring dan tanpa rata-rata per
+    dimensi/sub-skala.
+    """
+
+    item_id: str = Field(description="Kode item.", examples=["D1a"])
+    kelompok_kode: str = Field(
+        description="Kode dimensi (WCP) atau sub-skala (DCS) pemilik item.", examples=["DEMAND"]
+    )
+    urutan: int = Field(description="Urutan global item.", examples=[1])
+    n: int = Field(description="Jumlah responden yang menjawab item ini.", examples=[7])
+    n_kosong: int = Field(
+        description="Jumlah responden ber-submit yang tidak menjawab item ini.", examples=[0]
+    )
+    frekuensi: dict[str, int] = Field(
+        description='Frekuensi jawaban raw, kunci "1".."5".',
+        examples=[{"1": 0, "2": 1, "3": 2, "4": 3, "5": 1}],
+    )
+    mean_raw: float | None = Field(
+        default=None, description="Rata-rata raw; null bila n < 1.", examples=[3.57]
+    )
+    sd_raw: float | None = Field(
+        default=None, description="Simpangan baku sampel raw; null bila n < 2.", examples=[0.98]
+    )

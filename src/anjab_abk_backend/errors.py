@@ -74,6 +74,12 @@ class InstrumenBerisiJawabanError(ConflictError):
     error_code = "instrument_has_responses"
 
 
+class ScoringNotApprovedError(ConflictError):
+    """409: skor/interpretasi WCP/DCS ditolak karena kunci skor belum disahkan (flag mati)."""
+
+    error_code = "scoring_key_not_approved"
+
+
 class CatalogInUseError(ConflictError):
     """409: katalog Task Inventory masih dipakai sesi TI/OPM sehingga purge ditolak."""
 

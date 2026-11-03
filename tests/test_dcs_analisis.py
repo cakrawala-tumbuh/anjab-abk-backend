@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from anjab_abk_backend.dcs.seed import ITEM
+
+pytestmark = pytest.mark.usefixtures("skor_hidup")
 
 RSP_BASE = "/api/v1/dcs/responden"
 INSTRUMEN_BASE = "/api/v1/dcs/instrumen"

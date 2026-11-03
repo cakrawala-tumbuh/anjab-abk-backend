@@ -6,8 +6,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Response
 
+from ...config import Settings, get_settings
+from ...core.raw_hasil import agregat_raw_per_item
 from ...core.services.partisipan import PartisipanService
-from ...dcs.schemas.hasil import DcsHasilRead, DcsHasilRespondenRead
+from ...dcs.schemas.hasil import DcsHasilRawRead, DcsHasilRespondenRead, DcsHasilResponse
 from ...dcs.services.analisis import build_catalog, compute_hasil, compute_hasil_responden
 from ...dcs.services.instrumen import DcsInstrumenService
 from ...dcs.services.jawaban import DcsJawabanService
@@ -30,6 +32,7 @@ from ...dependencies import (
     rate_limit,
 )
 from ...errors import ValidationAppError
+from ...fitur import FiturKode, fitur_aktif, require_skor_disahkan
 from ...schemas.common import ErrorResponse
 from ...security import Principal
 from ...wcp.services.analisis import (
@@ -52,6 +55,12 @@ _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 _NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
+_SCORING_OFF = {
+    409: {
+        "model": ErrorResponse,
+        "description": "Skor belum disahkan (flag WCP_DCS_SCORING mati): scoring_key_not_approved.",
+    }
+}
 _FORBIDDEN = {
     403: {"model": ErrorResponse, "description": "Bukan admin atau bukan pemilik responden."}
 }
@@ -91,9 +100,32 @@ def _compute_wcp_risk_score(
     return round(sum(risk_scores) / len(risk_scores), 4) if risk_scores else 0.0
 
 
+def _hasil_dcs(
+    responden_raw: list[tuple[str, dict[str, int]]],
+    sk_service: DcsSubSkalaService,
+    wcp_rsp_service: WcpRespondenService,
+    wcp_jwb_service: WcpJawabanService,
+    wcp_dim_service: WcpDimensiService,
+    settings: Settings,
+) -> DcsHasilResponse:
+    """Susun hasil DCS: `SCORED` bila flag hidup, selain itu `RAW_ONLY`.
+
+    Saat flag mati komponen risiko WCP untuk K-Index tidak dihitung sama sekali.
+    """
+    if fitur_aktif(FiturKode.WCP_DCS_SCORING, settings):
+        wcp_catalog = _build_wcp_catalog(wcp_dim_service)
+        wcp_risk = _compute_wcp_risk_score(wcp_rsp_service, wcp_jwb_service, wcp_catalog)
+        return compute_hasil(responden_raw, wcp_risk, _build_dcs_catalog(sk_service))
+    items = [(i.item_id, i.subskala_kode, i.urutan) for i in sk_service.list_item()]
+    return DcsHasilRawRead(
+        n_responden=len(responden_raw),
+        items=agregat_raw_per_item(responden_raw, items),
+    )
+
+
 @router.post(
     "/analisis",
-    response_model=DcsHasilRead,
+    response_model=DcsHasilResponse,
     summary="Jalankan analisis DCS (CLOSED → ANALYZED)",
     operation_id="dcs_analisis",
     dependencies=_WRITE_GUARDS,
@@ -109,8 +141,9 @@ def run_analisis(
     wcp_dim_service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
     idem: Annotated[Idempotency, Depends(idempotency)],
     response: Response,
-) -> DcsHasilRead:
-    def _analisis() -> DcsHasilRead:
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> DcsHasilResponse:
+    def _analisis() -> DcsHasilResponse:
         instrumen = instrumen_service.get()
         if instrumen.status not in ("CLOSED", "ANALYZED"):
             raise ValidationAppError(
@@ -131,20 +164,19 @@ def run_analisis(
             (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted
         ]
 
-        wcp_catalog = _build_wcp_catalog(wcp_dim_service)
-        wcp_risk = _compute_wcp_risk_score(wcp_rsp_service, wcp_jwb_service, wcp_catalog)
-
         if instrumen.status == "CLOSED":
             instrumen_service.set_analyzed()
 
-        return compute_hasil(responden_raw, wcp_risk, _build_dcs_catalog(sk_service))
+        return _hasil_dcs(
+            responden_raw, sk_service, wcp_rsp_service, wcp_jwb_service, wcp_dim_service, settings
+        )
 
-    return run_idempotent(idem, response, DcsHasilRead, _analisis)
+    return run_idempotent(idem, response, DcsHasilResponse, _analisis)
 
 
 @router.get(
     "/hasil",
-    response_model=DcsHasilRead,
+    response_model=DcsHasilResponse,
     summary="Lihat hasil analisis instrumen DCS",
     operation_id="dcs_hasil",
     dependencies=READ_GUARDS,
@@ -158,7 +190,8 @@ def get_hasil(
     wcp_rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     wcp_jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
     wcp_dim_service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
-) -> DcsHasilRead:
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> DcsHasilResponse:
     instrumen = instrumen_service.get()
     if instrumen.status != "ANALYZED":
         raise ValidationAppError(
@@ -170,11 +203,9 @@ def get_hasil(
     responden_raw: list[tuple[str, dict[str, int]]] = [
         (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted
     ]
-
-    wcp_catalog = _build_wcp_catalog(wcp_dim_service)
-    wcp_risk = _compute_wcp_risk_score(wcp_rsp_service, wcp_jwb_service, wcp_catalog)
-
-    return compute_hasil(responden_raw, wcp_risk, _build_dcs_catalog(sk_service))
+    return _hasil_dcs(
+        responden_raw, sk_service, wcp_rsp_service, wcp_jwb_service, wcp_dim_service, settings
+    )
 
 
 @router.get(
@@ -182,8 +213,8 @@ def get_hasil(
     response_model=DcsHasilRespondenRead,
     summary="Lihat hasil analisis per responden DCS (admin atau pemilik)",
     operation_id="dcs_hasil_responden_get",
-    dependencies=READ_GUARDS,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND_RSP},
+    dependencies=[*READ_GUARDS, Depends(require_skor_disahkan)],
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND_RSP, **_SCORING_OFF},
 )
 def get_hasil_responden(
     responden_id: Annotated[str, Path(description="ID responden.")],

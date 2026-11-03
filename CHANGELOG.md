@@ -9,6 +9,13 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Skor WCP/DCS di balik flag `WCP_DCS_SCORING`** (backlog #75, A7): selama flag mati (bawaan),
+  `POST /api/v1/{wcp,dcs}/analisis` dan `GET /api/v1/{wcp,dcs}/hasil` mengembalikan `mode: "RAW_ONLY"`
+  berisi frekuensi jawaban raw dan `mean_raw`/`sd_raw` per item, tanpa skor dimensi/sub-skala,
+  interpretasi, `risk_flag`, alpha, maupun K-Index. `GET .../hasil-responden/{id}` menjawab 409
+  `scoring_key_not_approved`. Saat flag hidup isi tetap seperti sebelumnya ditambah `mode: "SCORED"`.
+  Batas `min_responden` tetap berlaku di kedua mode.
+
 - **Log audit baca data terlindung** (backlog #74, A5): setiap `GET` yang lolos guard object-level
   (`authorize_responden_access`/`authorize_sesi_access`/`authorize_opm_sesi_access`) dan seluruh
   `GET` `/api/v1/redesain/kode-orang` & `/api/v1/redesain/ekspor` menulis satu record `protected_read`

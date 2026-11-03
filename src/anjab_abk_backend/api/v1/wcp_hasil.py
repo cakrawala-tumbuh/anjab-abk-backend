@@ -6,6 +6,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Response
 
+from ...config import Settings, get_settings
+from ...core.raw_hasil import agregat_raw_per_item
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
@@ -21,9 +23,14 @@ from ...dependencies import (
     rate_limit,
 )
 from ...errors import ValidationAppError
+from ...fitur import FiturKode, fitur_aktif, require_skor_disahkan
 from ...schemas.common import ErrorResponse
 from ...security import Principal
-from ...wcp.schemas.hasil import WcpHasilRead, WcpHasilRespondenRead
+from ...wcp.schemas.hasil import (
+    WcpHasilRawRead,
+    WcpHasilRespondenRead,
+    WcpHasilResponse,
+)
 from ...wcp.services.analisis import build_catalog, compute_hasil, compute_hasil_responden
 from ...wcp.services.dimensi import WcpDimensiService
 from ...wcp.services.instrumen import WcpInstrumenService
@@ -37,6 +44,12 @@ _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 _NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
+_SCORING_OFF = {
+    409: {
+        "model": ErrorResponse,
+        "description": "Skor belum disahkan (flag WCP_DCS_SCORING mati): scoring_key_not_approved.",
+    }
+}
 _FORBIDDEN = {
     403: {"model": ErrorResponse, "description": "Bukan admin atau bukan pemilik responden."}
 }
@@ -46,9 +59,24 @@ def _build_wcp_catalog(dim_service: WcpDimensiService):
     return build_catalog(dim_service.list_dimensi(), dim_service.list_item())
 
 
+def _hasil_wcp(
+    responden_raw: list[tuple[str, dict[str, int]]],
+    dim_service: WcpDimensiService,
+    settings: Settings,
+) -> WcpHasilResponse:
+    """Susun hasil WCP: `SCORED` bila flag hidup, selain itu `RAW_ONLY` (tanpa skor)."""
+    if fitur_aktif(FiturKode.WCP_DCS_SCORING, settings):
+        return compute_hasil(responden_raw, _build_wcp_catalog(dim_service))
+    items = [(i.item_id, i.dimensi_kode, i.urutan) for i in dim_service.list_item()]
+    return WcpHasilRawRead(
+        n_responden=len(responden_raw),
+        items=agregat_raw_per_item(responden_raw, items),
+    )
+
+
 @router.post(
     "/analisis",
-    response_model=WcpHasilRead,
+    response_model=WcpHasilResponse,
     summary="Jalankan analisis WCP (CLOSED → ANALYZED)",
     operation_id="wcp_analisis",
     dependencies=_WRITE_GUARDS,
@@ -61,8 +89,9 @@ def run_analisis(
     dim_service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
     idem: Annotated[Idempotency, Depends(idempotency)],
     response: Response,
-) -> WcpHasilRead:
-    def _analisis() -> WcpHasilRead:
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> WcpHasilResponse:
+    def _analisis() -> WcpHasilResponse:
         instrumen = instrumen_service.get()
         if instrumen.status not in ("CLOSED", "ANALYZED"):
             raise ValidationAppError(
@@ -86,14 +115,14 @@ def run_analisis(
         if instrumen.status == "CLOSED":
             instrumen_service.set_analyzed()
 
-        return compute_hasil(responden_raw, _build_wcp_catalog(dim_service))
+        return _hasil_wcp(responden_raw, dim_service, settings)
 
-    return run_idempotent(idem, response, WcpHasilRead, _analisis)
+    return run_idempotent(idem, response, WcpHasilResponse, _analisis)
 
 
 @router.get(
     "/hasil",
-    response_model=WcpHasilRead,
+    response_model=WcpHasilResponse,
     summary="Lihat hasil analisis instrumen WCP",
     operation_id="wcp_hasil",
     dependencies=READ_GUARDS,
@@ -104,7 +133,8 @@ def get_hasil(
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
     dim_service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
-) -> WcpHasilRead:
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> WcpHasilResponse:
     instrumen = instrumen_service.get()
     if instrumen.status != "ANALYZED":
         raise ValidationAppError(
@@ -116,7 +146,7 @@ def get_hasil(
     responden_raw: list[tuple[str, dict[str, int]]] = [
         (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted
     ]
-    return compute_hasil(responden_raw, _build_wcp_catalog(dim_service))
+    return _hasil_wcp(responden_raw, dim_service, settings)
 
 
 @router.get(
@@ -124,8 +154,8 @@ def get_hasil(
     response_model=WcpHasilRespondenRead,
     summary="Lihat hasil analisis per responden (admin atau pemilik)",
     operation_id="wcp_hasil_responden_get",
-    dependencies=READ_GUARDS,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND_RSP},
+    dependencies=[*READ_GUARDS, Depends(require_skor_disahkan)],
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND_RSP, **_SCORING_OFF},
 )
 def get_hasil_responden(
     responden_id: Annotated[str, Path(description="ID responden.")],

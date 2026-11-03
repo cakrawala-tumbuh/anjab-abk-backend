@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from ...schemas.common import HasilRawItemRead
 
 InterpretasiNormal = Literal["BAIK", "CUKUP", "PERLU_PERHATIAN"]
 InterpretasiRisiko = Literal["AMAN", "WASPADA", "RISIKO_TINGGI"]
@@ -54,5 +56,22 @@ class WcpHasilRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    mode: Literal["SCORED"] = Field(
+        default="SCORED", description="Diskriminan: skor aktif (flag WCP_DCS_SCORING hidup)."
+    )
     n_responden: int = Field(description="Total responden yang submit.")
     dimensi: list[WcpHasilDimensiRead] = Field(description="Hasil per dimensi (12 entri).")
+
+
+class WcpHasilRawRead(BaseModel):
+    """Hasil WCP mode `RAW_ONLY`: raw per item + statistik deskriptif raw, tanpa skor."""
+
+    mode: Literal["RAW_ONLY"] = Field(
+        default="RAW_ONLY", description="Diskriminan: skoring dimatikan (flag mati)."
+    )
+    n_responden: int = Field(description="Total responden yang submit.")
+    items: list[HasilRawItemRead] = Field(description="Agregat raw per item.")
+
+
+WcpHasilResponse = Annotated[WcpHasilRead | WcpHasilRawRead, Field(discriminator="mode")]
+"""Union diskriminan hasil WCP (`mode`: `SCORED` | `RAW_ONLY`)."""

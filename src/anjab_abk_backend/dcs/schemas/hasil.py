@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from ...schemas.common import HasilRawItemRead
 
 DcsRiskFlag = Literal["HIGH", "MODERATE", "LOW"]
 
@@ -55,6 +57,9 @@ class DcsHasilRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    mode: Literal["SCORED"] = Field(
+        default="SCORED", description="Diskriminan: skor aktif (flag WCP_DCS_SCORING hidup)."
+    )
     n_responden: int = Field(description="Total responden yang submit.")
     sub_skala: list[DcsHasilSubSkalaRead] = Field(description="Hasil per sub-skala (3 entri).")
     risk_flag: DcsRiskFlag = Field(
@@ -78,3 +83,17 @@ class DcsHasilRead(BaseModel):
         description="Komponen WCP risk yang dipakai dalam K-Index (0–1). None jika tidak ada.",
         examples=[0.65],
     )
+
+
+class DcsHasilRawRead(BaseModel):
+    """Hasil DCS mode `RAW_ONLY`: raw per item + statistik deskriptif raw, tanpa skor."""
+
+    mode: Literal["RAW_ONLY"] = Field(
+        default="RAW_ONLY", description="Diskriminan: skoring dimatikan (flag mati)."
+    )
+    n_responden: int = Field(description="Total responden yang submit.")
+    items: list[HasilRawItemRead] = Field(description="Agregat raw per item.")
+
+
+DcsHasilResponse = Annotated[DcsHasilRead | DcsHasilRawRead, Field(discriminator="mode")]
+"""Union diskriminan hasil DCS (`mode`: `SCORED` | `RAW_ONLY`)."""

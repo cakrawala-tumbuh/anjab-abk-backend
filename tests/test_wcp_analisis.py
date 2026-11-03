@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
+
+pytestmark = pytest.mark.usefixtures("skor_hidup")
 
 RSP_BASE = "/api/v1/wcp/responden"
 INSTRUMEN_BASE = "/api/v1/wcp/instrumen"

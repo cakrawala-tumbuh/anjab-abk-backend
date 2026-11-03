@@ -108,6 +108,16 @@ def app(settings: Settings, db_session: Session):
 
 
 @pytest.fixture
+def skor_hidup(app):
+    """Hidupkan flag ``WCP_DCS_SCORING`` pada `app` (default test: mati, mode RAW_ONLY)."""
+    from anjab_abk_backend.config import get_settings
+
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None, feature_wcp_dcs_scoring=True
+    )
+
+
+@pytest.fixture
 def anon_client(app) -> TestClient:
     """Client tanpa token."""
     with TestClient(app, raise_server_exceptions=True) as c:
