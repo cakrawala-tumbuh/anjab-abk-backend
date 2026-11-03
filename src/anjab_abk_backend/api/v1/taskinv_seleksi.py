@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, Path, Response, status
 
+from ...config import Settings, get_settings
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     authorize_responden_access,
     get_current_principal,
     get_partisipan_service,
@@ -16,9 +18,11 @@ from ...dependencies import (
     get_ti_responden_service,
     get_ti_seleksi_service,
     get_ti_sesi_service,
+    idempotency,
     rate_limit,
 )
 from ...errors import NotFoundError, ValidationAppError
+from ...etag import check_if_match, compute_etag
 from ...schemas.common import ErrorResponse
 from ...security import Principal
 from ...taskinv.schemas.seleksi import TiSeleksiDraftSave, TiSeleksiRead
@@ -26,6 +30,12 @@ from ...taskinv.services.catalog import TiCatalogService
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.seleksi import TiSeleksiService
 from ...taskinv.services.sesi import TiSesiService
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 
 router = APIRouter()
 
@@ -49,6 +59,7 @@ _FORBIDDEN = {
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND_RSP,
+        **PRECONDITION_RESPONSES,
         422: {
             "model": ErrorResponse,
             "description": "Kode task tidak valid, sesi bukan TAHAP1, atau responden sudah submit.",
@@ -64,9 +75,16 @@ def save_draft_seleksi(
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     catalog: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> TiSeleksiRead:
     responden = rsp_service.get(responden_id)
     authorize_responden_access(principal, responden.partisipan_id, par_service)
+    # Belum ada seleksi tersimpan -> GET-nya 404 (tak ada ETag untuk dipegang klien), jadi
+    # state kosong dibandingkan sebagai `{}`.
+    saat_ini = seleksi_service.get_by_responden(responden_id)
+    check_if_match(saat_ini if saat_ini is not None else {}, if_match, settings.require_if_match)
     sesi = sesi_service.get(responden.sesi_id)
     if sesi.status != "TAHAP1":
         raise ValidationAppError(
@@ -78,7 +96,9 @@ def save_draft_seleksi(
             "Responden ini sudah menyelesaikan Tahap 1; draft tidak bisa diubah."
         )
     valid = catalog.valid_kodes_for_jabatan(sesi.jabatan_id)
-    return seleksi_service.save_draft(responden_id, sesi.id, payload.task_kode, valid)
+    hasil = seleksi_service.save_draft(responden_id, sesi.id, payload.task_kode, valid)
+    response.headers["ETag"] = compute_etag(hasil)
+    return hasil
 
 
 @router.post(
@@ -93,6 +113,7 @@ def save_draft_seleksi(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND_RSP,
+        **IDEMPOTENCY_RESPONSES,
         422: {
             "model": ErrorResponse,
             "description": (
@@ -108,20 +129,26 @@ def submit_seleksi(
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> TiSeleksiRead:
     responden = rsp_service.get(responden_id)
     authorize_responden_access(principal, responden.partisipan_id, par_service)
-    sesi = sesi_service.get(responden.sesi_id)
-    if sesi.status != "TAHAP1":
-        raise ValidationAppError(
-            f"Seleksi Tahap 1 hanya dapat disubmit saat sesi berstatus TAHAP1"
-            f" (saat ini: {sesi.status})."
-        )
-    if responden.tahap1_submit:
-        raise ValidationAppError("Responden ini sudah menyelesaikan Tahap 1.")
-    result = seleksi_service.submit(responden_id)
-    rsp_service.mark_tahap1(responden_id)
-    return result
+
+    def _submit() -> TiSeleksiRead:
+        sesi = sesi_service.get(responden.sesi_id)
+        if sesi.status != "TAHAP1":
+            raise ValidationAppError(
+                f"Seleksi Tahap 1 hanya dapat disubmit saat sesi berstatus TAHAP1"
+                f" (saat ini: {sesi.status})."
+            )
+        if responden.tahap1_submit:
+            raise ValidationAppError("Responden ini sudah menyelesaikan Tahap 1.")
+        result = seleksi_service.submit(responden_id)
+        rsp_service.mark_tahap1(responden_id)
+        return result
+
+    return run_idempotent(idem, response, TiSeleksiRead, _submit)
 
 
 @router.get(
@@ -138,10 +165,12 @@ def get_seleksi(
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    response: Response,
 ) -> TiSeleksiRead:
     responden = rsp_service.get(responden_id)
     authorize_responden_access(principal, responden.partisipan_id, par_service)
     result = seleksi_service.get_by_responden(responden_id)
     if result is None:
         raise NotFoundError("Responden belum submit seleksi Tahap 1.")
+    response.headers["ETag"] = compute_etag(result)
     return result

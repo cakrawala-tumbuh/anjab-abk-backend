@@ -9,6 +9,15 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Kunci optimistik dan Idempotency-Key di rute tulis OPM dan Task Inventory** (backlog #76, A5):
+  `PATCH`/`PUT`/`DELETE` pada sesi, responden, jawaban draft OPM, seleksi dan detail TI, serta
+  hapus usulan menerima `If-Match` (412 bila usang, 428 bila `REQUIRE_IF_MATCH=true` dan header
+  absen); GET sumbernya dan respons sukses penulisan mengembalikan `ETag`. Rute `POST` non-search
+  (buka/tutup/mulai-tahap, buat dan alihkan responden, bulk, submit seleksi/detail/jawaban,
+  keputusan Tahap 2, usulan, analisis, purge/reseed katalog) menerima `Idempotency-Key`: key sama
+  diulang mengembalikan 200 dengan respons pertama, key yang masih diproses 409. Tanpa header,
+  perilaku tidak berubah. Endpoint baru: `GET /api/v1/task-inventory/usulan/{usulan_id}`
+  (sumber ETag untuk `DELETE`).
 - **Penyimpanan dan mesin status job asinkron** (backlog #78): tabel `async_job`, status `PENDING/RUNNING/SUCCEEDED/FAILED/MANUAL_REVIEW` dengan aturan transisi, seam `AsyncJobService`, dan endpoint admin `GET /api/v1/system/jobs/{job_id}`. Belum ada produsen job.
 - **Skor WCP/DCS di balik flag `WCP_DCS_SCORING`** (backlog #75, A7): selama flag mati (bawaan),
   `POST /api/v1/{wcp,dcs}/analisis` dan `GET /api/v1/{wcp,dcs}/hasil` mengembalikan `mode: "RAW_ONLY"`

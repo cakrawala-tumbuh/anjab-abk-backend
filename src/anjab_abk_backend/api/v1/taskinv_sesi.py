@@ -7,6 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, Query, Response, status
 
+from ...config import Settings, get_settings
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
@@ -28,6 +29,7 @@ from ...dependencies import (
     require_admin,
 )
 from ...errors import ConflictError, ValidationAppError
+from ...etag import check_if_match, compute_etag
 from ...redesain.services.kode_orang import KodeOrangService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
@@ -44,6 +46,12 @@ from ...taskinv.services.seleksi import TiSeleksiService
 from ...taskinv.services.sesi import TiSesiService
 from ...taskinv.services.tahap2 import TiTahap2Service
 from ...taskinv.services.usulan import TiUsulanService
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 from ..kode_orang_isi import isi_kode_orang
 
 router = APIRouter()
@@ -173,9 +181,11 @@ def get_sesi(
     service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
+    response: Response,
 ) -> TiSesiRead:
     sesi = service.get(sesi_id)
     authorize_sesi_access(principal, sesi, par_service, rsp_service)
+    response.headers["ETag"] = compute_etag(sesi)
     return sesi
 
 
@@ -190,6 +200,7 @@ def get_sesi(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND,
+        **PRECONDITION_RESPONSES,
         422: {
             "model": ErrorResponse,
             "description": (
@@ -203,8 +214,14 @@ def update_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
     payload: TiSesiUpdate,
     service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> TiSesiRead:
-    return service.update(sesi_id, payload)
+    check_if_match(service.get(sesi_id), if_match, settings.require_if_match)
+    hasil = service.update(sesi_id, payload)
+    response.headers["ETag"] = compute_etag(hasil)
+    return hasil
 
 
 @router.delete(
@@ -218,6 +235,7 @@ def update_sesi(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND,
+        **PRECONDITION_RESPONSES,
         422: {
             "model": ErrorResponse,
             "description": "Sesi bukan DRAFT dan paksa tidak di-set.",
@@ -228,6 +246,8 @@ def delete_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
     service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     principal: Annotated[Principal, Depends(require_admin)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    if_match: IfMatchHeader = None,
     paksa: Annotated[
         bool,
         Query(
@@ -237,6 +257,7 @@ def delete_sesi(
         ),
     ] = False,
 ) -> Response:
+    check_if_match(service.get(sesi_id), if_match, settings.require_if_match)
     if paksa:
         logger.warning(
             "force_delete_sesi",
@@ -252,13 +273,15 @@ def delete_sesi(
     summary="Mulai Tahap 1 — Seleksi Relevansi (DRAFT → TAHAP1) (admin)",
     operation_id="taskinv_sesi_mulai_tahap1",
     dependencies=_ADMIN_GUARDS,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND, **IDEMPOTENCY_RESPONSES},
 )
 def mulai_tahap1(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
     service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> TiSesiRead:
-    return service.transition(sesi_id, "TAHAP1")
+    return run_idempotent(idem, response, TiSesiRead, lambda: service.transition(sesi_id, "TAHAP1"))
 
 
 @router.post(
@@ -272,6 +295,7 @@ def mulai_tahap1(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND,
+        **IDEMPOTENCY_RESPONSES,
         422: {
             "model": ErrorResponse,
             "description": "Belum ada responden yang submit Tahap 1.",
@@ -282,26 +306,31 @@ def mulai_tahap2(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
     service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
     paksa: Annotated[
         bool,
         Query(description="Paksa lanjut walau belum semua partisipan submit Tahap 1."),
     ] = False,
 ) -> TiSesiRead:
-    sesi = service.get(sesi_id)
-    if sesi.status != "TAHAP1":
-        raise ValidationAppError(
-            f"Tahap 2 hanya dapat dimulai dari TAHAP1 (saat ini: {sesi.status})."
-        )
-    total = rsp_service.count_by_sesi(sesi_id)
-    submitted = rsp_service.count_tahap1_submitted(sesi_id)
-    if submitted == 0:
-        raise ValidationAppError("Belum ada partisipan yang submit Tahap 1.")
-    if submitted < total and not paksa:
-        raise ValidationAppError(
-            f"Baru {submitted} dari {total} partisipan submit Tahap 1."
-            " Gunakan paksa=true untuk tetap melanjutkan."
-        )
-    return service.transition(sesi_id, "TAHAP2")
+    def _run() -> TiSesiRead:
+        sesi = service.get(sesi_id)
+        if sesi.status != "TAHAP1":
+            raise ValidationAppError(
+                f"Tahap 2 hanya dapat dimulai dari TAHAP1 (saat ini: {sesi.status})."
+            )
+        total = rsp_service.count_by_sesi(sesi_id)
+        submitted = rsp_service.count_tahap1_submitted(sesi_id)
+        if submitted == 0:
+            raise ValidationAppError("Belum ada partisipan yang submit Tahap 1.")
+        if submitted < total and not paksa:
+            raise ValidationAppError(
+                f"Baru {submitted} dari {total} partisipan submit Tahap 1."
+                " Gunakan paksa=true untuk tetap melanjutkan."
+            )
+        return service.transition(sesi_id, "TAHAP2")
+
+    return run_idempotent(idem, response, TiSesiRead, _run)
 
 
 @router.post(
@@ -315,6 +344,7 @@ def mulai_tahap2(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND,
+        **IDEMPOTENCY_RESPONSES,
         422: {
             "model": ErrorResponse,
             "description": "Belum semua task diputuskan koordinator / tidak ada task relevan.",
@@ -328,6 +358,8 @@ def mulai_tahap3(
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     tahap2_service: Annotated[TiTahap2Service, Depends(get_ti_tahap2_service)],
     usulan_service: Annotated[TiUsulanService, Depends(get_ti_usulan_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
     paksa: Annotated[
         bool,
         Query(
@@ -337,35 +369,38 @@ def mulai_tahap3(
         ),
     ] = False,
 ) -> TiSesiRead:
-    sesi = service.get(sesi_id)
-    if sesi.status != "TAHAP2":
-        raise ValidationAppError(
-            f"Tahap 3 hanya dapat dimulai dari TAHAP2 (saat ini: {sesi.status})."
-        )
-    n_submitted = rsp_service.count_tahap1_submitted(sesi_id)
-    unanimous = seleksi_service.unanimous_terpilih(sesi_id, n_submitted)
-    partial = seleksi_service.partial_terpilih(sesi_id, n_submitted)
-    counts = seleksi_service.count_relevan_per_task(sesi_id)
-
-    if partial:
-        # `usulan=[]`: gerbang `paksa` ini murni tentang task partial (perilaku
-        # pre-existing, tidak diubah) — keputusan usulan Tahap 1 TIDAK menghalangi
-        # transisi ke TAHAP3; usulan yang belum diputuskan hanya tidak dimaterialisasi
-        # (lihat `usulan_service.materialize_approved` di bawah).
-        review = tahap2_service.get_review(sesi_id, partial, counts, n_submitted, [])
-        if review.jumlah_belum_diputuskan > 0 and not paksa:
+    def _run() -> TiSesiRead:
+        sesi = service.get(sesi_id)
+        if sesi.status != "TAHAP2":
             raise ValidationAppError(
-                f"Masih ada {review.jumlah_belum_diputuskan} task"
-                " yang belum diputuskan koordinator."
-                " Gunakan paksa=true untuk tetap melanjutkan"
-                " (task belum diputuskan akan diabaikan)."
+                f"Tahap 3 hanya dapat dimulai dari TAHAP2 (saat ini: {sesi.status})."
             )
+        n_submitted = rsp_service.count_tahap1_submitted(sesi_id)
+        unanimous = seleksi_service.unanimous_terpilih(sesi_id, n_submitted)
+        partial = seleksi_service.partial_terpilih(sesi_id, n_submitted)
+        counts = seleksi_service.count_relevan_per_task(sesi_id)
 
-    approved = tahap2_service.get_approved_kodes(sesi_id)
-    final_kodes = sorted(set(unanimous) | set(approved))
-    usulan_kodes = usulan_service.materialize_approved(sesi_id, sesi.jabatan_id)
-    final_kodes = sorted(set(final_kodes) | set(usulan_kodes))
-    return service.freeze_task_terpilih(sesi_id, final_kodes)
+        if partial:
+            # `usulan=[]`: gerbang `paksa` ini murni tentang task partial (perilaku
+            # pre-existing, tidak diubah) — keputusan usulan Tahap 1 TIDAK menghalangi
+            # transisi ke TAHAP3; usulan yang belum diputuskan hanya tidak dimaterialisasi
+            # (lihat `usulan_service.materialize_approved` di bawah).
+            review = tahap2_service.get_review(sesi_id, partial, counts, n_submitted, [])
+            if review.jumlah_belum_diputuskan > 0 and not paksa:
+                raise ValidationAppError(
+                    f"Masih ada {review.jumlah_belum_diputuskan} task"
+                    " yang belum diputuskan koordinator."
+                    " Gunakan paksa=true untuk tetap melanjutkan"
+                    " (task belum diputuskan akan diabaikan)."
+                )
+
+        approved = tahap2_service.get_approved_kodes(sesi_id)
+        final_kodes = sorted(set(unanimous) | set(approved))
+        usulan_kodes = usulan_service.materialize_approved(sesi_id, sesi.jabatan_id)
+        final_kodes = sorted(set(final_kodes) | set(usulan_kodes))
+        return service.freeze_task_terpilih(sesi_id, final_kodes)
+
+    return run_idempotent(idem, response, TiSesiRead, _run)
 
 
 @router.post(
@@ -379,6 +414,7 @@ def mulai_tahap3(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND,
+        **IDEMPOTENCY_RESPONSES,
         422: {
             "model": ErrorResponse,
             "description": "Sesi tidak berstatus TAHAP3, atau alasan kosong.",
@@ -390,6 +426,8 @@ def batalkan_tahap3(
     payload: TiSesiBatalkanTahap3,
     service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     principal: Annotated[Principal, Depends(require_admin)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> TiSesiRead:
     """Kembalikan sebuah sesi Task Inventory dari TAHAP3 ke TAHAP2 (unfreeze).
 
@@ -404,6 +442,9 @@ def batalkan_tahap3(
         payload: Alasan pembatalan (`alasan`, wajib diisi, dicatat di audit log).
         service: Seam `TiSesiService` yang menjalankan efek balik status + link task.
         principal: Principal admin yang memanggil endpoint ini (dari `require_admin`).
+        idem: Dependency `idempotency`; pengulangan dengan `Idempotency-Key` sama
+            mengembalikan hasil pertama (200) tanpa membatalkan lagi.
+        response: Objek respons, dipakai menurunkan status ke 200 saat replay.
 
     Returns:
         `TiSesiRead` sesi setelah `status` kembali ke `"TAHAP2"`.
@@ -412,16 +453,20 @@ def batalkan_tahap3(
         NotFoundError: `sesi_id` tidak ditemukan (404).
         ValidationAppError: status sesi saat ini bukan `"TAHAP3"` (422).
     """
-    logger.warning(
-        "ti_sesi_batalkan_tahap3",
-        extra={
-            "modul": "taskinv",
-            "sesi_id": sesi_id,
-            "aktor": principal.subject,
-            "alasan": payload.alasan,
-        },
-    )
-    return service.batalkan_tahap3(sesi_id, payload.alasan)
+
+    def _batalkan() -> TiSesiRead:
+        logger.warning(
+            "ti_sesi_batalkan_tahap3",
+            extra={
+                "modul": "taskinv",
+                "sesi_id": sesi_id,
+                "aktor": principal.subject,
+                "alasan": payload.alasan,
+            },
+        )
+        return service.batalkan_tahap3(sesi_id, payload.alasan)
+
+    return run_idempotent(idem, response, TiSesiRead, _batalkan)
 
 
 @router.post(
@@ -430,10 +475,12 @@ def batalkan_tahap3(
     summary="Tutup sesi (TAHAP3 → CLOSED) (admin)",
     operation_id="taskinv_sesi_tutup",
     dependencies=_ADMIN_GUARDS,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND, **IDEMPOTENCY_RESPONSES},
 )
 def tutup_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi.")],
     service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> TiSesiRead:
-    return service.transition(sesi_id, "CLOSED")
+    return run_idempotent(idem, response, TiSesiRead, lambda: service.transition(sesi_id, "CLOSED"))

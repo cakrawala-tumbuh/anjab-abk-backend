@@ -7,6 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, Query, Request, Response, status
 
+from ...config import Settings, get_settings
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
@@ -24,6 +25,7 @@ from ...dependencies import (
     require_admin,
 )
 from ...errors import ConflictError
+from ...etag import check_if_match, compute_etag
 from ...opm.schemas.pengecualian import OpmPengecualianRead
 from ...opm.schemas.sesi import OpmSesiCreate, OpmSesiRead, OpmSesiTaskRead, OpmSesiUpdate
 from ...opm.services.responden import OpmRespondenService
@@ -32,6 +34,12 @@ from ...redesain.services.kode_orang import KodeOrangService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
 from ...security import Principal
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 from ..kode_orang_isi import isi_kode_orang
 from ..pagination import set_pagination_links
 
@@ -161,8 +169,11 @@ def search_sesi(
 def get_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
     service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
+    response: Response,
 ) -> OpmSesiRead:
-    return service.get(sesi_id)
+    sesi = service.get(sesi_id)
+    response.headers["ETag"] = compute_etag(sesi)
+    return sesi
 
 
 @router.patch(
@@ -171,14 +182,20 @@ def get_sesi(
     summary="Perbarui sesi OPM (hanya saat DRAFT) (admin)",
     operation_id="opm_sesi_update",
     dependencies=_ADMIN_GUARDS,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND, **PRECONDITION_RESPONSES},
 )
 def update_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
     payload: OpmSesiUpdate,
     service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> OpmSesiRead:
-    return service.update(sesi_id, payload)
+    check_if_match(service.get(sesi_id), if_match, settings.require_if_match)
+    hasil = service.update(sesi_id, payload)
+    response.headers["ETag"] = compute_etag(hasil)
+    return hasil
 
 
 @router.delete(
@@ -192,6 +209,7 @@ def update_sesi(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND,
+        **PRECONDITION_RESPONSES,
         422: {
             "model": ErrorResponse,
             "description": "Sesi bukan DRAFT dan paksa tidak di-set.",
@@ -202,6 +220,8 @@ def delete_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
     service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
     principal: Annotated[Principal, Depends(require_admin)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    if_match: IfMatchHeader = None,
     paksa: Annotated[
         bool,
         Query(
@@ -211,6 +231,7 @@ def delete_sesi(
         ),
     ] = False,
 ) -> Response:
+    check_if_match(service.get(sesi_id), if_match, settings.require_if_match)
     if paksa:
         logger.warning(
             "force_delete_sesi",
@@ -226,13 +247,15 @@ def delete_sesi(
     summary="Buka sesi OPM (DRAFT → OPEN) (admin)",
     operation_id="opm_sesi_buka",
     dependencies=_ADMIN_GUARDS,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND, **IDEMPOTENCY_RESPONSES},
 )
 def buka_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
     service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> OpmSesiRead:
-    return service.transition(sesi_id, "OPEN")
+    return run_idempotent(idem, response, OpmSesiRead, lambda: service.transition(sesi_id, "OPEN"))
 
 
 @router.post(
@@ -241,13 +264,17 @@ def buka_sesi(
     summary="Tutup sesi OPM (OPEN → CLOSED) (admin)",
     operation_id="opm_sesi_tutup",
     dependencies=_ADMIN_GUARDS,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND},
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOT_FOUND, **IDEMPOTENCY_RESPONSES},
 )
 def tutup_sesi(
     sesi_id: Annotated[str, Path(description="ID sesi OPM.")],
     service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> OpmSesiRead:
-    return service.transition(sesi_id, "CLOSED")
+    return run_idempotent(
+        idem, response, OpmSesiRead, lambda: service.transition(sesi_id, "CLOSED")
+    )
 
 
 @router.get(

@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Response
 
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     authorize_sesi_access,
     get_current_principal,
     get_kode_orang_service,
@@ -19,6 +20,7 @@ from ...dependencies import (
     get_ti_sesi_service,
     get_ti_tahap2_service,
     get_ti_usulan_service,
+    idempotency,
     rate_limit,
 )
 from ...errors import ForbiddenError, ValidationAppError
@@ -33,6 +35,7 @@ from ...taskinv.services.seleksi import TiSeleksiService
 from ...taskinv.services.sesi import TiSesiService
 from ...taskinv.services.tahap2 import TiTahap2Service
 from ...taskinv.services.usulan import TiUsulanService
+from ..concurrency import IDEMPOTENCY_RESPONSES, run_idempotent
 from ..kode_orang_isi import isi_kode_orang
 
 router = APIRouter()
@@ -125,6 +128,7 @@ _FORBIDDEN_SESI = {
         **_RATE,
         **_NOT_FOUND_SESI,
         **_FORBIDDEN_SESI,
+        **IDEMPOTENCY_RESPONSES,
         422: {"model": ErrorResponse, "description": "Sesi bukan TAHAP2 / kode task tidak valid."},
     },
 )
@@ -140,6 +144,8 @@ def submit_tahap2_keputusan(
     tahap2_service: Annotated[TiTahap2Service, Depends(get_ti_tahap2_service)],
     usulan_service: Annotated[TiUsulanService, Depends(get_ti_usulan_service)],
     ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> TiTahap2ReviewRead:
     sesi = sesi_service.get(sesi_id)
     if "admin" not in principal.groups:
@@ -149,42 +155,48 @@ def submit_tahap2_keputusan(
                 "Akses ditolak: hanya admin atau koordinator SME panel"
                 " yang dapat submit keputusan Tahap 2."
             )
-    if sesi.status != "TAHAP2":
-        raise ValidationAppError(
-            f"Keputusan koordinator hanya dapat disubmit saat sesi berstatus TAHAP2"
-            f" (saat ini: {sesi.status})."
-        )
-    if not payload.keputusan and not payload.keputusan_usulan:
-        raise ValidationAppError(
-            "Payload tidak boleh kosong: isi 'keputusan' dan/atau 'keputusan_usulan'."
-        )
-    n_submitted = rsp_service.count_tahap1_submitted(sesi_id)
-    partial = seleksi_service.partial_terpilih(sesi_id, n_submitted)
-    partial_set = set(partial)
-    submitted_kodes = {k.task_kode for k in payload.keputusan}
-    non_partial = submitted_kodes - partial_set
-    if non_partial:
-        raise ValidationAppError(
-            f"Task berikut bukan task partial (sudah dipilih semua atau tidak ada di seleksi): "
-            f"{', '.join(sorted(non_partial)[:5])}"
-        )
-    # Validasi kepemilikan usulan SEBELUM menyimpan apa pun — payload ditolak utuh
-    # (bukan sebagian) bila ada usulan_id yang bukan milik sesi ini.
-    usulan_ids_payload = {k.usulan_id for k in payload.keputusan_usulan}
-    sesi_usulan_ids = {u.id for u in usulan_service.list_by_sesi(sesi_id)}
-    unknown_usulan = usulan_ids_payload - sesi_usulan_ids
-    if unknown_usulan:
-        raise ValidationAppError(
-            f"Usulan berikut bukan milik sesi ini: {', '.join(sorted(unknown_usulan)[:5])}"
-            + ("..." if len(unknown_usulan) > 5 else ".")
-        )
-    valid_kodes = catalog.valid_kodes_for_jabatan(sesi.jabatan_id)
-    result = tahap2_service.submit_keputusan(sesi_id, payload.keputusan, valid_kodes)
 
-    usulan_reviews = [
-        _to_usulan_review(
-            usulan_service.set_keputusan(item.usulan_id, item.disetujui), rsp_service, ko_service
-        )
-        for item in payload.keputusan_usulan
-    ]
-    return result.model_copy(update={"usulan": usulan_reviews})
+    def _submit() -> TiTahap2ReviewRead:
+        if sesi.status != "TAHAP2":
+            raise ValidationAppError(
+                f"Keputusan koordinator hanya dapat disubmit saat sesi berstatus TAHAP2"
+                f" (saat ini: {sesi.status})."
+            )
+        if not payload.keputusan and not payload.keputusan_usulan:
+            raise ValidationAppError(
+                "Payload tidak boleh kosong: isi 'keputusan' dan/atau 'keputusan_usulan'."
+            )
+        n_submitted = rsp_service.count_tahap1_submitted(sesi_id)
+        partial = seleksi_service.partial_terpilih(sesi_id, n_submitted)
+        partial_set = set(partial)
+        submitted_kodes = {k.task_kode for k in payload.keputusan}
+        non_partial = submitted_kodes - partial_set
+        if non_partial:
+            raise ValidationAppError(
+                f"Task berikut bukan task partial (sudah dipilih semua atau tidak ada di seleksi): "
+                f"{', '.join(sorted(non_partial)[:5])}"
+            )
+        # Validasi kepemilikan usulan SEBELUM menyimpan apa pun — payload ditolak utuh
+        # (bukan sebagian) bila ada usulan_id yang bukan milik sesi ini.
+        usulan_ids_payload = {k.usulan_id for k in payload.keputusan_usulan}
+        sesi_usulan_ids = {u.id for u in usulan_service.list_by_sesi(sesi_id)}
+        unknown_usulan = usulan_ids_payload - sesi_usulan_ids
+        if unknown_usulan:
+            raise ValidationAppError(
+                f"Usulan berikut bukan milik sesi ini: {', '.join(sorted(unknown_usulan)[:5])}"
+                + ("..." if len(unknown_usulan) > 5 else ".")
+            )
+        valid_kodes = catalog.valid_kodes_for_jabatan(sesi.jabatan_id)
+        result = tahap2_service.submit_keputusan(sesi_id, payload.keputusan, valid_kodes)
+
+        usulan_reviews = [
+            _to_usulan_review(
+                usulan_service.set_keputusan(item.usulan_id, item.disetujui),
+                rsp_service,
+                ko_service,
+            )
+            for item in payload.keputusan_usulan
+        ]
+        return result.model_copy(update={"usulan": usulan_reviews})
+
+    return run_idempotent(idem, response, TiTahap2ReviewRead, _submit)

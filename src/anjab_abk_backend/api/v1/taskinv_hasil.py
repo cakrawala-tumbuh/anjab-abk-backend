@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Path, Request, Response
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     authorize_sesi_access,
     get_current_principal,
@@ -18,6 +19,7 @@ from ...dependencies import (
     get_ti_responden_service,
     get_ti_seleksi_service,
     get_ti_sesi_service,
+    idempotency,
     pagination_params,
     rate_limit,
     require_admin,
@@ -33,6 +35,7 @@ from ...taskinv.services.detail import TiDetailService
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.seleksi import TiSeleksiService
 from ...taskinv.services.sesi import TiSesiService
+from ..concurrency import IDEMPOTENCY_RESPONSES, run_idempotent
 from ..pagination import set_pagination_links
 
 router = APIRouter()
@@ -108,6 +111,7 @@ def get_task_terpilih(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND_SESI,
+        **IDEMPOTENCY_RESPONSES,
         422: {"model": ErrorResponse},
     },
 )
@@ -118,23 +122,28 @@ def run_analisis(
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     detail_service: Annotated[TiDetailService, Depends(get_ti_detail_service)],
     catalog: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> TiHasilSesiRead:
-    sesi = sesi_service.get(sesi_id)
-    if sesi.status not in ("CLOSED", "ANALYZED"):
-        raise ValidationAppError(
-            f"Analisis hanya dapat dijalankan saat sesi berstatus CLOSED atau ANALYZED"
-            f" (saat ini: {sesi.status})."
+    def _run() -> TiHasilSesiRead:
+        sesi = sesi_service.get(sesi_id)
+        if sesi.status not in ("CLOSED", "ANALYZED"):
+            raise ValidationAppError(
+                f"Analisis hanya dapat dijalankan saat sesi berstatus CLOSED atau ANALYZED"
+                f" (saat ini: {sesi.status})."
+            )
+        n_tahap3 = detail_service.count_responden_submitted(sesi_id)
+        if n_tahap3 < 1:
+            raise ValidationAppError(
+                "Analisis membutuhkan minimal 1 responden yang sudah submit detail Tahap 3."
+            )
+        if sesi.status == "CLOSED":
+            sesi = sesi_service.transition(sesi_id, "ANALYZED")
+        return _build_hasil(
+            sesi, sesi_service, seleksi_service, rsp_service, detail_service, catalog, n_tahap3
         )
-    n_tahap3 = detail_service.count_responden_submitted(sesi_id)
-    if n_tahap3 < 1:
-        raise ValidationAppError(
-            "Analisis membutuhkan minimal 1 responden yang sudah submit detail Tahap 3."
-        )
-    if sesi.status == "CLOSED":
-        sesi = sesi_service.transition(sesi_id, "ANALYZED")
-    return _build_hasil(
-        sesi, sesi_service, seleksi_service, rsp_service, detail_service, catalog, n_tahap3
-    )
+
+    return run_idempotent(idem, response, TiHasilSesiRead, _run)
 
 
 @router.get(

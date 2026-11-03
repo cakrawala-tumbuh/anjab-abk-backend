@@ -11,9 +11,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Response, status
 
+from ...config import Settings, get_settings
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     authorize_responden_access,
     get_current_principal,
     get_detil_tugas_service,
@@ -22,9 +24,11 @@ from ...dependencies import (
     get_ti_sesi_service,
     get_ti_usulan_service,
     get_tugas_pokok_service,
+    idempotency,
     rate_limit,
 )
 from ...errors import NotFoundError, ValidationAppError
+from ...etag import check_if_match, compute_etag
 from ...schemas.common import ErrorResponse
 from ...security import Principal
 from ...taskinv.schemas.usulan import TiUsulanCreate, TiUsulanRead
@@ -33,6 +37,12 @@ from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.sesi import TiSesiService
 from ...taskinv.services.tugas_pokok import TugasPokokService
 from ...taskinv.services.usulan import TiUsulanService
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 
 router = APIRouter()
 
@@ -108,6 +118,7 @@ def _validasi_induk_usulan(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND_RSP,
+        **IDEMPOTENCY_RESPONSES,
         422: _VALIDASI_USULAN,
     },
 )
@@ -121,20 +132,50 @@ def create_usulan(
     tp_service: Annotated[TugasPokokService, Depends(get_tugas_pokok_service)],
     dt_service: Annotated[DetilTugasService, Depends(get_detil_tugas_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> TiUsulanRead:
     responden = rsp_service.get(responden_id)
     authorize_responden_access(principal, responden.partisipan_id, par_service)
-    sesi = sesi_service.get(responden.sesi_id)
-    if sesi.status != "TAHAP1":
-        raise ValidationAppError(
-            f"Usulan hanya dapat dicatat saat sesi berstatus TAHAP1 (saat ini: {sesi.status})."
-        )
-    if responden.tahap1_submit:
-        raise ValidationAppError(
-            "Responden ini sudah menyelesaikan Tahap 1; usulan tidak bisa dicatat."
-        )
-    _validasi_induk_usulan(payload, sesi.jabatan_id, tp_service, dt_service)
-    return usulan_service.create(responden_id, sesi.id, payload)
+
+    def _create() -> TiUsulanRead:
+        sesi = sesi_service.get(responden.sesi_id)
+        if sesi.status != "TAHAP1":
+            raise ValidationAppError(
+                f"Usulan hanya dapat dicatat saat sesi berstatus TAHAP1 (saat ini: {sesi.status})."
+            )
+        if responden.tahap1_submit:
+            raise ValidationAppError(
+                "Responden ini sudah menyelesaikan Tahap 1; usulan tidak bisa dicatat."
+            )
+        _validasi_induk_usulan(payload, sesi.jabatan_id, tp_service, dt_service)
+        return usulan_service.create(responden_id, sesi.id, payload)
+
+    return run_idempotent(idem, response, TiUsulanRead, _create)
+
+
+@router.get(
+    "/usulan/{usulan_id}",
+    response_model=TiUsulanRead,
+    summary="Ambil satu usulan uraian tugas (admin atau pemilik); sumber ETag untuk DELETE",
+    operation_id="taskinv_usulan_get",
+    dependencies=READ_GUARDS,
+    responses={**_RATE, **_AUTH, **_FORBIDDEN, **_NOT_FOUND_USULAN},
+)
+def get_usulan(
+    usulan_id: Annotated[str, Path(description="ID usulan.")],
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
+    usulan_service: Annotated[TiUsulanService, Depends(get_ti_usulan_service)],
+    par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    response: Response,
+) -> TiUsulanRead:
+    """Kembalikan satu usulan beserta header `ETag`-nya (otorisasi seperti `DELETE`)."""
+    usulan = usulan_service.get(usulan_id)
+    responden = rsp_service.get(usulan.responden_id)
+    authorize_responden_access(principal, responden.partisipan_id, par_service)
+    response.headers["ETag"] = compute_etag(usulan)
+    return usulan
 
 
 @router.get(
@@ -168,6 +209,7 @@ def list_usulan(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND_USULAN,
+        **PRECONDITION_RESPONSES,
         422: _VALIDASI_USULAN,
     },
 )
@@ -178,10 +220,13 @@ def delete_usulan(
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     usulan_service: Annotated[TiUsulanService, Depends(get_ti_usulan_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    if_match: IfMatchHeader = None,
 ) -> Response:
     usulan = usulan_service.get(usulan_id)
     responden = rsp_service.get(usulan.responden_id)
     authorize_responden_access(principal, responden.partisipan_id, par_service)
+    check_if_match(usulan, if_match, settings.require_if_match)
     sesi = sesi_service.get(usulan.sesi_id)
     if sesi.status != "TAHAP1":
         raise ValidationAppError(

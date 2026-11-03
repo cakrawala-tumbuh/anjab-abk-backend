@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from ...anjab.services.jabatan import JabatanService
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     SessionDep,
     get_detil_tugas_service,
@@ -19,6 +20,7 @@ from ...dependencies import (
     get_ti_sesi_service,
     get_tugas_pokok_service,
     get_uraian_tugas_service,
+    idempotency,
     pagination_params,
     rate_limit,
     require_admin,
@@ -41,6 +43,7 @@ from ...taskinv.services.detil_tugas import DetilTugasService
 from ...taskinv.services.sesi import TiSesiService
 from ...taskinv.services.tugas_pokok import TugasPokokService
 from ...taskinv.services.uraian_tugas import UraianTugasService
+from ..concurrency import IDEMPOTENCY_RESPONSES, run_idempotent
 from ..pagination import set_pagination_links
 
 router = APIRouter()
@@ -112,7 +115,10 @@ def list_catalog(
         **_FORBIDDEN,
         409: {
             "model": ErrorResponse,
-            "description": "Katalog masih dipakai sesi TI/OPM (`catalog_in_use`).",
+            "description": (
+                "Katalog masih dipakai sesi TI/OPM (`catalog_in_use`),"
+                " atau Idempotency-Key sedang diproses."
+            ),
         },
     },
 )
@@ -121,10 +127,15 @@ def purge_catalog_endpoint(
     sesi_svc: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     opm_sesi_svc: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
     principal: Annotated[Principal, Depends(require_admin)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> TiCatalogPurgeResult:
-    guard_no_active_sesi(sesi_svc, opm_sesi_svc)
-    logger.warning("catalog_purge", extra={"modul": "taskinv", "actor": principal.subject})
-    return TiCatalogPurgeResult(deleted=TiCatalogPurgeCounts(**purge_catalog(session)))
+    def _purge() -> TiCatalogPurgeResult:
+        guard_no_active_sesi(sesi_svc, opm_sesi_svc)
+        logger.warning("catalog_purge", extra={"modul": "taskinv", "actor": principal.subject})
+        return TiCatalogPurgeResult(deleted=TiCatalogPurgeCounts(**purge_catalog(session)))
+
+    return run_idempotent(idem, response, TiCatalogPurgeResult, _purge)
 
 
 @router.post(
@@ -133,7 +144,7 @@ def purge_catalog_endpoint(
     summary="Reseed katalog master Task Inventory dari task_catalog.json",
     operation_id="taskinv_catalog_reseed",
     dependencies=[Depends(rate_limit)],
-    responses={**_AUTH, **_RATE, **_FORBIDDEN},
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **IDEMPOTENCY_RESPONSES},
 )
 def reseed_catalog_endpoint(
     principal: Annotated[Principal, Depends(require_admin)],
@@ -141,7 +152,12 @@ def reseed_catalog_endpoint(
     dt_svc: Annotated[DetilTugasService, Depends(get_detil_tugas_service)],
     ut_svc: Annotated[UraianTugasService, Depends(get_uraian_tugas_service)],
     jabatan_svc: Annotated[JabatanService, Depends(get_jabatan_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> TiCatalogReseedResult:
-    logger.warning("catalog_reseed", extra={"modul": "taskinv", "actor": principal.subject})
-    counts = seed_catalog_models(tp_svc, dt_svc, ut_svc, jabatan_svc)
-    return TiCatalogReseedResult(created=TiCatalogReseedCounts(**counts))
+    def _reseed() -> TiCatalogReseedResult:
+        logger.warning("catalog_reseed", extra={"modul": "taskinv", "actor": principal.subject})
+        counts = seed_catalog_models(tp_svc, dt_svc, ut_svc, jabatan_svc)
+        return TiCatalogReseedResult(created=TiCatalogReseedCounts(**counts))
+
+    return run_idempotent(idem, response, TiCatalogReseedResult, _reseed)

@@ -6,9 +6,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Request, Response, status
 
+from ...config import Settings, get_settings
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     authorize_responden_access,
     get_current_principal,
@@ -16,16 +18,24 @@ from ...dependencies import (
     get_ti_detail_service,
     get_ti_responden_service,
     get_ti_sesi_service,
+    idempotency,
     pagination_params,
     rate_limit,
 )
 from ...errors import ValidationAppError
+from ...etag import check_if_match, compute_etag
 from ...schemas.common import ErrorResponse, Page
 from ...security import Principal
 from ...taskinv.schemas.detail import TiDetailRead, TiDetailUpsert
 from ...taskinv.services.detail import TiDetailService
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.sesi import TiSesiService
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 from ..pagination import set_pagination_links
 
 router = APIRouter()
@@ -50,6 +60,7 @@ _FORBIDDEN = {
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND_RSP,
+        **PRECONDITION_RESPONSES,
         422: {
             "model": ErrorResponse,
             "description": "task_kode di luar himpunan terpilih, sesi bukan TAHAP3,"
@@ -65,9 +76,15 @@ def save_draft_detail(
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     detail_service: Annotated[TiDetailService, Depends(get_ti_detail_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> list[TiDetailRead]:
     responden = rsp_service.get(responden_id)
     authorize_responden_access(principal, responden.partisipan_id, par_service)
+    check_if_match(
+        detail_service.list_by_responden(responden_id)[0], if_match, settings.require_if_match
+    )
     sesi = sesi_service.get(responden.sesi_id)
     if sesi.status != "TAHAP3":
         raise ValidationAppError(
@@ -80,7 +97,9 @@ def save_draft_detail(
         )
     kodes, _ = sesi_service.get_task_terpilih(sesi.id)
     valid = set(kodes)
-    return detail_service.upsert(responden_id, sesi.id, payload, valid)
+    hasil = detail_service.upsert(responden_id, sesi.id, payload, valid)
+    response.headers["ETag"] = compute_etag(detail_service.list_by_responden(responden_id)[0])
+    return hasil
 
 
 @router.post(
@@ -95,6 +114,7 @@ def save_draft_detail(
         **_RATE,
         **_FORBIDDEN,
         **_NOT_FOUND_RSP,
+        **IDEMPOTENCY_RESPONSES,
         422: {
             "model": ErrorResponse,
             "description": (
@@ -112,20 +132,26 @@ def submit_detail(
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     detail_service: Annotated[TiDetailService, Depends(get_ti_detail_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> list[TiDetailRead]:
     responden = rsp_service.get(responden_id)
     authorize_responden_access(principal, responden.partisipan_id, par_service)
-    sesi = sesi_service.get(responden.sesi_id)
-    if sesi.status != "TAHAP3":
-        raise ValidationAppError(
-            f"Detail Tahap 3 hanya dapat disubmit saat sesi berstatus TAHAP3"
-            f" (saat ini: {sesi.status})."
-        )
-    if responden.tahap3_submit:
-        raise ValidationAppError("Responden ini sudah menyelesaikan Tahap 3.")
-    result = detail_service.submit(responden_id)
-    rsp_service.mark_tahap3(responden_id)
-    return result
+
+    def _submit() -> list[TiDetailRead]:
+        sesi = sesi_service.get(responden.sesi_id)
+        if sesi.status != "TAHAP3":
+            raise ValidationAppError(
+                f"Detail Tahap 3 hanya dapat disubmit saat sesi berstatus TAHAP3"
+                f" (saat ini: {sesi.status})."
+            )
+        if responden.tahap3_submit:
+            raise ValidationAppError("Responden ini sudah menyelesaikan Tahap 3.")
+        result = detail_service.submit(responden_id)
+        rsp_service.mark_tahap3(responden_id)
+        return result
+
+    return run_idempotent(idem, response, list[TiDetailRead], _submit)
 
 
 @router.get(
@@ -151,5 +177,6 @@ def list_detail(
     items, total = detail_service.list_by_responden(
         responden_id, limit=page.limit, offset=page.offset
     )
+    response.headers["ETag"] = compute_etag(detail_service.list_by_responden(responden_id)[0])
     set_pagination_links(response, request, total, page.limit, page.offset)
     return Page[TiDetailRead](items=items, total=total, limit=page.limit, offset=page.offset)
