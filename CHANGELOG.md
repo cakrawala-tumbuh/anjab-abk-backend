@@ -9,6 +9,7 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Penyimpanan dan mesin status job asinkron** (backlog #78): tabel `async_job`, status `PENDING/RUNNING/SUCCEEDED/FAILED/MANUAL_REVIEW` dengan aturan transisi, seam `AsyncJobService`, dan endpoint admin `GET /api/v1/system/jobs/{job_id}`. Belum ada produsen job.
 - **Skor WCP/DCS di balik flag `WCP_DCS_SCORING`** (backlog #75, A7): selama flag mati (bawaan),
   `POST /api/v1/{wcp,dcs}/analisis` dan `GET /api/v1/{wcp,dcs}/hasil` mengembalikan `mode: "RAW_ONLY"`
   berisi frekuensi jawaban raw dan `mean_raw`/`sd_raw` per item, tanpa skor dimensi/sub-skala,

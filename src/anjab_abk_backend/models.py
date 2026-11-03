@@ -28,6 +28,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     MetaData,
     Sequence,
@@ -78,6 +79,26 @@ class IdempotencyRecord(Base):
     completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = _ts()
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AsyncJobModel(Base):
+    """Tabel `async_job` — job asinkron generik lintas fitur (status dikelola service)."""
+
+    __tablename__ = "async_job"
+    __table_args__ = (Index("ix_async_job_fitur_status", "fitur", "status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    fitur: Mapped[str] = mapped_column(String(50), nullable=False)
+    jenis: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    ref_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    percobaan: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    dibuat_oleh: Mapped[str | None] = mapped_column(String(254), nullable=True)
+    created_at: Mapped[datetime] = _ts()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
 
 
 # ======================================================================================

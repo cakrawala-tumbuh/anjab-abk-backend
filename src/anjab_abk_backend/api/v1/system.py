@@ -9,11 +9,19 @@ from fastapi import APIRouter, Depends
 
 from ... import __version__
 from ...config import Settings, get_settings
-from ...dependencies import READ_GUARDS, get_current_principal, get_readiness_checks
+from ...dependencies import (
+    READ_GUARDS,
+    get_async_job_service,
+    get_current_principal,
+    get_readiness_checks,
+    require_admin,
+)
 from ...errors import ServiceUnavailableError
 from ...fitur import daftar_fitur
+from ...schemas.async_job import AsyncJobRead
 from ...schemas.common import ErrorDetail, ErrorResponse, FiturListRead, Health
 from ...security import Principal
+from ...services.async_job import AsyncJobService
 from ...services.readiness import ReadinessCheck
 
 router = APIRouter()
@@ -81,3 +89,23 @@ def me(principal: Annotated[Principal, Depends(get_current_principal)]) -> Princ
 def list_fitur(settings: Annotated[Settings, Depends(get_settings)]) -> FiturListRead:
     """Daftar lima feature flag fungsional beserta statusnya (selalu lima entri)."""
     return FiturListRead(items=daftar_fitur(settings))
+
+
+@router.get(
+    "/system/jobs/{job_id}",
+    response_model=AsyncJobRead,
+    summary="Status job asinkron",
+    tags=["system"],
+    operation_id="system_job_get",
+    dependencies=[Depends(require_admin)],
+    responses={
+        401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."},
+        403: {"model": ErrorResponse, "description": "Bukan admin."},
+        404: {"model": ErrorResponse, "description": "Job tidak ditemukan."},
+    },
+)
+def get_job(
+    job_id: str, service: Annotated[AsyncJobService, Depends(get_async_job_service)]
+) -> AsyncJobRead:
+    """Baca status sebuah job asinkron (admin saja)."""
+    return service.get(job_id)

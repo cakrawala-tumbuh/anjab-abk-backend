@@ -81,6 +81,8 @@ from .redesain.services.versi_metode_sql import SqlVersiMetodeService
 from .redesain.services.yayasan import RingkasanYayasanService
 from .redesain.services.yayasan_sql import SqlRingkasanYayasanService
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
+from .services.async_job import AsyncJobService
+from .services.async_job_sql import SqlAsyncJobService
 from .services.authentik_provisioner import (
     AuthentikProvisioner,
     HttpAuthentikProvisioner,
@@ -414,6 +416,13 @@ def get_proses_service(session: SessionDep) -> ProsesService:
 def get_konfirmasi_service(session: SessionDep) -> KonfirmasiService:
     """SEAM: `KonfirmasiService` PostgreSQL (riwayat sesi yang sama)."""
     return SqlKonfirmasiService(session, SqlRiwayatService(session), get_masalah_service(session))
+
+
+def get_async_job_service(
+    session: SessionDep, settings: Annotated[Settings, Depends(get_settings)]
+) -> AsyncJobService:
+    """SEAM: `AsyncJobService` PostgreSQL (job asinkron; flag fitur dibaca dari settings)."""
+    return SqlAsyncJobService(session, settings)
 
 
 def get_koreksi_service(session: SessionDep) -> KoreksiService:
