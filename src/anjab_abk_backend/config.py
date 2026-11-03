@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     # Observability
     tracing_enabled: bool = False
 
+    # Feature flag fungsional (fail-closed: default mati). Berubah hanya lewat env +
+    # restart. Diperiksa lewat `fitur.fitur_aktif` / `fitur.require_fitur`, bukan
+    # dibaca langsung oleh service/router lain.
+    feature_ai_narrative_draft: bool = False
+    feature_participant_validation: bool = False
+    feature_wcp_dcs_scoring: bool = False
+    feature_research_export: bool = False
+    feature_change_authorization: bool = False
+
     # Auth Authentik — parameter validasi token (seam; bukan koneksi ke IdP).
     # Diisi oleh skill backend-authentik-skill.
     authentik_issuer: str | None = None

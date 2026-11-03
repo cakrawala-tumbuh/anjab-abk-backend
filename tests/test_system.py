@@ -59,3 +59,73 @@ def test_redoc(anon_client: TestClient) -> None:
 def test_request_id_header_present(anon_client: TestClient) -> None:
     r = anon_client.get("/api/v1/health")
     assert "x-request-id" in r.headers
+
+
+# --- Feature flag (backlog #68) ---
+
+import pytest  # noqa: E402
+from fastapi import Depends, FastAPI  # noqa: E402
+
+from anjab_abk_backend.config import Settings, get_settings  # noqa: E402
+from anjab_abk_backend.errors import install_exception_handlers  # noqa: E402
+from anjab_abk_backend.fitur import FiturKode, fitur_aktif, require_fitur  # noqa: E402
+
+
+def test_fitur_default_semua_mati() -> None:
+    s = Settings(_env_file=None)
+    assert [fitur_aktif(k, s) for k in FiturKode] == [False] * 5
+
+
+def test_fitur_env_menghidupkan_satu_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FEATURE_RESEARCH_EXPORT", "true")
+    s = Settings(_env_file=None)
+    assert fitur_aktif(FiturKode.RESEARCH_EXPORT, s) is True
+    assert [k for k in FiturKode if fitur_aktif(k, s)] == [FiturKode.RESEARCH_EXPORT]
+
+
+def test_fitur_endpoint_default(client: TestClient) -> None:
+    r = client.get("/api/v1/system/fitur")
+    assert r.status_code == 200
+    items = r.json()["items"]
+    assert [i["kode"] for i in items] == [k.value for k in FiturKode]
+    assert all(i["aktif"] is False for i in items)
+    assert all(i["keterangan"] for i in items)
+
+
+def test_fitur_endpoint_satu_flag_hidup(client: TestClient, app) -> None:
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None, feature_wcp_dcs_scoring=True
+    )
+    items = client.get("/api/v1/system/fitur").json()["items"]
+    aktif = {i["kode"]: i["aktif"] for i in items}
+    assert aktif["WCP_DCS_SCORING"] is True
+    assert sum(aktif.values()) == 1
+
+
+def test_fitur_endpoint_tanpa_token_401(anon_client: TestClient) -> None:
+    assert anon_client.get("/api/v1/system/fitur").status_code == 401
+
+
+def _mini_app(settings: Settings) -> TestClient:
+    a = FastAPI()
+    install_exception_handlers(a)
+    a.dependency_overrides[get_settings] = lambda: settings
+
+    @a.get("/x", dependencies=[Depends(require_fitur(FiturKode.WCP_DCS_SCORING))])
+    def x() -> dict:
+        return {"ok": True}
+
+    return TestClient(a)
+
+
+def test_require_fitur_mati_409() -> None:
+    r = _mini_app(Settings(_env_file=None)).get("/x")
+    assert r.status_code == 409
+    body = r.json()
+    assert body["error"] == "feature_disabled"
+    assert "WCP_DCS_SCORING" in body["message"]
+
+
+def test_require_fitur_hidup_lolos() -> None:
+    r = _mini_app(Settings(_env_file=None, feature_wcp_dcs_scoring=True)).get("/x")
+    assert r.status_code == 200

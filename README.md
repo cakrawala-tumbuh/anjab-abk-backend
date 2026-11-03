@@ -46,3 +46,10 @@ make test   # lint + unit di Docker (gate — dari skill automated-test)
 ## Konfigurasi
 
 Lihat `.env.example`. Semua via environment (12-factor).
+
+### Feature flag
+
+Lima fungsi dapat dimatikan independen lewat env, semuanya default `false` (fail-closed):
+`FEATURE_AI_NARRATIVE_DRAFT`, `FEATURE_PARTICIPANT_VALIDATION`, `FEATURE_WCP_DCS_SCORING`,
+`FEATURE_RESEARCH_EXPORT`, `FEATURE_CHANGE_AUTHORIZATION`. Perubahan butuh restart. Status
+dapat dibaca (bertoken) lewat `GET /api/v1/system/fitur`.

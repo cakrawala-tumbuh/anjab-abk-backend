@@ -8,9 +8,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from ... import __version__
-from ...dependencies import get_current_principal, get_readiness_checks
+from ...config import Settings, get_settings
+from ...dependencies import READ_GUARDS, get_current_principal, get_readiness_checks
 from ...errors import ServiceUnavailableError
-from ...schemas.common import ErrorDetail, ErrorResponse, Health
+from ...fitur import daftar_fitur
+from ...schemas.common import ErrorDetail, ErrorResponse, FiturListRead, Health
 from ...security import Principal
 from ...services.readiness import ReadinessCheck
 
@@ -65,3 +67,17 @@ def version() -> Health:
 )
 def me(principal: Annotated[Principal, Depends(get_current_principal)]) -> Principal:
     return principal
+
+
+@router.get(
+    "/system/fitur",
+    response_model=FiturListRead,
+    summary="Status feature flag",
+    tags=["system"],
+    operation_id="system_fitur_list",
+    dependencies=READ_GUARDS,
+    responses={401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}},
+)
+def list_fitur(settings: Annotated[Settings, Depends(get_settings)]) -> FiturListRead:
+    """Daftar lima feature flag fungsional beserta statusnya (selalu lima entri)."""
+    return FiturListRead(items=daftar_fitur(settings))

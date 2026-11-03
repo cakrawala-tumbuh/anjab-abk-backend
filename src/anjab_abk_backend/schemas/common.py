@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, Field
@@ -72,3 +73,27 @@ class ErrorResponse(BaseModel):
     message: str = Field(description="Pesan ramah-manusia.", examples=["Data tidak ditemukan."])
     request_id: str | None = Field(default=None, description="Korelasi dengan log.")
     details: list[ErrorDetail] | None = Field(default=None, description="Rincian validasi.")
+
+
+class FiturKode(StrEnum):
+    """Kode lima fungsi yang dapat dimatikan secara independen (feature flag).
+
+    Nilai literal mengikuti paket kajian; urutan anggota = urutan di respons
+    `GET /api/v1/system/fitur`.
+    """
+
+    AI_NARRATIVE_DRAFT = "AI_NARRATIVE_DRAFT"
+    PARTICIPANT_VALIDATION = "PARTICIPANT_VALIDATION"
+    WCP_DCS_SCORING = "WCP_DCS_SCORING"
+    RESEARCH_EXPORT = "RESEARCH_EXPORT"
+    CHANGE_AUTHORIZATION = "CHANGE_AUTHORIZATION"
+
+
+class FiturRead(BaseModel):
+    kode: FiturKode = Field(description="Kode fungsi.", examples=["WCP_DCS_SCORING"])
+    aktif: bool = Field(description="True bila fungsi diaktifkan lewat environment.")
+    keterangan: str = Field(description="Penjelasan singkat fungsi yang digerbang flag ini.")
+
+
+class FiturListRead(BaseModel):
+    items: list[FiturRead] = Field(description="Selalu lima entri, urutan sesuai enum.")

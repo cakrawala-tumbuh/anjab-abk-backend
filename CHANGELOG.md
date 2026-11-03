@@ -7,6 +7,14 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Ditambahkan
+
+- **Kerangka feature flag** (backlog #68): lima flag fungsional (`FEATURE_AI_NARRATIVE_DRAFT`,
+  `FEATURE_PARTICIPANT_VALIDATION`, `FEATURE_WCP_DCS_SCORING`, `FEATURE_RESEARCH_EXPORT`,
+  `FEATURE_CHANGE_AUTHORIZATION`), default mati, serta endpoint baca bertoken
+  `GET /api/v1/system/fitur`. Dependency `require_fitur` menolak fungsi yang mati dengan 409
+  `feature_disabled`. Tanpa migrasi.
+
 ## [0.48.1] - 2026-11-02
 
 ### Diperbaiki
