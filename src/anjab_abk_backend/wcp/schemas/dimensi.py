@@ -33,6 +33,21 @@ class WcpItemRead(BaseModel):
         examples=["R"],
     )
     urutan: int = Field(description="Urutan global item (1–72).", examples=[1])
+    status_paket: Literal["SAMA", "REDAKSI_BEDA", "TIDAK_ADA_DI_PAKET"] = Field(
+        description=(
+            "Status redaksi item terhadap CSV paket R1.1 (normalisasi: trim + rapatkan spasi;"
+            " tanda baca dan huruf besar dihitung beda). Hanya penanda: teks item tidak diubah."
+        ),
+        examples=["SAMA"],
+    )
+    kembar_dengan: str | None = Field(
+        default=None,
+        description=(
+            "Item kembar lintas instrumen menurut paket R1.1, berbentuk"
+            ' `"<INSTRUMEN>:<item_id>"`; null bila tidak punya kembar.'
+        ),
+        examples=["DCS:C8a"],
+    )
 
 
 class WcpItemUpdate(BaseModel):

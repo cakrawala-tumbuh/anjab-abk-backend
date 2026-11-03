@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from ...errors import NotFoundError, ValidationAppError
 from ...instrumen_guard import guard_tanpa_jawaban
 from ...models import WcpDimensiModel, WcpItemModel, WcpJawabanModel
+from ..bank_item import status_dan_kembar
 from ..schemas.dimensi import (
     WcpDimensiRead,
     WcpDimensiWithItemsRead,
@@ -26,6 +27,7 @@ from ..schemas.dimensi import (
 
 
 def _to_item_read(rec: WcpItemModel) -> WcpItemRead:
+    status_paket, kembar_dengan = status_dan_kembar(rec.item_id, rec.pernyataan)
     return WcpItemRead(
         id=rec.id,
         item_id=rec.item_id,
@@ -35,6 +37,8 @@ def _to_item_read(rec: WcpItemModel) -> WcpItemRead:
         pernyataan=rec.pernyataan,
         reverse_type=rec.reverse_type,
         urutan=rec.urutan,
+        status_paket=status_paket,
+        kembar_dengan=kembar_dengan,
     )
 
 

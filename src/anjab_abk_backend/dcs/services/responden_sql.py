@@ -25,8 +25,9 @@ from sqlalchemy.orm import Session
 from ...anjab.services.jabatan import JabatanService
 from ...core.services.partisipan import PartisipanService
 from ...errors import ConflictError, NotFoundError, ValidationAppError
-from ...models import DcsInstrumenModel, DcsRespondenModel
+from ...models import DcsInstrumenModel, DcsItemModel, DcsRespondenModel
 from ...schemas.common import BulkAssignResult, BulkSkipped
+from ..bank_item import hitung_item_bank_hash
 from ..schemas.responden import DcsRespondenRead
 
 # Sumber tunggal id singleton instrumen.
@@ -49,6 +50,7 @@ def _to_read(rec: DcsRespondenModel) -> DcsRespondenRead:
         sudah_submit=rec.sudah_submit,
         submitted_at=submitted,
         created_at=created,
+        item_bank_hash=rec.item_bank_hash,
     )
 
 
@@ -211,6 +213,8 @@ class SqlDcsRespondenService:
             raise ValidationAppError("Responden ini sudah pernah mengirimkan jawaban.")
         rec.sudah_submit = True
         rec.submitted_at = datetime.now(UTC)
+        # Catat hash bank item yang "dilihat" responden saat submit final.
+        rec.item_bank_hash = hitung_item_bank_hash(self._s.scalars(select(DcsItemModel)).all())
         self._s.flush()
         return _to_read(rec)
 

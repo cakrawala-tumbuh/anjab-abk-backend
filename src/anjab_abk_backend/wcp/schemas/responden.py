@@ -40,3 +40,10 @@ class WcpRespondenRead(BaseModel):
     sudah_submit: bool = Field(description="True jika jawaban sudah disubmit.")
     submitted_at: datetime | None = Field(default=None, description="Waktu submit jawaban.")
     created_at: datetime = Field(description="Waktu pendaftaran (UTC, ISO-8601).")
+    item_bank_hash: str | None = Field(
+        default=None,
+        description=(
+            "Hash bank item yang berlaku saat responden submit final; null untuk draft"
+            " dan responden lama (sebelum fitur ini)."
+        ),
+    )

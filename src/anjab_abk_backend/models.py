@@ -263,6 +263,7 @@ class DcsRespondenModel(Base):
     sudah_submit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = _ts(index=True)
+    item_bank_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class DcsJawabanModel(Base):
@@ -329,6 +330,7 @@ class WcpRespondenModel(Base):
     sudah_submit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = _ts(index=True)
+    item_bank_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class WcpJawabanModel(Base):

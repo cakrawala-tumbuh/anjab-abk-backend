@@ -34,3 +34,14 @@ class WcpInstrumenRead(BaseModel):
         default=None, description="Waktu instrumen terakhir ditutup (None bila belum pernah)."
     )
     created_at: datetime = Field(description="Waktu baris instrumen dibuat (oleh migrasi).")
+    item_bank_hash: str = Field(
+        description="sha256 hex (64 karakter) bank item aktif saat ini.",
+        examples=["<64 hex>"],
+    )
+    jumlah_item: int = Field(description="Jumlah item aktif di bank.", examples=[72])
+    jumlah_redaksi_beda: int = Field(
+        description="Jumlah item aktif berstatus `REDAKSI_BEDA` terhadap CSV paket R1.1."
+    )
+    jumlah_tidak_di_paket: int = Field(
+        description="Jumlah item aktif berstatus `TIDAK_ADA_DI_PAKET` (kode tak ada di CSV paket)."
+    )

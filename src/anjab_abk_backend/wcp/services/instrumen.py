@@ -5,10 +5,13 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Protocol
 
 from ...errors import AppError, ValidationAppError
+from ..bank_item import ringkasan_bank
 from ..schemas.instrumen import StatusInstrumenWcp, WcpInstrumenRead, WcpInstrumenUpdate
+from ..seed import ITEM
 
 # Instrumen singleton: SATU baris tetap, dibuat oleh migrasi. Tidak ada create/delete.
 INSTRUMEN_ID = "wcp"
@@ -62,7 +65,13 @@ class InMemoryWcpInstrumenService:
         )
 
     def _to_read(self) -> WcpInstrumenRead:
-        return WcpInstrumenRead.model_validate(self._rec)
+        items = [
+            SimpleNamespace(
+                item_id=i[0], dimensi_kode=i[1], pernyataan=i[4], reverse_type=i[5], urutan=i[6]
+            )
+            for i in ITEM
+        ]
+        return WcpInstrumenRead.model_validate({**self._rec.__dict__, **ringkasan_bank(items)})
 
     def get(self) -> WcpInstrumenRead:
         with self._lock:

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from ...errors import NotFoundError, ValidationAppError
+from ..bank_item import status_dan_kembar
 from ..schemas.subskala import (
     DcsItemRead,
     DcsItemUpdate,
@@ -52,7 +53,10 @@ class DcsSubSkalaService(Protocol):
 
 
 def _to_item_read(rec: _ItemRecord) -> DcsItemRead:
-    return DcsItemRead.model_validate(rec)
+    status_paket, kembar_dengan = status_dan_kembar(rec.item_id, rec.pernyataan)
+    return DcsItemRead.model_validate(
+        {**rec.__dict__, "status_paket": status_paket, "kembar_dengan": kembar_dengan}
+    )
 
 
 def _to_sub_skala_read(rec: _SubSkalaRecord) -> DcsSubSkalaRead:

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from ...errors import NotFoundError, ValidationAppError
 from ...instrumen_guard import guard_tanpa_jawaban
 from ...models import DcsItemModel, DcsJawabanModel, DcsSubSkalaModel
+from ..bank_item import status_dan_kembar
 from ..schemas.subskala import (
     DcsItemRead,
     DcsItemUpdate,
@@ -24,6 +25,7 @@ from ..schemas.subskala import (
 
 
 def _to_item_read(rec: DcsItemModel) -> DcsItemRead:
+    status_paket, kembar_dengan = status_dan_kembar(rec.item_id, rec.pernyataan)
     return DcsItemRead(
         id=rec.id,
         item_id=rec.item_id,
@@ -32,6 +34,8 @@ def _to_item_read(rec: DcsItemModel) -> DcsItemRead:
         pernyataan=rec.pernyataan,
         arah=rec.arah,  # type: ignore[arg-type]
         urutan=rec.urutan,
+        status_paket=status_paket,
+        kembar_dengan=kembar_dengan,
     )
 
 

@@ -7,6 +7,15 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Ditambahkan
+
+- **Integritas bank item WCP/DCS** (backlog #72, A8/A30): `WcpItemRead`/`DcsItemRead` bertambah
+  `status_paket` (`SAMA` | `REDAKSI_BEDA` | `TIDAK_ADA_DI_PAKET` terhadap CSV paket R1.1) dan
+  `kembar_dengan` (mis. `DCS:C8a`); `WcpInstrumenRead`/`DcsInstrumenRead` bertambah
+  `item_bank_hash`, `jumlah_item`, `jumlah_redaksi_beda`, `jumlah_tidak_di_paket`; responden
+  mencatat `item_bank_hash` bank yang berlaku saat submit final (null untuk draft dan responden
+  lama). Teks item tidak diubah. Migrasi `b3e8f1c5a7d2` (dua kolom nullable).
+
 ### Diubah
 
 - **Jawaban tersimpan tidak bisa lagi dihapus/ditimpa** (backlog #71, A27 minimum): `POST

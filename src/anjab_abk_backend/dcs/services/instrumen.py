@@ -5,10 +5,13 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Protocol
 
 from ...errors import AppError, ValidationAppError
+from ..bank_item import ringkasan_bank
 from ..schemas.instrumen import DcsInstrumenRead, DcsInstrumenUpdate, StatusInstrumenDcs
+from ..seed import ITEM
 
 # Instrumen singleton: SATU baris tetap, dibuat oleh migrasi. Tidak ada create/delete.
 INSTRUMEN_ID = "dcs"
@@ -62,7 +65,13 @@ class InMemoryDcsInstrumenService:
         )
 
     def _to_read(self) -> DcsInstrumenRead:
-        return DcsInstrumenRead.model_validate(self._rec)
+        items = [
+            SimpleNamespace(
+                item_id=i[0], subskala_kode=i[1], pernyataan=i[3], arah=i[4], urutan=i[5]
+            )
+            for i in ITEM
+        ]
+        return DcsInstrumenRead.model_validate({**self._rec.__dict__, **ringkasan_bank(items)})
 
     def get(self) -> DcsInstrumenRead:
         with self._lock:

@@ -9,18 +9,20 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...errors import AppError, ValidationAppError
 from ...instrumen_guard import guard_tanpa_jawaban
-from ...models import DcsInstrumenModel, DcsJawabanModel, DcsRespondenModel
+from ...models import DcsInstrumenModel, DcsItemModel, DcsJawabanModel, DcsRespondenModel
+from ..bank_item import ringkasan_bank
 from ..schemas.instrumen import DcsInstrumenRead, DcsInstrumenUpdate, StatusInstrumenDcs
 
 # Sumber tunggal id singleton & state machine.
 from .instrumen import _ERR_MISSING_ROW, _VALID_TRANSITIONS, INSTRUMEN_ID
 
 
-def _to_read(rec: DcsInstrumenModel) -> DcsInstrumenRead:
+def _to_read(rec: DcsInstrumenModel, items: list[DcsItemModel]) -> DcsInstrumenRead:
     created = rec.created_at
     if created.tzinfo is None:
         created = created.replace(tzinfo=UTC)
@@ -34,6 +36,7 @@ def _to_read(rec: DcsInstrumenModel) -> DcsInstrumenRead:
         catatan=rec.catatan,
         closed_at=closed,
         created_at=created,
+        **ringkasan_bank(items),
     )
 
 
@@ -43,6 +46,10 @@ class SqlDcsInstrumenService:
     def __init__(self, session: Session) -> None:
         self._s = session
 
+    def _items(self) -> list[DcsItemModel]:
+        """Item aktif bank (untuk hash & ringkasan redaksi vs paket)."""
+        return list(self._s.scalars(select(DcsItemModel)).all())
+
     def _get_model(self) -> DcsInstrumenModel:
         rec = self._s.get(DcsInstrumenModel, INSTRUMEN_ID)
         if rec is None:
@@ -50,7 +57,7 @@ class SqlDcsInstrumenService:
         return rec
 
     def get(self) -> DcsInstrumenRead:
-        return _to_read(self._get_model())
+        return _to_read(self._get_model(), self._items())
 
     def update(self, data: DcsInstrumenUpdate) -> DcsInstrumenRead:
         rec = self._get_model()
@@ -58,7 +65,7 @@ class SqlDcsInstrumenService:
         for key, value in changes.items():
             setattr(rec, key, value)
         self._s.flush()
-        return _to_read(rec)
+        return _to_read(rec, self._items())
 
     def _transition(self, target: StatusInstrumenDcs) -> DcsInstrumenRead:
         rec = self._get_model()
@@ -72,7 +79,7 @@ class SqlDcsInstrumenService:
         if target == "CLOSED":
             rec.closed_at = datetime.now(UTC)
         self._s.flush()
-        return _to_read(rec)
+        return _to_read(rec, self._items())
 
     def tutup(self) -> DcsInstrumenRead:
         return self._transition("CLOSED")
@@ -110,4 +117,4 @@ class SqlDcsInstrumenService:
         rec.status = "OPEN"
         rec.closed_at = None
         self._s.flush()
-        return _to_read(rec)
+        return _to_read(rec, self._items())
