@@ -120,6 +120,26 @@ class SqlKodeOrangService:
         self._riwayat.catat(ENTITAS, read.id, "create", None, _snapshot(read), read.kode)
         return read
 
+    def peta_partisipan(self, partisipan_ids: list[str]) -> dict[str, str]:
+        """Baca massal kode orang untuk banyak partisipan dalam satu query (tanpa efek tulis).
+
+        Berbeda dari `untuk_partisipan`, metode ini TIDAK membuat kode: dipakai jalur GET
+        yang tidak boleh menulis.
+
+        Args:
+            partisipan_ids: ID partisipan yang dicari; boleh kosong atau berduplikat.
+
+        Returns:
+            Peta `partisipan_id -> kode`. ID tak dikenal atau belum berkode tidak muncul
+            (tidak error); input kosong menghasilkan `{}` tanpa menyentuh DB.
+        """
+        ids = list(dict.fromkeys(partisipan_ids))
+        if not ids:
+            return {}
+        m = RedesainKodeOrangModel
+        rows = self._s.execute(select(m.partisipan_id, m.kode).where(m.partisipan_id.in_(ids)))
+        return {pid: kode for pid, kode in rows if pid is not None}
+
     def create(self, data: KodeOrangCreate, *, pelaku_kode_orang: str | None) -> KodeOrangRead:
         """Daftarkan orang baru (narasumber atau partisipan) dan catat riwayat.
 

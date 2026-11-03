@@ -641,7 +641,8 @@ def test_alihkan_opm_kuota_penuh_tersubmit_sukses(
     data = r.json()
     assert data["id"] == rid
     assert data["partisipan_id"] == par_c
-    assert data["nama"] == "OPM Test AlihkanC"
+    assert "nama" not in data
+    assert data["kode_orang"].startswith("O-")
     assert data["jabatan_label"] == before["jabatan_label"]
     assert data["sudah_submit"] is True
     assert data["submitted_at"] == before["submitted_at"]

@@ -44,7 +44,6 @@ def _to_read(rec: WcpRespondenModel) -> WcpRespondenRead:
         submitted = submitted.replace(tzinfo=UTC)
     return WcpRespondenRead(
         id=rec.id,
-        nama=rec.nama,
         jabatan_label=rec.jabatan_label,
         partisipan_id=rec.partisipan_id,
         sudah_submit=rec.sudah_submit,

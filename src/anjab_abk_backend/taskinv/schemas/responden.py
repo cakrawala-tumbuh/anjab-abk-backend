@@ -68,7 +68,14 @@ class TiRespondenRead(BaseModel):
 
     id: str = Field(description="ID responden.", examples=["trsp_a1b2c3d4"])
     sesi_id: str = Field(description="ID sesi induk.", examples=["tises_a1b2c3d4"])
-    nama: str | None = Field(default=None, description="Nama responden.")
+    kode_orang: str | None = Field(
+        default=None,
+        description=(
+            "Kode orang pseudonim responden (`O-nnnn`, sama dengan register redesain);"
+            " null bila responden tidak terhubung ke partisipan."
+        ),
+        examples=["O-0012"],
+    )
     partisipan_id: str | None = Field(default=None, description="ID partisipan terhubung.")
     tahap1_submit: bool = Field(description="True jika seleksi Tahap 1 sudah disubmit.")
     tahap1_submitted_at: datetime | None = Field(default=None, description="Waktu submit Tahap 1.")

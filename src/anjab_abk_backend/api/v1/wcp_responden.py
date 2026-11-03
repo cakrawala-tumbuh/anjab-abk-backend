@@ -12,6 +12,7 @@ from ...dependencies import (
     Pagination,
     authorize_responden_access,
     get_current_principal,
+    get_kode_orang_service,
     get_partisipan_service,
     get_wcp_dimensi_service,
     get_wcp_jawaban_service,
@@ -21,6 +22,7 @@ from ...dependencies import (
     require_admin,
 )
 from ...errors import ValidationAppError
+from ...redesain.services.kode_orang import KodeOrangService
 from ...schemas.common import BulkAssignResult, ErrorResponse, Page
 from ...security import Principal
 from ...wcp.schemas.jawaban import WcpJawabanRead, WcpJawabanUpsert
@@ -28,6 +30,7 @@ from ...wcp.schemas.responden import WcpRespondenCreate, WcpRespondenRead
 from ...wcp.services.dimensi import WcpDimensiService
 from ...wcp.services.jawaban import WcpJawabanService
 from ...wcp.services.responden import WcpRespondenService
+from ..kode_orang_isi import isi_kode_orang
 from ..pagination import set_pagination_links
 
 router = APIRouter()
@@ -55,8 +58,10 @@ def list_responden(
     response: Response,
     page: Annotated[Pagination, Depends(pagination_params)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> Page[WcpRespondenRead]:
     items, total = rsp_service.list_all(limit=page.limit, offset=page.offset)
+    isi_kode_orang(items, ko_service)
     set_pagination_links(response, request, total, page.limit, page.offset)
     return Page[WcpRespondenRead](items=items, total=total, limit=page.limit, offset=page.offset)
 
@@ -81,8 +86,11 @@ def list_responden(
 def create_responden(
     payload: WcpRespondenCreate,
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> BulkAssignResult[WcpRespondenRead]:
-    return rsp_service.create_banyak(payload.partisipan_ids)
+    hasil = rsp_service.create_banyak(payload.partisipan_ids)
+    isi_kode_orang(hasil.created, ko_service, jamin=True)
+    return hasil
 
 
 @router.get(
@@ -98,9 +106,11 @@ def get_responden(
     principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> WcpRespondenRead:
     responden = rsp_service.get(responden_id)
     authorize_responden_access(principal, responden.partisipan_id, par_service)
+    isi_kode_orang([responden], ko_service)
     return responden
 
 

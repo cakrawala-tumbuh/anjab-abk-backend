@@ -11,6 +11,7 @@ from ...dependencies import (
     READ_GUARDS,
     authorize_sesi_access,
     get_current_principal,
+    get_kode_orang_service,
     get_partisipan_service,
     get_ti_catalog_service,
     get_ti_responden_service,
@@ -21,6 +22,7 @@ from ...dependencies import (
     rate_limit,
 )
 from ...errors import ForbiddenError, ValidationAppError
+from ...redesain.services.kode_orang import KodeOrangService
 from ...schemas.common import ErrorResponse
 from ...security import Principal
 from ...taskinv.schemas.tahap2 import TiTahap2ReviewRead, TiTahap2Submit, TiUsulanReviewRead
@@ -31,22 +33,26 @@ from ...taskinv.services.seleksi import TiSeleksiService
 from ...taskinv.services.sesi import TiSesiService
 from ...taskinv.services.tahap2 import TiTahap2Service
 from ...taskinv.services.usulan import TiUsulanService
+from ..kode_orang_isi import isi_kode_orang
 
 router = APIRouter()
 
 
-def _to_usulan_review(usulan: TiUsulanRead, rsp_service: TiRespondenService) -> TiUsulanReviewRead:
-    """Proyeksikan `TiUsulanRead` ke `TiUsulanReviewRead`, menambah `responden_nama`.
+def _to_usulan_review(
+    usulan: TiUsulanRead, rsp_service: TiRespondenService, ko_service: KodeOrangService
+) -> TiUsulanReviewRead:
+    """Proyeksikan `TiUsulanRead` ke `TiUsulanReviewRead`, menambah `responden_kode_orang`.
 
     `responden_id` selalu valid saat proyeksi ini dipanggil (FK `ON DELETE CASCADE`
     ke `ti_responden` — usulan tidak mungkin outlive respondennya), jadi `.get()`
     dipanggil langsung tanpa fallback.
     """
     responden = rsp_service.get(usulan.responden_id)
+    isi_kode_orang([responden], ko_service)
     return TiUsulanReviewRead(
         usulan_id=usulan.id,
         responden_id=usulan.responden_id,
-        responden_nama=responden.nama,
+        responden_kode_orang=responden.kode_orang,
         tugas_pokok=usulan.tugas_pokok,
         detil_tugas=usulan.detil_tugas,
         uraian=usulan.uraian,
@@ -86,6 +92,7 @@ def get_tahap2_review(
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     tahap2_service: Annotated[TiTahap2Service, Depends(get_ti_tahap2_service)],
     usulan_service: Annotated[TiUsulanService, Depends(get_ti_usulan_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> TiTahap2ReviewRead:
     sesi = sesi_service.get(sesi_id)
     authorize_sesi_access(principal, sesi, par_service, rsp_service)
@@ -96,7 +103,9 @@ def get_tahap2_review(
     n_submitted = rsp_service.count_tahap1_submitted(sesi_id)
     partial = seleksi_service.partial_terpilih(sesi_id, n_submitted)
     counts = seleksi_service.count_relevan_per_task(sesi_id)
-    usulan = [_to_usulan_review(u, rsp_service) for u in usulan_service.list_by_sesi(sesi_id)]
+    usulan = [
+        _to_usulan_review(u, rsp_service, ko_service) for u in usulan_service.list_by_sesi(sesi_id)
+    ]
     return tahap2_service.get_review(sesi_id, partial, counts, n_submitted, usulan)
 
 
@@ -130,6 +139,7 @@ def submit_tahap2_keputusan(
     catalog: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
     tahap2_service: Annotated[TiTahap2Service, Depends(get_ti_tahap2_service)],
     usulan_service: Annotated[TiUsulanService, Depends(get_ti_usulan_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> TiTahap2ReviewRead:
     sesi = sesi_service.get(sesi_id)
     if "admin" not in principal.groups:
@@ -172,7 +182,9 @@ def submit_tahap2_keputusan(
     result = tahap2_service.submit_keputusan(sesi_id, payload.keputusan, valid_kodes)
 
     usulan_reviews = [
-        _to_usulan_review(usulan_service.set_keputusan(item.usulan_id, item.disetujui), rsp_service)
+        _to_usulan_review(
+            usulan_service.set_keputusan(item.usulan_id, item.disetujui), rsp_service, ko_service
+        )
         for item in payload.keputusan_usulan
     ]
     return result.model_copy(update={"usulan": usulan_reviews})

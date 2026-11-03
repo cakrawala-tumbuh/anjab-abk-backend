@@ -14,6 +14,7 @@ from ...dependencies import (
     Pagination,
     authorize_sesi_access,
     get_current_principal,
+    get_kode_orang_service,
     get_partisipan_service,
     get_ti_catalog_service,
     get_ti_responden_service,
@@ -27,6 +28,7 @@ from ...dependencies import (
     require_admin,
 )
 from ...errors import ConflictError, ValidationAppError
+from ...redesain.services.kode_orang import KodeOrangService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
 from ...security import Principal
@@ -42,6 +44,7 @@ from ...taskinv.services.seleksi import TiSeleksiService
 from ...taskinv.services.sesi import TiSesiService
 from ...taskinv.services.tahap2 import TiTahap2Service
 from ...taskinv.services.usulan import TiUsulanService
+from ..kode_orang_isi import isi_kode_orang
 
 router = APIRouter()
 
@@ -110,6 +113,8 @@ def create_sesi(
     catalog: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
     idem: Annotated[Idempotency, Depends(idempotency)],
     response: Response,
+    rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> TiSesiRead:
     if not catalog.valid_kodes_for_jabatan(payload.jabatan_id):
         raise ValidationAppError(f"Tidak ada task catalog untuk jabatan '{payload.jabatan_id}'.")
@@ -121,6 +126,9 @@ def create_sesi(
         raise ConflictError("Permintaan dengan Idempotency-Key ini sedang diproses.")
     try:
         item = service.create(payload)
+        # Auto-responden dari SME panel: jamin kode orang pseudonim-nya.
+        awal, _ = rsp_service.list_by_sesi(item.id)
+        isi_kode_orang(awal, ko_service, jamin=True)
     except Exception:
         idem.release()
         raise
@@ -324,7 +332,7 @@ def mulai_tahap3(
         bool,
         Query(
             description=(
-                "Paksa lanjut walau masih ada task partial" " yang belum diputuskan koordinator."
+                "Paksa lanjut walau masih ada task partial yang belum diputuskan koordinator."
             )
         ),
     ] = False,

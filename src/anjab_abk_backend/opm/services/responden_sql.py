@@ -29,7 +29,6 @@ def _to_read(rec: OpmRespondenModel) -> OpmRespondenRead:
     return OpmRespondenRead(
         id=rec.id,
         sesi_id=rec.sesi_id,
-        nama=rec.nama,
         jabatan_label=rec.jabatan_label,
         partisipan_id=rec.partisipan_id,
         sudah_submit=rec.sudah_submit,

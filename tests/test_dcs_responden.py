@@ -71,10 +71,13 @@ def test_create_responden_bulk_5_dalam_satu_request(client: TestClient, partisip
     assert len(r.json()["items"]) == 5
 
 
-def test_create_responden_derives_nama_dan_jabatan_label(client: TestClient, par_a: str) -> None:
+def test_create_responden_derives_kode_orang_dan_jabatan_label(
+    client: TestClient, par_a: str
+) -> None:
     created = _assign(client, [par_a])[0]
     assert created["partisipan_id"] == par_a
-    assert created["nama"]
+    assert "nama" not in created
+    assert created["kode_orang"].startswith("O-")
     assert created["jabatan_label"]
     assert created["sudah_submit"] is False
 

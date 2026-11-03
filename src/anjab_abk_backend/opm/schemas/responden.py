@@ -82,7 +82,14 @@ class OpmRespondenRead(BaseModel):
 
     id: str = Field(description="ID responden.", examples=["oprs_a1b2c3d4"])
     sesi_id: str = Field(description="ID sesi induk.", examples=["opses_a1b2c3d4"])
-    nama: str | None = Field(default=None, description="Nama responden.")
+    kode_orang: str | None = Field(
+        default=None,
+        description=(
+            "Kode orang pseudonim responden (`O-nnnn`, sama dengan register redesain);"
+            " null bila responden tidak terhubung ke partisipan."
+        ),
+        examples=["O-0012"],
+    )
     jabatan_label: str = Field(description="Label jabatan responden.")
     partisipan_id: str | None = Field(
         default=None, description="ID partisipan yang terhubung, bila ada."

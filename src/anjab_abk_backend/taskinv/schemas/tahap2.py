@@ -34,7 +34,7 @@ class TiUsulanReviewRead(BaseModel):
     """Satu usulan uraian tugas Tahap 1 yang perlu diputuskan koordinator di Tahap 2.
 
     Proyeksi ringkas dari `TiUsulanRead` (`taskinv/schemas/usulan.py`) khusus untuk
-    layar review koordinator — menambah `responden_nama` (bukan sekadar id) dan
+    layar review koordinator — menambah `responden_kode_orang` (pseudonim, bukan nama) dan
     membuang `sesi_id`/`task_kode`/`created_at` yang tidak relevan di layar ini.
     """
 
@@ -42,7 +42,13 @@ class TiUsulanReviewRead(BaseModel):
 
     usulan_id: str = Field(description="ID usulan.", examples=["tius_a1b2c3d4"])
     responden_id: str = Field(description="ID responden pengusul.", examples=["trsp_a1b2c3d4"])
-    responden_nama: str | None = Field(default=None, description="Nama responden pengusul.")
+    responden_kode_orang: str | None = Field(
+        default=None,
+        description=(
+            "Kode orang pseudonim (`O-nnnn`) responden pengusul; null bila tanpa partisipan."
+        ),
+        examples=["O-0012"],
+    )
     tugas_pokok: str = Field(description="Nama tugas pokok induk usulan (ter-resolve).")
     detil_tugas: str | None = Field(
         default=None, description="Nama detil tugas induk usulan (ter-resolve, bila ada)."

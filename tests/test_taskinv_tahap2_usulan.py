@@ -126,7 +126,11 @@ def tp_dt(client: TestClient, jabatan_id_tk: str) -> tuple[str, str]:
 
 
 def test_tahap2_get_review_includes_usulan(
-    client: TestClient, jabatan_id_tk: str, tp_dt: tuple[str, str]
+    client: TestClient,
+    jabatan_id_tk: str,
+    tp_dt: tuple[str, str],
+    db_session,
+    partisipan_factory,
 ) -> None:
     tp_id, dt_id = tp_dt
     sesi = _create_sesi(client, jabatan_id_tk)
@@ -136,6 +140,20 @@ def test_tahap2_get_review_includes_usulan(
     client.post(f"{SESI}/{sid}/mulai-tahap1")
     ra = _add_responden(client, sid, nama="A")
     rb = _add_responden(client, sid, nama="B")
+    # Responden A dihubungkan ke partisipan ber-kode orang; B tetap eksternal (tanpa partisipan).
+    from sqlalchemy import update
+
+    from anjab_abk_backend.models import TiRespondenModel
+    from anjab_abk_backend.redesain.services.kode_orang_sql import SqlKodeOrangService
+    from anjab_abk_backend.redesain.services.riwayat_sql import SqlRiwayatService
+
+    par_a = partisipan_factory("ti-tahap2-ko-a")
+    db_session.execute(
+        update(TiRespondenModel).where(TiRespondenModel.id == ra["id"]).values(partisipan_id=par_a)
+    )
+    kode_a = (
+        SqlKodeOrangService(db_session, SqlRiwayatService(db_session)).untuk_partisipan(par_a).kode
+    )
 
     usulan_a = _create_usulan(client, ra["id"], tp_id, dt_id, "Usulan dari A.")
     usulan_b = _create_usulan(client, rb["id"], tp_id, None, "Usulan dari B.")
@@ -154,9 +172,11 @@ def test_tahap2_get_review_includes_usulan(
     usulan_ids = {u["usulan_id"] for u in review["usulan"]}
     assert {usulan_a["id"], usulan_b["id"]} == usulan_ids
     assert all(u["disetujui"] is None for u in review["usulan"])
-    # responden_nama ter-resolve (bukan None) untuk responden yang diberi nama.
+    # Nama tidak keluar; kode orang terisi untuk responden ber-partisipan, null bila eksternal.
     by_id = {u["usulan_id"]: u for u in review["usulan"]}
-    assert by_id[usulan_a["id"]]["responden_nama"] == "A"
+    assert "responden_nama" not in by_id[usulan_a["id"]]
+    assert by_id[usulan_a["id"]]["responden_kode_orang"] == kode_a
+    assert by_id[usulan_b["id"]]["responden_kode_orang"] is None
     assert by_id[usulan_a["id"]]["tugas_pokok"]
     assert by_id[usulan_a["id"]]["detil_tugas"]
     assert by_id[usulan_b["id"]]["detil_tugas"] is None

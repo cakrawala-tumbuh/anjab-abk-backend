@@ -33,7 +33,6 @@ def _to_read(rec: TiRespondenModel) -> TiRespondenRead:
     return TiRespondenRead(
         id=rec.id,
         sesi_id=rec.sesi_id,
-        nama=rec.nama,
         partisipan_id=rec.partisipan_id,
         tahap1_submit=rec.tahap1_submit,
         tahap1_submitted_at=t1,

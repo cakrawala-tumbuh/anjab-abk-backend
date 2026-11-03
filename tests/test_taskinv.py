@@ -1558,9 +1558,9 @@ def test_create_sesi_auto_populate_dari_panel(client: TestClient, jabatan_id_tk:
     responden = r.json()["items"]
     assert len(responden) == 2
     assert {row["partisipan_id"] for row in responden} == set(anggota)
-    # nama diresolusi dari data partisipan (bukan anonim) — dipakai UI untuk
-    # menampilkan nama responden alih-alih "Anonim".
-    assert all(row["nama"] for row in responden)
+    # Respons memuat kode orang pseudonim (dijamin saat auto-populate), bukan nama.
+    assert all("nama" not in row for row in responden)
+    assert all(row["kode_orang"].startswith("O-") for row in responden)
 
 
 def test_create_sesi_panel_besar_semua_jadi_responden(
@@ -1948,7 +1948,7 @@ def test_responden_bulk_happy_path(client: TestClient, jabatan_id_tk: str) -> No
     data = r.json()
     assert {c["partisipan_id"] for c in data["created"]} == set(anggota)
     assert data["skipped"] == []
-    assert all(c["nama"] for c in data["created"])
+    assert all("nama" not in c and c["kode_orang"].startswith("O-") for c in data["created"])
 
 
 def test_responden_bulk_skip_sudah_terdaftar(client: TestClient, jabatan_id_tk: str) -> None:
@@ -2520,7 +2520,8 @@ def test_alihkan_ti_tahap3_tersubmit_sukses(
     data = r.json()
     assert data["id"] == rid
     assert data["partisipan_id"] == par_b
-    assert data["nama"] == "Partisipan ti-alihkan-b"
+    assert "nama" not in data
+    assert data["kode_orang"].startswith("O-")
     assert data["tahap1_submit"] is True
     assert data["tahap1_submitted_at"] == before["tahap1_submitted_at"]
     assert data["tahap3_submit"] is True

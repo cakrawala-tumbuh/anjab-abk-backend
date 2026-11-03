@@ -25,7 +25,18 @@ from sqlalchemy.orm import Session
 from .db import session_scope
 from .dcs.seed import ITEM as DCS_ITEM
 from .dcs.seed import SUB_SKALA as DCS_SUB_SKALA
-from .models import DcsItemModel, DcsSubSkalaModel, WcpDimensiModel, WcpItemModel
+from .errors import NotFoundError
+from .models import (
+    DcsItemModel,
+    DcsRespondenModel,
+    DcsSubSkalaModel,
+    OpmRespondenModel,
+    RedesainKodeOrangModel,
+    TiRespondenModel,
+    WcpDimensiModel,
+    WcpItemModel,
+    WcpRespondenModel,
+)
 from .redesain.seed import (
     seed_cakupan_jabatan,
     seed_konteks,
@@ -114,6 +125,48 @@ def _seed_taskinv(session: Session) -> None:
     )
 
 
+def seed_kode_orang_responden(session: Session) -> int:
+    """Backfill kode orang pseudonim untuk semua responden ber-`partisipan_id`.
+
+    Mengumpulkan `partisipan_id` dari responden TI/OPM/WCP/DCS yang belum punya baris
+    `redesain_kode_orang`, lalu membuatnya lewat `SqlKodeOrangService.untuk_partisipan`
+    (urutan deterministik menurut ID). Idempoten: putaran kedua tidak menemukan
+    kandidat sehingga tidak menambah baris. Partisipan yatim (tidak ada di tabel
+    partisipan) dilewati dengan peringatan.
+
+    Args:
+        session: Sesi transaksi seed.
+
+    Returns:
+        Jumlah kode orang yang dibuat pada putaran ini.
+    """
+    from .redesain.services.kode_orang_sql import SqlKodeOrangService
+    from .redesain.services.riwayat_sql import SqlRiwayatService
+
+    sudah = select(RedesainKodeOrangModel.partisipan_id).where(
+        RedesainKodeOrangModel.partisipan_id.is_not(None)
+    )
+    kandidat: set[str] = set()
+    for model in (TiRespondenModel, OpmRespondenModel, WcpRespondenModel, DcsRespondenModel):
+        kandidat.update(
+            session.scalars(
+                select(model.partisipan_id)
+                .where(model.partisipan_id.is_not(None))
+                .where(model.partisipan_id.not_in(sudah))
+                .distinct()
+            ).all()
+        )
+    service = SqlKodeOrangService(session, SqlRiwayatService(session))
+    dibuat = 0
+    for partisipan_id in sorted(kandidat):
+        try:
+            service.untuk_partisipan(partisipan_id)
+            dibuat += 1
+        except NotFoundError:
+            logger.warning("backfill kode orang: partisipan %s tidak ada, dilewati", partisipan_id)
+    return dibuat
+
+
 def seed_all(session: Session) -> None:
     """Seed seluruh master data (DCS, WCP, Task Inventory) dalam satu transaksi."""
     _seed_dcs(session)
@@ -123,6 +176,7 @@ def seed_all(session: Session) -> None:
     seed_masalah(session)
     seed_cakupan_jabatan(session)
     seed_versi_metode(session)
+    seed_kode_orang_responden(session)
 
 
 def main() -> None:

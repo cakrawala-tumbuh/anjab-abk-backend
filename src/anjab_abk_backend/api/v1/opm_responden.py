@@ -12,6 +12,7 @@ from ...dependencies import (
     Pagination,
     authorize_responden_access,
     get_current_principal,
+    get_kode_orang_service,
     get_opm_jawaban_service,
     get_opm_responden_service,
     get_opm_sesi_service,
@@ -31,8 +32,10 @@ from ...opm.schemas.responden import (
 from ...opm.services.jawaban import OpmJawabanService
 from ...opm.services.responden import OpmRespondenService
 from ...opm.services.sesi import OpmSesiService
+from ...redesain.services.kode_orang import KodeOrangService
 from ...schemas.common import BulkAssignResult, ErrorResponse, Page
 from ...security import Principal
+from ..kode_orang_isi import isi_kode_orang
 from ..pagination import set_pagination_links
 
 router = APIRouter()
@@ -63,9 +66,11 @@ def list_responden(
     page: Annotated[Pagination, Depends(pagination_params)],
     sesi_service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
     rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> Page[OpmRespondenRead]:
     sesi_service.get(sesi_id)
     items, total = rsp_service.list_by_sesi(sesi_id, limit=page.limit, offset=page.offset)
+    isi_kode_orang(items, ko_service)
     set_pagination_links(response, request, total, page.limit, page.offset)
     return Page[OpmRespondenRead](items=items, total=total, limit=page.limit, offset=page.offset)
 
@@ -97,13 +102,16 @@ def create_responden(
     payload: OpmRespondenCreate,
     sesi_service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
     rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> OpmRespondenRead:
     sesi = sesi_service.get(sesi_id)
     if sesi.status not in ("DRAFT", "OPEN"):
         raise ValidationAppError(
             f"Responden hanya dapat ditambahkan saat sesi DRAFT/OPEN (saat ini: {sesi.status})."
         )
-    return rsp_service.create(sesi_id, payload, sesi.max_responden, sesi.jabatan_id)
+    hasil = rsp_service.create(sesi_id, payload, sesi.max_responden, sesi.jabatan_id)
+    isi_kode_orang([hasil], ko_service, jamin=True)
+    return hasil
 
 
 @router.post(
@@ -129,18 +137,21 @@ def create_responden_banyak(
     payload: OpmRespondenBulkCreate,
     sesi_service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
     rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> BulkAssignResult[OpmRespondenRead]:
     sesi = sesi_service.get(sesi_id)
     if sesi.status not in ("DRAFT", "OPEN"):
         raise ValidationAppError(
             f"Responden hanya dapat ditambahkan saat sesi DRAFT/OPEN (saat ini: {sesi.status})."
         )
-    return rsp_service.assign_banyak(
+    hasil = rsp_service.assign_banyak(
         sesi_id,
         payload.partisipan_ids,
         max_responden=sesi.max_responden,
         jabatan_id=sesi.jabatan_id,
     )
+    isi_kode_orang(hasil.created, ko_service, jamin=True)
+    return hasil
 
 
 @router.get(
@@ -156,9 +167,11 @@ def get_responden(
     principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> OpmRespondenRead:
     responden = rsp_service.get(responden_id)
     authorize_responden_access(principal, responden.partisipan_id, par_service)
+    isi_kode_orang([responden], ko_service)
     return responden
 
 
@@ -210,6 +223,7 @@ def alihkan_responden(
     payload: OpmRespondenAlihkan,
     rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> OpmRespondenRead:
     """Alihkan kepemilikan responden OPM `responden_id` dari `dari_partisipan_id`
     ke `ke_partisipan_id` (admin).
@@ -241,7 +255,9 @@ def alihkan_responden(
     partisipan_b = par_service.get(payload.ke_partisipan_id)
     if not partisipan_b.aktif:
         raise ValidationAppError(f"Partisipan '{payload.ke_partisipan_id}' tidak aktif.")
-    return rsp_service.alihkan(responden_id, payload.ke_partisipan_id, partisipan_b.nama)
+    hasil = rsp_service.alihkan(responden_id, payload.ke_partisipan_id, partisipan_b.nama)
+    isi_kode_orang([hasil], ko_service, jamin=True)
+    return hasil
 
 
 @router.put(

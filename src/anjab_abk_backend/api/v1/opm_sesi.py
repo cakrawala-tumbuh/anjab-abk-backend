@@ -14,6 +14,7 @@ from ...dependencies import (
     Pagination,
     authorize_opm_sesi_access,
     get_current_principal,
+    get_kode_orang_service,
     get_opm_responden_service,
     get_opm_sesi_service,
     get_partisipan_service,
@@ -27,9 +28,11 @@ from ...opm.schemas.pengecualian import OpmPengecualianRead
 from ...opm.schemas.sesi import OpmSesiCreate, OpmSesiRead, OpmSesiTaskRead, OpmSesiUpdate
 from ...opm.services.responden import OpmRespondenService
 from ...opm.services.sesi import OpmSesiService
+from ...redesain.services.kode_orang import KodeOrangService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
 from ...security import Principal
+from ..kode_orang_isi import isi_kode_orang
 from ..pagination import set_pagination_links
 
 router = APIRouter()
@@ -103,6 +106,8 @@ def create_sesi(
     service: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
     idem: Annotated[Idempotency, Depends(idempotency)],
     response: Response,
+    rsp_service: Annotated[OpmRespondenService, Depends(get_opm_responden_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> OpmSesiRead:
     cached = idem.cached()
     if cached is not None:
@@ -112,6 +117,9 @@ def create_sesi(
         raise ConflictError("Permintaan dengan Idempotency-Key ini sedang diproses.")
     try:
         item = service.create(payload)
+        # Auto-responden dari SME panel: jamin kode orang pseudonim-nya.
+        awal, _ = rsp_service.list_by_sesi(item.id)
+        isi_kode_orang(awal, ko_service, jamin=True)
     except Exception:
         idem.release()
         raise

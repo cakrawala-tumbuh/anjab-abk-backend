@@ -17,6 +17,10 @@ class KodeOrangService(Protocol):
         """Ambil kode partisipan; buat bila belum ada (idempoten)."""
         ...
 
+    def peta_partisipan(self, partisipan_ids: list[str]) -> dict[str, str]:
+        """Baca massal kode orang per partisipan (tanpa efek tulis)."""
+        ...
+
     def create(self, data: KodeOrangCreate, *, pelaku_kode_orang: str | None) -> KodeOrangRead:
         """Daftarkan orang baru dan catat riwayatnya."""
         ...

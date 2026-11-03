@@ -25,7 +25,14 @@ class WcpRespondenRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str = Field(description="ID responden.", examples=["wrsp_a1b2c3d4"])
-    nama: str | None = Field(default=None, description="Nama responden.")
+    kode_orang: str | None = Field(
+        default=None,
+        description=(
+            "Kode orang pseudonim responden (`O-nnnn`, sama dengan register redesain);"
+            " null bila responden tidak terhubung ke partisipan."
+        ),
+        examples=["O-0012"],
+    )
     jabatan_label: str = Field(description="Label jabatan responden.")
     partisipan_id: str | None = Field(
         default=None, description="ID partisipan yang terhubung, bila ada."

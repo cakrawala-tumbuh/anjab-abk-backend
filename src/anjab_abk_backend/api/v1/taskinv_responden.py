@@ -14,6 +14,7 @@ from ...dependencies import (
     authorize_responden_access,
     authorize_sesi_access,
     get_current_principal,
+    get_kode_orang_service,
     get_partisipan_service,
     get_sme_panel_service,
     get_ti_responden_service,
@@ -23,6 +24,7 @@ from ...dependencies import (
     require_admin,
 )
 from ...errors import ValidationAppError
+from ...redesain.services.kode_orang import KodeOrangService
 from ...schemas.common import BulkAssignResult, BulkSkipped, ErrorResponse, Page
 from ...security import Principal
 from ...taskinv.schemas.responden import (
@@ -33,6 +35,7 @@ from ...taskinv.schemas.responden import (
 )
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.sesi import TiSesiService
+from ..kode_orang_isi import isi_kode_orang
 from ..pagination import set_pagination_links
 
 router = APIRouter()
@@ -68,10 +71,12 @@ def list_responden(
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> Page[TiRespondenRead]:
     sesi = sesi_service.get(sesi_id)
     authorize_sesi_access(principal, sesi, par_service, rsp_service)
     items, total = rsp_service.list_by_sesi(sesi_id, limit=page.limit, offset=page.offset)
+    isi_kode_orang(items, ko_service)
     set_pagination_links(response, request, total, page.limit, page.offset)
     return Page[TiRespondenRead](items=items, total=total, limit=page.limit, offset=page.offset)
 
@@ -107,6 +112,7 @@ def create_responden(
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     sme_panel_service: Annotated[SMEPanelService, Depends(get_sme_panel_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> TiRespondenRead:
     """Daftarkan satu responden ke sesi Task Inventory `sesi_id` (admin).
 
@@ -137,10 +143,11 @@ def create_responden(
             raise ValidationAppError("SME panel untuk jabatan sesi ini belum dibuat.")
         if payload.partisipan_id not in panels[0].partisipan_ids:
             raise ValidationAppError(
-                "Partisipan tidak dapat ditambahkan:"
-                " belum tergabung dalam SME panel jabatan ini."
+                "Partisipan tidak dapat ditambahkan: belum tergabung dalam SME panel jabatan ini."
             )
-    return rsp_service.create(sesi_id, payload)
+    hasil = rsp_service.create(sesi_id, payload)
+    isi_kode_orang([hasil], ko_service, jamin=True)
+    return hasil
 
 
 @router.post(
@@ -167,6 +174,7 @@ def create_responden_banyak(
     sesi_service: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     sme_panel_service: Annotated[SMEPanelService, Depends(get_sme_panel_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> BulkAssignResult[TiRespondenRead]:
     sesi = sesi_service.get(sesi_id)
     if sesi.status not in ("DRAFT", "TAHAP1"):
@@ -202,6 +210,7 @@ def create_responden_banyak(
 
     result = rsp_service.assign_banyak(sesi_id, anggota_valid)
     result.skipped = skipped + result.skipped
+    isi_kode_orang(result.created, ko_service, jamin=True)
     return result
 
 
@@ -218,9 +227,11 @@ def get_responden(
     principal: Annotated[Principal, Depends(get_current_principal)],
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> TiRespondenRead:
     responden = rsp_service.get(responden_id)
     authorize_responden_access(principal, responden.partisipan_id, par_service)
+    isi_kode_orang([responden], ko_service)
     return responden
 
 
@@ -272,6 +283,7 @@ def alihkan_responden(
     payload: TiRespondenAlihkan,
     rsp_service: Annotated[TiRespondenService, Depends(get_ti_responden_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
 ) -> TiRespondenRead:
     """Alihkan kepemilikan responden `responden_id` dari `dari_partisipan_id` ke
     `ke_partisipan_id` (admin).
@@ -303,4 +315,6 @@ def alihkan_responden(
     partisipan_b = par_service.get(payload.ke_partisipan_id)
     if not partisipan_b.aktif:
         raise ValidationAppError(f"Partisipan '{payload.ke_partisipan_id}' tidak aktif.")
-    return rsp_service.alihkan(responden_id, payload.ke_partisipan_id, partisipan_b.nama)
+    hasil = rsp_service.alihkan(responden_id, payload.ke_partisipan_id, partisipan_b.nama)
+    isi_kode_orang([hasil], ko_service, jamin=True)
+    return hasil
