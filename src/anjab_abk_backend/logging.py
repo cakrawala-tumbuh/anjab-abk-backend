@@ -16,7 +16,19 @@ _EXTRA_FIELDS = (
     "method",
     "status_code",
     "duration_ms",
+    "actor",
+    "resource",
+    "resource_id",
+    "tujuan",
 )
+
+AUDIT_LOGGER_NAME = "anjab_abk_backend.audit"
+"""Nama logger audit baca data terlindung (event `protected_read`).
+
+Terpisah dari log akses (`anjab_abk_backend.access`) agar bisa disaring/dialihkan
+sendiri. Record-nya hanya memuat `actor`, `resource`, `resource_id`, `tujuan`
+(+ `request_id`/`trace_id` otomatis) — tidak pernah nama atau isi data.
+"""
 
 
 class RequestIdFilter(logging.Filter):

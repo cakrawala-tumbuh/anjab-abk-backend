@@ -9,6 +9,13 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Log audit baca data terlindung** (backlog #74, A5): setiap `GET` yang lolos guard object-level
+  (`authorize_responden_access`/`authorize_sesi_access`/`authorize_opm_sesi_access`) dan seluruh
+  `GET` `/api/v1/redesain/kode-orang` & `/api/v1/redesain/ekspor` menulis satu record `protected_read`
+  di logger `anjab_abk_backend.audit` berisi `actor`, `resource`, `resource_id`, `tujuan`. Tujuan
+  diambil dari header opsional `X-Tujuan-Akses` (maks. 200 karakter; absen -> `TIDAK_DINYATAKAN`).
+  Penolakan 403 dan operasi tulis tidak dicatat; nama/isi data tidak pernah masuk log.
+
 - **Kunci optimistik & idempotensi rute tulis WCP/DCS** (backlog #73, A5): `PATCH` instrumen & item,
   `PUT` jawaban draft, `DELETE` item & responden menerima `If-Match` (412 bila usang; 428 bila
   `REQUIRE_IF_MATCH=true` dan header absen); `GET` instrumen, item (endpoint baru

@@ -10,6 +10,7 @@ from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
     Pagination,
+    audit_baca_terlindung,
     get_kode_orang_pemanggil,
     get_kode_orang_service,
     get_partisipan_service,
@@ -32,7 +33,7 @@ from ...security import Principal
 
 router = APIRouter()
 
-_READ = [*READ_GUARDS, Depends(require_tim_kajian)]
+_READ = [*READ_GUARDS, Depends(require_tim_kajian), Depends(audit_baca_terlindung)]
 _WRITE = [Depends(require_tim_kajian), Depends(rate_limit)]
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
@@ -45,7 +46,11 @@ _NOTFOUND = {404: {"model": ErrorResponse, "description": "Kode orang tidak dite
     response_model=KodeOrangSaya,
     summary="Kode orang milik pemanggil (tim-kajian / sekolah-pengisi)",
     operation_id="redesain_kode_orang_saya",
-    dependencies=[*READ_GUARDS, Depends(require_tim_kajian_atau_pengisi)],
+    dependencies=[
+        *READ_GUARDS,
+        Depends(require_tim_kajian_atau_pengisi),
+        Depends(audit_baca_terlindung),
+    ],
     responses={
         **_AUTH,
         **_RATE,

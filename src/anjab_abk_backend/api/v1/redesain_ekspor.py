@@ -12,6 +12,7 @@ from sqlalchemy import Row, select
 from ...dependencies import (
     READ_GUARDS,
     SessionDep,
+    audit_baca_terlindung,
     get_alternatif_service,
     get_bukti_service,
     get_cakupan_jabatan_service,
@@ -56,7 +57,7 @@ from ...schemas.common import ErrorResponse
 
 router = APIRouter()
 
-_READ = [*READ_GUARDS, Depends(require_tim_kajian)]
+_READ = [*READ_GUARDS, Depends(require_tim_kajian), Depends(audit_baca_terlindung)]
 _DOCX = {
     200: {
         "description": "Berkas DOCX.",

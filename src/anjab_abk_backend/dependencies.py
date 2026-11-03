@@ -10,6 +10,8 @@ teardown setelah respons terbentuk). Verifier token & rate limiter tetap singlet
 
 from __future__ import annotations
 
+import logging
+from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Annotated, Any
@@ -42,6 +44,7 @@ from .dcs.services.responden_sql import SqlDcsRespondenService
 from .dcs.services.subskala import DcsSubSkalaService
 from .dcs.services.subskala_sql import SqlDcsSubSkalaService
 from .errors import ForbiddenError, RateLimitedError, UnauthorizedError
+from .logging import AUDIT_LOGGER_NAME
 from .opm.services.jawaban import OpmJawabanService
 from .opm.services.jawaban_sql import SqlOpmJawabanService
 from .opm.services.responden import OpmRespondenService
@@ -585,11 +588,11 @@ def authorize_responden_access(
     di endpoint TI/DCS/WCP/OPM/TS agar partisipan tidak dapat membaca atau menulis
     data responden milik partisipan lain lewat penebakan ID (BOLA/IDOR).
     """
-    if "admin" in principal.groups:
-        return
-    par = par_service.get_by_subject(principal.subject)
-    if par is None or partisipan_id is None or par.id != partisipan_id:
-        raise ForbiddenError("Akses ditolak: Anda bukan pemilik data responden ini.")
+    if "admin" not in principal.groups:
+        par = par_service.get_by_subject(principal.subject)
+        if par is None or partisipan_id is None or par.id != partisipan_id:
+            raise ForbiddenError("Akses ditolak: Anda bukan pemilik data responden ini.")
+    catat_baca_terlindung(principal)
 
 
 def authorize_sesi_access(
@@ -604,16 +607,15 @@ def authorize_sesi_access(
     ini. Dipakai di endpoint baca sesi/tahap2/task-terpilih agar partisipan tidak dapat
     membaca sesi jabatan lain lewat penebakan ID (BOLA/IDOR).
     """
-    if "admin" in principal.groups:
-        return
-    par = par_service.get_by_subject(principal.subject)
-    if par is None:
-        raise ForbiddenError("Akses ditolak: Anda bukan peserta sesi ini.")
-    if par.id == sesi.koordinator_id:
-        return
-    if any(r.sesi_id == sesi.id for r in rsp_service.list_by_partisipan(par.id)):
-        return
-    raise ForbiddenError("Akses ditolak: Anda bukan peserta sesi ini.")
+    if "admin" not in principal.groups:
+        par = par_service.get_by_subject(principal.subject)
+        if par is None:
+            raise ForbiddenError("Akses ditolak: Anda bukan peserta sesi ini.")
+        if par.id != sesi.koordinator_id and not any(
+            r.sesi_id == sesi.id for r in rsp_service.list_by_partisipan(par.id)
+        ):
+            raise ForbiddenError("Akses ditolak: Anda bukan peserta sesi ini.")
+    catat_baca_terlindung(principal)
 
 
 def authorize_opm_sesi_access(
@@ -629,11 +631,127 @@ def authorize_opm_sesi_access(
     partisipan tidak dapat membaca snapshot task sesi jabatan lain lewat penebakan ID
     (BOLA/IDOR).
     """
-    if "admin" in principal.groups:
+    if "admin" not in principal.groups:
+        par = par_service.get_by_subject(principal.subject)
+        if par is None or not any(
+            r.sesi_id == sesi_id for r in rsp_service.list_by_partisipan(par.id)
+        ):
+            raise ForbiddenError("Akses ditolak: Anda bukan peserta sesi OPM ini.")
+    catat_baca_terlindung(principal)
+
+
+# --- Audit baca data terlindung ---
+
+_audit_logger = logging.getLogger(AUDIT_LOGGER_NAME)
+
+TUJUAN_TIDAK_DINYATAKAN = "TIDAK_DINYATAKAN"
+"""Nilai `tujuan` bila klien tidak mengirim header `X-Tujuan-Akses`."""
+
+TUJUAN_MAKS_PANJANG = 200
+"""Batas panjang `tujuan` yang dicatat (sisanya dipotong)."""
+
+
+@dataclass(frozen=True)
+class _KonteksAudit:
+    """Konteks permintaan GET yang dipakai guard object-level untuk mencatat audit."""
+
+    metode: str
+    resource: str
+    resource_id: str | None
+    tujuan: str
+
+
+_konteks_audit: ContextVar[_KonteksAudit | None] = ContextVar("konteks_audit", default=None)
+
+
+def normalisasi_tujuan(nilai: str | None) -> str:
+    """Rapikan header tujuan akses untuk log audit.
+
+    Args:
+        nilai: Isi header `X-Tujuan-Akses` (boleh `None`).
+
+    Returns:
+        Teks yang di-trim dan dipotong `TUJUAN_MAKS_PANJANG` karakter;
+        `TIDAK_DINYATAKAN` bila absen atau kosong.
+    """
+    teks = (nilai or "").strip()[:TUJUAN_MAKS_PANJANG].strip()
+    return teks or TUJUAN_TIDAK_DINYATAKAN
+
+
+def _bangun_konteks(request: Request, tujuan: str | None) -> _KonteksAudit:
+    """Turunkan konteks audit dari permintaan (template rute, path param utama, tujuan)."""
+    params = request.path_params
+    nama_per_nilai = {str(v): k for k, v in params.items()}
+    # `route.path` bersifat relatif terhadap router bersarang, jadi template dirakit dari
+    # jalur nyata: segmen yang sama dengan nilai path param diganti `{nama}`.
+    resource = "/".join(
+        "{" + nama_per_nilai[seg] + "}" if seg in nama_per_nilai else seg
+        for seg in request.url.path.split("/")
+    )
+    resource_id = str(next(iter(params.values()))) if params else None
+    return _KonteksAudit(request.method, resource, resource_id, normalisasi_tujuan(tujuan))
+
+
+def _tulis_audit(principal: Principal, konteks: _KonteksAudit) -> None:
+    """Tulis satu record `protected_read` (tanpa nama/isi data apa pun)."""
+    # `logging.config.fileConfig` (dipanggil Alembic saat migrasi/initdb) menonaktifkan
+    # logger yang sudah ada -> record audit hilang senyap. Nyalakan ulang tiap tulis.
+    _audit_logger.disabled = False
+    _audit_logger.info(
+        "protected_read",
+        extra={
+            "actor": principal.subject,
+            "resource": konteks.resource,
+            "resource_id": konteks.resource_id,
+            "tujuan": konteks.tujuan,
+        },
+    )
+
+
+async def siapkan_konteks_audit(
+    request: Request,
+    tujuan: Annotated[
+        str | None,
+        Header(
+            alias="X-Tujuan-Akses",
+            description=(
+                "Tujuan akses yang dinyatakan klien (opsional, maks. 200 karakter). "
+                "Dicatat di log audit pembacaan data terlindung; absen -> TIDAK_DINYATAKAN."
+            ),
+        ),
+    ] = None,
+) -> None:
+    """Dependency: simpan konteks permintaan agar guard object-level dapat mencatat audit.
+
+    Dipasang di `READ_GUARDS`. Sengaja `async` agar contextvar yang di-set terlihat oleh
+    endpoint sync (threadpool menyalin konteks pemanggil).
+    """
+    _konteks_audit.set(_bangun_konteks(request, tujuan))
+
+
+def catat_baca_terlindung(principal: Principal) -> None:
+    """Catat audit `protected_read` bila permintaan berjalan adalah GET.
+
+    Dipanggil di dalam guard object-level SETELAH otorisasi lolos. Permintaan non-GET
+    (tulis) atau tanpa konteks audit tidak menghasilkan record.
+    """
+    konteks = _konteks_audit.get()
+    if konteks is None or konteks.metode != "GET":
         return
-    par = par_service.get_by_subject(principal.subject)
-    if par is None or not any(r.sesi_id == sesi_id for r in rsp_service.list_by_partisipan(par.id)):
-        raise ForbiddenError("Akses ditolak: Anda bukan peserta sesi OPM ini.")
+    _tulis_audit(principal, konteks)
+
+
+def audit_baca_terlindung(
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    _konteks: Annotated[None, Depends(siapkan_konteks_audit)],
+) -> None:
+    """Dependency audit untuk rute baca terlindung tanpa guard object-level (redesain).
+
+    Wajib dipasang SETELAH dependency otorisasi di daftar `dependencies` agar penolakan
+    403 tidak menghasilkan record. Konteks (termasuk header `X-Tujuan-Akses`) diambil dari
+    `siapkan_konteks_audit` (di-cache per permintaan). Hanya mencatat untuk metode GET.
+    """
+    catat_baca_terlindung(principal)
 
 
 # --- Rate limiting ---
@@ -663,7 +781,11 @@ def rate_limit(
 
 # --- Guard konstan untuk operasi baca ---
 
-READ_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
+READ_GUARDS = [
+    Depends(get_current_principal),
+    Depends(rate_limit),
+    Depends(siapkan_konteks_audit),
+]
 """Guard baku untuk SETIAP operasi baca (GET) di `api/v1/`.
 
 INVARIANT: setiap operasi GET wajib memasang `dependencies=READ_GUARDS` — kecuali
