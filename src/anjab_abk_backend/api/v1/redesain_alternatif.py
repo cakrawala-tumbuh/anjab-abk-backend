@@ -4,21 +4,31 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
+from ...config import Settings, get_settings
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     get_alternatif_service,
     get_kode_orang_pemanggil,
+    idempotency,
     pagination_params,
     rate_limit,
     require_tim_kajian,
 )
+from ...etag import check_if_match, compute_etag
 from ...redesain.schemas.alternatif import AlternatifCreate, AlternatifRead, AlternatifUpdate
 from ...redesain.services.alternatif import AlternatifService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 
 router = APIRouter()
 
@@ -55,6 +65,7 @@ def list_alternatif(
     operation_id="redesain_alternatif_create",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -66,9 +77,15 @@ def create_alternatif(
     data: AlternatifCreate,
     service: Annotated[AlternatifService, Depends(get_alternatif_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> AlternatifRead:
     """Buat alternatif baru (kode `U-NNN`); 422 bila rujukan atau aturan opsi/status tak valid."""
-    return service.create(data, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> AlternatifRead:
+        return service.create(data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, AlternatifRead, _aksi)
 
 
 @router.post(
@@ -106,9 +123,12 @@ def search_alternatif(
 def get_alternatif(
     alternatif_id: str,
     service: Annotated[AlternatifService, Depends(get_alternatif_service)],
+    response: Response,
 ) -> AlternatifRead:
     """Ambil satu alternatif."""
-    return service.get(alternatif_id)
+    item = service.get(alternatif_id)
+    response.headers["ETag"] = compute_etag(item)
+    return item
 
 
 @router.patch(
@@ -117,13 +137,19 @@ def get_alternatif(
     summary="Ubah alternatif redesain (tim-kajian)",
     operation_id="redesain_alternatif_update",
     dependencies=_WRITE,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
+    responses={**PRECONDITION_RESPONSES, **_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
 )
 def update_alternatif(
     alternatif_id: str,
     data: AlternatifUpdate,
     service: Annotated[AlternatifService, Depends(get_alternatif_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> AlternatifRead:
     """Ubah parsial alternatif (mis. status telaah); `kode` dan `masalah_id` tetap."""
-    return service.update(alternatif_id, data, pelaku_kode_orang=pelaku)
+    check_if_match(service.get(alternatif_id), if_match, settings.require_if_match)
+    item = service.update(alternatif_id, data, pelaku_kode_orang=pelaku)
+    response.headers["ETag"] = compute_etag(item)
+    return item

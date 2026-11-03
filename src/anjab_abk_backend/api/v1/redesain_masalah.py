@@ -4,18 +4,22 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
+from ...config import Settings, get_settings
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     get_kode_orang_pemanggil,
     get_masalah_service,
     get_penilaian_service,
+    idempotency,
     pagination_params,
     rate_limit,
     require_tim_kajian,
 )
+from ...etag import check_if_match, compute_etag
 from ...redesain.schemas.masalah import (
     MasalahCreate,
     MasalahRead,
@@ -27,6 +31,12 @@ from ...redesain.services.masalah import MasalahService
 from ...redesain.services.penilaian import PenilaianService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 
 router = APIRouter()
 
@@ -69,6 +79,7 @@ def list_masalah(
     operation_id="redesain_masalah_create",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -80,13 +91,19 @@ def create_masalah(
     data: MasalahCreate,
     service: Annotated[MasalahService, Depends(get_masalah_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> MasalahRead:
     """Buat masalah baru; `kode` dibangkitkan dari kode konteks (`K-01` → `M-K01-NN`).
 
     `uraian_tugas_ids` divalidasi lewat seam katalog Task Inventory; ID tak dikenal → 422
     tanpa satu baris pun tertulis. Riwayat `entitas="masalah"` dicatat.
     """
-    return service.create(data, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> MasalahRead:
+        return service.create(data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, MasalahRead, _aksi)
 
 
 @router.post(
@@ -125,9 +142,12 @@ def search_masalah(
 def get_masalah(
     masalah_id: str,
     service: Annotated[MasalahService, Depends(get_masalah_service)],
+    response: Response,
 ) -> MasalahRead:
     """Ambil satu masalah beserta `uraian_tugas_ids`."""
-    return service.get(masalah_id)
+    item = service.get(masalah_id)
+    response.headers["ETag"] = compute_etag(item)
+    return item
 
 
 @router.patch(
@@ -137,6 +157,7 @@ def get_masalah(
     operation_id="redesain_masalah_update",
     dependencies=_WRITE,
     responses={
+        **PRECONDITION_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -150,13 +171,19 @@ def update_masalah(
     data: MasalahUpdate,
     service: Annotated[MasalahService, Depends(get_masalah_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> MasalahRead:
     """Ubah parsial masalah; `uraian_tugas_ids` (bila dikirim) mengganti penuh tautan.
 
     `kode` & `status_awal_dibekukan_pada` read-only; `status_awal` ditolak 409 bila sudah
     dibekukan (field lain tetap boleh).
     """
-    return service.update(masalah_id, data, pelaku_kode_orang=pelaku)
+    check_if_match(service.get(masalah_id), if_match, settings.require_if_match)
+    item = service.update(masalah_id, data, pelaku_kode_orang=pelaku)
+    response.headers["ETag"] = compute_etag(item)
+    return item
 
 
 @router.post(
@@ -165,16 +192,22 @@ def update_masalah(
     summary="Buka/tutup masalah untuk konfirmasi sekolah (tim-kajian)",
     operation_id="redesain_masalah_status_konfirmasi",
     dependencies=_WRITE,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
+    responses={**IDEMPOTENCY_RESPONSES, **_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
 )
 def status_konfirmasi_masalah(
     masalah_id: str,
     data: MasalahStatusKonfirmasi,
     service: Annotated[MasalahService, Depends(get_masalah_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> MasalahRead:
     """Set `dibuka_untuk_konfirmasi` sesuai `dibuka` dan catat riwayat."""
-    return service.set_status_konfirmasi(masalah_id, data.dibuka, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> MasalahRead:
+        return service.set_status_konfirmasi(masalah_id, data.dibuka, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, MasalahRead, _aksi)
 
 
 @router.get(

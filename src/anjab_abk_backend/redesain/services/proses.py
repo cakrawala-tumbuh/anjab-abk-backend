@@ -62,6 +62,10 @@ class ProsesService(Protocol):
         """
         ...
 
+    def get_langkah(self, langkah_id: str) -> LangkahRead:
+        """Ambil satu langkah; `NotFoundError` bila tak ada."""
+        ...
+
     def update_langkah(
         self, langkah_id: str, data: LangkahUpdate, *, pelaku_kode_orang: str | None
     ) -> LangkahRead:

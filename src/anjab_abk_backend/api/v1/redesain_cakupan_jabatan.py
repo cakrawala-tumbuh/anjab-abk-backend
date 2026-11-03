@@ -4,17 +4,21 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
+from ...config import Settings, get_settings
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     get_cakupan_jabatan_service,
     get_kode_orang_pemanggil,
+    idempotency,
     pagination_params,
     rate_limit,
     require_tim_kajian,
 )
+from ...etag import check_if_match, compute_etag
 from ...redesain.schemas.cakupan_jabatan import (
     CakupanJabatanCreate,
     CakupanJabatanRead,
@@ -23,6 +27,12 @@ from ...redesain.schemas.cakupan_jabatan import (
 from ...redesain.services.cakupan_jabatan import CakupanJabatanService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 
 router = APIRouter()
 
@@ -59,6 +69,7 @@ def list_cakupan(
     operation_id="redesain_cakupan_jabatan_create",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -70,9 +81,15 @@ def create_cakupan(
     data: CakupanJabatanCreate,
     service: Annotated[CakupanJabatanService, Depends(get_cakupan_jabatan_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> CakupanJabatanRead:
     """Buat entri cakupan; 409 bila pasangan role_kode+cabang ada, 422 bila jabatan tak dikenal."""
-    return service.create(data, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> CakupanJabatanRead:
+        return service.create(data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, CakupanJabatanRead, _aksi)
 
 
 @router.post(
@@ -110,9 +127,12 @@ def search_cakupan(
 def get_cakupan(
     cakupan_id: str,
     service: Annotated[CakupanJabatanService, Depends(get_cakupan_jabatan_service)],
+    response: Response,
 ) -> CakupanJabatanRead:
     """Ambil satu entri cakupan jabatan."""
-    return service.get(cakupan_id)
+    item = service.get(cakupan_id)
+    response.headers["ETag"] = compute_etag(item)
+    return item
 
 
 @router.patch(
@@ -121,13 +141,19 @@ def get_cakupan(
     summary="Ubah cakupan jabatan redesain (tim-kajian)",
     operation_id="redesain_cakupan_jabatan_update",
     dependencies=_WRITE,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
+    responses={**PRECONDITION_RESPONSES, **_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
 )
 def update_cakupan(
     cakupan_id: str,
     data: CakupanJabatanUpdate,
     service: Annotated[CakupanJabatanService, Depends(get_cakupan_jabatan_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> CakupanJabatanRead:
     """Ubah parsial entri (mis. status, pemetaan jabatan_id); role_kode dan cabang tetap."""
-    return service.update(cakupan_id, data, pelaku_kode_orang=pelaku)
+    check_if_match(service.get(cakupan_id), if_match, settings.require_if_match)
+    item = service.update(cakupan_id, data, pelaku_kode_orang=pelaku)
+    response.headers["ETag"] = compute_etag(item)
+    return item

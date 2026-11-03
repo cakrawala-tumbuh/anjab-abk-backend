@@ -9,6 +9,15 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Kunci optimistik dan Idempotency-Key di rute tulis modul redesain** (backlog #77, A5):
+  seluruh `PATCH` redesain (masalah, penilaian, bukti, alternatif, konteks, versi metode, cakupan
+  jabatan, kode orang, sesi, proses, langkah, konfirmasi) menerima `If-Match` (412 bila usang,
+  428 bila `REQUIRE_IF_MATCH=true` dan header absen, tanpa entri riwayat baru); GET sumber dan
+  respons sukses mengembalikan `ETag`. Seluruh `POST` non-search (pembuatan, aksi
+  status/putuskan/kunci-cerita/tampilkan-dugaan/kirim/ralat/angkat-masalah, langkah, koreksi)
+  menerima `Idempotency-Key`: key sama diulang mengembalikan 200 dengan respons pertama (satu
+  baris, satu riwayat), key yang masih diproses 409. Tanpa header perilaku tidak berubah.
+  Endpoint baru: `GET /api/v1/redesain/langkah/{langkah_id}` (sumber ETag untuk `PATCH` langkah).
 - **Kunci optimistik dan Idempotency-Key di rute tulis OPM dan Task Inventory** (backlog #76, A5):
   `PATCH`/`PUT`/`DELETE` pada sesi, responden, jawaban draft OPM, seleksi dan detail TI, serta
   hapus usulan menerima `If-Match` (412 bila usang, 428 bila `REQUIRE_IF_MATCH=true` dan header

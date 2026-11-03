@@ -4,21 +4,31 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
+from ...config import Settings, get_settings
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     get_kode_orang_pemanggil,
     get_versi_metode_service,
+    idempotency,
     pagination_params,
     rate_limit,
     require_tim_kajian,
 )
+from ...etag import check_if_match, compute_etag
 from ...redesain.schemas.versi_metode import VersiMetodeCreate, VersiMetodeRead, VersiMetodeUpdate
 from ...redesain.services.versi_metode import VersiMetodeService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 
 router = APIRouter()
 
@@ -55,6 +65,7 @@ def list_versi_metode(
     operation_id="redesain_versi_metode_create",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -66,9 +77,15 @@ def create_versi_metode(
     data: VersiMetodeCreate,
     service: Annotated[VersiMetodeService, Depends(get_versi_metode_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> VersiMetodeRead:
     """Buat catatan baru; 409 bila pasangan versi+bagian sudah ada."""
-    return service.create(data, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> VersiMetodeRead:
+        return service.create(data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, VersiMetodeRead, _aksi)
 
 
 @router.post(
@@ -106,9 +123,12 @@ def search_versi_metode(
 def get_versi_metode(
     versi_id: str,
     service: Annotated[VersiMetodeService, Depends(get_versi_metode_service)],
+    response: Response,
 ) -> VersiMetodeRead:
     """Ambil satu catatan."""
-    return service.get(versi_id)
+    item = service.get(versi_id)
+    response.headers["ETag"] = compute_etag(item)
+    return item
 
 
 @router.patch(
@@ -118,6 +138,7 @@ def get_versi_metode(
     operation_id="redesain_versi_metode_update",
     dependencies=_WRITE,
     responses={
+        **PRECONDITION_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -130,6 +151,12 @@ def update_versi_metode(
     data: VersiMetodeUpdate,
     service: Annotated[VersiMetodeService, Depends(get_versi_metode_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> VersiMetodeRead:
     """Ubah parsial catatan; 409 bila pasangan versi+bagian jadi bentrok."""
-    return service.update(versi_id, data, pelaku_kode_orang=pelaku)
+    check_if_match(service.get(versi_id), if_match, settings.require_if_match)
+    item = service.update(versi_id, data, pelaku_kode_orang=pelaku)
+    response.headers["ETag"] = compute_etag(item)
+    return item

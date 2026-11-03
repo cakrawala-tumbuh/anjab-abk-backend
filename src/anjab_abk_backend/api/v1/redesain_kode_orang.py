@@ -4,22 +4,26 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
+from ...config import Settings, get_settings
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     audit_baca_terlindung,
     get_kode_orang_pemanggil,
     get_kode_orang_service,
     get_partisipan_service,
+    idempotency,
     pagination_params,
     rate_limit,
     require_tim_kajian,
     require_tim_kajian_atau_pengisi,
 )
 from ...errors import ForbiddenError
+from ...etag import check_if_match, compute_etag
 from ...redesain.schemas.kode_orang import (
     KodeOrangCreate,
     KodeOrangRead,
@@ -30,6 +34,12 @@ from ...redesain.services.kode_orang import KodeOrangService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
 from ...security import Principal
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 
 router = APIRouter()
 
@@ -94,6 +104,7 @@ def list_kode_orang(
     operation_id="redesain_kode_orang_create",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -106,9 +117,15 @@ def create_kode_orang(
     data: KodeOrangCreate,
     service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> KodeOrangRead:
     """Buat kode baru; `kode` dibangkitkan sistem dari sequence."""
-    return service.create(data, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> KodeOrangRead:
+        return service.create(data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, KodeOrangRead, _aksi)
 
 
 @router.post(
@@ -146,9 +163,12 @@ def search_kode_orang(
 def get_kode_orang(
     kode_orang_id: str,
     service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
+    response: Response,
 ) -> KodeOrangRead:
     """Ambil satu baris kode orang."""
-    return service.get(kode_orang_id)
+    item = service.get(kode_orang_id)
+    response.headers["ETag"] = compute_etag(item)
+    return item
 
 
 @router.patch(
@@ -157,13 +177,19 @@ def get_kode_orang(
     summary="Ubah keterangan peran kode orang (tim-kajian)",
     operation_id="redesain_kode_orang_update",
     dependencies=_WRITE,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
+    responses={**PRECONDITION_RESPONSES, **_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
 )
 def update_kode_orang(
     kode_orang_id: str,
     data: KodeOrangUpdate,
     service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> KodeOrangRead:
     """Ubah `keterangan_peran`; `kode` dan `partisipan_id` tidak dapat diubah."""
-    return service.update(kode_orang_id, data, pelaku_kode_orang=pelaku)
+    check_if_match(service.get(kode_orang_id), if_match, settings.require_if_match)
+    item = service.update(kode_orang_id, data, pelaku_kode_orang=pelaku)
+    response.headers["ETag"] = compute_etag(item)
+    return item

@@ -4,21 +4,31 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
+from ...config import Settings, get_settings
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     get_bukti_service,
     get_kode_orang_pemanggil,
+    idempotency,
     pagination_params,
     rate_limit,
     require_tim_kajian,
 )
+from ...etag import check_if_match, compute_etag
 from ...redesain.schemas.bukti import BuktiCreate, BuktiRead, BuktiUpdate
 from ...redesain.services.bukti import BuktiService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 
 router = APIRouter()
 
@@ -55,6 +65,7 @@ def list_bukti(
     operation_id="redesain_bukti_create",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -66,9 +77,15 @@ def create_bukti(
     data: BuktiCreate,
     service: Annotated[BuktiService, Depends(get_bukti_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> BuktiRead:
     """Buat bukti baru (kode `B-NNNN`); 422 bila masalah, langkah, atau kode orang tak valid."""
-    return service.create(data, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> BuktiRead:
+        return service.create(data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, BuktiRead, _aksi)
 
 
 @router.post(
@@ -106,9 +123,12 @@ def search_bukti(
 def get_bukti(
     bukti_id: str,
     service: Annotated[BuktiService, Depends(get_bukti_service)],
+    response: Response,
 ) -> BuktiRead:
     """Ambil satu bukti."""
-    return service.get(bukti_id)
+    item = service.get(bukti_id)
+    response.headers["ETag"] = compute_etag(item)
+    return item
 
 
 @router.patch(
@@ -117,13 +137,19 @@ def get_bukti(
     summary="Ubah bukti redesain (tim-kajian)",
     operation_id="redesain_bukti_update",
     dependencies=_WRITE,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
+    responses={**PRECONDITION_RESPONSES, **_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
 )
 def update_bukti(
     bukti_id: str,
     data: BuktiUpdate,
     service: Annotated[BuktiService, Depends(get_bukti_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> BuktiRead:
     """Ubah parsial bukti (mis. status pemeriksaan); `kode` dan `masalah_id` tetap."""
-    return service.update(bukti_id, data, pelaku_kode_orang=pelaku)
+    check_if_match(service.get(bukti_id), if_match, settings.require_if_match)
+    item = service.update(bukti_id, data, pelaku_kode_orang=pelaku)
+    response.headers["ETag"] = compute_etag(item)
+    return item

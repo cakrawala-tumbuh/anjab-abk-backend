@@ -11,17 +11,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
+from ...config import Settings, get_settings
 from ...core.services.partisipan import PartisipanService
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     get_kode_orang_pemanggil,
     get_kode_orang_service,
     get_konfirmasi_service,
     get_koreksi_service,
     get_partisipan_service,
+    idempotency,
     pagination_params,
     rate_limit,
     require_sekolah_pengisi,
@@ -29,6 +32,7 @@ from ...dependencies import (
     require_tim_kajian_atau_pengisi,
 )
 from ...errors import ForbiddenError
+from ...etag import check_if_match, compute_etag
 from ...redesain.schemas.konfirmasi import (
     AngkatMasalahCreate,
     DugaanRead,
@@ -48,6 +52,12 @@ from ...redesain.services.koreksi import KoreksiService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
 from ...security import Principal
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 
 router = APIRouter()
 router_sekolah = APIRouter()
@@ -134,6 +144,7 @@ def list_masalah_sekolah(
     operation_id="redesain_konfirmasi_create",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -145,16 +156,24 @@ def list_masalah_sekolah(
     },
 )
 def create_konfirmasi(
-    data: KonfirmasiCreate, pengisi: PengisiDep, service: ServiceDep
+    data: KonfirmasiCreate,
+    pengisi: PengisiDep,
+    service: ServiceDep,
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> KonfirmasiRead:
     """Buat draf `daring` untuk masalah sekolah pemanggil; `sekolah_id` disalin dari partisipan.
 
     Masalah sekolah lain atau belum dibuka → 403; satu orang hanya satu draf/terkirim per
     masalah → 409.
     """
-    return service.create(
-        data.masalah_id, kode_orang=pengisi.kode_orang, sekolah_id=pengisi.sekolah_id
-    )
+
+    def _aksi() -> KonfirmasiRead:
+        return service.create(
+            data.masalah_id, kode_orang=pengisi.kode_orang, sekolah_id=pengisi.sekolah_id
+        )
+
+    return run_idempotent(idem, response, KonfirmasiRead, _aksi)
 
 
 @router.get(
@@ -225,6 +244,7 @@ def search_konfirmasi(req: SearchRequest, service: ServiceDep) -> Page[Konfirmas
     operation_id="redesain_konfirmasi_luring",
     dependencies=_WRITE_TIM,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN_TIM,
@@ -242,10 +262,16 @@ def create_konfirmasi_luring(
     data: KonfirmasiLuringCreate,
     service: ServiceDep,
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> KonfirmasiRead:
     """Simpan langsung `terkirim` dengan `sumber="luring"`; membekukan status awal masalah
     dan menandai eskalasi seperti `kirim`. Riwayat `create` oleh Tim pemanggil."""
-    return service.luring(data, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> KonfirmasiRead:
+        return service.luring(data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, KonfirmasiRead, _aksi)
 
 
 @router.get(
@@ -262,6 +288,7 @@ def get_konfirmasi(
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
     ko_service: Annotated[KodeOrangService, Depends(get_kode_orang_service)],
     service: ServiceDep,
+    response: Response,
 ) -> KonfirmasiRead:
     """Ambil satu konfirmasi beserta `dugaan_diperlihatkan` (`Ya`/`Belum`).
 
@@ -269,11 +296,11 @@ def get_konfirmasi(
     Rumusan hipotesis tidak pernah ikut di respons ini.
     """
     konf = service.get(konfirmasi_id)
-    if GRUP_TIM_KAJIAN in principal.groups:
-        return konf
-    par = par_service.get_by_subject(principal.subject)
-    if par is None or ko_service.untuk_partisipan(par.id).kode != konf.kode_orang:
-        raise ForbiddenError("Akses ditolak: konfirmasi ini bukan milik Anda.")
+    if GRUP_TIM_KAJIAN not in principal.groups:
+        par = par_service.get_by_subject(principal.subject)
+        if par is None or ko_service.untuk_partisipan(par.id).kode != konf.kode_orang:
+            raise ForbiddenError("Akses ditolak: konfirmasi ini bukan milik Anda.")
+    response.headers["ETag"] = compute_etag(konf)
     return konf
 
 
@@ -284,6 +311,7 @@ def get_konfirmasi(
     operation_id="redesain_konfirmasi_update",
     dependencies=_WRITE,
     responses={
+        **PRECONDITION_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -298,11 +326,23 @@ def get_konfirmasi(
     },
 )
 def update_konfirmasi(
-    konfirmasi_id: str, data: KonfirmasiUpdate, pengisi: PengisiDep, service: ServiceDep
+    konfirmasi_id: str,
+    data: KonfirmasiUpdate,
+    pengisi: PengisiDep,
+    service: ServiceDep,
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> KonfirmasiRead:
     """Ubah parsial draf; `cerita_sebelum` hanya sebelum dikunci, bagian C–E hanya setelah
     dugaan ditampilkan. Riwayat `aksi="update"` dicatat."""
-    return service.update(konfirmasi_id, data, kode_orang=pengisi.kode_orang)
+    sekarang = service.get(konfirmasi_id)
+    if sekarang.kode_orang == pengisi.kode_orang:
+        # Bukan milik pemanggil → lewati pemeriksaan; service.update menolak 403 seperti biasa.
+        check_if_match(sekarang, if_match, settings.require_if_match)
+    item = service.update(konfirmasi_id, data, kode_orang=pengisi.kode_orang)
+    response.headers["ETag"] = compute_etag(item)
+    return item
 
 
 @router.post(
@@ -312,6 +352,7 @@ def update_konfirmasi(
     operation_id="redesain_konfirmasi_kunci_cerita",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -320,9 +361,19 @@ def update_konfirmasi(
         422: {"model": ErrorResponse, "description": "`cerita_sebelum` kosong/spasi."},
     },
 )
-def kunci_cerita(konfirmasi_id: str, pengisi: PengisiDep, service: ServiceDep) -> KonfirmasiRead:
+def kunci_cerita(
+    konfirmasi_id: str,
+    pengisi: PengisiDep,
+    service: ServiceDep,
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> KonfirmasiRead:
     """Isi `cerita_dikunci_pada`; setelahnya `cerita_sebelum` tidak dapat diubah."""
-    return service.kunci_cerita(konfirmasi_id, kode_orang=pengisi.kode_orang)
+
+    def _aksi() -> KonfirmasiRead:
+        return service.kunci_cerita(konfirmasi_id, kode_orang=pengisi.kode_orang)
+
+    return run_idempotent(idem, response, KonfirmasiRead, _aksi)
 
 
 @router.post(
@@ -332,6 +383,7 @@ def kunci_cerita(konfirmasi_id: str, pengisi: PengisiDep, service: ServiceDep) -
     operation_id="redesain_konfirmasi_tampilkan_dugaan",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -342,9 +394,19 @@ def kunci_cerita(konfirmasi_id: str, pengisi: PengisiDep, service: ServiceDep) -
         },
     },
 )
-def tampilkan_dugaan(konfirmasi_id: str, pengisi: PengisiDep, service: ServiceDep) -> DugaanRead:
+def tampilkan_dugaan(
+    konfirmasi_id: str,
+    pengisi: PengisiDep,
+    service: ServiceDep,
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> DugaanRead:
     """Kembalikan `rumusan_hipotesis`; panggilan pertama mengisi `dugaan_ditampilkan_pada`."""
-    return service.tampilkan_dugaan(konfirmasi_id, kode_orang=pengisi.kode_orang)
+
+    def _aksi() -> DugaanRead:
+        return service.tampilkan_dugaan(konfirmasi_id, kode_orang=pengisi.kode_orang)
+
+    return run_idempotent(idem, response, DugaanRead, _aksi)
 
 
 @router.post(
@@ -354,6 +416,7 @@ def tampilkan_dugaan(konfirmasi_id: str, pengisi: PengisiDep, service: ServiceDe
     operation_id="redesain_konfirmasi_kirim",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -363,14 +426,22 @@ def tampilkan_dugaan(konfirmasi_id: str, pengisi: PengisiDep, service: ServiceDe
     },
 )
 def kirim_konfirmasi(
-    konfirmasi_id: str, pengisi: PengisiDep, service: ServiceDep
+    konfirmasi_id: str,
+    pengisi: PengisiDep,
+    service: ServiceDep,
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> KonfirmasiRead:
     """Kirim: wajib `peran`, `kesesuaian`, `k1`…`k4`, `indikasi_risiko`.
 
     Membekukan `masalah.status_awal` (bila belum) dan menandai `masalah.eskalasi_pada`
     bila `indikasi_risiko="Ada indikasi"`. Riwayat `aksi="kirim"` dicatat.
     """
-    return service.kirim(konfirmasi_id, kode_orang=pengisi.kode_orang)
+
+    def _aksi() -> KonfirmasiRead:
+        return service.kirim(konfirmasi_id, kode_orang=pengisi.kode_orang)
+
+    return run_idempotent(idem, response, KonfirmasiRead, _aksi)
 
 
 @router.get(
@@ -411,6 +482,7 @@ def get_alur_konfirmasi(
     operation_id="redesain_konfirmasi_ralat",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -425,14 +497,22 @@ def get_alur_konfirmasi(
     },
 )
 def ralat_konfirmasi(
-    konfirmasi_id: str, pengisi: PengisiDep, service: ServiceDep
+    konfirmasi_id: str,
+    pengisi: PengisiDep,
+    service: ServiceDep,
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> KonfirmasiRead:
     """Buat draf baru berisi salinan isi lama dengan `menggantikan_id` = id lama.
 
     Versi lama tidak berubah; cerita tidak dibuka ulang. Draf ralat diedit lewat PATCH dan
     dikirim lewat `kirim` seperti biasa.
     """
-    return service.ralat(konfirmasi_id, kode_orang=pengisi.kode_orang)
+
+    def _aksi() -> KonfirmasiRead:
+        return service.ralat(konfirmasi_id, kode_orang=pengisi.kode_orang)
+
+    return run_idempotent(idem, response, KonfirmasiRead, _aksi)
 
 
 @router.post(
@@ -443,6 +523,7 @@ def ralat_konfirmasi(
     operation_id="redesain_konfirmasi_angkat_masalah",
     dependencies=_WRITE_TIM,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN_TIM,
@@ -462,7 +543,13 @@ def angkat_masalah(
     data: AngkatMasalahCreate,
     service: ServiceDep,
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> MasalahRead:
     """Buat masalah `Keterangan kasus` untuk sekolah konfirmasi dengan `sumber_konfirmasi_id`
     terisi; teks `masalah_baru` konfirmasi tidak diubah."""
-    return service.angkat_masalah(konfirmasi_id, data, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> MasalahRead:
+        return service.angkat_masalah(konfirmasi_id, data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, MasalahRead, _aksi)

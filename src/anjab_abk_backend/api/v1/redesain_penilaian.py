@@ -4,17 +4,21 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
+from ...config import Settings, get_settings
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     get_kode_orang_pemanggil,
     get_penilaian_service,
+    idempotency,
     pagination_params,
     rate_limit,
     require_tim_kajian,
 )
+from ...etag import check_if_match, compute_etag
 from ...redesain.schemas.penilaian import (
     PenilaianCreate,
     PenilaianPutuskan,
@@ -25,6 +29,12 @@ from ...redesain.schemas.penilaian import (
 from ...redesain.services.penilaian import PenilaianService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 
 router = APIRouter()
 
@@ -61,6 +71,7 @@ def list_penilaian(
     operation_id="redesain_penilaian_create",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -72,9 +83,15 @@ def create_penilaian(
     data: PenilaianCreate,
     service: Annotated[PenilaianService, Depends(get_penilaian_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> PenilaianRead:
     """Buat penilaian satu masalah; `saran_otomatis` dihitung sistem, 409 bila sudah ada."""
-    return service.create(data, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> PenilaianRead:
+        return service.create(data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, PenilaianRead, _aksi)
 
 
 @router.post(
@@ -129,9 +146,12 @@ def agenda_yayasan(
 def get_penilaian(
     penilaian_id: str,
     service: Annotated[PenilaianService, Depends(get_penilaian_service)],
+    response: Response,
 ) -> PenilaianRead:
     """Ambil satu penilaian."""
-    return service.get(penilaian_id)
+    item = service.get(penilaian_id)
+    response.headers["ETag"] = compute_etag(item)
+    return item
 
 
 @router.patch(
@@ -140,16 +160,22 @@ def get_penilaian(
     summary="Ubah penilaian redesain (tim-kajian)",
     operation_id="redesain_penilaian_update",
     dependencies=_WRITE,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
+    responses={**PRECONDITION_RESPONSES, **_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
 )
 def update_penilaian(
     penilaian_id: str,
     data: PenilaianUpdate,
     service: Annotated[PenilaianService, Depends(get_penilaian_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> PenilaianRead:
     """Ubah parsial penilaian; `saran_otomatis` dihitung ulang, `masalah_id` tetap."""
-    return service.update(penilaian_id, data, pelaku_kode_orang=pelaku)
+    check_if_match(service.get(penilaian_id), if_match, settings.require_if_match)
+    item = service.update(penilaian_id, data, pelaku_kode_orang=pelaku)
+    response.headers["ETag"] = compute_etag(item)
+    return item
 
 
 @router.post(
@@ -159,6 +185,7 @@ def update_penilaian(
     operation_id="redesain_penilaian_putuskan",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -171,9 +198,15 @@ def putuskan_penilaian(
     data: PenilaianPutuskan,
     service: Annotated[PenilaianService, Depends(get_penilaian_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> PenilaianRead:
     """Catat prioritas final beserta alasan, pemutus, dan tanggal; peringatan tidak memblokir."""
-    return service.putuskan(penilaian_id, data, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> PenilaianRead:
+        return service.putuskan(penilaian_id, data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, PenilaianRead, _aksi)
 
 
 @router.post(
@@ -183,6 +216,7 @@ def putuskan_penilaian(
     operation_id="redesain_penilaian_status",
     dependencies=_WRITE,
     responses={
+        **IDEMPOTENCY_RESPONSES,
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
@@ -195,6 +229,12 @@ def ubah_status_penilaian(
     data: PenilaianStatus,
     service: Annotated[PenilaianService, Depends(get_penilaian_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> PenilaianRead:
     """Ubah `status_penilaian` ke salah satu dari empat status selain `Telah diputuskan`."""
-    return service.set_status(penilaian_id, data, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> PenilaianRead:
+        return service.set_status(penilaian_id, data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, PenilaianRead, _aksi)

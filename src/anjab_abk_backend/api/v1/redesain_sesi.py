@@ -4,21 +4,31 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
+from ...config import Settings, get_settings
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     get_kode_orang_pemanggil,
     get_sesi_service,
+    idempotency,
     pagination_params,
     rate_limit,
     require_tim_kajian,
 )
+from ...etag import check_if_match, compute_etag
 from ...redesain.schemas.sesi import RekapOrangRead, SesiCreate, SesiRead, SesiUpdate
 from ...redesain.services.sesi import SesiService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ..concurrency import (
+    IDEMPOTENCY_RESPONSES,
+    PRECONDITION_RESPONSES,
+    IfMatchHeader,
+    run_idempotent,
+)
 
 router = APIRouter()
 
@@ -56,15 +66,21 @@ def list_sesi(
     summary="Catat keterlibatan orang pada sesi (tim-kajian)",
     operation_id="redesain_sesi_create",
     dependencies=_WRITE,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_CONFLICT, **_INVALID},
+    responses={**IDEMPOTENCY_RESPONSES, **_AUTH, **_RATE, **_FORBIDDEN, **_CONFLICT, **_INVALID},
 )
 def create_sesi(
     data: SesiCreate,
     service: Annotated[SesiService, Depends(get_sesi_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> SesiRead:
     """Catat satu orang × satu sesi; `status_izin` apa pun (juga `Tidak diotorisasi`) diterima."""
-    return service.create(data, pelaku_kode_orang=pelaku)
+
+    def _aksi() -> SesiRead:
+        return service.create(data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, SesiRead, _aksi)
 
 
 @router.post(
@@ -119,9 +135,12 @@ def rekap_orang(
 def get_sesi(
     sesi_id: str,
     service: Annotated[SesiService, Depends(get_sesi_service)],
+    response: Response,
 ) -> SesiRead:
     """Ambil satu baris sesi beserta `masalah_ids`."""
-    return service.get(sesi_id)
+    item = service.get(sesi_id)
+    response.headers["ETag"] = compute_etag(item)
+    return item
 
 
 @router.patch(
@@ -130,13 +149,27 @@ def get_sesi(
     summary="Ubah sesi partisipasi (tim-kajian)",
     operation_id="redesain_sesi_update",
     dependencies=_WRITE,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND, **_CONFLICT, **_INVALID},
+    responses={
+        **PRECONDITION_RESPONSES,
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOTFOUND,
+        **_CONFLICT,
+        **_INVALID,
+    },
 )
 def update_sesi(
     sesi_id: str,
     data: SesiUpdate,
     service: Annotated[SesiService, Depends(get_sesi_service)],
     pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> SesiRead:
     """Ubah parsial; `masalah_ids` yang dikirim mengganti seluruh tautan masalah."""
-    return service.update(sesi_id, data, pelaku_kode_orang=pelaku)
+    check_if_match(service.get(sesi_id), if_match, settings.require_if_match)
+    item = service.update(sesi_id, data, pelaku_kode_orang=pelaku)
+    response.headers["ETag"] = compute_etag(item)
+    return item

@@ -290,6 +290,17 @@ class SqlProsesService:
         )
         return read
 
+    def get_langkah(self, langkah_id: str) -> LangkahRead:
+        """Ambil satu langkah.
+
+        Raises:
+            NotFoundError: langkah tidak ada.
+        """
+        rec = self._s.get(RedesainLangkahModel, langkah_id)
+        if rec is None:
+            raise NotFoundError(f"Langkah '{langkah_id}' tidak ditemukan.")
+        return self._langkah_to_read(rec)
+
     def update_langkah(
         self, langkah_id: str, data: LangkahUpdate, *, pelaku_kode_orang: str | None
     ) -> LangkahRead:
