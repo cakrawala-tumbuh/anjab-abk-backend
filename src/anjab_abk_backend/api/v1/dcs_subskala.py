@@ -34,6 +34,12 @@ _AUTH = {
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 
 
+_HAS_RESPONSES = {
+    "model": ErrorResponse,
+    "description": "Instrumen sudah berisi jawaban (`instrument_has_responses`).",
+}
+
+
 @router.get(
     "",
     response_model=list[DcsSubSkalaRead],
@@ -85,7 +91,7 @@ def list_items_by_sub_skala(
     summary="Ubah satu item DCS (admin)",
     operation_id="dcs_item_update",
     dependencies=[Depends(require_admin)],
-    responses={**_AUTH, **_ITEM_NOT_FOUND},
+    responses={**_AUTH, **_ITEM_NOT_FOUND, 409: _HAS_RESPONSES},
 )
 def update_item(
     item_id: Annotated[str, Path(description="Kode item orisinal, mis. D1a.")],
@@ -104,6 +110,7 @@ def update_item(
     responses={
         **_AUTH,
         **_ITEM_NOT_FOUND,
+        409: _HAS_RESPONSES,
         422: {
             "model": ErrorResponse,
             "description": "Instrumen tidak OPEN, atau item terakhir sub-skala.",

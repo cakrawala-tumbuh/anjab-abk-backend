@@ -16,7 +16,7 @@ INSTRUMEN_ID = "dcs"
 _VALID_TRANSITIONS: dict[StatusInstrumenDcs, set[StatusInstrumenDcs]] = {
     "OPEN": {"CLOSED"},
     "CLOSED": {"OPEN", "ANALYZED"},
-    "ANALYZED": set(),
+    "ANALYZED": {"OPEN"},
 }
 
 _ERR_MISSING_ROW = (

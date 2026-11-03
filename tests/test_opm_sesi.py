@@ -775,3 +775,27 @@ def test_opm_task_bukan_responden_403(
     as_luar = client_as("opm-guard-task-luar")
     r = as_luar.get(f"{BASE}/{sesi['id']}/task")
     assert r.status_code == 403
+
+
+def test_purge_katalog_ditolak_409_bila_masih_ada_sesi_opm(
+    client: TestClient, jabatan_id_tk: str
+) -> None:
+    """Sesi OPM menyimpan snapshot katalog: purge ditolak walau sesi TI sudah tak ada."""
+    catalog_purge = "/api/v1/task-inventory/catalog/purge"
+    ctx = _setup_jabatan_panel_ti(client, jabatan_id_tk)
+    r = client.post(BASE, json=_payload(ctx["jabatan_id"], ctx["ti_sesi_id"]))
+    assert r.status_code == 201, r.text
+    opm_id = r.json()["id"]
+    # Hapus sesi TI (opm_sesi.ti_sesi_id bukan FK) agar yang tersisa hanya sesi OPM.
+    rd = client.delete(f"/api/v1/task-inventory/sesi/{ctx['ti_sesi_id']}", params={"paksa": True})
+    assert rd.status_code == 204, rd.text
+
+    r1 = client.post(catalog_purge)
+    assert r1.status_code == 409
+    assert r1.json()["error"] == "catalog_in_use"
+    assert "1 sesi OPM" in r1.json()["message"]
+
+    # Tanpa sesi apa pun → purge sukses.
+    assert client.delete(f"{BASE}/{opm_id}", params={"paksa": True}).status_code == 204
+    r2 = client.post(catalog_purge)
+    assert r2.status_code == 200, r2.text

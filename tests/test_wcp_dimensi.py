@@ -189,16 +189,40 @@ def test_delete_last_item_dimensi_ditolak(client: TestClient) -> None:
     assert r.status_code == 422
 
 
-def test_delete_item_membersihkan_jawaban_yatim(client: TestClient, partisipan_factory) -> None:
-    par_id = partisipan_factory("wcp-del-jwb")
+def _isi_satu_jawaban(client: TestClient, partisipan_factory, slug: str) -> str:
+    par_id = partisipan_factory(slug)
     rsp = client.post(RSP_BASE, json={"partisipan_ids": [par_id]}).json()["created"][0]
-    client.put(
+    r = client.put(
         f"{RSP_BASE}/{rsp['id']}/jawaban",
         json={"jawaban": [{"item_id": "SC1a", "skor_raw": 4}]},
     )
-    assert any(j["item_id"] == "SC1a" for j in client.get(f"{RSP_BASE}/{rsp['id']}/jawaban").json())
+    assert r.status_code == 200, r.text
+    return rsp["id"]
 
-    assert client.delete(f"{BASE}/items/SC1a").status_code == 204
 
-    sisa = client.get(f"{RSP_BASE}/{rsp['id']}/jawaban").json()
-    assert all(j["item_id"] != "SC1a" for j in sisa)
+def test_delete_item_ditolak_409_bila_instrumen_berisi_jawaban(
+    client: TestClient, partisipan_factory
+) -> None:
+    rsp_id = _isi_satu_jawaban(client, partisipan_factory, "wcp-del-jwb")
+
+    r = client.delete(f"{BASE}/items/SC1a")
+    assert r.status_code == 409
+    assert r.json()["error"] == "instrument_has_responses"
+    assert "1 responden" in r.json()["message"]
+    # Item & jawaban tidak berubah.
+    assert any(i["item_id"] == "SC1a" for i in client.get(f"{BASE}/SC/items").json())
+    jwb = client.get(f"{RSP_BASE}/{rsp_id}/jawaban").json()
+    assert any(j["item_id"] == "SC1a" for j in jwb)
+
+
+def test_patch_item_ditolak_409_bila_instrumen_berisi_jawaban(
+    client: TestClient, partisipan_factory
+) -> None:
+    _isi_satu_jawaban(client, partisipan_factory, "wcp-del-jwb-patch")
+    sebelum = {i["item_id"]: i for i in client.get(f"{BASE}/SC/items").json()}["SC1a"]
+
+    r = client.patch(f"{BASE}/items/SC1a", json={"pernyataan": "Teks baru."})
+    assert r.status_code == 409
+    assert r.json()["error"] == "instrument_has_responses"
+    sesudah = {i["item_id"]: i for i in client.get(f"{BASE}/SC/items").json()}["SC1a"]
+    assert sesudah["pernyataan"] == sebelum["pernyataan"]

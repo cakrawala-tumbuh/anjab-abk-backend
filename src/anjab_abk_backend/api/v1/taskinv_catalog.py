@@ -14,6 +14,7 @@ from ...dependencies import (
     SessionDep,
     get_detil_tugas_service,
     get_jabatan_service,
+    get_opm_sesi_service,
     get_ti_catalog_service,
     get_ti_sesi_service,
     get_tugas_pokok_service,
@@ -22,6 +23,7 @@ from ...dependencies import (
     rate_limit,
     require_admin,
 )
+from ...opm.services.sesi import OpmSesiService
 from ...schemas.common import ErrorResponse, Page
 from ...security import Principal
 from ...taskinv.schemas.catalog import (
@@ -108,15 +110,19 @@ def list_catalog(
         **_AUTH,
         **_RATE,
         **_FORBIDDEN,
-        409: {"model": ErrorResponse, "description": "Masih ada sesi Task Inventory aktif."},
+        409: {
+            "model": ErrorResponse,
+            "description": "Katalog masih dipakai sesi TI/OPM (`catalog_in_use`).",
+        },
     },
 )
 def purge_catalog_endpoint(
     session: SessionDep,
     sesi_svc: Annotated[TiSesiService, Depends(get_ti_sesi_service)],
+    opm_sesi_svc: Annotated[OpmSesiService, Depends(get_opm_sesi_service)],
     principal: Annotated[Principal, Depends(require_admin)],
 ) -> TiCatalogPurgeResult:
-    guard_no_active_sesi(sesi_svc)
+    guard_no_active_sesi(sesi_svc, opm_sesi_svc)
     logger.warning("catalog_purge", extra={"modul": "taskinv", "actor": principal.subject})
     return TiCatalogPurgeResult(deleted=TiCatalogPurgeCounts(**purge_catalog(session)))
 

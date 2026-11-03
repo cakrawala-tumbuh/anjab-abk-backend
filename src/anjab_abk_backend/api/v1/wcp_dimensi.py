@@ -34,6 +34,12 @@ _AUTH = {
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 
 
+_HAS_RESPONSES = {
+    "model": ErrorResponse,
+    "description": "Instrumen sudah berisi jawaban (`instrument_has_responses`).",
+}
+
+
 @router.get(
     "",
     response_model=list[WcpDimensiRead],
@@ -85,7 +91,7 @@ def list_items_by_dimensi(
     summary="Ubah satu item WCP (admin)",
     operation_id="wcp_item_update",
     dependencies=[Depends(require_admin)],
-    responses={**_AUTH, **_ITEM_NOT_FOUND},
+    responses={**_AUTH, **_ITEM_NOT_FOUND, 409: _HAS_RESPONSES},
 )
 def update_item(
     item_id: Annotated[str, Path(description="Kode item orisinal, mis. SC1a.")],
@@ -104,6 +110,7 @@ def update_item(
     responses={
         **_AUTH,
         **_ITEM_NOT_FOUND,
+        409: _HAS_RESPONSES,
         422: {
             "model": ErrorResponse,
             "description": "Instrumen tidak OPEN, atau item terakhir dimensi.",

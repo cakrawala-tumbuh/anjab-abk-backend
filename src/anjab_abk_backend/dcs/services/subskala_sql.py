@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ...errors import NotFoundError, ValidationAppError
+from ...instrumen_guard import guard_tanpa_jawaban
 from ...models import DcsItemModel, DcsJawabanModel, DcsSubSkalaModel
 from ..schemas.subskala import (
     DcsItemRead,
@@ -78,6 +79,7 @@ class SqlDcsSubSkalaService:
 
     def update_item(self, item_id: str, data: DcsItemUpdate) -> DcsItemRead:
         rec = self._get_item_model(item_id)
+        guard_tanpa_jawaban(self._s, DcsJawabanModel, "ubah item")
         patch = data.model_dump(exclude_unset=True)
         if "pernyataan" in patch:
             rec.pernyataan = patch["pernyataan"]
@@ -90,6 +92,7 @@ class SqlDcsSubSkalaService:
 
     def delete_item(self, item_id: str) -> None:
         rec = self._get_item_model(item_id)
+        guard_tanpa_jawaban(self._s, DcsJawabanModel, "hapus item")
         sisa = self._s.scalar(
             select(func.count())
             .select_from(DcsItemModel)
@@ -100,10 +103,5 @@ class SqlDcsSubSkalaService:
                 f"Tidak dapat menghapus item terakhir sub-skala '{rec.subskala_kode}';"
                 f" sub-skala harus punya minimal 1 item."
             )
-        # Jawaban DCS mereferensikan item lewat `item_id` teks (bukan FK) — tidak ada
-        # cascade DB, jadi hapus jawaban yatim untuk item ini secara eksplisit.
-        self._s.query(DcsJawabanModel).filter(DcsJawabanModel.item_id == item_id).delete(
-            synchronize_session=False
-        )
         self._s.delete(rec)
         self._s.flush()

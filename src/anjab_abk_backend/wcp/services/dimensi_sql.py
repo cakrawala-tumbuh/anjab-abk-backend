@@ -15,6 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ...errors import NotFoundError, ValidationAppError
+from ...instrumen_guard import guard_tanpa_jawaban
 from ...models import WcpDimensiModel, WcpItemModel, WcpJawabanModel
 from ..schemas.dimensi import (
     WcpDimensiRead,
@@ -84,6 +85,7 @@ class SqlWcpDimensiService:
         rec = self._s.scalar(select(WcpItemModel).where(WcpItemModel.item_id == item_id))
         if rec is None:
             raise NotFoundError(f"Item WCP '{item_id}' tidak ditemukan.")
+        guard_tanpa_jawaban(self._s, WcpJawabanModel, "ubah item")
         patch = data.model_dump(exclude_unset=True)
         if "pernyataan" in patch:
             rec.pernyataan = patch["pernyataan"]
@@ -98,6 +100,7 @@ class SqlWcpDimensiService:
         rec = self._s.scalar(select(WcpItemModel).where(WcpItemModel.item_id == item_id))
         if rec is None:
             raise NotFoundError(f"Item WCP '{item_id}' tidak ditemukan.")
+        guard_tanpa_jawaban(self._s, WcpJawabanModel, "hapus item")
         sisa = self._s.scalar(
             select(func.count())
             .select_from(WcpItemModel)
@@ -108,10 +111,5 @@ class SqlWcpDimensiService:
                 f"Tidak dapat menghapus item terakhir dimensi '{rec.dimensi_kode}';"
                 f" dimensi harus punya minimal 1 item."
             )
-        # Jawaban WCP mereferensikan item lewat `item_id` teks (bukan FK) — tidak ada
-        # cascade DB, jadi hapus jawaban yatim untuk item ini secara eksplisit.
-        self._s.query(WcpJawabanModel).filter(WcpJawabanModel.item_id == item_id).delete(
-            synchronize_session=False
-        )
         self._s.delete(rec)
         self._s.flush()

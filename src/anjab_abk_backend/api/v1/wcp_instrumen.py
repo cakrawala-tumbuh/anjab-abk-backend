@@ -31,6 +31,12 @@ _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan
 _TRANSISI_INVALID = {422: {"model": ErrorResponse, "description": "Transisi status tidak valid."}}
 
 
+_HAS_RESPONSES = {
+    "model": ErrorResponse,
+    "description": "Instrumen sudah berisi jawaban (`instrument_has_responses`).",
+}
+
+
 @router.get(
     "",
     response_model=WcpInstrumenRead,
@@ -77,7 +83,7 @@ def tutup_instrumen(
 @router.post(
     "/buka-ulang",
     response_model=WcpInstrumenRead,
-    summary="Buka ulang instrumen WCP (CLOSED → OPEN)",
+    summary="Buka ulang instrumen WCP (CLOSED/ANALYZED → OPEN)",
     operation_id="wcp_instrumen_buka_ulang",
     dependencies=_WRITE_GUARDS,
     responses={**_AUTH, **_RATE, **_TRANSISI_INVALID},
@@ -91,17 +97,18 @@ def buka_ulang_instrumen(
 @router.post(
     "/reset",
     response_model=WcpInstrumenRead,
-    summary="Reset instrumen WCP (admin): hapus SEMUA responden & jawaban, buka kembali (OPEN)",
+    summary="Reset instrumen WCP (admin): hanya bila belum ada jawaban",
     operation_id="wcp_instrumen_reset",
     dependencies=_ADMIN_GUARDS,
-    responses={**_AUTH, **_RATE, **_FORBIDDEN},
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, 409: _HAS_RESPONSES},
 )
 def reset_instrumen(
     principal: Annotated[Principal, Depends(require_admin)],
     service: Annotated[WcpInstrumenService, Depends(get_wcp_instrumen_service)],
 ) -> WcpInstrumenRead:
-    """DESTRUKTIF: menghapus seluruh responden WCP (jawaban ikut lewat CASCADE) dan
-    mengembalikan instrumen ke OPEN — sah dipanggil dari status APA PUN (idempoten),
-    beda dari `/buka-ulang` yang hanya sah dari CLOSED dan tidak menghapus data."""
+    """Hapus responden WCP dan kembalikan instrumen ke OPEN, HANYA bila instrumen belum
+    berisi jawaban sama sekali; bila sudah ada jawaban (draft/submit) → 409
+    `instrument_has_responses`. Untuk membuka instrumen ANALYZED tanpa menghapus data,
+    pakai `/buka-ulang`."""
     logger.warning("instrumen_reset", extra={"modul": "wcp", "actor": principal.subject})
     return service.reset()

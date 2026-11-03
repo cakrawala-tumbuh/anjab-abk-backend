@@ -68,6 +68,18 @@ class ConflictError(AppError):
     error_code = "conflict"
 
 
+class InstrumenBerisiJawabanError(ConflictError):
+    """409: instrumen WCP/DCS sudah berisi jawaban sehingga reset/ubah/hapus item ditolak."""
+
+    error_code = "instrument_has_responses"
+
+
+class CatalogInUseError(ConflictError):
+    """409: katalog Task Inventory masih dipakai sesi TI/OPM sehingga purge ditolak."""
+
+    error_code = "catalog_in_use"
+
+
 class ValidationAppError(AppError):
     status_code = 422
     error_code = "validation_error"

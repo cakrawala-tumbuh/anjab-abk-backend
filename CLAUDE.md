@@ -82,6 +82,29 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-03] WCP/DCS/TI: tolak hapus/ubah bila sudah ada jawaban (A27 minimum)
+
+Backlog `#71` (paket R1.1 melarang menimpa respons atau menghapus item yang pernah
+diadministrasikan). **Dipilih TOLAK, bukan arsip berversi** — penolakan reversibel dan tanpa
+migrasi; arsip berversi menuntut model versi item/form yang menunggu keputusan metode
+(A27 penuh). **Mengubah invarian entri `[2026-07-15]` di bawah**: `reset` tidak lagi sah
+"dari status APA PUN" dan bukan lagi satu-satunya jalan keluar `ANALYZED`.
+
+- **"Instrumen berisi jawaban"** = ada >= 1 baris `{wcp,dcs}_jawaban` (draft maupun submit).
+  Guard `instrumen_guard.guard_tanpa_jawaban()` dipanggil di service SQL, satu transaksi
+  dengan operasinya: `reset()`, `update_item()`, `delete_item()` (WCP & DCS) →
+  `InstrumenBerisiJawabanError` (409, `error_code="instrument_has_responses"`, pesan memuat
+  jumlah responden berjawaban). Urutan: 404 item dulu, lalu 409, baru 422 (item terakhir).
+  Instrumen tanpa jawaban berperilaku seperti sebelumnya; pembersihan jawaban yatim di
+  `delete_item` dibuang karena tak lagi bisa terjadi.
+- **`buka-ulang` kini sah dari `ANALYZED`** (`_VALID_TRANSITIONS["ANALYZED"] = {"OPEN"}`):
+  non-destruktif; hasil analisis dihitung ulang saat `POST .../analisis` berikutnya.
+- **Purge katalog TI**: `guard_no_active_sesi(sesi_svc, opm_sesi_svc)` menolak
+  (`CatalogInUseError`, 409 `catalog_in_use`) bila ada sesi TI **atau** sesi OPM (status apa
+  pun); pesan menyebut kedua jumlah. `paksa=true` force-delete sesi tidak disentuh.
+- Tanpa migrasi; `openapi.json` bertambah respons 409 pada 7 operasi. Web app
+  (`anjab-abk-web-app#82`) dan MCP (`anjab-abk-mcp#20`) menyusul.
+
 ### [2026-08-07] OPM: terima draft rating parsial; kelengkapan tiga dimensi digerbang saat submit
 
 Backlog `#39`. `OpmJawabanItem` mewajibkan ketiga dimensi (`importance`/`frequency`/

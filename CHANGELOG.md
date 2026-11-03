@@ -7,6 +7,15 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diubah
+
+- **Jawaban tersimpan tidak bisa lagi dihapus/ditimpa** (backlog #71, A27 minimum): `POST
+  /api/v1/{wcp,dcs}/instrumen/reset`, `PATCH` dan `DELETE .../items/{item_id}` kini ditolak 409
+  `instrument_has_responses` bila instrumen sudah berisi >= 1 jawaban (draft maupun submit);
+  `POST /api/v1/task-inventory/catalog/purge` ditolak 409 `catalog_in_use` bila masih ada sesi TI
+  atau sesi OPM. `POST .../instrumen/buka-ulang` kini juga sah dari `ANALYZED` (non-destruktif,
+  jawaban tetap utuh). Tanpa migrasi.
+
 ### Ditambahkan
 
 - **Register pengecualian TI-OPM** (backlog #69): tabel `opm_sesi_pengecualian` (migrasi

@@ -9,12 +9,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypedDict
 
-from ...errors import ConflictError
+from ...errors import CatalogInUseError
 from ...models import TiDetilTugasModel, TiTugasPokokModel, TiUraianTugasModel
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
+    from ...opm.services.sesi import OpmSesiService
     from .sesi import TiSesiService
 
 
@@ -26,14 +27,26 @@ class PurgeSummary(TypedDict):
     tugas_pokok: int
 
 
-def guard_no_active_sesi(sesi_svc: TiSesiService) -> None:
-    """Hard block: `ConflictError` bila ada >=1 sesi Task Inventory (status apa pun)."""
-    _, total = sesi_svc.search(domain=[], order=[], limit=1, offset=0)
-    if total > 0:
-        raise ConflictError(
-            f"Tidak dapat purge katalog: masih ada {total} sesi Task Inventory. "
-            "Pastikan tidak ada sesi (status apa pun) sebelum purge — ti_seleksi/"
-            "ti_tahap2/ti_detail merujuk katalog lewat task_kode, bukan FK."
+def guard_no_active_sesi(sesi_svc: TiSesiService, opm_sesi_svc: OpmSesiService) -> None:
+    """Hard block: `CatalogInUseError` (409 `catalog_in_use`) bila katalog masih dipakai.
+
+    Katalog dianggap dipakai bila ada >= 1 sesi Task Inventory ATAU >= 1 sesi OPM
+    (status apa pun): `ti_seleksi`/`ti_tahap2`/`ti_detail` merujuk katalog lewat
+    `task_kode`, dan sesi OPM menyimpan snapshot task dari katalog.
+
+    Args:
+        sesi_svc: Service sesi Task Inventory (hanya dibaca jumlahnya).
+        opm_sesi_svc: Service sesi OPM (hanya dibaca jumlahnya).
+
+    Raises:
+        CatalogInUseError: Bila ada sesi TI atau OPM; pesan menyebut kedua jumlah.
+    """
+    _, n_ti = sesi_svc.search(domain=[], order=[], limit=1, offset=0)
+    _, n_opm = opm_sesi_svc.search(domain=[], order=[], limit=1, offset=0)
+    if n_ti > 0 or n_opm > 0:
+        raise CatalogInUseError(
+            f"Tidak dapat purge katalog: masih dipakai {n_ti} sesi Task Inventory "
+            f"dan {n_opm} sesi OPM. Hapus seluruh sesi (status apa pun) sebelum purge."
         )
 
 

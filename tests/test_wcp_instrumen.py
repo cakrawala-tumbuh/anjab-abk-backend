@@ -91,25 +91,49 @@ def _submit_satu_responden(client: TestClient, partisipan_factory, slug: str) ->
     return rsp_id
 
 
-def test_reset_dari_analyzed_kembali_open_dan_responden_kosong(
+def test_reset_ditolak_409_bila_berisi_jawaban_submit(
     client: TestClient, partisipan_factory
 ) -> None:
     client.patch(BASE, json={"min_responden": 1})
-    _submit_satu_responden(client, partisipan_factory, "wcp-reset-analyzed")
-    client.post(f"{BASE}/tutup")
-    r_analisis = client.post("/api/v1/wcp/analisis")
-    assert r_analisis.status_code == 200
-    assert client.get(BASE).json()["status"] == "ANALYZED"
+    _submit_satu_responden(client, partisipan_factory, "wcp-reset-submit")
+
+    r = client.post(f"{BASE}/reset")
+    assert r.status_code == 409
+    assert r.json()["error"] == "instrument_has_responses"
+    assert "1 responden" in r.json()["message"]
+    assert len(client.get("/api/v1/wcp/responden").json()["items"]) == 1
+
+
+def test_reset_ditolak_409_bila_berisi_jawaban_draft(
+    client: TestClient, partisipan_factory
+) -> None:
+    par_id = partisipan_factory("wcp-reset-draft")
+    rsp_id = client.post("/api/v1/wcp/responden", json={"partisipan_ids": [par_id]}).json()[
+        "created"
+    ][0]["id"]
+    item_id = client.get("/api/v1/wcp/dimensi/SC/items").json()[0]["item_id"]
+    r0 = client.put(
+        f"/api/v1/wcp/responden/{rsp_id}/jawaban",
+        json={"jawaban": [{"item_id": item_id, "skor_raw": 3}]},
+    )
+    assert r0.status_code == 200, r0.text
+
+    r = client.post(f"{BASE}/reset")
+    assert r.status_code == 409
+    assert len(client.get("/api/v1/wcp/responden").json()["items"]) == 1
+    assert len(client.get(f"/api/v1/wcp/responden/{rsp_id}/jawaban").json()) == 1
+
+
+def test_reset_tanpa_jawaban_sukses_walau_ada_responden_kosong(
+    client: TestClient, partisipan_factory
+) -> None:
+    par_id = partisipan_factory("wcp-reset-kosong")
+    client.post("/api/v1/wcp/responden", json={"partisipan_ids": [par_id]})
 
     r = client.post(f"{BASE}/reset")
     assert r.status_code == 200
-    data = r.json()
-    assert data["status"] == "OPEN"
-    assert data["closed_at"] is None
-
-    r_rsp = client.get("/api/v1/wcp/responden")
-    assert r_rsp.status_code == 200
-    assert r_rsp.json()["items"] == []
+    assert r.json()["status"] == "OPEN"
+    assert client.get("/api/v1/wcp/responden").json()["items"] == []
 
 
 def test_reset_idempoten_dari_open(client: TestClient) -> None:
@@ -129,16 +153,24 @@ def test_reset_requires_auth(anon_client: TestClient) -> None:
     assert r.status_code == 401
 
 
-def test_buka_ulang_biasa_tetap_ditolak_dari_analyzed(
+def test_buka_ulang_dari_analyzed_kembali_open_jawaban_utuh(
     client: TestClient, partisipan_factory
 ) -> None:
-    """`reset` != `buka-ulang`: buka-ulang biasa tetap 422 dari ANALYZED, hanya
-    `reset` yang menjadi jalur keluar sah dari status terminal ini."""
     client.patch(BASE, json={"min_responden": 1})
-    _submit_satu_responden(client, partisipan_factory, "wcp-reset-vs-bukaulang")
+    rsp_id = _submit_satu_responden(client, partisipan_factory, "wcp-bukaulang-analyzed")
+    submitted_at = client.get(f"/api/v1/wcp/responden/{rsp_id}").json()["submitted_at"]
     client.post(f"{BASE}/tutup")
-    client.post("/api/v1/wcp/analisis")
+    assert client.post("/api/v1/wcp/analisis").status_code == 200
     assert client.get(BASE).json()["status"] == "ANALYZED"
 
     r = client.post(f"{BASE}/buka-ulang")
-    assert r.status_code == 422
+    assert r.status_code == 200
+    assert r.json()["status"] == "OPEN"
+
+    rsp = client.get(f"/api/v1/wcp/responden/{rsp_id}").json()
+    assert rsp["submitted_at"] == submitted_at
+    assert len(client.get(f"/api/v1/wcp/responden/{rsp_id}/jawaban").json()) > 0
+
+    # Analisis ulang setelah tutup tetap sukses.
+    client.post(f"{BASE}/tutup")
+    assert client.post("/api/v1/wcp/analisis").status_code == 200

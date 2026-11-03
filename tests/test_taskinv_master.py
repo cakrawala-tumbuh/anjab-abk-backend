@@ -791,6 +791,7 @@ def test_purge_blocked_when_sesi_exists(client: TestClient) -> None:
 
     r2 = client.post(f"{CATALOG_BASE}/purge")
     assert r2.status_code == 409
+    assert r2.json()["error"] == "catalog_in_use"
 
 
 def test_purge_reseed_round_trip(client: TestClient) -> None:

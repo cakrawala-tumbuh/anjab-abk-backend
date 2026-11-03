@@ -12,7 +12,8 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from ...errors import AppError, ValidationAppError
-from ...models import DcsInstrumenModel, DcsRespondenModel
+from ...instrumen_guard import guard_tanpa_jawaban
+from ...models import DcsInstrumenModel, DcsJawabanModel, DcsRespondenModel
 from ..schemas.instrumen import DcsInstrumenRead, DcsInstrumenUpdate, StatusInstrumenDcs
 
 # Sumber tunggal id singleton & state machine.
@@ -77,6 +78,11 @@ class SqlDcsInstrumenService:
         return self._transition("CLOSED")
 
     def buka_ulang(self) -> DcsInstrumenRead:
+        """Buka kembali instrumen `CLOSED` atau `ANALYZED` ke `OPEN` (non-destruktif).
+
+        Responden, jawaban, dan status submit tetap utuh; hasil analisis dihitung
+        ulang saat `analisis` berikutnya dijalankan.
+        """
         return self._transition("OPEN")
 
     def set_analyzed(self) -> DcsInstrumenRead:
@@ -86,15 +92,20 @@ class SqlDcsInstrumenService:
         """Hapus SEMUA responden DCS (jawaban ikut lewat `ON DELETE CASCADE`) dan
         kembalikan instrumen ke `OPEN`, `closed_at=NULL` — dalam satu transaksi.
 
-        Melewati `_VALID_TRANSITIONS`: berbeda dari `buka_ulang()` (hanya sah dari
-        `CLOSED`), `reset()` sengaja sah dipanggil dari status APA PUN (idempoten) —
-        ini satu-satunya jalur resmi keluar dari `ANALYZED` (terminal untuk
-        `buka_ulang()`/`_transition`). Bulk-delete lewat `Query.delete()` meniru pola
-        `purge_catalog()` (`taskinv/services/catalog_admin.py`) — operasi admin bulk
-        lintas-baris dalam satu domain, bukan lewat `RespondenService` per-baris
-        (yang menolak baris `sudah_submit`).
+        DITOLAK (409 `instrument_has_responses`) bila instrumen sudah berisi >= 1
+        jawaban (draft maupun submit) — jalan keluar dari `ANALYZED` kini
+        `buka_ulang()` yang non-destruktif. Hanya instrumen tanpa jawaban yang
+        bisa di-reset.
+
+        Melewati `_VALID_TRANSITIONS`: `reset()` sah dipanggil dari status APA PUN
+        selama instrumen belum berisi jawaban (idempoten). Bulk-delete lewat
+        `Query.delete()` meniru pola `purge_catalog()`
+        (`taskinv/services/catalog_admin.py`) — operasi admin bulk lintas-baris
+        dalam satu domain, bukan lewat `RespondenService` per-baris (yang menolak
+        baris `sudah_submit`).
         """
         rec = self._get_model()
+        guard_tanpa_jawaban(self._s, DcsJawabanModel, "reset")
         self._s.query(DcsRespondenModel).delete()
         rec.status = "OPEN"
         rec.closed_at = None
