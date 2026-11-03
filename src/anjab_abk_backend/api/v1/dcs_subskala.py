@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, Response, status
 
+from ...config import Settings, get_settings
 from ...dcs.schemas.subskala import (
     DcsItemRead,
     DcsItemUpdate,
@@ -21,7 +22,9 @@ from ...dependencies import (
     require_admin,
 )
 from ...errors import ValidationAppError
+from ...etag import check_if_match, compute_etag
 from ...schemas.common import ErrorResponse
+from ..concurrency import PRECONDITION_RESPONSES, IfMatchHeader
 
 router = APIRouter()
 
@@ -85,20 +88,44 @@ def list_items_by_sub_skala(
     return sk.items
 
 
+@router.get(
+    "/items/{item_id}",
+    response_model=DcsItemRead,
+    summary="Ambil satu item Dcs (membawa header ETag)",
+    operation_id="dcs_item_get",
+    dependencies=READ_GUARDS,
+    responses={**_AUTH, **_RATE, **_ITEM_NOT_FOUND},
+)
+def get_item(
+    item_id: Annotated[str, Path(description="Kode item orisinal.")],
+    service: Annotated[DcsSubSkalaService, Depends(get_dcs_subskala_service)],
+    response: Response,
+) -> DcsItemRead:
+    item = service.get_item_by_item_id(item_id)
+    response.headers["ETag"] = compute_etag(item)
+    return item
+
+
 @router.patch(
     "/items/{item_id}",
     response_model=DcsItemRead,
     summary="Ubah satu item DCS (admin)",
     operation_id="dcs_item_update",
     dependencies=[Depends(require_admin)],
-    responses={**_AUTH, **_ITEM_NOT_FOUND, 409: _HAS_RESPONSES},
+    responses={**_AUTH, **_ITEM_NOT_FOUND, **PRECONDITION_RESPONSES, 409: _HAS_RESPONSES},
 )
 def update_item(
     item_id: Annotated[str, Path(description="Kode item orisinal, mis. D1a.")],
     payload: Annotated[DcsItemUpdate, Body()],
     service: Annotated[DcsSubSkalaService, Depends(get_dcs_subskala_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    response: Response,
+    if_match: IfMatchHeader = None,
 ) -> DcsItemRead:
-    return service.update_item(item_id, payload)
+    check_if_match(service.get_item_by_item_id(item_id), if_match, settings.require_if_match)
+    updated = service.update_item(item_id, payload)
+    response.headers["ETag"] = compute_etag(updated)
+    return updated
 
 
 @router.delete(
@@ -110,6 +137,7 @@ def update_item(
     responses={
         **_AUTH,
         **_ITEM_NOT_FOUND,
+        **PRECONDITION_RESPONSES,
         409: _HAS_RESPONSES,
         422: {
             "model": ErrorResponse,
@@ -121,6 +149,8 @@ def delete_item(
     item_id: Annotated[str, Path(description="Kode item orisinal, mis. D1a.")],
     service: Annotated[DcsSubSkalaService, Depends(get_dcs_subskala_service)],
     instrumen_service: Annotated[DcsInstrumenService, Depends(get_dcs_instrumen_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    if_match: IfMatchHeader = None,
 ) -> Response:
     # Hapus item master hanya sah saat pengumpulan data belum final (OPEN) — mencegah
     # katalog berubah di bawah analisis yang sudah/segera dijalankan (CLOSED/ANALYZED).
@@ -130,5 +160,6 @@ def delete_item(
             f"Item hanya dapat dihapus saat instrumen DCS berstatus OPEN"
             f" (saat ini: {instrumen.status})."
         )
+    check_if_match(service.get_item_by_item_id(item_id), if_match, settings.require_if_match)
     service.delete_item(item_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

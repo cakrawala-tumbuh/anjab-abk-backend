@@ -48,7 +48,13 @@ class DcsItemRead(BaseModel):
 
 
 class DcsItemUpdate(BaseModel):
-    """Field item DCS yang dapat diubah admin (partial; field kosong diabaikan)."""
+    """Field item DCS yang dapat diubah admin (partial; field kosong diabaikan).
+
+    Field asing ditolak (`extra="forbid"` → 422 `validation_error`) agar salah ketik tidak
+    diabaikan diam-diam.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     pernyataan: str | None = Field(
         default=None, min_length=1, max_length=500, description="Teks pernyataan baru."

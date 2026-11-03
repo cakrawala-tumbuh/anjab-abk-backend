@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Response
 
 from ...core.services.partisipan import PartisipanService
 from ...dcs.schemas.hasil import DcsHasilRead, DcsHasilRespondenRead
@@ -15,6 +15,7 @@ from ...dcs.services.responden import DcsRespondenService
 from ...dcs.services.subskala import DcsSubSkalaService
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     authorize_responden_access,
     get_current_principal,
     get_dcs_instrumen_service,
@@ -25,6 +26,7 @@ from ...dependencies import (
     get_wcp_dimensi_service,
     get_wcp_jawaban_service,
     get_wcp_responden_service,
+    idempotency,
     rate_limit,
 )
 from ...errors import ValidationAppError
@@ -42,6 +44,7 @@ from ...wcp.services.analisis import (
 from ...wcp.services.dimensi import WcpDimensiService
 from ...wcp.services.jawaban import WcpJawabanService
 from ...wcp.services.responden import WcpRespondenService
+from ..concurrency import IDEMPOTENCY_RESPONSES, run_idempotent
 
 router = APIRouter()
 
@@ -94,7 +97,7 @@ def _compute_wcp_risk_score(
     summary="Jalankan analisis DCS (CLOSED → ANALYZED)",
     operation_id="dcs_analisis",
     dependencies=_WRITE_GUARDS,
-    responses={**_AUTH, **_RATE},
+    responses={**_AUTH, **_RATE, **IDEMPOTENCY_RESPONSES},
 )
 def run_analisis(
     instrumen_service: Annotated[DcsInstrumenService, Depends(get_dcs_instrumen_service)],
@@ -104,34 +107,39 @@ def run_analisis(
     wcp_rsp_service: Annotated[WcpRespondenService, Depends(get_wcp_responden_service)],
     wcp_jwb_service: Annotated[WcpJawabanService, Depends(get_wcp_jawaban_service)],
     wcp_dim_service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
 ) -> DcsHasilRead:
-    instrumen = instrumen_service.get()
-    if instrumen.status not in ("CLOSED", "ANALYZED"):
-        raise ValidationAppError(
-            f"Analisis hanya dapat dijalankan saat instrumen berstatus CLOSED atau ANALYZED"
-            f" (saat ini: {instrumen.status})."
-        )
+    def _analisis() -> DcsHasilRead:
+        instrumen = instrumen_service.get()
+        if instrumen.status not in ("CLOSED", "ANALYZED"):
+            raise ValidationAppError(
+                f"Analisis hanya dapat dijalankan saat instrumen berstatus CLOSED atau ANALYZED"
+                f" (saat ini: {instrumen.status})."
+            )
 
-    responden_list, _ = rsp_service.list_all()
-    submitted = [r for r in responden_list if r.sudah_submit]
+        responden_list, _ = rsp_service.list_all()
+        submitted = [r for r in responden_list if r.sudah_submit]
 
-    if len(submitted) < instrumen.min_responden:
-        raise ValidationAppError(
-            f"Analisis membutuhkan minimal {instrumen.min_responden} responden yang sudah"
-            f" submit, baru ada {len(submitted)}."
-        )
+        if len(submitted) < instrumen.min_responden:
+            raise ValidationAppError(
+                f"Analisis membutuhkan minimal {instrumen.min_responden} responden yang sudah"
+                f" submit, baru ada {len(submitted)}."
+            )
 
-    responden_raw: list[tuple[str, dict[str, int]]] = [
-        (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted
-    ]
+        responden_raw: list[tuple[str, dict[str, int]]] = [
+            (r.id, jwb_service.get_raw_by_responden(r.id)) for r in submitted
+        ]
 
-    wcp_catalog = _build_wcp_catalog(wcp_dim_service)
-    wcp_risk = _compute_wcp_risk_score(wcp_rsp_service, wcp_jwb_service, wcp_catalog)
+        wcp_catalog = _build_wcp_catalog(wcp_dim_service)
+        wcp_risk = _compute_wcp_risk_score(wcp_rsp_service, wcp_jwb_service, wcp_catalog)
 
-    if instrumen.status == "CLOSED":
-        instrumen_service.set_analyzed()
+        if instrumen.status == "CLOSED":
+            instrumen_service.set_analyzed()
 
-    return compute_hasil(responden_raw, wcp_risk, _build_dcs_catalog(sk_service))
+        return compute_hasil(responden_raw, wcp_risk, _build_dcs_catalog(sk_service))
+
+    return run_idempotent(idem, response, DcsHasilRead, _analisis)
 
 
 @router.get(

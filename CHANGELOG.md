@@ -9,6 +9,14 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Kunci optimistik & idempotensi rute tulis WCP/DCS** (backlog #73, A5): `PATCH` instrumen & item,
+  `PUT` jawaban draft, `DELETE` item & responden menerima `If-Match` (412 bila usang; 428 bila
+  `REQUIRE_IF_MATCH=true` dan header absen); `GET` instrumen, item (endpoint baru
+  `GET .../items/{item_id}`), responden, dan jawaban mengembalikan header `ETag`. `POST` assign
+  responden, submit jawaban, tutup, buka-ulang, analisis, dan reset menerima `Idempotency-Key`
+  (ulangan → 200 respons tersimpan; sedang diproses → 409). `WcpItemUpdate`/`DcsItemUpdate`
+  menolak field asing (422). Tanpa header, perilaku tidak berubah. Helper bersama:
+  `etag.check_if_match`, `api/concurrency.py` (`run_idempotent`).
 - **Integritas bank item WCP/DCS** (backlog #72, A8/A30): `WcpItemRead`/`DcsItemRead` bertambah
   `status_paket` (`SAMA` | `REDAKSI_BEDA` | `TIDAK_ADA_DI_PAKET` terhadap CSV paket R1.1) dan
   `kembar_dengan` (mis. `DCS:C8a`); `WcpInstrumenRead`/`DcsInstrumenRead` bertambah
