@@ -87,6 +87,12 @@ class Settings(BaseSettings):
     ai_refusal_fallback: bool = True
     """Aktifkan fallback server-side saat penolakan; env ``AI_REFUSAL_FALLBACK``."""
 
+    # Worker job AI (lihat ai/worker.py).
+    ai_worker_poll_detik: int = 5
+    """Jeda polling worker saat tidak ada job (detik); env ``AI_WORKER_POLL_DETIK``."""
+    ai_job_maks_percobaan: int = 3
+    """Total percobaan job sebelum ``MANUAL_REVIEW``; env ``AI_JOB_MAKS_PERCOBAAN``."""
+
     # Auth Authentik — parameter validasi token (seam; bukan koneksi ke IdP).
     # Diisi oleh skill backend-authentik-skill.
     authentik_issuer: str | None = None
