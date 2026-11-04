@@ -73,6 +73,20 @@ class Settings(BaseSettings):
     """``BLOKIR`` menolak masukan bila ada PII; ``SAMARKAN`` mengganti dengan penanda
     (kecuali nama murid/keluarga); env ``AI_PII_MODE``."""
 
+    # Klien model (lihat ai/klien.py). Kunci hanya ``ANTHROPIC_API_KEY`` (dibaca SDK).
+    ai_model: str = "claude-opus-5-5"
+    """Model yang diminta; env ``AI_MODEL``."""
+    ai_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
+    """Kedalaman berpikir; env ``AI_EFFORT``."""
+    ai_max_tokens: int = 16000
+    """Batas token keluaran; env ``AI_MAX_TOKENS``."""
+    ai_timeout_detik: int = 300
+    """Batas waktu permintaan (detik); env ``AI_TIMEOUT_DETIK``."""
+    ai_inference_geo: str = ""
+    """Lokasi pemrosesan; kosong = ``inference_geo`` tidak dikirim; env ``AI_INFERENCE_GEO``."""
+    ai_refusal_fallback: bool = True
+    """Aktifkan fallback server-side saat penolakan; env ``AI_REFUSAL_FALLBACK``."""
+
     # Auth Authentik — parameter validasi token (seam; bukan koneksi ke IdP).
     # Diisi oleh skill backend-authentik-skill.
     authentik_issuer: str | None = None
