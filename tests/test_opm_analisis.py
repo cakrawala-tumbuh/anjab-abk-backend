@@ -408,6 +408,45 @@ def test_compute_hasil_sesi_task_tanpa_rating_mean_dan_flag_none() -> None:
     assert t.orphan is True
 
 
+def _hasil_task(raws: list[tuple[int, int, int]]):
+    rr = [(f"r{i}", {"K001": v}) for i, v in enumerate(raws)]
+    return compute_hasil_sesi(_sesi_read(), [_task_read()], rr).tasks[0]
+
+
+def test_distribusi_n_ganjil_median_tengah_dan_spread_true() -> None:
+    t = _hasil_task([(1, 3, 3), (3, 3, 3), (3, 3, 3)])
+    assert (t.min_importance, t.median_importance, t.max_importance) == (1.0, 3.0, 3.0)
+    assert t.rating_spread is True
+    assert t.mean_importance == 2.33
+
+
+def test_distribusi_n_genap_median_rata_dua_tengah() -> None:
+    t = _hasil_task([(1, 3, 3), (2, 3, 3), (4, 3, 3), (5, 3, 3)])
+    assert t.median_importance == 3.0
+    t2 = _hasil_task([(3, 3, 3), (4, 3, 3)])
+    assert t2.median_importance == 3.5
+    assert t2.rating_spread is False
+
+
+def test_rating_spread_selisih_tepat_2_pada_satu_dimensi_true() -> None:
+    t = _hasil_task([(3, 3, 3), (3, 5, 3)])
+    assert (t.min_frequency, t.median_frequency, t.max_frequency) == (3.0, 4.0, 5.0)
+    assert t.rating_spread is True
+
+
+def test_rating_spread_selisih_1_false() -> None:
+    t = _hasil_task([(3, 4, 4), (4, 4, 4), (4, 4, 4)])
+    assert t.rating_spread is False
+
+
+def test_distribusi_n_nol_semua_null() -> None:
+    t = _hasil_task([])
+    for nama in ("importance", "frequency", "criticality"):
+        for st in ("min", "median", "max"):
+            assert getattr(t, f"{st}_{nama}") is None
+    assert t.rating_spread is None
+
+
 def test_pengecualian_sesi_tak_dikenal_404(client: TestClient) -> None:
     assert client.get(f"{SESI_BASE}/opses_tidak_ada/pengecualian").status_code == 404
 

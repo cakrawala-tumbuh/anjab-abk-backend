@@ -9,6 +9,7 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Distribusi rating OPM per task** (backlog #82, A29): `OpmHasilTaskRead` memuat `min_`/`median_`/`max_` untuk `importance`, `frequency`, `criticality` (`float | null`) dan `rating_spread` (`bool | null`, true bila max - min >= 2 pada minimal satu dimensi); semuanya `null` bila `n == 0`. `mean_*`, `sd_*`, dan flag esensial tidak berubah.
 - **Commit build pada `GET /api/v1/version`** (backlog #79): respons kini memuat `commit` (SHA build image, `unknown` bila dibangun di luar `release.yml`). `release.yml` meneruskan `GIT_COMMIT` lewat `build_args`; `Dockerfile` menyetel `APP_BUILD_COMMIT`.
 - **Kunci optimistik dan Idempotency-Key di rute tulis modul redesain** (backlog #77, A5):
   seluruh `PATCH` redesain (masalah, penilaian, bukti, alternatif, konteks, versi metode, cakupan

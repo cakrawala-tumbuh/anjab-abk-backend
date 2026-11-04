@@ -34,7 +34,10 @@ def compute_hasil_sesi(
 
     Task tanpa satu pun rating (``n == 0``) TIDAK diberi angka: seluruh ``mean_*`` dan
     kedua flag esensial bernilai ``None`` (bukan 0.0/False) agar kekosongan tidak terbaca
-    sebagai nilai (backlog ``#69``).
+    sebagai nilai (backlog ``#69``). Hal yang sama berlaku untuk ``min_*``/``median_*``/
+    ``max_*`` dan ``rating_spread`` (backlog ``#82``): ``rating_spread`` bernilai ``True``
+    bila ``max - min >= 2`` pada minimal satu dimensi, murni sinyal telaah yang tidak
+    memengaruhi mean, SD, maupun flag esensial.
 
     Args:
         sesi: Sesi OPM yang dianalisis.
@@ -64,6 +67,21 @@ def compute_hasil_sesi(
         sd_importance = round(statistics.stdev(importances), 2) if n >= 2 else None
         sd_frequency = round(statistics.stdev(frequencies), 2) if n >= 2 else None
         sd_criticality = round(statistics.stdev(criticalities), 2) if n >= 2 else None
+
+        sebaran: dict[str, float] = {}
+        rating_spread: bool | None = None
+        if n:
+            for nama, vals in (
+                ("importance", importances),
+                ("frequency", frequencies),
+                ("criticality", criticalities),
+            ):
+                sebaran[f"min_{nama}"] = float(min(vals))
+                sebaran[f"median_{nama}"] = float(statistics.median(vals))
+                sebaran[f"max_{nama}"] = float(max(vals))
+            rating_spread = any(
+                max(vals) - min(vals) >= 2 for vals in (importances, frequencies, criticalities)
+            )
 
         selection_essential: bool | None = None
         workload_essential: bool | None = None
@@ -96,6 +114,8 @@ def compute_hasil_sesi(
                 sd_importance=sd_importance,
                 sd_frequency=sd_frequency,
                 sd_criticality=sd_criticality,
+                rating_spread=rating_spread,
+                **sebaran,
                 selection_essential=selection_essential,
                 workload_essential=workload_essential,
                 prop_selection_essential=prop_selection_essential,

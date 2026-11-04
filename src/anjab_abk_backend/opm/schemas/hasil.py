@@ -35,6 +35,40 @@ class OpmHasilTaskRead(BaseModel):
     sd_criticality: float | None = Field(
         default=None, description="Standar deviasi criticality (None bila n < 2)."
     )
+    min_importance: float | None = Field(
+        default=None, description="Nilai minimum importance lintas responden (null bila n == 0)."
+    )
+    min_frequency: float | None = Field(
+        default=None, description="Nilai minimum frequency lintas responden (null bila n == 0)."
+    )
+    min_criticality: float | None = Field(
+        default=None, description="Nilai minimum criticality lintas responden (null bila n == 0)."
+    )
+    median_importance: float | None = Field(
+        default=None, description="Nilai median importance lintas responden (null bila n == 0)."
+    )
+    median_frequency: float | None = Field(
+        default=None, description="Nilai median frequency lintas responden (null bila n == 0)."
+    )
+    median_criticality: float | None = Field(
+        default=None, description="Nilai median criticality lintas responden (null bila n == 0)."
+    )
+    max_importance: float | None = Field(
+        default=None, description="Nilai maksimum importance lintas responden (null bila n == 0)."
+    )
+    max_frequency: float | None = Field(
+        default=None, description="Nilai maksimum frequency lintas responden (null bila n == 0)."
+    )
+    max_criticality: float | None = Field(
+        default=None, description="Nilai maksimum criticality lintas responden (null bila n == 0)."
+    )
+    rating_spread: bool | None = Field(
+        default=None,
+        description=(
+            "True bila selisih max - min >= 2 pada minimal satu dimensi; sinyal perlu telaah,"
+            " bukan bukti error, dan tidak memengaruhi flag lain (null bila n == 0)."
+        ),
+    )
     selection_essential: bool | None = Field(
         default=None,
         description="True bila mean_importance >= 4 atau mean_criticality >= 4 (null bila n == 0).",
