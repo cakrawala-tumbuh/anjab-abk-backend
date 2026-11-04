@@ -83,6 +83,8 @@ from .redesain.services.yayasan_sql import SqlRingkasanYayasanService
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
 from .services.ai_run import AiRunService
 from .services.ai_run_sql import SqlAiRunService
+from .services.ai_saklar import SaklarAiService
+from .services.ai_saklar_sql import SqlSaklarAiService
 from .services.async_job import AsyncJobService
 from .services.async_job_sql import SqlAsyncJobService
 from .services.authentik_provisioner import (
@@ -434,6 +436,13 @@ def get_ai_run_service(
 ) -> AiRunService:
     """SEAM: `AiRunService` PostgreSQL (register run AI; kebijakan simpan masukan dari settings)."""
     return SqlAiRunService(session, settings)
+
+
+def get_saklar_ai_service(
+    session: SessionDep, settings: Annotated[Settings, Depends(get_settings)]
+) -> SaklarAiService:
+    """SEAM: `SaklarAiService` PostgreSQL (kill switch layanan AI; flag env dari settings)."""
+    return SqlSaklarAiService(session, settings)
 
 
 def get_skema_db_service(session: SessionDep) -> SkemaDbService:

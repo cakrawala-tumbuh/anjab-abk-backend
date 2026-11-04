@@ -128,6 +128,20 @@ class AiRunModel(Base):
     selesai_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class AiSaklarEventModel(Base):
+    """Tabel `ai_saklar_event` — kill switch layanan AI, append-only (tak pernah diubah)."""
+
+    __tablename__ = "ai_saklar_event"
+    __table_args__ = (Index("ix_ai_saklar_event_layanan_created_at", "layanan", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    layanan: Mapped[str] = mapped_column(String(50), nullable=False)
+    aksi: Mapped[str] = mapped_column(String(10), nullable=False)
+    alasan: Mapped[str] = mapped_column(Text, nullable=False)
+    aktor: Mapped[str] = mapped_column(String(254), nullable=False)
+    created_at: Mapped[datetime] = _ts()
+
+
 # ======================================================================================
 # Core
 # ======================================================================================

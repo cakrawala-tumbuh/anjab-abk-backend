@@ -10,6 +10,8 @@ from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from .config import Settings, get_settings
 from .errors import ConflictError, ScoringNotApprovedError
@@ -18,6 +20,7 @@ from .schemas.common import FiturKode, FiturRead
 __all__ = [
     "FiturKode",
     "FiturNonaktifError",
+    "ai_boleh_jalan",
     "daftar_fitur",
     "fitur_aktif",
     "require_fitur",
@@ -99,3 +102,33 @@ def require_skor_disahkan(
             "Skor per responden belum dapat ditampilkan: kunci skor belum disahkan."
             " Jawaban raw tetap dapat dibaca lewat endpoint jawaban responden."
         )
+
+
+def ai_boleh_jalan(
+    session: Session,
+    settings: Settings | None = None,
+    layanan: FiturKode = FiturKode.AI_NARRATIVE_DRAFT,
+) -> bool:
+    """Putuskan apakah layanan AI boleh berjalan sekarang (``FAIL CLOSED``).
+
+    ``True`` hanya bila flag env ``layanan`` hidup **dan** event saklar terakhirnya bukan
+    ``MATIKAN``. Tanpa event berarti tidak dimatikan; flag env tetap gerbang utama.
+
+    Args:
+        session: Sesi basis data tempat event saklar dibaca.
+        settings: Settings yang dipakai; default singleton `get_settings()`.
+        layanan: Layanan yang diperiksa.
+
+    Returns:
+        ``False`` bila flag mati, saklar dimatikan, atau pembacaan basis data gagal.
+    """
+    if not fitur_aktif(layanan, settings):
+        return False
+    from .schemas.ai_saklar import AiSaklarAksi
+    from .services.ai_saklar_sql import event_terakhir
+
+    try:
+        ev = event_terakhir(session, layanan)
+    except SQLAlchemyError:
+        return False
+    return ev is None or ev.aksi != AiSaklarAksi.MATIKAN.value

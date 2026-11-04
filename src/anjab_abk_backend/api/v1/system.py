@@ -5,32 +5,46 @@ from __future__ import annotations
 import asyncio
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 
 from ... import __version__
 from ...config import Settings, get_settings
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     get_ai_run_service,
     get_async_job_service,
     get_current_principal,
     get_readiness_checks,
+    get_saklar_ai_service,
     get_skema_db_service,
+    idempotency,
     pagination_params,
     require_admin,
 )
 from ...errors import ServiceUnavailableError
 from ...fitur import daftar_fitur
 from ...schemas.ai_run import AiRunRead, StatusQaAi
+from ...schemas.ai_saklar import SaklarAiAlasan, SaklarAiRead
 from ...schemas.async_job import AsyncJobRead
-from ...schemas.common import ErrorDetail, ErrorResponse, FiturListRead, Health, Page, VersiRead
+from ...schemas.common import (
+    ErrorDetail,
+    ErrorResponse,
+    FiturKode,
+    FiturListRead,
+    Health,
+    Page,
+    VersiRead,
+)
 from ...schemas.skema_db import SkemaDbRead
 from ...security import Principal
 from ...services.ai_run import AiRunService
+from ...services.ai_saklar import SaklarAiService
 from ...services.async_job import AsyncJobService
 from ...services.readiness import ReadinessCheck
 from ...services.skema_db import SkemaDbService
+from ..concurrency import IDEMPOTENCY_RESPONSES, run_idempotent
 
 router = APIRouter()
 
@@ -190,3 +204,78 @@ def get_ai_run(
 ) -> AiRunRead:
     """Baca satu run AI (admin saja). ``masukan`` dan ``keluaran`` tidak pernah diekspos."""
     return service.get(run_id)
+
+
+_LAYANAN_SAKLAR = FiturKode.AI_NARRATIVE_DRAFT
+_RESP_SAKLAR_AKSI = {
+    **_RESP_ADMIN,
+    **IDEMPOTENCY_RESPONSES,
+    409: {"model": ErrorResponse, "description": "Aksi berulang atau Idempotency-Key diproses."},
+}
+
+
+@router.get(
+    "/system/ai/saklar",
+    response_model=SaklarAiRead,
+    summary="Status kill switch layanan AI",
+    tags=["system"],
+    operation_id="system_ai_saklar_get",
+    dependencies=[Depends(require_admin)],
+    responses=_RESP_ADMIN,
+)
+def get_saklar_ai(
+    service: Annotated[SaklarAiService, Depends(get_saklar_ai_service)],
+) -> SaklarAiRead:
+    """Status saklar: flag env, apakah dimatikan, dan event terakhir (admin saja)."""
+    return service.status(_LAYANAN_SAKLAR)
+
+
+@router.post(
+    "/system/ai/saklar/matikan",
+    response_model=SaklarAiRead,
+    summary="Matikan layanan AI seketika",
+    tags=["system"],
+    operation_id="system_ai_saklar_matikan",
+    dependencies=[Depends(require_admin)],
+    responses=_RESP_SAKLAR_AKSI,
+)
+def matikan_saklar_ai(
+    body: SaklarAiAlasan,
+    service: Annotated[SaklarAiService, Depends(get_saklar_ai_service)],
+    principal: Annotated[Principal, Depends(require_admin)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> SaklarAiRead:
+    """Catat event MATIKAN tanpa restart (admin saja). Aktor diambil dari token."""
+    return run_idempotent(
+        idem,
+        response,
+        SaklarAiRead,
+        lambda: service.matikan(_LAYANAN_SAKLAR, body.alasan, principal.subject),
+    )
+
+
+@router.post(
+    "/system/ai/saklar/hidupkan",
+    response_model=SaklarAiRead,
+    summary="Hidupkan kembali layanan AI",
+    tags=["system"],
+    operation_id="system_ai_saklar_hidupkan",
+    dependencies=[Depends(require_admin)],
+    responses=_RESP_SAKLAR_AKSI,
+)
+def hidupkan_saklar_ai(
+    body: SaklarAiAlasan,
+    service: Annotated[SaklarAiService, Depends(get_saklar_ai_service)],
+    principal: Annotated[Principal, Depends(require_admin)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> SaklarAiRead:
+    """Catat event HIDUPKAN (admin saja). Tidak menyalakan flag env: dengan flag mati
+    ``boleh_jalan`` tetap ``false``. Aktor diambil dari token."""
+    return run_idempotent(
+        idem,
+        response,
+        SaklarAiRead,
+        lambda: service.hidupkan(_LAYANAN_SAKLAR, body.alasan, principal.subject),
+    )
