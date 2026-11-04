@@ -18,3 +18,13 @@ jobs:
       # Docker sudah tersedia di runner ubuntu-latest.
       - name: Automated test (lint + unit) di Docker
         run: make test
+
+  # Image runtime linux/arm64 dibangun & diuji asap di runner ARM native (bukan QEMU).
+  arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Uji asap image arm64
+        run: make test-arm64

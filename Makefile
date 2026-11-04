@@ -16,7 +16,7 @@ COMPOSE_TEST = docker compose -f docker-compose.test.yml
 
 .DEFAULT_GOAL := test
 .PHONY: build lint unit test clean shell help \
-        migration backup restore backup-list
+        migration backup restore backup-list test-arm64
 
 ## help: tampilkan daftar target
 help:
@@ -39,6 +39,18 @@ unit: build
 
 ## test: gate lengkap = lint + unit. Dipakai LOKAL dan CI (identik).
 test: lint unit
+
+## test-arm64: bangun image runtime linux/arm64 lalu uji asap (aarch64, impor paket, pg_dump 16); BUKAN bagian `make test`
+ARM64_IMAGE ?= $(shell basename $(CURDIR))-arm64
+test-arm64:
+	docker buildx build --platform linux/arm64 --load -f Dockerfile -t $(ARM64_IMAGE) .
+	docker run --rm --platform linux/arm64 --entrypoint sh $(ARM64_IMAGE) -c '\
+	  set -e; \
+	  [ "$$(uname -m)" = "aarch64" ] || { echo "arsitektur bukan aarch64"; exit 1; }; \
+	  python -c "import anjab_abk_backend, psycopg; print(psycopg.__version__)"; \
+	  pg_dump --version | grep -q " 16\."; \
+	  pg_dump --version; \
+	  echo "uji asap arm64 OK"'
 
 ## migration: buat revisi Alembic baru dari perubahan model — m="deskripsi" (satu berkas/perubahan)
 migration: build
