@@ -5,24 +5,29 @@ from __future__ import annotations
 import asyncio
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from ... import __version__
 from ...config import Settings, get_settings
 from ...dependencies import (
     READ_GUARDS,
+    Pagination,
+    get_ai_run_service,
     get_async_job_service,
     get_current_principal,
     get_readiness_checks,
     get_skema_db_service,
+    pagination_params,
     require_admin,
 )
 from ...errors import ServiceUnavailableError
 from ...fitur import daftar_fitur
+from ...schemas.ai_run import AiRunRead, StatusQaAi
 from ...schemas.async_job import AsyncJobRead
-from ...schemas.common import ErrorDetail, ErrorResponse, FiturListRead, Health, VersiRead
+from ...schemas.common import ErrorDetail, ErrorResponse, FiturListRead, Health, Page, VersiRead
 from ...schemas.skema_db import SkemaDbRead
 from ...security import Principal
+from ...services.ai_run import AiRunService
 from ...services.async_job import AsyncJobService
 from ...services.readiness import ReadinessCheck
 from ...services.skema_db import SkemaDbService
@@ -143,3 +148,45 @@ def get_skema(
     membandingkan revisi, sedangkan ``selisih_model`` membandingkan struktur sebenarnya.
     """
     return service.baca()
+
+
+_RESP_ADMIN = {
+    401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."},
+    403: {"model": ErrorResponse, "description": "Bukan admin."},
+}
+
+
+@router.get(
+    "/system/ai/runs",
+    response_model=Page[AiRunRead],
+    summary="Daftar run AI",
+    tags=["system"],
+    operation_id="system_ai_run_list",
+    dependencies=[Depends(require_admin)],
+    responses=_RESP_ADMIN,
+)
+def list_ai_runs(
+    service: Annotated[AiRunService, Depends(get_ai_run_service)],
+    page: Annotated[Pagination, Depends(pagination_params)],
+    fungsi: Annotated[str | None, Query(description="Filter fungsi AI.")] = None,
+    status_qa: Annotated[StatusQaAi | None, Query(description="Filter status QA.")] = None,
+) -> Page[AiRunRead]:
+    """Daftar register run AI, terbaru dulu (admin saja). Tanpa ``masukan``/``keluaran``."""
+    items, total = service.list(fungsi, status_qa, page.limit, page.offset)
+    return Page[AiRunRead](items=items, total=total, limit=page.limit, offset=page.offset)
+
+
+@router.get(
+    "/system/ai/runs/{run_id}",
+    response_model=AiRunRead,
+    summary="Detail run AI",
+    tags=["system"],
+    operation_id="system_ai_run_get",
+    dependencies=[Depends(require_admin)],
+    responses={**_RESP_ADMIN, 404: {"model": ErrorResponse, "description": "Run tak ditemukan."}},
+)
+def get_ai_run(
+    run_id: str, service: Annotated[AiRunService, Depends(get_ai_run_service)]
+) -> AiRunRead:
+    """Baca satu run AI (admin saja). ``masukan`` dan ``keluaran`` tidak pernah diekspos."""
+    return service.get(run_id)

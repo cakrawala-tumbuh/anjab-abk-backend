@@ -101,6 +101,33 @@ class AsyncJobModel(Base):
     )
 
 
+class AiRunModel(Base):
+    """Tabel `ai_run` — register run AI (ModelRun_ID, hash, Protocol_ID)."""
+
+    __tablename__ = "ai_run"
+    __table_args__ = (Index("ix_ai_run_fungsi_status_qa", "fungsi", "status_qa"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    fungsi: Mapped[str] = mapped_column(String(100), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    prompt_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    model_diminta: Mapped[str] = mapped_column(String(100), nullable=False)
+    model_dilayani: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    protocol_id: Mapped[str] = mapped_column(String(300), nullable=False)
+    input_snapshot_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    sumber: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+    masukan: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    keluaran: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    status_qa: Mapped[str] = mapped_column(String(20), nullable=False)
+    kode_qa: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    stop_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    dibuat_oleh: Mapped[str | None] = mapped_column(String(254), nullable=True)
+    created_at: Mapped[datetime] = _ts()
+    selesai_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 # ======================================================================================
 # Core
 # ======================================================================================

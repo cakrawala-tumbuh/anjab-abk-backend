@@ -81,6 +81,8 @@ from .redesain.services.versi_metode_sql import SqlVersiMetodeService
 from .redesain.services.yayasan import RingkasanYayasanService
 from .redesain.services.yayasan_sql import SqlRingkasanYayasanService
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
+from .services.ai_run import AiRunService
+from .services.ai_run_sql import SqlAiRunService
 from .services.async_job import AsyncJobService
 from .services.async_job_sql import SqlAsyncJobService
 from .services.authentik_provisioner import (
@@ -425,6 +427,13 @@ def get_async_job_service(
 ) -> AsyncJobService:
     """SEAM: `AsyncJobService` PostgreSQL (job asinkron; flag fitur dibaca dari settings)."""
     return SqlAsyncJobService(session, settings)
+
+
+def get_ai_run_service(
+    session: SessionDep, settings: Annotated[Settings, Depends(get_settings)]
+) -> AiRunService:
+    """SEAM: `AiRunService` PostgreSQL (register run AI; kebijakan simpan masukan dari settings)."""
+    return SqlAiRunService(session, settings)
 
 
 def get_skema_db_service(session: SessionDep) -> SkemaDbService:

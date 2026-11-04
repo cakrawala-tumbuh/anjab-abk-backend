@@ -9,6 +9,7 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Register run AI** (backlog #85): tabel `ai_run` (revisi `d7a2f4c9e1b3`), seam `AiRunService`, helper `hash_masukan` dan `bangun_protocol_id`, serta `GET /api/v1/system/ai/runs` dan `GET /api/v1/system/ai/runs/{run_id}` (admin saja, tanpa `masukan` dan `keluaran`). Env baru `AI_PROTOCOL_ARM` (bawaan `TANPA_ARM`) dan `AI_SIMPAN_MASUKAN` (bawaan `false`; `masukan` dikosongkan saat run ditutup). Belum ada pemanggilan model.
 - **Pembanding revisi skema basis data** (backlog #84): `GET /api/v1/system/skema` (admin saja, `operation_id` `system_skema_get`) mengembalikan `SkemaDbRead` dengan `revisi_db`, `head_kode`, `selaras`, `selisih_model`, dan `selisih_terbaca`. Hanya baca; `GET /api/v1/version` tidak berubah.
 - **Image `linux/arm64`** (backlog #83): `release.yml` kini menerbitkan image `linux/amd64` dan `linux/arm64`; target `make test-arm64` dan job CI `arm64` (runner `ubuntu-24.04-arm`) membangun image runtime lalu memastikan `aarch64`, impor `psycopg`, dan `pg_dump` versi 16. Tidak ada perubahan kode aplikasi.
 - **Distribusi rating OPM per task** (backlog #82, A29): `OpmHasilTaskRead` memuat `min_`/`median_`/`max_` untuk `importance`, `frequency`, `criticality` (`float | null`) dan `rating_spread` (`bool | null`, true bila max - min >= 2 pada minimal satu dimensi); semuanya `null` bila `n == 0`. `mean_*`, `sd_*`, dan flag esensial tidak berubah.

@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     feature_research_export: bool = False
     feature_change_authorization: bool = False
 
+    # Register run AI (lihat services/ai_run.py)
+    ai_protocol_arm: str = "TANPA_ARM"
+    """Arm/prosedur pada ``Protocol_ID``; env ``AI_PROTOCOL_ARM``."""
+    ai_simpan_masukan: bool = False
+    """Bila true, ``masukan`` run dipertahankan setelah ``tutup``; env ``AI_SIMPAN_MASUKAN``."""
+
     # Auth Authentik — parameter validasi token (seam; bukan koneksi ke IdP).
     # Diisi oleh skill backend-authentik-skill.
     authentik_issuer: str | None = None
