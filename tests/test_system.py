@@ -162,3 +162,60 @@ def test_require_fitur_mati_409() -> None:
 def test_require_fitur_hidup_lolos() -> None:
     r = _mini_app(Settings(_env_file=None, feature_wcp_dcs_scoring=True)).get("/x")
     assert r.status_code == 200
+
+
+def _metode_operasi(methods: dict) -> dict:
+    return {m: op for m, op in methods.items() if m in {"get", "post", "put", "patch", "delete"}}
+
+
+def _punya_if_match(op: dict) -> bool:
+    return any(
+        p.get("in") == "header" and p.get("name", "").lower() == "if-match"
+        for p in op.get("parameters", [])
+    )
+
+
+def _periksa_kontrak_etag(paths: dict) -> int:
+    """Tegakkan aturan ETag pada skema; kembalikan jumlah path ber-If-Match."""
+    n = 0
+    for path, methods in paths.items():
+        ops = _metode_operasi(methods)
+        if not any(_punya_if_match(op) for op in ops.values()):
+            continue
+        n += 1
+        assert "get" in ops, f"{path} ber-If-Match tetapi tidak punya GET"
+        for m, op in ops.items():
+            dua_xx = [r for k, r in op["responses"].items() if str(k).startswith("2")]
+            if m == "get" or (m in {"patch", "put"} and _punya_if_match(op)):
+                assert dua_xx, f"{m} {path} tanpa respons 2xx"
+                for r in dua_xx:
+                    assert "ETag" in r.get("headers", {}), f"{m} {path} tanpa header ETag"
+            if m == "delete":
+                for r in dua_xx:
+                    assert "ETag" not in r.get("headers", {}), f"delete {path} memuat ETag"
+    return n
+
+
+def test_openapi_mendeklarasikan_etag_untuk_rute_if_match(anon_client: TestClient) -> None:
+    paths = anon_client.get("/openapi.json").json()["paths"]
+    assert _periksa_kontrak_etag(paths) > 0
+
+
+def test_pemindai_etag_gagal_bila_path_if_match_tanpa_get() -> None:
+    paths = {
+        "/x/{id}": {
+            "patch": {
+                "parameters": [{"in": "header", "name": "If-Match"}],
+                "responses": {"200": {"headers": {"ETag": {}}}},
+            }
+        }
+    }
+    with pytest.raises(AssertionError, match="tidak punya GET"):
+        _periksa_kontrak_etag(paths)
+
+
+def test_etag_wcp_instrumen_terkirim_sesuai_deklarasi(client: TestClient) -> None:
+    schema = client.get("/openapi.json").json()
+    resp = schema["paths"]["/api/v1/wcp/instrumen"]["get"]["responses"]["200"]
+    assert "ETag" in resp["headers"]
+    assert client.get("/api/v1/wcp/instrumen").headers.get("ETag")

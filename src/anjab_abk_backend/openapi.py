@@ -139,6 +139,50 @@ def openapi_kwargs(settings: Settings) -> dict:
     return kwargs
 
 
+ETAG_HEADER_DOC: dict = {
+    "description": "ETag representasi resource; kirim kembali lewat If-Match.",
+    "schema": {"type": "string"},
+}
+"""Deklarasi header respons `ETag` yang disisipkan ke OpenAPI."""
+
+_METODE_ETAG = ("get", "patch", "put")
+
+
+def _punya_if_match(op: object) -> bool:
+    """Apakah operasi OpenAPI memiliki parameter header `If-Match`."""
+    if not isinstance(op, dict):
+        return False
+    return any(
+        isinstance(p, dict) and p.get("in") == "header" and p.get("name", "").lower() == "if-match"
+        for p in op.get("parameters", [])
+    )
+
+
+def deklarasikan_etag(schema: dict) -> None:
+    """Tambahkan `headers.ETag` ke respons 2xx rute ber-`If-Match` dan GET sepath-nya.
+
+    Untuk tiap path yang punya minimal satu operasi dengan parameter header `If-Match`,
+    deklarasi `ETag` dipasang pada respons 2xx operasi GET path itu serta PATCH/PUT yang
+    ber-`If-Match`. DELETE dan operasi tanpa blok respons 2xx dilewati. Mengubah `schema`
+    di tempat; tidak ada efek runtime.
+
+    Args:
+        schema: Dokumen OpenAPI hasil `get_openapi`.
+    """
+    for methods in schema.get("paths", {}).values():
+        if not any(_punya_if_match(op) for op in methods.values()):
+            continue
+        for metode in _METODE_ETAG:
+            op = methods.get(metode)
+            if not isinstance(op, dict):
+                continue
+            if metode != "get" and not _punya_if_match(op):
+                continue
+            for kode, resp in (op.get("responses") or {}).items():
+                if str(kode).startswith("2") and isinstance(resp, dict):
+                    resp.setdefault("headers", {})["ETag"] = dict(ETAG_HEADER_DOC)
+
+
 def install_openapi(app: FastAPI, settings: Settings) -> None:
     def custom_openapi() -> dict:
         if app.openapi_schema:
@@ -174,6 +218,7 @@ def install_openapi(app: FastAPI, settings: Settings) -> None:
                         continue
                     if any("BearerAuth" in r for r in reqs):
                         reqs.append({"OAuth2": oauth_scopes})
+        deklarasikan_etag(schema)
         app.openapi_schema = schema
         return schema
 

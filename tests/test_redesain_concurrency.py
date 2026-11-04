@@ -275,3 +275,26 @@ def test_tanpa_header_perilaku_lama_tetap(client_as, partisipan_factory, db_sess
     assert tim.patch(url, json={"gelombang": "G2"}).status_code == 200
     assert tim.patch(url, json={"gelombang": "G3"}).status_code == 200
     assert db_session.get(RedesainMasalahModel, m["id"]) is not None
+
+
+def test_bukti_get_etag_terkirim_sesuai_deklarasi_openapi(
+    client_as, partisipan_factory, db_session
+):
+    tim = _tim(client_as, partisipan_factory)
+    skema = tim.get("/openapi.json").json()
+    resp = skema["paths"][f"{BASE}/bukti/{{bukti_id}}"]["get"]["responses"]["200"]
+    assert "ETag" in resp["headers"]
+    m = _masalah(tim, db_session)
+    b = tim.post(
+        f"{BASE}/bukti",
+        json={
+            "masalah_id": m["id"],
+            "unit_periode": "SD A, TA 2026/27",
+            "jenis": "SK/aturan",
+            "independen": "Ya",
+            "klaim_didukung": "Jadwal disusun manual oleh wakasek.",
+            "tanggal_versi_lokasi": "SK Kepsek 12/2026, arsip TU",
+        },
+    )
+    assert b.status_code == 201, b.text
+    assert tim.get(f"{BASE}/bukti/{b.json()['id']}").headers.get("ETag")
