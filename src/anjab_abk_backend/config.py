@@ -8,6 +8,7 @@ akses data adalah seam dependency injection (lihat services/ dan CLAUDE.md atura
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -63,6 +64,14 @@ class Settings(BaseSettings):
     """Arm/prosedur pada ``Protocol_ID``; env ``AI_PROTOCOL_ARM``."""
     ai_simpan_masukan: bool = False
     """Bila true, ``masukan`` run dipertahankan setelah ``tutup``; env ``AI_SIMPAN_MASUKAN``."""
+
+    # Gerbang redaksi PII (lihat ai/redaksi.py); bawaan paling ketat (fail-closed).
+    ai_jenis_sumber_diizinkan: list[str] = ["SINTETIS"]
+    """Jenis sumber yang boleh dikirim ke model; env ``AI_JENIS_SUMBER_DIIZINKAN`` (JSON).
+    Jenis berawalan WCP/DCS/KONSELING/MURID selalu ditolak."""
+    ai_pii_mode: Literal["BLOKIR", "SAMARKAN"] = "BLOKIR"
+    """``BLOKIR`` menolak masukan bila ada PII; ``SAMARKAN`` mengganti dengan penanda
+    (kecuali nama murid/keluarga); env ``AI_PII_MODE``."""
 
     # Auth Authentik — parameter validasi token (seam; bukan koneksi ke IdP).
     # Diisi oleh skill backend-authentik-skill.
