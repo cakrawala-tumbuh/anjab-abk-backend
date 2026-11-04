@@ -9,6 +9,7 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Commit build pada `GET /api/v1/version`** (backlog #79): respons kini memuat `commit` (SHA build image, `unknown` bila dibangun di luar `release.yml`). `release.yml` meneruskan `GIT_COMMIT` lewat `build_args`; `Dockerfile` menyetel `APP_BUILD_COMMIT`.
 - **Kunci optimistik dan Idempotency-Key di rute tulis modul redesain** (backlog #77, A5):
   seluruh `PATCH` redesain (masalah, penilaian, bukti, alternatif, konteks, versi metode, cakupan
   jabatan, kode orang, sesi, proses, langkah, konfirmasi) menerima `If-Match` (412 bila usang,

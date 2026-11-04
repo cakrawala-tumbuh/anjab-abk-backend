@@ -12,6 +12,7 @@ COPY src ./src
 RUN python -m build --wheel --outdir /dist
 
 FROM python:3.12-slim AS runtime
+ARG GIT_COMMIT=unknown
 LABEL org.opencontainers.image.title="anjab-abk-backend" \
       org.opencontainers.image.description="Backend REST API ANJAB & ABK yayasan pendidikan." \
       org.opencontainers.image.source="https://github.com/OWNER/anjab-abk-backend" \
@@ -20,7 +21,8 @@ LABEL org.opencontainers.image.title="anjab-abk-backend" \
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    LOG_LEVEL=INFO
+    LOG_LEVEL=INFO \
+    APP_BUILD_COMMIT=${GIT_COMMIT}
 
 WORKDIR /app
 COPY --from=builder /dist/*.whl /tmp/

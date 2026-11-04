@@ -25,6 +25,39 @@ def test_version(anon_client: TestClient) -> None:
     assert "version" in r.json()
 
 
+def test_version_commit_default_unknown(anon_client: TestClient) -> None:
+    from anjab_abk_backend import __version__
+
+    r = anon_client.get("/api/v1/version")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok", "version": __version__, "commit": "unknown"}
+
+
+def test_version_commit_dari_settings(app, anon_client: TestClient) -> None:
+    from anjab_abk_backend import __version__
+    from anjab_abk_backend.config import Settings, get_settings
+
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None, app_build_commit="abc123"
+    )
+    r = anon_client.get("/api/v1/version")
+    assert r.json()["commit"] == "abc123"
+    assert r.json()["version"] == __version__
+
+
+def test_health_dan_ready_tanpa_commit(anon_client: TestClient) -> None:
+    assert "commit" not in anon_client.get("/api/v1/health").json()
+    assert "commit" not in anon_client.get("/api/v1/ready").json()
+
+
+def test_openapi_version_memakai_versirread(anon_client: TestClient) -> None:
+    schema = anon_client.get("/openapi.json").json()
+    ref = schema["paths"]["/api/v1/version"]["get"]["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"]["$ref"]
+    assert ref.endswith("/VersiRead")
+
+
 def test_me_unauthorized(anon_client: TestClient) -> None:
     r = anon_client.get("/api/v1/me")
     assert r.status_code == 401

@@ -20,4 +20,5 @@ jobs:
     uses: andhit-r/release-docker-image-ghcr/.github/workflows/ghcr.yml@v2
     with:
       dockerfile: Dockerfile
+      build_args: GIT_COMMIT=${{ github.sha }}
     secrets: inherit

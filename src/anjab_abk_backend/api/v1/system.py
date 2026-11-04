@@ -19,7 +19,7 @@ from ...dependencies import (
 from ...errors import ServiceUnavailableError
 from ...fitur import daftar_fitur
 from ...schemas.async_job import AsyncJobRead
-from ...schemas.common import ErrorDetail, ErrorResponse, FiturListRead, Health
+from ...schemas.common import ErrorDetail, ErrorResponse, FiturListRead, Health, VersiRead
 from ...security import Principal
 from ...services.async_job import AsyncJobService
 from ...services.readiness import ReadinessCheck
@@ -61,9 +61,16 @@ async def ready(
     return Health(status="ready", version=__version__)
 
 
-@router.get("/version", response_model=Health, summary="Versi", tags=["system"])
-def version() -> Health:
-    return Health(status="ok", version=__version__)
+@router.get("/version", response_model=VersiRead, summary="Versi", tags=["system"])
+def version(settings: Annotated[Settings, Depends(get_settings)]) -> VersiRead:
+    """Kembalikan versi aplikasi dan commit build runtime.
+
+    Endpoint publik, tidak menyentuh basis data.
+
+    Returns:
+        VersiRead: ``commit`` bernilai ``unknown`` bila ``APP_BUILD_COMMIT`` tak diset.
+    """
+    return VersiRead(status="ok", version=__version__, commit=settings.app_build_commit)
 
 
 @router.get(

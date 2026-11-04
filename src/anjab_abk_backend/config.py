@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     """Pengaturan aplikasi ANJAB-ABK."""
 
     app_title: str = "ANJAB-ABK Backend"
+    app_build_commit: str = "unknown"
+    """SHA commit (40 hex) tempat image dibangun; env ``APP_BUILD_COMMIT``, diisi
+    ``release.yml`` lewat build-arg ``GIT_COMMIT``. ``unknown`` = image dibangun di luar
+    ``release.yml`` dan TIDAK boleh dipakai sebagai bukti baseline."""
     log_level: str = "INFO"
 
     host: str = "0.0.0.0"

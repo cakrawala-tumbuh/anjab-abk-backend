@@ -29,6 +29,15 @@ class Health(BaseModel):
     version: str = Field(description="Versi aplikasi.", examples=["0.1.0"])
 
 
+class VersiRead(Health):
+    """Respons ``GET /api/v1/version``: versi aplikasi plus identitas build runtime."""
+
+    commit: str = Field(
+        description="SHA commit build image; 'unknown' bila dibangun di luar release.yml.",
+        examples=["0f16ded0000000000000000000000000000000a1"],
+    )
+
+
 class Message(BaseModel):
     message: str = Field(description="Pesan.", examples=["Berhasil."])
 
