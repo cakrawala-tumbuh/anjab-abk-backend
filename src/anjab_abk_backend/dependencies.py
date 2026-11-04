@@ -94,6 +94,8 @@ from .services.idempotency_sql import SqlIdempotencyStore
 from .services.ratelimit import AllowAllRateLimiter, RateLimiter
 from .services.readiness import ReadinessCheck
 from .services.readiness_db import DatabaseReadinessCheck
+from .services.skema_db import SkemaDbService
+from .services.skema_db_sql import SqlSkemaDbService
 from .taskinv.schemas.sesi import TiSesiRead
 from .taskinv.services.catalog import TiCatalogService, UraianTugasBackedCatalogService
 from .taskinv.services.detail import TiDetailService
@@ -423,6 +425,11 @@ def get_async_job_service(
 ) -> AsyncJobService:
     """SEAM: `AsyncJobService` PostgreSQL (job asinkron; flag fitur dibaca dari settings)."""
     return SqlAsyncJobService(session, settings)
+
+
+def get_skema_db_service(session: SessionDep) -> SkemaDbService:
+    """SEAM: `SkemaDbService` PostgreSQL (pembanding revisi skema, hanya baca)."""
+    return SqlSkemaDbService(session)
 
 
 def get_koreksi_service(session: SessionDep) -> KoreksiService:

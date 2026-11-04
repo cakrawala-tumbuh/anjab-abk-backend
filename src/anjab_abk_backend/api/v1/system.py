@@ -14,15 +14,18 @@ from ...dependencies import (
     get_async_job_service,
     get_current_principal,
     get_readiness_checks,
+    get_skema_db_service,
     require_admin,
 )
 from ...errors import ServiceUnavailableError
 from ...fitur import daftar_fitur
 from ...schemas.async_job import AsyncJobRead
 from ...schemas.common import ErrorDetail, ErrorResponse, FiturListRead, Health, VersiRead
+from ...schemas.skema_db import SkemaDbRead
 from ...security import Principal
 from ...services.async_job import AsyncJobService
 from ...services.readiness import ReadinessCheck
+from ...services.skema_db import SkemaDbService
 
 router = APIRouter()
 
@@ -116,3 +119,27 @@ def get_job(
 ) -> AsyncJobRead:
     """Baca status sebuah job asinkron (admin saja)."""
     return service.get(job_id)
+
+
+@router.get(
+    "/system/skema",
+    response_model=SkemaDbRead,
+    summary="Revisi skema basis data",
+    tags=["system"],
+    operation_id="system_skema_get",
+    dependencies=[Depends(require_admin)],
+    responses={
+        401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."},
+        403: {"model": ErrorResponse, "description": "Bukan admin."},
+        503: {"model": ErrorResponse, "description": "Basis data tak terjangkau."},
+    },
+)
+def get_skema(
+    service: Annotated[SkemaDbService, Depends(get_skema_db_service)],
+) -> SkemaDbRead:
+    """Bandingkan skema basis data aktif dengan head migrasi kode dan model ORM (admin saja).
+
+    Hanya membaca; tidak menjalankan migrasi dan tidak memuat data baris. ``selaras`` hanya
+    membandingkan revisi, sedangkan ``selisih_model`` membandingkan struktur sebenarnya.
+    """
+    return service.baca()

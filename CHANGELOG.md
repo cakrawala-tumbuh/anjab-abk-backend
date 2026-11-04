@@ -9,6 +9,7 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Ditambahkan
 
+- **Pembanding revisi skema basis data** (backlog #84): `GET /api/v1/system/skema` (admin saja, `operation_id` `system_skema_get`) mengembalikan `SkemaDbRead` dengan `revisi_db`, `head_kode`, `selaras`, `selisih_model`, dan `selisih_terbaca`. Hanya baca; `GET /api/v1/version` tidak berubah.
 - **Image `linux/arm64`** (backlog #83): `release.yml` kini menerbitkan image `linux/amd64` dan `linux/arm64`; target `make test-arm64` dan job CI `arm64` (runner `ubuntu-24.04-arm`) membangun image runtime lalu memastikan `aarch64`, impor `psycopg`, dan `pg_dump` versi 16. Tidak ada perubahan kode aplikasi.
 - **Distribusi rating OPM per task** (backlog #82, A29): `OpmHasilTaskRead` memuat `min_`/`median_`/`max_` untuk `importance`, `frequency`, `criticality` (`float | null`) dan `rating_spread` (`bool | null`, true bila max - min >= 2 pada minimal satu dimensi); semuanya `null` bila `n == 0`. `mean_*`, `sd_*`, dan flag esensial tidak berubah.
 - **Commit build pada `GET /api/v1/version`** (backlog #79): respons kini memuat `commit` (SHA build image, `unknown` bila dibangun di luar `release.yml`). `release.yml` meneruskan `GIT_COMMIT` lewat `build_args`; `Dockerfile` menyetel `APP_BUILD_COMMIT`.

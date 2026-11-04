@@ -219,3 +219,54 @@ def test_etag_wcp_instrumen_terkirim_sesuai_deklarasi(client: TestClient) -> Non
     resp = schema["paths"]["/api/v1/wcp/instrumen"]["get"]["responses"]["200"]
     assert "ETag" in resp["headers"]
     assert client.get("/api/v1/wcp/instrumen").headers.get("ETag")
+
+
+def test_skema_db_di_head(client: TestClient) -> None:
+    r = client.get("/api/v1/system/skema")
+    assert r.status_code == 200
+    b = r.json()
+    assert b["selaras"] is True and b["selisih_model"] == [] and b["selisih_terbaca"] is True
+    assert b["revisi_db"] == b["head_kode"] and len(b["head_kode"]) == 1
+
+
+def test_skema_db_revisi_beda(client: TestClient, db_session) -> None:
+    from sqlalchemy import text
+
+    db_session.execute(text("UPDATE alembic_version SET version_num = 'revisi_lain'"))
+    b = client.get("/api/v1/system/skema").json()
+    assert b["selaras"] is False and b["revisi_db"] == ["revisi_lain"]
+
+
+def test_skema_db_tabel_liar(client: TestClient, db_session) -> None:
+    from sqlalchemy import text
+
+    db_session.execute(text("CREATE TABLE tabel_liar_uji (id int)"))
+    b = client.get("/api/v1/system/skema").json()
+    assert "remove_table:tabel_liar_uji" in b["selisih_model"]
+
+
+def test_skema_db_alembic_version_absen(client: TestClient, db_session) -> None:
+    from sqlalchemy import text
+
+    db_session.execute(text("DROP TABLE alembic_version"))
+    r = client.get("/api/v1/system/skema")
+    assert r.status_code == 200
+    assert r.json()["revisi_db"] == [] and r.json()["selaras"] is False
+
+
+def test_skema_db_otorisasi(anon_client: TestClient, client_as) -> None:
+    assert anon_client.get("/api/v1/system/skema").status_code == 401
+    assert client_as("biasa", groups=["partisipan"]).get("/api/v1/system/skema").status_code == 403
+
+
+def test_skema_db_banding_gagal_bukan_500(client: TestClient, monkeypatch) -> None:
+    from anjab_abk_backend.services import skema_db_sql
+
+    def _rusak(_conn):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(skema_db_sql, "_hitung_selisih", _rusak)
+    r = client.get("/api/v1/system/skema")
+    assert r.status_code == 200
+    b = r.json()
+    assert b["selisih_terbaca"] is False and b["selisih_model"] == []
