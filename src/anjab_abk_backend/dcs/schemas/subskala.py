@@ -81,3 +81,23 @@ class DcsSubSkalaWithItemsRead(DcsSubSkalaRead):
     """Representasi sub-skala DCS beserta 14 item-nya."""
 
     items: list[DcsItemRead] = Field(description="Daftar 14 item sub-skala ini.")
+
+
+class DcsItemBerEtagRead(DcsItemRead):
+    """Item DCS yang membawa ETag-nya sendiri di dalam badan respons detail sub-skala."""
+
+    etag: str = Field(
+        description=(
+            "ETag item, identik dengan header `ETag` pada `GET .../items/{item_id}` "
+            "(termasuk tanda kutip ganda); dipakai langsung sebagai `If-Match` PATCH/DELETE item."
+        ),
+        examples=['"0123456789abcdef0123456789abcdef"'],
+    )
+
+
+class DcsSubSkalaWithItemsEtagRead(DcsSubSkalaRead):
+    """Sub-skala DCS beserta item-itemnya, tiap item membawa `etag`."""
+
+    items: list[DcsItemBerEtagRead] = Field(
+        description="Daftar 14 item sub-skala ini, masing-masing ber-`etag`."
+    )

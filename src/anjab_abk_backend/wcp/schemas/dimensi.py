@@ -86,3 +86,23 @@ class WcpDimensiWithItemsRead(WcpDimensiRead):
     """Representasi dimensi WCP beserta 6 item-nya."""
 
     items: list[WcpItemRead] = Field(description="Daftar 6 item dimensi ini.")
+
+
+class WcpItemBerEtagRead(WcpItemRead):
+    """Item WCP yang membawa ETag-nya sendiri di dalam badan respons detail dimensi."""
+
+    etag: str = Field(
+        description=(
+            "ETag item, identik dengan header `ETag` pada `GET .../items/{item_id}` "
+            "(termasuk tanda kutip ganda); dipakai langsung sebagai `If-Match` PATCH/DELETE item."
+        ),
+        examples=['"0123456789abcdef0123456789abcdef"'],
+    )
+
+
+class WcpDimensiWithItemsEtagRead(WcpDimensiRead):
+    """Dimensi WCP beserta item-itemnya, tiap item membawa `etag`."""
+
+    items: list[WcpItemBerEtagRead] = Field(
+        description="Daftar 6 item dimensi ini, masing-masing ber-`etag`."
+    )

@@ -18,7 +18,8 @@ from ...etag import check_if_match, compute_etag
 from ...schemas.common import ErrorResponse
 from ...wcp.schemas.dimensi import (
     WcpDimensiRead,
-    WcpDimensiWithItemsRead,
+    WcpDimensiWithItemsEtagRead,
+    WcpItemBerEtagRead,
     WcpItemRead,
     WcpItemUpdate,
 )
@@ -59,7 +60,7 @@ def list_dimensi(
 
 @router.get(
     "/{kode}",
-    response_model=WcpDimensiWithItemsRead,
+    response_model=WcpDimensiWithItemsEtagRead,
     summary="Ambil dimensi WCP beserta 6 item-nya",
     operation_id="wcp_dimensi_get",
     dependencies=READ_GUARDS,
@@ -68,8 +69,15 @@ def list_dimensi(
 def get_dimensi(
     kode: Annotated[str, Path(description="Kode dimensi (SC/TM/AS/RC/DA/WP/PC/SS/CH/SD/PI/RA).")],
     service: Annotated[WcpDimensiService, Depends(get_wcp_dimensi_service)],
-) -> WcpDimensiWithItemsRead:
-    return service.get_dimensi(kode.upper())
+) -> WcpDimensiWithItemsEtagRead:
+    """Ambil dimensi beserta item-nya; tiap item membawa `etag` per item.
+
+    `etag` dihitung dengan `compute_etag` atas `WcpItemRead` asal, sehingga identik
+    dengan header `ETag` `GET /items/{item_id}` dan langsung dapat dipakai sebagai `If-Match`.
+    """
+    dim = service.get_dimensi(kode.upper())
+    items = [WcpItemBerEtagRead(**item.model_dump(), etag=compute_etag(item)) for item in dim.items]
+    return WcpDimensiWithItemsEtagRead(**dim.model_dump(exclude={"items"}), items=items)
 
 
 @router.get(

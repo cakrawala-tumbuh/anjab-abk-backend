@@ -207,3 +207,26 @@ def test_patch_item_ditolak_409_bila_instrumen_berisi_jawaban(
     assert r.json()["error"] == "instrument_has_responses"
     sesudah = {i["item_id"]: i for i in client.get(f"{BASE}/DEMAND/items").json()}["D8"]
     assert sesudah["pernyataan"] == sebelum["pernyataan"]
+
+
+def test_detail_sub_skala_etag_item_sama_dengan_header_item(client: TestClient) -> None:
+    items = client.get(f"{BASE}/DEMAND").json()["items"]
+    assert len(items) == 14
+    for it in items:
+        r = client.get(f"{BASE}/items/{it['item_id']}")
+        assert it["etag"] == r.headers["ETag"]
+
+
+def test_detail_sub_skala_etag_dipakai_patch_item_200_lalu_usang_412(client: TestClient) -> None:
+    item = client.get(f"{BASE}/DEMAND").json()["items"][0]
+    url = f"{BASE}/items/{item['item_id']}"
+    hdr = {"If-Match": item["etag"]}
+    ok = client.patch(url, json={"pernyataan": "Teks etag DCS."}, headers=hdr)
+    assert ok.status_code == 200
+    usang = client.patch(url, json={"pernyataan": "Lagi."}, headers=hdr)
+    assert usang.status_code == 412
+
+
+def test_header_etag_item_dcs_tanpa_field_etag(client: TestClient) -> None:
+    it = client.get(f"{BASE}/DEMAND").json()["items"][0]
+    assert "etag" not in client.get(f"{BASE}/items/{it['item_id']}").json()

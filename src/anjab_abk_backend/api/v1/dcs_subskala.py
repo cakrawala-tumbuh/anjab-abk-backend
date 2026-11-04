@@ -8,10 +8,11 @@ from fastapi import APIRouter, Body, Depends, Path, Response, status
 
 from ...config import Settings, get_settings
 from ...dcs.schemas.subskala import (
+    DcsItemBerEtagRead,
     DcsItemRead,
     DcsItemUpdate,
     DcsSubSkalaRead,
-    DcsSubSkalaWithItemsRead,
+    DcsSubSkalaWithItemsEtagRead,
 )
 from ...dcs.services.instrumen import DcsInstrumenService
 from ...dcs.services.subskala import DcsSubSkalaService
@@ -59,7 +60,7 @@ def list_sub_skala(
 
 @router.get(
     "/{kode}",
-    response_model=DcsSubSkalaWithItemsRead,
+    response_model=DcsSubSkalaWithItemsEtagRead,
     summary="Ambil sub-skala DCS beserta 14 item-nya",
     operation_id="dcs_subskala_get",
     dependencies=READ_GUARDS,
@@ -68,8 +69,15 @@ def list_sub_skala(
 def get_sub_skala(
     kode: Annotated[str, Path(description="Kode sub-skala (DEMAND/CONTROL/SUPPORT).")],
     service: Annotated[DcsSubSkalaService, Depends(get_dcs_subskala_service)],
-) -> DcsSubSkalaWithItemsRead:
-    return service.get_sub_skala(kode.upper())
+) -> DcsSubSkalaWithItemsEtagRead:
+    """Ambil sub-skala beserta item-nya; tiap item membawa `etag` per item.
+
+    `etag` dihitung dengan `compute_etag` atas `DcsItemRead` asal, sehingga identik
+    dengan header `ETag` `GET /items/{item_id}` dan langsung dapat dipakai sebagai `If-Match`.
+    """
+    sk = service.get_sub_skala(kode.upper())
+    items = [DcsItemBerEtagRead(**item.model_dump(), etag=compute_etag(item)) for item in sk.items]
+    return DcsSubSkalaWithItemsEtagRead(**sk.model_dump(exclude={"items"}), items=items)
 
 
 @router.get(
