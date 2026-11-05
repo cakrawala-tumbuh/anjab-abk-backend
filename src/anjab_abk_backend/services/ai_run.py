@@ -84,6 +84,14 @@ class AiRunService(Protocol):
         """Baca run; ``NotFoundError`` bila tak ada."""
         ...
 
+    def keluaran_internal(self, run_id: str) -> dict[str, Any] | None:
+        """Keluaran model run untuk penyerap; internal, tanpa rute dan di luar `AiRunRead`.
+
+        Raises:
+            NotFoundError: run tak ada (404).
+        """
+        ...
+
     def list(
         self,
         fungsi: str | None,

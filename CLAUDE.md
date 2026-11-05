@@ -82,6 +82,28 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-05] Penyerap hasil run AI ke versi narasi (proses terpisah)
+
+Backlog `#99`. Worker `ai/worker.py` hanya menulis `ai_run` dan `async_job`; `narasi/penyerap.py`
+memindahkan hasil run final ke `narasi_versi` (`python -m anjab_abk_backend.narasi.penyerap`).
+
+- **Klaim**: `serap_run(session, permintaan_id)` mengunci baris `narasi_ai_permintaan` ber-`diserap_at`
+  null dengan `FOR UPDATE SKIP LOCKED`; `serap_tertunda(fabrik, limit)` satu transaksi per permintaan,
+  galat tak terduga satu permintaan dicatat (nama jenis saja) dan tidak menghentikan putaran.
+  Pagar kedua: `narasi_versi.ai_run_id` UNIQUE (versi untuk run itu sudah ada -> tidak dibuat lagi).
+- **Pemetaan**: `LOLOS` + `draft_text` berisi -> `AI_DRAFT`/`VERSI_DIBUAT`; `EVIDENCE_GAP` -> versi
+  `NEED_FACT` teks null/`NEED_FACT` (tanpa keluaran: `missing_facts=kode_qa`, mis. `SUMBER_KOSONG`,
+  `output_hash` null); `KARANTINA`/`DIBLOKIR`/`GAGAL` -> `MANUAL`, `kode_serap` = `kode_qa`.
+  `output_hash = hash_masukan(keluaran)`. `MENUNGGU` tidak disentuh.
+- **Semua hasil akhir mengisi `diserap_at`** (kalau tidak, `ada_belum_diserap` menahan kasus selamanya
+  pada rute pengaju). Kode MANUAL tambahan: `ATURAN_SND_DILANGGAR` (`draft_text` tak sesuai status run),
+  `KASUS_BERUBAH` (status kasus bukan `SOURCE_CHECKED`/`NEED_FACT`, `TransisiTidakSahError`,
+  `VersiBasiError`), `VERSI_DITOLAK` (`ValidationAppError`: `NO_SOURCE_NO_FACT`, hash/sumber tak sah),
+  `GALAT_SERAP` (`AppError`/`IntegrityError` lain). Semuanya: tanpa versi, kasus tetap.
+- **Dilarang `catat_event`**: penyerap hanya memakai `tambah_versi`. `AiRunService.keluaran_internal`
+  internal tanpa rute; `keluaran` tidak boleh masuk log atau respons. Bawaan flag tidak berubah;
+  layanan Compose bukan bagian item ini.
+
 ### [2026-11-05] Narasi: tabel kasus, versi, dan tautan sumber (append-only di basis data)
 
 Backlog `#92`. Struktur data untuk narasi per kasus dengan versi yang tidak menimpa catatan

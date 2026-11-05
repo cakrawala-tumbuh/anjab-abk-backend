@@ -90,6 +90,26 @@ class SqlAiRunService:
             raise NotFoundError(f"Run AI '{run_id}' tidak ditemukan.")
         return AiRunRead.model_validate(rec)
 
+    def keluaran_internal(self, run_id: str) -> dict[str, Any] | None:
+        """Kembalikan salinan `keluaran` run, atau `None` bila belum ada (run `MENUNGGU`/gap).
+
+        Metode internal bagi penyerap narasi; tidak dipasang pada rute mana pun dan
+        isinya tidak boleh dicatat ke log.
+
+        Args:
+            run_id: Id run.
+
+        Returns:
+            Salinan dict keluaran, atau `None` bila kolom kosong.
+
+        Raises:
+            NotFoundError: run tak ada.
+        """
+        rec = self._s.get(AiRunModel, run_id)
+        if rec is None:
+            raise NotFoundError(f"Run AI '{run_id}' tidak ditemukan.")
+        return dict(rec.keluaran) if rec.keluaran is not None else None
+
     def list(
         self,
         fungsi: str | None,
