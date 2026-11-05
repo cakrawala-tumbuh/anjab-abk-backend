@@ -92,6 +92,8 @@ from .services.ai_run import AiRunService
 from .services.ai_run_sql import SqlAiRunService
 from .services.ai_saklar import SaklarAiService
 from .services.ai_saklar_sql import SqlSaklarAiService
+from .services.ai_usulan import AiUsulanService
+from .services.ai_usulan_sql import SqlAiUsulanService
 from .services.async_job import AsyncJobService
 from .services.async_job_sql import SqlAsyncJobService
 from .services.authentik_provisioner import (
@@ -431,6 +433,13 @@ def get_ai_gateway(
 ) -> AiGateway:
     """SEAM: `AiGateway` di atas sesi request; registri fungsi dari `FUNGSI_TERDAFTAR`."""
     return AiGateway(session, settings)
+
+
+def get_ai_usulan_service(
+    session: SessionDep, settings: Annotated[Settings, Depends(get_settings)]
+) -> AiUsulanService:
+    """SEAM: `AiUsulanService` PostgreSQL (pengajuan umum fungsi AI non-narasi)."""
+    return SqlAiUsulanService(session, settings, AiGateway(session, settings))
 
 
 def get_penilaian_service(session: SessionDep) -> PenilaianService:

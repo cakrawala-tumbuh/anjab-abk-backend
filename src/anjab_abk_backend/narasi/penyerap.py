@@ -7,7 +7,9 @@ dapat menyetujui, menolak, atau meninjau apa pun.
 
 Jalankan dengan ``python -m anjab_abk_backend.narasi.penyerap``. Bila flag
 ``FEATURE_AI_NARRATIVE_DRAFT`` mati, proses mencatat log lalu keluar kode 0; selain itu ia
-polling tiap ``AI_WORKER_POLL_DETIK`` dan berhenti rapi pada SIGTERM.
+polling tiap ``AI_WORKER_POLL_DETIK`` dan berhenti rapi pada SIGTERM. Tiap putaran juga
+menyerap usulan fungsi AI non-narasi lewat ``ai.penyerap_usulan.serap_usulan_tertunda``
+(hanya menulis ``ai_usulan``).
 
 Setiap hasil akhir menandai ``diserap_at`` supaya permintaan itu tidak lagi menahan kasus
 (`PermintaanAiService.ada_belum_diserap`). Hanya run ``MENUNGGU`` yang dibiarkan.
@@ -27,6 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..ai.penyerap_usulan import serap_usulan_tertunda
 from ..config import get_settings
 from ..errors import AppError, ValidationAppError
 from ..fitur import fitur_aktif
@@ -285,11 +288,15 @@ def main() -> int:
     signal.signal(signal.SIGTERM, lambda *_: berhenti.set())
     signal.signal(signal.SIGINT, lambda *_: berhenti.set())
     while not berhenti.is_set():
+        n = 0
         try:
-            n = serap_tertunda(session_scope)
+            n += serap_tertunda(session_scope)
         except Exception as exc:
             logger.error("narasi_penyerap_putaran_gagal", extra={"jenis": type(exc).__name__})
-            n = 0
+        try:
+            n += serap_usulan_tertunda(session_scope)
+        except Exception as exc:
+            logger.error("ai_usulan_penyerap_putaran_gagal", extra={"jenis": type(exc).__name__})
         if n == 0:
             berhenti.wait(settings.ai_worker_poll_detik)
     logger.info("narasi_penyerap_berhenti")

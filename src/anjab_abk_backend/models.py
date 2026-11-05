@@ -48,6 +48,7 @@ from anjab_abk_backend.narasi.schemas.kasus import (
     RevisionOrigin,
     StatusNarasi,
 )
+from anjab_abk_backend.schemas.ai_usulan import SasaranUsulan
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -1623,6 +1624,46 @@ class NarasiAiPermintaanModel(Base):
     diserap_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     hasil_serap: Mapped[str | None] = mapped_column(String(40), nullable=True)
     kode_serap: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+
+
+class AiUsulanModel(Base):
+    """Usulan hasil fungsi AI non-narasi atas satu sasaran; tidak pernah menjadi versi narasi.
+
+    `ai_run_id` UNIQUE (satu run, satu usulan). `sasaran_id` polimorfik, sengaja tanpa FK.
+    `diserap_at`, `hasil_serap`, `kode_serap`, `isi`, `amplop`, `output_hash` null sampai
+    penyerap menulisnya; `isi` dan `amplop` adalah keluaran model dan tidak boleh dicatat ke log.
+    """
+
+    __tablename__ = "ai_usulan"
+    __table_args__ = (
+        CheckConstraint(_in_check("sasaran_jenis", SasaranUsulan), name="sasaran_jenis"),
+        Index("ix_ai_usulan_fungsi_sasaran_id_created_at", "fungsi", "sasaran_id", "created_at"),
+        Index(
+            "ix_ai_usulan_belum_diserap",
+            "created_at",
+            postgresql_where=text("diserap_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    fungsi: Mapped[str] = mapped_column(String(10), nullable=False)
+    sasaran_jenis: Mapped[str] = mapped_column(String(30), nullable=False)
+    sasaran_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    job_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    ai_run_id: Mapped[str] = mapped_column(
+        ForeignKey("ai_run.id", name="fk_ai_usulan_ai_run_id_ai_run"),
+        nullable=False,
+        unique=True,
+    )
+    sumber_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    diminta_oleh: Mapped[str] = mapped_column(String(254), nullable=False)
+    created_at: Mapped[datetime] = _ts()
+    diserap_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hasil_serap: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    kode_serap: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    isi: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    amplop: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    output_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class NarasiVersiSumberModel(Base):
