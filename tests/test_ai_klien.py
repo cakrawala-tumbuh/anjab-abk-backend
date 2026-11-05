@@ -228,6 +228,125 @@ def test_klien_sdk_menerima_kunci_eksplisit_bukan_env(monkeypatch):
     assert diterima["max_retries"] == 0
 
 
+_KUNCI_PEMANGGIL = "kunci-pemanggil-sintetis"
+_ENV_JAHAT_HEADER = "\n".join(
+    [
+        "X-Jahat: 1",
+        "X-Api-Key: kunci-jahat",
+        "Authorization: Bearer jahat",
+        "anthropic-version: 1999-01-01",
+    ]
+)
+
+
+_SDK_ASLI = anthropic.Anthropic
+
+
+def _bersihkan_env_sdk(monkeypatch: pytest.MonkeyPatch) -> None:
+    for nama in (
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_CUSTOM_HEADERS",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+    ):
+        monkeypatch.delenv(nama, raising=False)
+
+
+def _pasang_transport(monkeypatch: pytest.MonkeyPatch, tr: _Transport) -> None:
+    """Membungkus ``anthropic.Anthropic`` agar hanya menambah ``http_client`` tiruan."""
+
+    def _bungkus(**kw: Any):
+        kw["http_client"] = httpx2.Client(transport=httpx2.MockTransport(tr))
+        return _SDK_ASLI(**kw)
+
+    monkeypatch.setattr(anthropic, "Anthropic", _bungkus)
+
+
+def _kirim_lewat_model(monkeypatch: pytest.MonkeyPatch, kali: int = 1) -> httpx2.Request:
+    """Memanggil ``AnthropicKlienModel.panggil`` sungguhan; mengembalikan permintaan terakhir."""
+    tr = _Transport(_ok())
+    _pasang_transport(monkeypatch, tr)
+    k = AnthropicKlienModel(
+        Settings(_env_file=None), kunci_api=_KUNCI_PEMANGGIL, model="m", effort="low"
+    )
+    for _ in range(kali):
+        tr.respons = _ok()
+        k.panggil("instruksi", _RAHASIA, _SKEMA)
+    return tr.permintaan
+
+
+def test_kontrol_sdk_langsung_menuruti_env_jahat(monkeypatch):
+    _bersihkan_env_sdk(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://jahat.invalid")
+    monkeypatch.setenv("ANTHROPIC_CUSTOM_HEADERS", _ENV_JAHAT_HEADER)
+    tr = _Transport(_ok())
+    sdk = anthropic.Anthropic(
+        api_key=_KUNCI_PEMANGGIL,
+        max_retries=0,
+        http_client=httpx2.Client(transport=httpx2.MockTransport(tr)),
+    )
+    with sdk.beta.messages.stream(
+        model="m", max_tokens=5, messages=[{"role": "user", "content": "x"}]
+    ) as aliran:
+        aliran.get_final_message()
+    assert tr.permintaan.url.host == "jahat.invalid"
+    assert tr.permintaan.headers["x-jahat"] == "1"
+    assert tr.permintaan.headers["authorization"] == "Bearer jahat"
+    assert tr.permintaan.headers["x-api-key"] == "kunci-jahat"
+
+
+def test_tujuan_dikunci_meski_env_base_url_jahat(monkeypatch):
+    _bersihkan_env_sdk(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://jahat.invalid")
+    req = _kirim_lewat_model(monkeypatch)
+    assert req.url.host == "api.anthropic.com"
+    assert req.url.scheme == "https"
+
+
+def test_header_env_jahat_tidak_terkirim_sama_dengan_tanpa_env(monkeypatch):
+    _bersihkan_env_sdk(monkeypatch)
+    dasar = _kirim_lewat_model(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_CUSTOM_HEADERS", _ENV_JAHAT_HEADER)
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "token-env-sintetis")
+    for req in (_kirim_lewat_model(monkeypatch), _kirim_lewat_model(monkeypatch, kali=2)):
+        assert "x-jahat" not in req.headers
+        # SDK 2.5.0 mengirim api_key sebagai ``Authorization: Bearer`` (bukan x-api-key).
+        assert req.headers["authorization"] == f"Bearer {_KUNCI_PEMANGGIL}"
+        assert req.headers["authorization"] == dasar.headers["authorization"]
+        assert "x-api-key" not in req.headers
+        assert "x-api-key" not in dasar.headers
+        assert req.headers["anthropic-version"] == dasar.headers["anthropic-version"]
+        assert req.headers["anthropic-version"] != "1999-01-01"
+        assert set(req.headers) == set(dasar.headers)
+
+
+def test_tanpa_env_tujuan_dan_kunci_pemanggil(monkeypatch):
+    _bersihkan_env_sdk(monkeypatch)
+    req = _kirim_lewat_model(monkeypatch)
+    assert req.url.host == "api.anthropic.com"
+    assert req.headers["authorization"] == f"Bearer {_KUNCI_PEMANGGIL}"
+    assert "x-api-key" not in req.headers
+
+
+def test_sdk_tanpa_custom_headers_gagal_tertutup_tanpa_permintaan(monkeypatch):
+    _bersihkan_env_sdk(monkeypatch)
+    tr = _Transport(_ok())
+
+    def _bungkus(**kw: Any):
+        kw["http_client"] = httpx2.Client(transport=httpx2.MockTransport(tr))
+        sdk = _SDK_ASLI(**kw)
+        del sdk._custom_headers
+        return sdk
+
+    monkeypatch.setattr(anthropic, "Anthropic", _bungkus)
+    k = AnthropicKlienModel(
+        Settings(_env_file=None), kunci_api=_KUNCI_PEMANGGIL, model="m", effort="low"
+    )
+    with pytest.raises(KesalahanModelPermanen, match="tidak dapat diamankan"):
+        k.panggil("instruksi", _RAHASIA, _SKEMA)
+    assert tr.permintaan is None
+
+
 def test_klien_dibuat_malas_bukan_saat_konstruksi(monkeypatch):
     def _larang(**_k: Any) -> None:
         raise AssertionError("klien SDK dibuat saat konstruksi")

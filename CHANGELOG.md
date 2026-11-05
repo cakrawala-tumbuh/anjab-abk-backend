@@ -7,6 +7,10 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diubah
+
+- **Tujuan dan header klien Anthropic dikunci dari env SDK** (backlog #113): `AnthropicKlienModel` selalu memakai `base_url=https://api.anthropic.com` dan mengosongkan header dari `ANTHROPIC_CUSTOM_HEADERS` setelah konstruksi, sehingga `ANTHROPIC_BASE_URL`/`ANTHROPIC_CUSTOM_HEADERS` tidak lagi dapat mengalihkan kunci dan prompt atau menimpa header kredensial. Bila klien SDK tidak punya `_custom_headers` (SDK berubah), `KesalahanModelPermanen` dilempar tanpa permintaan. `pyproject.toml` memakai `anthropic==2.5.0` (sebelumnya `>=2.4,<3`); menaikkan versi wajib lewat uji. Tanpa migrasi, tanpa env baru.
+
 ### Ditambahkan
 
 - **Driver `LANGGANAN_CLAUDE` berbasis CLI dan binary di image** (backlog #112): `ClaudeCliKlienModel` (`ai/klien.py`) memanggil `claude -p` (keluaran JSON + `--json-schema`, `--tools ""`, tanpa sesi, masukan lewat stdin, cwd kosong, env hanya `PATH`/`HOME`/`CLAUDE_CONFIG_DIR`/`DISABLE_UPDATES`). Timeout mematikan seluruh grup proses. Kode gagal-tertutup tanpa percobaan ulang: `PENYEDIA_TIDAK_TERSEDIA` (binary tidak ada) dan `LANGGANAN_BELUM_MASUK`; stdout, stderr, dan prompt tidak dicatat. Kunci API di basis data tidak dibaca pada mode ini. `Dockerfile` target `runtime` memasang `claude-code` terpin (`CLAUDE_CODE_VERSION=2.1.311-1`) dari repo apt bertanda tangan dengan pemeriksaan sidik jari kunci, dan menyetel `CLAUDE_CONFIG_DIR=/var/lib/claude-config`; **image membesar sekitar 280 MiB**. `make test-arm64` kini memeriksa `claude --version`. README memuat catatan risiko; tanpa migrasi, tanpa env deployment baru.

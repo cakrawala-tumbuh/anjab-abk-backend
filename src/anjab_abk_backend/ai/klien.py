@@ -40,6 +40,7 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 _BETA_FALLBACK = "server-side-fallback-2026-07-01"
+_BASE_URL_ANTHROPIC = "https://api.anthropic.com"
 
 _GALAT_SEMENTARA = (
     anthropic.RateLimitError,
@@ -126,6 +127,9 @@ class AnthropicKlienModel:
     data); kelas ini tidak membaca ``os.environ`` dan tidak mencatat kunci di mana pun.
     Klien SDK dibuat saat pertama dipakai, bukan saat impor, dengan ``api_key`` eksplisit
     sehingga SDK tidak jatuh ke ``ANTHROPIC_API_KEY`` atau ``ANTHROPIC_AUTH_TOKEN``.
+    ``api_key`` eksplisit TIDAK menutup env tujuan dan header: tujuan dikunci ke
+    ``_BASE_URL_ANTHROPIC`` dan header dari ``ANTHROPIC_CUSTOM_HEADERS`` dibuang
+    (lihat ``_dapatkan_klien``). Versi SDK dipin di ``pyproject.toml``.
     """
 
     def __init__(
@@ -164,20 +168,38 @@ class AnthropicKlienModel:
         return f"AnthropicKlienModel(model={self._model!r}, effort={self._effort!r})"
 
     def _dapatkan_klien(self) -> Any:
-        """Membuat klien SDK pada pemakaian pertama dengan ``api_key`` eksplisit.
+        """Membuat klien SDK pada pemakaian pertama, dengan tujuan dan header terkunci.
+
+        ``api_key`` eksplisit hanya menutup env kredensial. SDK tetap membaca
+        ``ANTHROPIC_BASE_URL`` bila ``base_url`` kosong dan selalu menggabungkan
+        ``ANTHROPIC_CUSTOM_HEADERS`` ke header bawaan (paling akhir, sehingga dapat
+        menimpa header kredensial). Karena itu ``base_url`` selalu diisi dengan
+        ``_BASE_URL_ANTHROPIC`` dan ``_custom_headers`` (satu-satunya tempat hasil env
+        tersimpan) dikosongkan segera setelah konstruksi. Klien tidak pernah diturunkan
+        lewat ``with_options``/``copy`` karena konstruktor akan membaca env lagi.
+
+        Returns:
+            Klien SDK yang di-cache untuk pemanggilan berikutnya.
 
         Raises:
             KunciModelTidakAda: SDK menolak kredensial.
+            KesalahanModelPermanen: Klien SDK tidak punya ``_custom_headers`` (SDK
+                berubah); gagal tertutup, tidak ada permintaan yang dikirim.
         """
         if self._klien is None:
             try:
-                self._klien = anthropic.Anthropic(
+                sdk = anthropic.Anthropic(
                     api_key=self._kunci,
+                    base_url=_BASE_URL_ANTHROPIC,
                     timeout=float(self._s.ai_timeout_detik),
                     max_retries=0,
                 )
             except anthropic.AnthropicError:
                 raise KunciModelTidakAda("Klien Anthropic tidak dapat dibuat.") from None
+            if not hasattr(sdk, "_custom_headers"):
+                raise KesalahanModelPermanen("Klien SDK tidak dapat diamankan.")
+            sdk._custom_headers = {}
+            self._klien = sdk
         return self._klien
 
     def _argumen(self, instruksi: str, masukan_json: str, skema: dict[str, Any]) -> dict[str, Any]:

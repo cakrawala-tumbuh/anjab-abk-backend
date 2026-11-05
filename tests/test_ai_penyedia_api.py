@@ -499,7 +499,14 @@ def test_cli_versi(
 
 def test_cli_env_daftar_putih_persis_dari_argumen_tiruan(monkeypatch: pytest.MonkeyPatch) -> None:
     rahasia = "nilai-rahasia-sintetis"
-    for nama in ("ANTHROPIC_API_KEY", "AI_KREDENSIAL_KUNCI_INDUK", "DATABASE_URL", "LAIN"):
+    for nama in (
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_CUSTOM_HEADERS",
+        "AI_KREDENSIAL_KUNCI_INDUK",
+        "DATABASE_URL",
+        "LAIN",
+    ):
         monkeypatch.setenv(nama, rahasia)
     monkeypatch.setenv("PATH", "/opt/tiruan")
     monkeypatch.setenv("HOME", "/home/tiruan")
