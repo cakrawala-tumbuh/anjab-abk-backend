@@ -33,6 +33,7 @@ from ..services.ai_run_sql import SqlAiRunService
 from ..services.async_job_sql import SqlAsyncJobService
 from .gateway import FITUR_AI, FUNGSI_TERDAFTAR, FungsiAi
 from .guardrail import susun_instruksi
+from .katalog import daftarkan_fungsi
 from .keluaran import cek_keluaran, skema_dengan_amplop
 from .klien import (
     AnthropicKlienModel,
@@ -254,6 +255,7 @@ def main() -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     settings = get_settings()
+    daftarkan_fungsi(settings)
     if not fitur_aktif(FITUR_AI, settings):
         logger.info("ai_worker_keluar_flag_mati")
         return 0

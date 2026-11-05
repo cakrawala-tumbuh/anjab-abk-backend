@@ -20,6 +20,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     cfg = settings or get_settings()
     configure_logging(cfg.log_level)
 
+    from .ai.katalog import daftarkan_fungsi
+
+    daftarkan_fungsi(cfg)  # ValueError bila AI_FUNGSI_AKTIF memuat kode tak dikenal
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         from .db import dispose_engine, init_engine

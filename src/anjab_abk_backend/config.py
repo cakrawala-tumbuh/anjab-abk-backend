@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     ai_refusal_fallback: bool = True
     """Aktifkan fallback server-side saat penolakan; env ``AI_REFUSAL_FALLBACK``."""
 
+    # Pendaftaran fungsi AI (lihat ai/katalog.py).
+    ai_fungsi_aktif: list[str] = []
+    """Kode fungsi AI yang didaftarkan; bawaan kosong; env ``AI_FUNGSI_AKTIF`` (JSON)."""
+
     # Worker job AI (lihat ai/worker.py).
     ai_worker_poll_detik: int = 5
     """Jeda polling worker saat tidak ada job (detik); env ``AI_WORKER_POLL_DETIK``."""
