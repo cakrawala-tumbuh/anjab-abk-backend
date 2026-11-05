@@ -10,7 +10,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     """Kode fungsi AI yang didaftarkan; bawaan kosong; env ``AI_FUNGSI_AKTIF`` (JSON)."""
 
     # Worker job AI (lihat ai/worker.py).
+    ai_kredensial_kunci_induk: SecretStr = SecretStr("")
+    """Kunci Fernet pengenkripsi kunci API penyedia AI; env ``AI_KREDENSIAL_KUNCI_INDUK``.
+    Kosong = tulis kunci API ditolak (gagal-tertutup). Tidak boleh disimpan di basis data."""
     ai_worker_poll_detik: int = 5
     """Jeda polling worker saat tidak ada job (detik); env ``AI_WORKER_POLL_DETIK``."""
     ai_job_maks_percobaan: int = 3

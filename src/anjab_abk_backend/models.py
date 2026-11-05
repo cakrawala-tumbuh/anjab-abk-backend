@@ -152,6 +152,44 @@ class AiSaklarEventModel(Base):
     created_at: Mapped[datetime] = _ts()
 
 
+class AiPenyediaPengaturanModel(Base):
+    """Tabel `ai_penyedia_pengaturan` — satu baris (`id` = `TUNGGAL`) pilihan penyedia AI.
+
+    `kredensial_terenkripsi` berisi token Fernet kunci API; tidak pernah teks asli.
+    """
+
+    __tablename__ = "ai_penyedia_pengaturan"
+
+    id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    effort: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    kredensial_terenkripsi: Mapped[str | None] = mapped_column(Text, nullable=True)
+    kredensial_akhiran: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    diperbarui_oleh: Mapped[str | None] = mapped_column(String(254), nullable=True)
+    updated_at: Mapped[datetime] = _ts()
+
+    def __repr__(self) -> str:
+        """Representasi tanpa kolom kredensial."""
+        return f"<AiPenyediaPengaturanModel id={self.id!r} mode={self.mode!r}>"
+
+
+class AiPenyediaEventModel(Base):
+    """Tabel `ai_penyedia_event` — riwayat perubahan pengaturan penyedia, append-only."""
+
+    __tablename__ = "ai_penyedia_event"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    aksi: Mapped[str] = mapped_column(String(20), nullable=False)
+    mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    effort: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    kredensial_akhiran: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    alasan: Mapped[str] = mapped_column(Text, nullable=False)
+    aktor: Mapped[str] = mapped_column(String(254), nullable=False)
+    created_at: Mapped[datetime] = _ts()
+
+
 # ======================================================================================
 # Core
 # ======================================================================================
