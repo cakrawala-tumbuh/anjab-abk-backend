@@ -88,6 +88,7 @@ from .redesain.services.versi_metode_sql import SqlVersiMetodeService
 from .redesain.services.yayasan import RingkasanYayasanService
 from .redesain.services.yayasan_sql import SqlRingkasanYayasanService
 from .security import JwksVerifier, PlaceholderVerifier, Principal, TokenVerifier, bearer_scheme
+from .services.ai_penyedia_sql import SqlAiPenyediaService
 from .services.ai_run import AiRunService
 from .services.ai_run_sql import SqlAiRunService
 from .services.ai_saklar import SaklarAiService
@@ -481,6 +482,13 @@ def get_saklar_ai_service(
 ) -> SaklarAiService:
     """SEAM: `SaklarAiService` PostgreSQL (kill switch layanan AI; flag env dari settings)."""
     return SqlSaklarAiService(session, settings)
+
+
+def get_ai_penyedia_service(
+    session: SessionDep, settings: Annotated[Settings, Depends(get_settings)]
+) -> SqlAiPenyediaService:
+    """SEAM: pengaturan penyedia AI di PostgreSQL. Rute dilarang memanggil `baca_kunci_api`."""
+    return SqlAiPenyediaService(session, settings)
 
 
 def get_skema_db_service(session: SessionDep) -> SkemaDbService:

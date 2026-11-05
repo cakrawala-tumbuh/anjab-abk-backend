@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response
 
 from ... import __version__
+from ...ai.langganan_cli import StatusCli, baca_status_cli
+from ...ai.penyedia import AI_EFFORT_BAWAAN, AI_MODEL_BAWAAN, AiEffort, AiPenyediaMode
 from ...config import Settings, get_settings
 from ...dependencies import (
     READ_GUARDS,
     Idempotency,
     Pagination,
+    get_ai_penyedia_service,
     get_ai_run_service,
     get_async_job_service,
     get_current_principal,
@@ -25,6 +29,14 @@ from ...dependencies import (
 )
 from ...errors import ServiceUnavailableError
 from ...fitur import daftar_fitur
+from ...schemas.ai_penyedia import (
+    AiPenyediaKredensialHapus,
+    AiPenyediaKredensialPasang,
+    AiPenyediaModelUbah,
+    AiPenyediaModeUbah,
+    AiPenyediaRead,
+    AiPenyediaStatusRead,
+)
 from ...schemas.ai_run import AiRunRead, StatusQaAi
 from ...schemas.ai_saklar import SaklarAiAlasan, SaklarAiRead
 from ...schemas.async_job import AsyncJobRead
@@ -39,6 +51,7 @@ from ...schemas.common import (
 )
 from ...schemas.skema_db import SkemaDbRead
 from ...security import Principal
+from ...services.ai_penyedia_sql import SqlAiPenyediaService
 from ...services.ai_run import AiRunService
 from ...services.ai_saklar import SaklarAiService
 from ...services.async_job import AsyncJobService
@@ -278,4 +291,213 @@ def hidupkan_saklar_ai(
         response,
         SaklarAiRead,
         lambda: service.hidupkan(_LAYANAN_SAKLAR, body.alasan, principal.subject),
+    )
+
+
+def _penyedia_read(
+    status: AiPenyediaStatusRead, cli: StatusCli, settings: Settings
+) -> AiPenyediaRead:
+    """Rakit respons penyedia dari status service, status CLI, dan setelan baca-saja env."""
+    return AiPenyediaRead(
+        mode=status.mode,
+        mode_tersedia=list(AiPenyediaMode),
+        kredensial_terpasang=status.kredensial_terpasang,
+        kredensial_akhiran=status.kredensial_akhiran,
+        kredensial_terbaca=status.kredensial_terbaca,
+        enkripsi_siap=status.enkripsi_siap,
+        model=status.model,
+        effort=status.effort,
+        effort_tersedia=list(AiEffort),
+        model_bawaan=AI_MODEL_BAWAAN,
+        effort_bawaan=AiEffort(AI_EFFORT_BAWAAN),
+        diperbarui_oleh=status.diperbarui_oleh,
+        diperbarui_pada=status.pada,
+        langganan_cli_terpasang=cli.terpasang,
+        langganan_cli_masuk=cli.masuk,
+        langganan_cli_versi=cli.versi,
+        inference_geo=settings.ai_inference_geo,
+        refusal_fallback=settings.ai_refusal_fallback,
+    )
+
+
+def _aksi_penyedia(
+    aksi: Callable[[], AiPenyediaStatusRead], settings: Settings
+) -> Callable[[], AiPenyediaRead]:
+    """Bungkus aksi service agar seluruh pra-kondisinya berjalan di dalam aksi idempoten.
+
+    Status CLI dibaca lebih dulu supaya baris pengaturan tidak terkunci selama subprocess.
+    Replay `Idempotency-Key` tidak memanggil aksi ini, sehingga tidak bertemu `409` keadaan
+    dan membalas respons tersimpan beserta status CLI saat itu.
+    """
+
+    def _jalankan() -> AiPenyediaRead:
+        cli = baca_status_cli()
+        return _penyedia_read(aksi(), cli, settings)
+
+    return _jalankan
+
+
+_RESP_PENYEDIA_AKSI = {
+    **_RESP_ADMIN,
+    **IDEMPOTENCY_RESPONSES,
+    409: {"model": ErrorResponse, "description": "Tidak ada perubahan atau key sedang diproses."},
+    422: {"model": ErrorResponse, "description": "Payload tidak valid."},
+}
+
+
+@router.get(
+    "/system/ai/penyedia",
+    response_model=AiPenyediaRead,
+    summary="Pengaturan penyedia model AI",
+    tags=["system"],
+    operation_id="system_ai_penyedia_get",
+    dependencies=[Depends(require_admin)],
+    responses=_RESP_ADMIN,
+)
+def get_ai_penyedia(
+    service: Annotated[SqlAiPenyediaService, Depends(get_ai_penyedia_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> AiPenyediaRead:
+    """Baca mode, model, effort, status kunci, dan status CLI langganan (admin saja).
+
+    Dapat menjalankan subprocess status CLI bila binary terpasang. Kredensial dan identitas
+    akun tidak pernah ada di respons; memilih penyedia tidak menyalakan AI.
+    """
+    return _penyedia_read(service.status(), baca_status_cli(), settings)
+
+
+@router.post(
+    "/system/ai/penyedia/mode",
+    response_model=AiPenyediaRead,
+    summary="Ubah mode penyedia model AI",
+    tags=["system"],
+    operation_id="system_ai_penyedia_mode",
+    dependencies=[Depends(require_admin)],
+    responses=_RESP_PENYEDIA_AKSI,
+)
+def ubah_mode_ai_penyedia(
+    body: AiPenyediaModeUbah,
+    service: Annotated[SqlAiPenyediaService, Depends(get_ai_penyedia_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[Principal, Depends(require_admin)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> AiPenyediaRead:
+    """Pilih penyedia (admin saja). ``409`` bila sama; mode langganan boleh walau CLI belum siap.
+
+    Tidak menyalakan AI. Aktor diambil dari token.
+    """
+    return run_idempotent(
+        idem,
+        response,
+        AiPenyediaRead,
+        _aksi_penyedia(
+            lambda: service.ubah_mode(body.mode, body.alasan, principal.subject), settings
+        ),
+    )
+
+
+@router.post(
+    "/system/ai/penyedia/model",
+    response_model=AiPenyediaRead,
+    summary="Ubah model dan effort AI",
+    tags=["system"],
+    operation_id="system_ai_penyedia_model",
+    dependencies=[Depends(require_admin)],
+    responses=_RESP_PENYEDIA_AKSI,
+)
+def ubah_model_ai_penyedia(
+    body: AiPenyediaModelUbah,
+    service: Annotated[SqlAiPenyediaService, Depends(get_ai_penyedia_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[Principal, Depends(require_admin)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> AiPenyediaRead:
+    """Ubah model dan effort (admin saja). ``null`` mengembalikan ke bawaan.
+
+    Raises:
+        ModelDitolak: Nama model tidak sah atau mewajibkan retensi (``422 MODEL_DITOLAK``).
+        ConflictError: Keduanya sama dengan yang berlaku (``409``).
+    """
+    effort = body.effort.value if body.effort else None
+    return run_idempotent(
+        idem,
+        response,
+        AiPenyediaRead,
+        _aksi_penyedia(
+            lambda: service.ubah_model(body.model, effort, body.alasan, principal.subject),
+            settings,
+        ),
+    )
+
+
+@router.post(
+    "/system/ai/penyedia/kredensial",
+    response_model=AiPenyediaRead,
+    summary="Pasang kunci API Anthropic",
+    tags=["system"],
+    operation_id="system_ai_penyedia_kredensial_pasang",
+    dependencies=[Depends(require_admin)],
+    responses={
+        **_RESP_PENYEDIA_AKSI,
+        503: {
+            "model": ErrorResponse,
+            "description": "KUNCI_INDUK_TIDAK_ADA: kunci induk enkripsi belum diatur atau salah.",
+        },
+    },
+)
+def pasang_kredensial_ai_penyedia(
+    body: AiPenyediaKredensialPasang,
+    service: Annotated[SqlAiPenyediaService, Depends(get_ai_penyedia_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[Principal, Depends(require_admin)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> AiPenyediaRead:
+    """Simpan kunci API terenkripsi, menggantikan yang lama (admin saja).
+
+    Respons hanya memuat empat karakter akhir. Catatan idempotensi menyimpan respons itu dan
+    hash dari key header; isi permintaan tidak pernah disimpan. Key yang sama dengan kunci
+    berbeda membalas respons lama tanpa memasang kunci baru.
+
+    Raises:
+        KunciIndukTidakAda: Kunci induk kosong atau salah (``503 KUNCI_INDUK_TIDAK_ADA``).
+    """
+    return run_idempotent(
+        idem,
+        response,
+        AiPenyediaRead,
+        _aksi_penyedia(
+            lambda: service.pasang_kredensial(
+                body.kunci_api.get_secret_value(), body.alasan, principal.subject
+            ),
+            settings,
+        ),
+    )
+
+
+@router.post(
+    "/system/ai/penyedia/kredensial/hapus",
+    response_model=AiPenyediaRead,
+    summary="Hapus kunci API Anthropic",
+    tags=["system"],
+    operation_id="system_ai_penyedia_kredensial_hapus",
+    dependencies=[Depends(require_admin)],
+    responses=_RESP_PENYEDIA_AKSI,
+)
+def hapus_kredensial_ai_penyedia(
+    body: AiPenyediaKredensialHapus,
+    service: Annotated[SqlAiPenyediaService, Depends(get_ai_penyedia_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[Principal, Depends(require_admin)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> AiPenyediaRead:
+    """Hapus kunci API tersimpan (admin saja). ``409`` bila tidak terpasang."""
+    return run_idempotent(
+        idem,
+        response,
+        AiPenyediaRead,
+        _aksi_penyedia(lambda: service.hapus_kredensial(body.alasan, principal.subject), settings),
     )

@@ -23,7 +23,7 @@ __all__ = [
 class KunciIndukTidakAda(ServiceUnavailableError):
     """503: kunci induk kosong atau bukan kunci Fernet yang sah (gagal-tertutup)."""
 
-    error_code = "kunci_induk_tidak_ada"
+    error_code = "KUNCI_INDUK_TIDAK_ADA"
 
 
 class KredensialTakTerbaca(Exception):

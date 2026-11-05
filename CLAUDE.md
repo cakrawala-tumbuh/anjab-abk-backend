@@ -82,6 +82,28 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-05] API admin pengaturan penyedia AI (rute `/system/ai/penyedia`)
+
+Backlog `#110`, permukaan HTTP untuk `SqlAiPenyediaService` (`#109`). Pemakaian oleh worker milik
+`#111`; rute dilarang memanggil `baca_kunci_api` (dijaga `test_rute_tidak_pernah_memanggil_baca_kunci_api`).
+
+- **Panjang kunci dua lapis**: skema menolak di bawah 20 karakter dihitung setelah `strip`;
+  `_MIN_KUNCI = 8` di service sengaja tidak diubah. `kunci_api` bertipe `SecretStr`.
+- **Kode galat `MODEL_DITOLAK` dan `KUNCI_INDUK_TIDAK_ADA` huruf besar**, menyimpang dari kode lain
+  yang huruf kecil, karena kontrak klien web bergantung padanya. `model` di body tanpa batasan
+  bentuk agar penolakannya selalu berkode ini; `model` dan `effort` wajib dikirim, boleh `null`
+  (`null` = bawaan), agar field yang lupa dikirim tidak mereset nilai.
+- **Pra-kondisi `409` berjalan di dalam aksi idempoten** (di service), sehingga retry
+  `Idempotency-Key` setelah sukses membalas respons tersimpan. Replay memuat status CLI saat itu.
+- **Catatan idempotensi** hanya menyimpan SHA-256 dari `{method}:{path}:{key}` dan JSON respons
+  (memuat `kredensial_akhiran`); tidak ada hash body. Konsekuensi: key sama dengan kunci berbeda
+  membalas respons lama tanpa memasang kunci baru (`test_key_sama_kunci_berbeda_...`).
+- **Status CLI** (`ai/langganan_cli.py`): `claude auth status` dijalankan dengan stdout/stderr
+  `DEVNULL`, env hanya `PATH`, `HOME`, `CLAUDE_CONFIG_DIR`, batas 10 detik per subprocess. Galat dicatat
+  nama jenisnya saja. GET dan POST bisa tertahan sampai ± 20 detik bila CLI macet; binary tak ada
+  dibalas seketika. Status dibaca sebelum service menulis agar baris tidak terkunci selama subprocess.
+- `inference_geo` keluar apa adanya dari env (string kosong bila tidak diatur, bukan `null`).
+
 ### [2026-11-05] Penyerap hasil run AI ke versi narasi (proses terpisah)
 
 Backlog `#99`. Worker `ai/worker.py` hanya menulis `ai_run` dan `async_job`; `narasi/penyerap.py`

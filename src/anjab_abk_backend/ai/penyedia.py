@@ -51,7 +51,7 @@ class AiEffort(StrEnum):
 class ModelDitolak(ValidationAppError):
     """422: nama model tidak sah atau mewajibkan retensi (dikecualikan K-4)."""
 
-    error_code = "model_ditolak"
+    error_code = "MODEL_DITOLAK"
 
 
 def validasi_model(model: str) -> str:
