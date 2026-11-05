@@ -82,6 +82,26 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-05] Narasi: tabel kasus, versi, dan tautan sumber (append-only di basis data)
+
+Backlog `#92`. Struktur data untuk narasi per kasus dengan versi yang tidak menimpa catatan
+lama; service (`#93`) dan rute (`#94`) menyusul.
+
+- **`narasi_kasus`**: lingkup = delapan kolom (`instrument_id`, `field_key`, `peran_ref`,
+  `periode`, `sekolah_id`, `assignment_ref`, `target_subject_ref`, `konteks_kode`) dengan
+  UNIQUE `NULLS NOT DISTINCT` (PostgreSQL 15+; test dan deployment memakai 16). Tidak ada
+  `context_id`. `status` adalah proyeksi yang boleh berubah.
+- **`narasi_versi`** dan **`narasi_versi_sumber`** append-only ditegakkan trigger
+  `narasi_tolak_ubah()` (`BEFORE UPDATE OR DELETE`), bukan hanya service. Versi menautkan ke
+  run AI (`ai_run_id` UNIQUE), bukan sebaliknya. `metadata_ai` hanya memuat kunci
+  `METADATA_AI_KUNCI`; model/prompt/snapshot dibaca lewat `ai_run`.
+- Enum berupa string di kolom + CHECK (tanpa enum DB). `status_hasil` belum dibatasi nilainya
+  (menunggu mesin status).
+- Konsekuensi: baris di dua tabel itu tidak bisa dihapus, termasuk lewat `DELETE` di service
+  backup/pembersihan; hapus/ubah hanya dengan menonaktifkan trigger secara sadar.
+- Satu revisi Alembic `74125eebc244` (tabel + fungsi + trigger); `downgrade` membuang trigger
+  dan fungsinya.
+
 ### [2026-11-05] Narasi: tabel `narasi_sumber` — teks sumber tak berubah, rute Tim
 
 Backlog `#91` (BE-1 pemanggil AI; berguna juga untuk jalur manual). Aplikasi belum punya

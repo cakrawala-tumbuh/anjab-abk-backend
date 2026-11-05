@@ -24,6 +24,7 @@ from typing import Any
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -39,6 +40,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from anjab_abk_backend.narasi.schemas.kasus import (
+    BasisRelation,
+    NarrativeKind,
+    RevisionOrigin,
+    StatusNarasi,
+)
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -1483,3 +1491,124 @@ class NarasiSumberModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )
+
+
+def _in_check(kolom: str, enum_cls: type) -> str:
+    """Ekspresi SQL `kolom IN (...)` dari nilai sebuah StrEnum (untuk CHECK constraint)."""
+    nilai = ", ".join(f"'{m.value}'" for m in enum_cls)  # type: ignore[attr-defined]
+    return f"{kolom} IN ({nilai})"
+
+
+class NarasiKasusModel(Base):
+    """Kasus narasi: satu lingkup unik (instrumen, field, peran, periode, ...) yang bersejarah.
+
+    UNIQUE delapan kolom lingkup memakai NULLS NOT DISTINCT (PostgreSQL 15+), sehingga kolom
+    null ikut dibandingkan. `status` adalah proyeksi yang boleh berubah; riwayat ada di
+    `narasi_versi`. Tidak ada `context_id`.
+    """
+
+    __tablename__ = "narasi_kasus"
+    __table_args__ = (
+        UniqueConstraint(
+            "instrument_id",
+            "field_key",
+            "peran_ref",
+            "periode",
+            "sekolah_id",
+            "assignment_ref",
+            "target_subject_ref",
+            "konteks_kode",
+            name="uq_narasi_kasus_lingkup",
+            postgresql_nulls_not_distinct=True,
+        ),
+        CheckConstraint(_in_check("narrative_kind", NarrativeKind), name="narrative_kind"),
+        CheckConstraint(_in_check("status", StatusNarasi), name="status"),
+        Index("ix_narasi_kasus_status_updated_at", "status", "updated_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    instrument_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    field_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    peran_ref: Mapped[str] = mapped_column(String(100), nullable=False)
+    periode: Mapped[str] = mapped_column(String(20), nullable=False)
+    sekolah_id: Mapped[str | None] = mapped_column(
+        ForeignKey("sekolah.id", name="fk_narasi_kasus_sekolah_id_sekolah"), nullable=True
+    )
+    assignment_ref: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    target_subject_ref: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    konteks_kode: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    narrative_kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False)
+    intended_use: Mapped[str] = mapped_column(String(200), nullable=False)
+    permission_scope: Mapped[str] = mapped_column(String(200), nullable=False)
+    sensitivity_class: Mapped[str] = mapped_column(String(40), nullable=False)
+    dibuat_oleh: Mapped[str] = mapped_column(String(254), nullable=False)
+    created_at: Mapped[datetime] = _ts()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+
+class NarasiVersiModel(Base):
+    """Satu versi teks sebuah kasus narasi; append-only (trigger `narasi_tolak_ubah`).
+
+    `ai_run_id` UNIQUE: satu run AI menghasilkan paling banyak satu versi. `metadata_ai`
+    hanya memuat kunci `METADATA_AI_KUNCI`; model/prompt/snapshot dibaca lewat `ai_run`.
+    `status_hasil` mencatat hasil pembuatan versi (nilai bebas hingga item mesin status).
+    """
+
+    __tablename__ = "narasi_versi"
+    __table_args__ = (
+        UniqueConstraint("narasi_id", "revision_no", name="uq_narasi_versi_narasi_revisi"),
+        CheckConstraint("revision_no > 0", name="revision_no_positif"),
+        CheckConstraint(_in_check("revision_origin", RevisionOrigin), name="revision_origin"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    narasi_id: Mapped[str] = mapped_column(
+        ForeignKey("narasi_kasus.id", name="fk_narasi_versi_narasi_id_narasi_kasus"),
+        nullable=False,
+    )
+    revision_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    revision_origin: Mapped[str] = mapped_column(String(20), nullable=False)
+    status_hasil: Mapped[str] = mapped_column(String(30), nullable=False)
+    teks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    supersedes_id: Mapped[str | None] = mapped_column(
+        ForeignKey("narasi_versi.id", name="fk_narasi_versi_supersedes_id_narasi_versi"),
+        nullable=True,
+    )
+    ai_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("ai_run.id", name="fk_narasi_versi_ai_run_id_ai_run"),
+        nullable=True,
+        unique=True,
+    )
+    output_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    metadata_ai: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    dibuat_oleh: Mapped[str] = mapped_column(String(254), nullable=False)
+    created_at: Mapped[datetime] = _ts()
+
+
+class NarasiVersiSumberModel(Base):
+    """Tautan versi narasi ke kutipan teks sumber; append-only (trigger `narasi_tolak_ubah`).
+
+    PK sendiri karena satu sumber boleh dikutip berkali-kali dalam satu versi.
+    """
+
+    __tablename__ = "narasi_versi_sumber"
+    __table_args__ = (
+        CheckConstraint(_in_check("basis_relation", BasisRelation), name="basis_relation"),
+        Index("ix_narasi_versi_sumber_narasi_versi_id", "narasi_versi_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    narasi_versi_id: Mapped[str] = mapped_column(
+        ForeignKey("narasi_versi.id", name="fk_narasi_versi_sumber_narasi_versi_id_narasi_versi"),
+        nullable=False,
+    )
+    sumber_id: Mapped[str] = mapped_column(
+        ForeignKey("narasi_sumber.id", name="fk_narasi_versi_sumber_sumber_id_narasi_sumber"),
+        nullable=False,
+    )
+    source_span: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    basis_relation: Mapped[str] = mapped_column(String(20), nullable=False)
