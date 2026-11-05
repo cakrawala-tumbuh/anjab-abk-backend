@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from .v1 import (
+    ai_usulan,
     dcs_hasil,
     dcs_instrumen,
     dcs_kuesioner,
@@ -283,6 +284,11 @@ api_router.include_router(
     redesain_sesi.router,
     prefix="/redesain/sesi",
     tags=["redesain"],
+)
+api_router.include_router(
+    ai_usulan.router,
+    prefix="/ai/usulan",
+    tags=["ai"],
 )
 api_router.include_router(
     narasi_sumber.router,

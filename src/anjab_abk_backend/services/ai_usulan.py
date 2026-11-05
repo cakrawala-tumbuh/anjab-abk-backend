@@ -6,15 +6,22 @@ from typing import Any, Protocol
 
 from ..ai.redaksi import SumberAi
 from ..errors import ConflictError
-from ..schemas.ai_usulan import AiUsulanRingkas, SasaranUsulan
+from ..schemas.ai_usulan import AiUsulanRead, AiUsulanRingkas, SasaranUsulan
+from ..schemas.search import Domain, Order
 from ..security import Principal
 
 __all__ = [
+    "SEARCHABLE_FIELDS",
     "AiUsulanService",
     "FungsiAiBelumAktifError",
     "PiiModeAiBelumDidukungError",
     "UsulanBerjalanError",
 ]
+
+SEARCHABLE_FIELDS = frozenset(
+    {"fungsi", "sasaran_jenis", "sasaran_id", "hasil_serap", "created_at"}
+)
+"""Field yang boleh dipakai pada domain search usulan AI; `isi` dan `amplop` tidak termasuk."""
 
 
 class PiiModeAiBelumDidukungError(ConflictError):
@@ -48,4 +55,27 @@ class AiUsulanService(Protocol):
         principal: Principal,
     ) -> AiUsulanRingkas:
         """Periksa gerbang, ajukan job lewat gateway, dan catat satu usulan."""
+        ...
+
+    def get(self, usulan_id: str) -> AiUsulanRead:
+        """Ambil satu usulan lengkap dengan `isi`/`amplop`; `NotFoundError` (404) bila tak ada."""
+        ...
+
+    def list(
+        self,
+        *,
+        fungsi: str | None,
+        sasaran_jenis: str | None,
+        sasaran_id: str | None,
+        hasil_serap: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[AiUsulanRingkas], int]:
+        """Daftar ringkas (tanpa `isi`/`amplop`), terbaru dulu, dengan filter opsional."""
+        ...
+
+    def search(
+        self, *, domain: Domain, order: Order, limit: int, offset: int
+    ) -> tuple[list[AiUsulanRingkas], int]:
+        """Cari memakai domain ala Odoo (field: `SEARCHABLE_FIELDS`); hasil tanpa `isi`/`amplop`."""
         ...

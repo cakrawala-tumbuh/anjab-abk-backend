@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-__all__ = ["AiUsulanRingkas", "HasilSerapUsulan", "SasaranUsulan"]
+__all__ = ["AiUsulanRead", "AiUsulanRingkas", "HasilSerapUsulan", "SasaranUsulan"]
 
 
 class SasaranUsulan(StrEnum):
@@ -42,3 +43,17 @@ class AiUsulanRingkas(BaseModel):
     diserap_at: datetime | None = Field(default=None, description="Null sampai run diserap.")
     hasil_serap: HasilSerapUsulan | None = Field(default=None, description="Hasil serap.")
     kode_serap: list[str] | None = Field(default=None, description="Kode alasan hasil `MANUAL`.")
+
+
+class AiUsulanRead(AiUsulanRingkas):
+    """Satu usulan lengkap untuk Tim Kajian: ringkas ditambah keluaran model.
+
+    `isi` dan `amplop` adalah keluaran model (null sampai diserap) dan hanya keluar dari
+    rute detail; `masukan` run tidak pernah dibuka dan `keluaran` run tidak lewat sini.
+    """
+
+    isi: dict[str, Any] | None = Field(default=None, description="Isi usulan; null sampai diserap.")
+    amplop: dict[str, Any] | None = Field(
+        default=None, description="Amplop keluaran model; null sampai diserap."
+    )
+    output_hash: str | None = Field(default=None, description="SHA-256 keluaran; null bila tanpa.")
