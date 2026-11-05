@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ...errors import ConflictError, ForbiddenError, NotFoundError, ValidationAppError
+from ...errors import ForbiddenError, NotFoundError, ValidationAppError
 from ...models import (
     NarasiEventModel,
     NarasiKasusModel,
@@ -17,6 +17,9 @@ from ...models import (
     NarasiVersiModel,
     NarasiVersiSumberModel,
 )
+from ...schemas.search import Domain, Order
+from ...services.domain import validate_searchable_fields
+from ...services.domain_sql import FieldMap, FieldSpec, compile_domain, order_by_columns
 from ..schemas.kasus import METADATA_AI_KUNCI, EventKind, RevisionOrigin, StatusNarasi
 from ..schemas.mesin import (
     AKTOR_AI_WORKER,
@@ -27,11 +30,14 @@ from ..schemas.mesin import (
     NarasiKasusRead,
     NarasiVersiRead,
 )
+from ..schemas.rute import NarasiVersiSumberRead
 from .narasi import (
     EVENT_TAHAP_TIM,
+    SEARCHABLE_FIELDS_KASUS,
     STATUS_HASIL_VERSI,
     TRANSISI_NARASI,
     EventBelumDibukaError,
+    LingkupGandaError,
     TransisiTidakSahError,
     VersiBasiError,
 )
@@ -76,6 +82,100 @@ class SqlNarasiService:
             .limit(1)
         ).one_or_none()
 
+    def get_kasus(self, narasi_id: str) -> NarasiKasusRead:
+        """Ambil satu kasus; `NotFoundError` (404) bila tak ada."""
+        rec = self._s.get(NarasiKasusModel, narasi_id)
+        if rec is None:
+            raise NotFoundError(f"Kasus narasi '{narasi_id}' tidak ditemukan.")
+        return _to_kasus(rec)
+
+    @staticmethod
+    def _field_map_kasus() -> FieldMap:
+        m = NarasiKasusModel
+        return {
+            "status": FieldSpec(column=m.status),
+            "instrument_id": FieldSpec(column=m.instrument_id),
+            "field_key": FieldSpec(column=m.field_key),
+            "periode": FieldSpec(column=m.periode),
+            "narrative_kind": FieldSpec(column=m.narrative_kind),
+            "created_at": FieldSpec(column=m.created_at),
+        }
+
+    def list_kasus(
+        self,
+        *,
+        status: str | None,
+        instrument_id: str | None,
+        periode: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[NarasiKasusRead], int]:
+        """Daftar kasus terbaru dulu; filter `status`/`instrument_id`/`periode` opsional."""
+        m = NarasiKasusModel
+        conds = []
+        if status is not None:
+            conds.append(m.status == status)
+        if instrument_id is not None:
+            conds.append(m.instrument_id == instrument_id)
+        if periode is not None:
+            conds.append(m.periode == periode)
+        total = self._s.scalar(select(func.count()).select_from(m).where(*conds)) or 0
+        rows = self._s.scalars(
+            select(m).where(*conds).order_by(m.created_at.desc(), m.id).limit(limit).offset(offset)
+        ).all()
+        return [_to_kasus(r) for r in rows], total
+
+    def search_kasus(
+        self, *, domain: Domain, order: Order, limit: int, offset: int
+    ) -> tuple[list[NarasiKasusRead], int]:
+        """Cari kasus memakai domain ala Odoo (field di-whitelist, nilai bound parameter).
+
+        Raises:
+            ValidationAppError: field di luar `SEARCHABLE_FIELDS_KASUS`.
+        """
+        validate_searchable_fields(domain, order, SEARCHABLE_FIELDS_KASUS)
+        m = NarasiKasusModel
+        field_map = self._field_map_kasus()
+        cond = compile_domain(domain, field_map)
+        order_cols = order_by_columns(order, field_map) or [m.created_at.desc(), m.id]
+        total = self._s.scalar(select(func.count()).select_from(m).where(cond)) or 0
+        rows = self._s.scalars(
+            select(m).where(cond).order_by(*order_cols).limit(limit).offset(offset)
+        ).all()
+        return [_to_kasus(r) for r in rows], total
+
+    def versi_terbaru(self, narasi_id: str) -> NarasiVersiRead | None:
+        """Versi ber-`revision_no` tertinggi kasus, atau `None`."""
+        rec = self._versi_terbaru(narasi_id)
+        return _to_versi(rec) if rec else None
+
+    def daftar_versi(self, narasi_id: str) -> list[NarasiVersiRead]:
+        """Seluruh versi kasus, urut `revision_no` naik."""
+        rows = self._s.scalars(
+            select(NarasiVersiModel)
+            .where(NarasiVersiModel.narasi_id == narasi_id)
+            .order_by(NarasiVersiModel.revision_no)
+        ).all()
+        return [_to_versi(r) for r in rows]
+
+    def sumber_versi(self, narasi_versi_id: str) -> list[NarasiVersiSumberRead]:
+        """Tautan sumber sebuah versi (tanpa teks sumber), urut kemunculan."""
+        rows = self._s.scalars(
+            select(NarasiVersiSumberModel)
+            .where(NarasiVersiSumberModel.narasi_versi_id == narasi_versi_id)
+            .order_by(NarasiVersiSumberModel.id)
+        ).all()
+        return [NarasiVersiSumberRead.model_validate(r, from_attributes=True) for r in rows]
+
+    def daftar_event(self, narasi_id: str) -> list[NarasiEventRead]:
+        """Seluruh event kasus, urut waktu naik."""
+        rows = self._s.scalars(
+            select(NarasiEventModel)
+            .where(NarasiEventModel.narasi_id == narasi_id)
+            .order_by(NarasiEventModel.event_at, NarasiEventModel.id)
+        ).all()
+        return [_to_event(r) for r in rows]
+
     @staticmethod
     def _cek_transisi(dari: str, ke: StatusNarasi) -> None:
         boleh = TRANSISI_NARASI.get(StatusNarasi(dari), frozenset())
@@ -86,7 +186,8 @@ class SqlNarasiService:
         """Buat kasus berstatus `SOURCE_CHECKED`.
 
         Raises:
-            ConflictError: lingkup kasus yang sama sudah ada (409).
+            LingkupGandaError: lingkup kasus yang sama sudah ada (409).
+            ValidationAppError: `sekolah_id` tak dikenal (422).
         """
         rec = NarasiKasusModel(
             id=str(uuid.uuid4()),
@@ -99,9 +200,12 @@ class SqlNarasiService:
                 self._s.add(rec)
                 self._s.flush()
         except IntegrityError as exc:
-            if getattr(exc.orig, "sqlstate", None) != "23505":
+            sqlstate = getattr(exc.orig, "sqlstate", None)
+            if sqlstate == "23503":
+                raise ValidationAppError("sekolah_id tidak ditemukan.") from exc
+            if sqlstate != "23505":
                 raise
-            raise ConflictError("Kasus narasi untuk lingkup ini sudah ada.") from exc
+            raise LingkupGandaError("Kasus narasi untuk lingkup ini sudah ada.") from exc
         self._s.refresh(rec)
         return _to_kasus(rec)
 

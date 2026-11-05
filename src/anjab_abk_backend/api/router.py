@@ -13,6 +13,7 @@ from .v1 import (
     jabatan,
     jenjang_pendidikan,
     mata_pelajaran,
+    narasi_kasus,
     narasi_sumber,
     opm_hasil,
     opm_kuesioner,
@@ -284,6 +285,11 @@ api_router.include_router(
 api_router.include_router(
     narasi_sumber.router,
     prefix="/narasi/sumber",
+    tags=["narasi"],
+)
+api_router.include_router(
+    narasi_kasus.router,
+    prefix="/narasi/kasus",
     tags=["narasi"],
 )
 api_router.include_router(

@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from ...errors import ConflictError
+from ...errors import ConflictError, ValidationAppError
+from ...schemas.search import Domain, Order
 from ..schemas.kasus import EventKind, RevisionOrigin, StatusNarasi
 from ..schemas.mesin import (
     AktorNarasi,
@@ -17,6 +18,12 @@ from ..schemas.mesin import (
     NarasiKasusRead,
     NarasiVersiRead,
 )
+from ..schemas.rute import NarasiVersiSumberRead
+
+SEARCHABLE_FIELDS_KASUS = frozenset(
+    {"status", "instrument_id", "field_key", "periode", "narrative_kind", "created_at"}
+)
+"""Field yang boleh dipakai pada domain search kasus narasi."""
 
 S = StatusNarasi
 
@@ -45,6 +52,24 @@ class EventBelumDibukaError(ConflictError):
     """409: jenis event di luar tahap Tim (belum dibuka)."""
 
     error_code = "event_belum_dibuka"
+
+
+class LingkupGandaError(ConflictError):
+    """409: lingkup kasus yang sama sudah ada."""
+
+    error_code = "narasi_lingkup_ganda"
+
+
+class JenisBelumDibukaError(ValidationAppError):
+    """422: `narrative_kind` selain `F1_FORMAL` belum dibuka pada jalur manual."""
+
+    error_code = "narasi_jenis_belum_dibuka"
+
+
+class SensitifBelumDibukaError(ValidationAppError):
+    """422: kasus `SENSITIF` belum dibuka."""
+
+    error_code = "narasi_sensitif_belum_dibuka"
 
 
 class VersiBasiError(ConflictError):
@@ -96,4 +121,42 @@ class NarasiService(Protocol):
         catatan: str | None,
     ) -> NarasiEventRead:
         """Catat tindakan manusia tahap Tim dan pindahkan status kasus."""
+        ...
+
+    def get_kasus(self, narasi_id: str) -> NarasiKasusRead:
+        """Ambil satu kasus; `NotFoundError` bila tak ada."""
+        ...
+
+    def list_kasus(
+        self,
+        *,
+        status: str | None,
+        instrument_id: str | None,
+        periode: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[NarasiKasusRead], int]:
+        """Daftar kasus, terbaru dulu, dengan filter opsional."""
+        ...
+
+    def search_kasus(
+        self, *, domain: Domain, order: Order, limit: int, offset: int
+    ) -> tuple[list[NarasiKasusRead], int]:
+        """Cari kasus memakai domain ala Odoo (field: `SEARCHABLE_FIELDS_KASUS`)."""
+        ...
+
+    def versi_terbaru(self, narasi_id: str) -> NarasiVersiRead | None:
+        """Versi ber-`revision_no` tertinggi kasus, atau `None` bila belum ada."""
+        ...
+
+    def daftar_versi(self, narasi_id: str) -> list[NarasiVersiRead]:
+        """Seluruh versi kasus, urut `revision_no` naik."""
+        ...
+
+    def sumber_versi(self, narasi_versi_id: str) -> list[NarasiVersiSumberRead]:
+        """Tautan sumber sebuah versi (tanpa teks sumber)."""
+        ...
+
+    def daftar_event(self, narasi_id: str) -> list[NarasiEventRead]:
+        """Seluruh event kasus, urut waktu naik."""
         ...
