@@ -10,7 +10,6 @@ internal; pesan galat tidak pernah memuat masukan atau isi respons.
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -55,7 +54,7 @@ class KesalahanModelPermanen(KesalahanModel):
 
 
 class KunciModelTidakAda(KesalahanModel):
-    """Kunci API (``ANTHROPIC_API_KEY``) tidak tersedia di lingkungan."""
+    """Kunci API penyedia tidak tersedia (belum dipasang, tak terbaca, atau ditolak SDK)."""
 
 
 @dataclass(frozen=True)
@@ -105,49 +104,75 @@ class KlienModel(Protocol):
 class AnthropicKlienModel:
     """``KlienModel`` berbasis SDK ``anthropic`` (beta messages, streaming).
 
-    Klien SDK dibuat saat pertama dipakai, bukan saat impor. Kunci hanya dibaca
-    SDK dari ``ANTHROPIC_API_KEY``; tidak disimpan di ``Settings``.
+    Kunci, model, dan effort diberikan pemanggil (dari pengaturan penyedia di basis
+    data); kelas ini tidak membaca ``os.environ`` dan tidak mencatat kunci di mana pun.
+    Klien SDK dibuat saat pertama dipakai, bukan saat impor, dengan ``api_key`` eksplisit
+    sehingga SDK tidak jatuh ke ``ANTHROPIC_API_KEY`` atau ``ANTHROPIC_AUTH_TOKEN``.
     """
 
-    def __init__(self, settings: Settings | None = None, *, klien: Any | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        kunci_api: str | None,
+        model: str,
+        effort: str,
+        klien: Any | None = None,
+    ) -> None:
         """Menyiapkan klien tanpa membuka koneksi.
 
         Args:
-            settings: Pengaturan; bawaan ``Settings()``.
-            klien: Klien SDK siap pakai (untuk uji). Bila diberikan, pemeriksaan
-                kunci dilewati.
-        """
-        self._s = settings or Settings()
-        self._klien = klien
-
-    def _dapatkan_klien(self) -> Any:
-        """Membuat klien SDK pada pemakaian pertama.
+            settings: Pengaturan (``ai_max_tokens``, timeout, geo, fallback).
+            kunci_api: Kunci API teks asli.
+            model: Nama model yang diminta.
+            effort: Kedalaman berpikir.
+            klien: Klien SDK siap pakai (untuk uji). Bila diberikan, ``kunci_api``
+                boleh ``None``.
 
         Raises:
-            KunciModelTidakAda: ``ANTHROPIC_API_KEY`` kosong atau SDK menolak kredensial.
+            KunciModelTidakAda: ``kunci_api`` kosong dan ``klien`` tidak diberikan;
+                klien SDK tidak pernah dibuat.
+        """
+        if klien is None and not kunci_api:
+            raise KunciModelTidakAda("Kunci API model belum tersedia.")
+        self._s = settings
+        self._kunci = kunci_api
+        self._model = model
+        self._effort = effort
+        self._klien = klien
+
+    def __repr__(self) -> str:
+        """Representasi tanpa kunci."""
+        return f"AnthropicKlienModel(model={self._model!r}, effort={self._effort!r})"
+
+    def _dapatkan_klien(self) -> Any:
+        """Membuat klien SDK pada pemakaian pertama dengan ``api_key`` eksplisit.
+
+        Raises:
+            KunciModelTidakAda: SDK menolak kredensial.
         """
         if self._klien is None:
-            if not os.environ.get("ANTHROPIC_API_KEY"):
-                raise KunciModelTidakAda("ANTHROPIC_API_KEY tidak diset.")
             try:
                 self._klien = anthropic.Anthropic(
-                    timeout=float(self._s.ai_timeout_detik), max_retries=0
+                    api_key=self._kunci,
+                    timeout=float(self._s.ai_timeout_detik),
+                    max_retries=0,
                 )
-            except anthropic.AnthropicError as exc:
-                raise KunciModelTidakAda("Klien Anthropic tidak dapat dibuat.") from exc
+            except anthropic.AnthropicError:
+                raise KunciModelTidakAda("Klien Anthropic tidak dapat dibuat.") from None
         return self._klien
 
     def _argumen(self, instruksi: str, masukan_json: str, skema: dict[str, Any]) -> dict[str, Any]:
         """Menyusun argumen ``messages.stream`` sesuai kebijakan (tanpa alat/sampling)."""
         s = self._s
         arg: dict[str, Any] = {
-            "model": s.ai_model,
+            "model": self._model,
             "max_tokens": s.ai_max_tokens,
             "system": instruksi,
             "messages": [{"role": "user", "content": masukan_json}],
             "thinking": {"type": "adaptive"},
             "output_config": {
-                "effort": s.ai_effort,
+                "effort": self._effort,
                 "format": {"type": "json_schema", "schema": skema},
             },
         }

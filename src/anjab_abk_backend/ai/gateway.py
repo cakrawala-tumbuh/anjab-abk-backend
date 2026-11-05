@@ -20,11 +20,13 @@ from ..fitur import FiturNonaktifError, ai_boleh_jalan
 from ..schemas.ai_run import AiSumber, StatusQaAi
 from ..schemas.async_job import AsyncJobRead, StatusJob
 from ..schemas.common import FiturKode
+from ..services.ai_penyedia_sql import SqlAiPenyediaService
 from ..services.ai_run import AiRunService
 from ..services.ai_run_sql import SqlAiRunService
 from ..services.async_job import AsyncJobService
 from ..services.async_job_sql import SqlAsyncJobService
 from .guardrail import hash_instruksi, susun_prompt_version
+from .penyedia import AiPenyediaMode
 from .redaksi import SumberAi, gerbang_masukan, muat_kamus_nama, periksa_pii
 
 __all__ = [
@@ -142,10 +144,14 @@ class AiGateway:
             Job hasil pengajuan (``PENDING`` atau ``MANUAL_REVIEW``).
 
         Raises:
-            FiturNonaktifError: flag atau saklar AI mati (409); tidak ada baris dibuat.
+            FiturNonaktifError: flag atau saklar AI mati, atau mode penyedia ``MATI`` (409);
+                tidak ada baris dibuat. Gerbang data sama untuk semua mode penyedia lainnya.
             NotFoundError: ``kode_fungsi`` tidak terdaftar (404).
         """
         if not ai_boleh_jalan(self._s, self._settings, FITUR_AI):
+            raise FiturNonaktifError(FITUR_AI)
+        penyedia = SqlAiPenyediaService(self._s, self._settings).status()
+        if penyedia.mode is AiPenyediaMode.MATI:
             raise FiturNonaktifError(FITUR_AI)
         fungsi = ambil_fungsi(kode_fungsi, self._registri)
 
@@ -183,10 +189,11 @@ class AiGateway:
             fungsi.kode,
             susun_prompt_version(fungsi.prompt_version),
             hash_instruksi(fungsi.instruksi),
-            self._settings.ai_model,
+            penyedia.model,
             rujukan,
             masukan,
             dibuat_oleh,
+            penyedia=penyedia.mode.value,
         )
         job = self._jobs.create(FITUR_AI, fungsi.kode, run.id, dibuat_oleh)
         if alasan is None:

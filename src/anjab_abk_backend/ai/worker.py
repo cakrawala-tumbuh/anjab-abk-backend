@@ -29,6 +29,7 @@ from ..fitur import ai_boleh_jalan, fitur_aktif
 from ..models import AiRunModel, AsyncJobModel, _utcnow
 from ..schemas.ai_run import StatusQaAi
 from ..schemas.async_job import AsyncJobRead, StatusJob
+from ..services.ai_penyedia_sql import SqlAiPenyediaService
 from ..services.ai_run_sql import SqlAiRunService
 from ..services.async_job_sql import SqlAsyncJobService
 from .gateway import FITUR_AI, FUNGSI_TERDAFTAR, FungsiAi
@@ -36,13 +37,13 @@ from .guardrail import susun_instruksi
 from .katalog import daftarkan_fungsi
 from .keluaran import cek_keluaran, skema_dengan_amplop
 from .klien import (
-    AnthropicKlienModel,
     JawabanModel,
     KesalahanModelPermanen,
     KesalahanModelSementara,
     KlienModel,
     KunciModelTidakAda,
 )
+from .penyedia import AiPenyediaMode, PenyediaMati, PenyediaTidakTersedia, buat_klien_model
 from .redaksi import muat_kamus_nama, periksa_pii
 
 __all__ = ["jalankan_satu", "klaim_job", "main", "pulihkan_job_basi"]
@@ -155,6 +156,48 @@ def _evaluasi(
     return StatusQaAi(hasil.status_qa), [], hasil.keluaran
 
 
+def _siapkan_klien(
+    fabrik_sesi: FabrikSesi,
+    settings: Settings,
+    run_id: str,
+    buat_klien: Callable[[], KlienModel] | None,
+) -> tuple[KlienModel | None, str | None]:
+    """Baca pengaturan penyedia, catat mode di run, lalu bangun klien (sesi singkat).
+
+    Sesi dibuka dan ditutup (commit) di fungsi ini, sebelum model dipanggil, sehingga
+    pembacaan kunci tidak menahan transaksi selama panggilan model. Kunci hanya hidup di
+    objek klien yang dikembalikan. Galat dipetakan ke kode tanpa memuat kunci.
+
+    Args:
+        fabrik_sesi: Pembuat unit-of-work sesi.
+        settings: Pengaturan aplikasi.
+        run_id: Run yang akan memanggil model.
+        buat_klien: Pembuat klien pengganti (uji); gerbang mode tetap berlaku.
+
+    Returns:
+        ``(klien, None)`` bila siap, atau ``(None, kode_galat)``: ``PENYEDIA_MATI``,
+        ``PENYEDIA_TIDAK_TERSEDIA``, ``KUNCI_MODEL_TIDAK_ADA``, ``GALAT_INTERNAL``.
+    """
+    with fabrik_sesi() as s:
+        status = SqlAiPenyediaService(s, settings).status()
+        SqlAiRunService(s, settings).catat_penyedia(run_id, status.mode.value)
+        try:
+            if status.mode is AiPenyediaMode.MATI:
+                raise PenyediaMati
+            if buat_klien is not None:
+                return buat_klien(), None
+            return buat_klien_model(s, settings, status=status).klien, None
+        except PenyediaMati:
+            return None, "PENYEDIA_MATI"
+        except PenyediaTidakTersedia:
+            return None, "PENYEDIA_TIDAK_TERSEDIA"
+        except KunciModelTidakAda:
+            return None, "KUNCI_MODEL_TIDAK_ADA"
+        except Exception as exc:
+            logger.error("ai_worker_klien_galat_tak_terduga", extra={"jenis": type(exc).__name__})
+            return None, "GALAT_INTERNAL"
+
+
 def jalankan_satu(
     fabrik_sesi: FabrikSesi,
     settings: Settings,
@@ -164,15 +207,19 @@ def jalankan_satu(
     """Klaim dan proses satu job AI.
 
     Tahap 1 (satu transaksi, di-commit sebelum model dipanggil): periksa
-    saklar, klaim job, baca run. Tahap 2 (tanpa transaksi): panggil model.
-    Tahap 3 (satu transaksi): periksa saklar lagi, validasi keluaran, tutup run
+    saklar, klaim job, baca run. Tahap 1b (sesi singkat, juga di-commit sebelum model
+    dipanggil): baca pengaturan penyedia tanpa cache, catat mode di ``ai_run.penyedia``,
+    bangun klien. Mode ``MATI`` menutup run ``GAGAL`` ``PENYEDIA_MATI`` tanpa panggilan;
+    ``LANGGANAN_CLAUDE`` ``PENYEDIA_TIDAK_TERSEDIA``. Tahap 2 (tanpa transaksi): panggil
+    model. Tahap 3 (satu transaksi): periksa saklar lagi, validasi keluaran, tutup run
     dan pindahkan job.
 
     Args:
         fabrik_sesi: Pembuat unit-of-work sesi.
         settings: Pengaturan aplikasi.
-        buat_klien: Pembuat ``KlienModel``; dipanggil hanya bila model akan
-            dipanggil. Bawaan ``AnthropicKlienModel``.
+        buat_klien: Pembuat ``KlienModel`` pengganti (uji); dipanggil hanya bila model
+            akan dipanggil dan mode penyedia bukan ``MATI``. Bawaan: pabrik
+            ``buat_klien_model`` dari pengaturan penyedia.
         registri: Registri fungsi; bawaan ``FUNGSI_TERDAFTAR``.
 
     Returns:
@@ -205,11 +252,11 @@ def jalankan_satu(
     )
     skema = skema_dengan_amplop(fungsi.skema_isi)
     jawaban: JawabanModel | None = None
-    galat: str | None = None
     sementara = False
+    klien, galat = _siapkan_klien(fabrik_sesi, settings, run_id, buat_klien)
     try:
-        klien = (buat_klien or (lambda: AnthropicKlienModel(settings)))()
-        jawaban = klien.panggil(susun_instruksi(fungsi.instruksi), masukan_json, skema)
+        if klien is not None:
+            jawaban = klien.panggil(susun_instruksi(fungsi.instruksi), masukan_json, skema)
     except KesalahanModelSementara:
         galat, sementara = "MODEL_SEMENTARA", True
     except KesalahanModelPermanen:

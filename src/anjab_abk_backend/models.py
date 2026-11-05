@@ -123,6 +123,7 @@ class AiRunModel(Base):
     prompt_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     model_diminta: Mapped[str] = mapped_column(String(100), nullable=False)
     model_dilayani: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    penyedia: Mapped[str | None] = mapped_column(String(20), nullable=True)
     protocol_id: Mapped[str] = mapped_column(String(300), nullable=False)
     input_snapshot_id: Mapped[str] = mapped_column(String(64), nullable=False)
     sumber: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)

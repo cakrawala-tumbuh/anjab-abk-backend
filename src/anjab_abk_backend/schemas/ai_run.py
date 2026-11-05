@@ -39,6 +39,11 @@ class AiRunRead(BaseModel):
     prompt_hash: str = Field(description="SHA-256 prompt yang dipakai.")
     model_diminta: str = Field(description="Model yang diminta pemanggil.")
     model_dilayani: str | None = Field(default=None, description="Model yang benar-benar melayani.")
+    penyedia: str | None = Field(
+        default=None,
+        description="Mode penyedia (`API_ANTHROPIC`/`LANGGANAN_CLAUDE`/`MATI`) saat run diajukan, "
+        "ditimpa mode yang dipakai tepat sebelum model dipanggil; null pada run lama.",
+    )
     protocol_id: str = Field(description="Protocol_ID: arm/versi aplikasi+commit/fungsi@prompt.")
     input_snapshot_id: str = Field(description="SHA-256 kanonik masukan (sidik jari data).")
     sumber: list[AiSumber] = Field(description="Sumber data beserta hash-nya.")

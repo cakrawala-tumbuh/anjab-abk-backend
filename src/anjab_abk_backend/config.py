@@ -8,10 +8,32 @@ akses data adalah seam dependency injection (lihat services/ dan CLAUDE.md atura
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+_ENV_LAMA_DIABAIKAN = frozenset({"ai_model", "ai_effort", "anthropic_api_key"})
+"""Kunci berkas `.env` lama yang kini diabaikan (kini berasal dari pengaturan penyedia di DB).
+
+`Settings` menolak kunci tak dikenal (`extra="forbid"` bawaan); tanpa daftar ini, `.env` lama
+yang masih memuatnya gagal start. Hanya tiga kunci ini yang dilonggarkan."""
+
+
+class _DotEnvTanpaKunciLama:
+    """Pembungkus sumber `.env` yang membuang `_ENV_LAMA_DIABAIKAN` sebelum validasi."""
+
+    def __init__(self, dasar: PydanticBaseSettingsSource) -> None:
+        self._dasar = dasar
+
+    def __call__(self) -> dict[str, Any]:
+        return {k: v for k, v in self._dasar().items() if k.lower() not in _ENV_LAMA_DIABAIKAN}
+
+    def __getattr__(self, nama: str) -> Any:
+        return getattr(self._dasar, nama)
+
+    def __repr__(self) -> str:
+        return repr(self._dasar)
 
 
 class Settings(BaseSettings):
@@ -73,11 +95,8 @@ class Settings(BaseSettings):
     """``BLOKIR`` menolak masukan bila ada PII; ``SAMARKAN`` mengganti dengan penanda
     (kecuali nama murid/keluarga); env ``AI_PII_MODE``."""
 
-    # Klien model (lihat ai/klien.py). Kunci hanya ``ANTHROPIC_API_KEY`` (dibaca SDK).
-    ai_model: str = "claude-opus-5-5"
-    """Model yang diminta; env ``AI_MODEL``."""
-    ai_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
-    """Kedalaman berpikir; env ``AI_EFFORT``."""
+    # Klien model (lihat ai/klien.py). Mode, model, effort, dan kunci API berasal dari
+    # pengaturan penyedia di basis data (UI admin), bukan dari env.
     ai_max_tokens: int = 16000
     """Batas token keluaran; env ``AI_MAX_TOKENS``."""
     ai_timeout_detik: int = 300
@@ -124,6 +143,23 @@ class Settings(BaseSettings):
         env_ignore_empty=True,
         case_sensitive=False,
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[Any, ...]:
+        """Urutan sumber bawaan, dengan `.env` yang tidak memuat kunci lama (`AI_MODEL` dll)."""
+        return (
+            init_settings,
+            env_settings,
+            _DotEnvTanpaKunciLama(dotenv_settings),
+            file_secret_settings,
+        )
 
     @model_validator(mode="after")
     def _reject_wildcard_origin_with_credentials(self) -> Settings:

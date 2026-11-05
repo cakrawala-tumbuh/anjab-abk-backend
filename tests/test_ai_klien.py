@@ -97,12 +97,17 @@ def _galat(status: int, tipe: str = "api_error") -> httpx2.Response:
     )
 
 
-def _klien(tr: _Transport, **setelan: Any) -> AnthropicKlienModel:
+def _klien(
+    tr: _Transport, *, model: str = "claude-opus-5-5", effort: str = "high", **setelan: Any
+) -> AnthropicKlienModel:
     sdk = anthropic.Anthropic(
         api_key="kunci-palsu", max_retries=0,
         http_client=httpx2.Client(transport=httpx2.MockTransport(tr)),
     )  # fmt: skip
-    return AnthropicKlienModel(Settings(**setelan), klien=sdk)
+    return AnthropicKlienModel(
+        Settings(_env_file=None, **setelan),
+        kunci_api="kunci-palsu", model=model, effort=effort, klien=sdk,
+    )  # fmt: skip
 
 
 def _panggil(k: AnthropicKlienModel):
@@ -145,9 +150,9 @@ def test_inference_geo_terkirim_bila_diisi_dan_tidak_bila_kosong():
     assert "inference_geo" not in tr2.badan
 
 
-def test_env_model_effort_max_tokens_dipakai():
+def test_model_effort_argumen_dan_max_tokens_dipakai():
     tr = _Transport(_ok())
-    _panggil(_klien(tr, ai_model="m-x", ai_effort="low", ai_max_tokens=123))
+    _panggil(_klien(tr, model="m-x", effort="low", ai_max_tokens=123))
     assert (tr.badan["model"], tr.badan["max_tokens"]) == ("m-x", 123)
     assert tr.badan["output_config"]["effort"] == "low"
 
@@ -192,15 +197,51 @@ def test_status_permanen(status):
         _panggil(_klien(_Transport(_galat(status, "invalid_request_error"))))
 
 
-def test_kunci_tidak_ada(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    with pytest.raises(KunciModelTidakAda):
-        _panggil(AnthropicKlienModel(Settings()))
+def test_kunci_kosong_klien_sdk_tidak_dibuat_walau_env_terisi(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "kunci-env-sintetis")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "token-env-sintetis")
+
+    def _larang(*_a: Any, **_k: Any) -> None:
+        raise AssertionError("klien SDK tidak boleh dibuat")
+
+    monkeypatch.setattr(anthropic, "Anthropic", _larang)
+    for kosong in (None, ""):
+        with pytest.raises(KunciModelTidakAda):
+            AnthropicKlienModel(Settings(_env_file=None), kunci_api=kosong, model="m", effort="low")
 
 
-def test_klien_dibuat_malas_bukan_saat_impor(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    AnthropicKlienModel(Settings())  # konstruksi tanpa kunci tidak melempar
+def test_klien_sdk_menerima_kunci_eksplisit_bukan_env(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "kunci-env-sintetis")
+    diterima: dict[str, Any] = {}
+    asli = anthropic.Anthropic
+
+    def _catat(**kw: Any):
+        diterima.update(kw)
+        return asli(**kw)
+
+    monkeypatch.setattr(anthropic, "Anthropic", _catat)
+    k = AnthropicKlienModel(
+        Settings(_env_file=None), kunci_api="kunci-db-sintetis", model="m", effort="low"
+    )
+    k._dapatkan_klien()
+    assert diterima["api_key"] == "kunci-db-sintetis"
+    assert diterima["max_retries"] == 0
+
+
+def test_klien_dibuat_malas_bukan_saat_konstruksi(monkeypatch):
+    def _larang(**_k: Any) -> None:
+        raise AssertionError("klien SDK dibuat saat konstruksi")
+
+    monkeypatch.setattr(anthropic, "Anthropic", _larang)
+    AnthropicKlienModel(Settings(_env_file=None), kunci_api="k-sintetis-1", model="m", effort="low")
+
+
+def test_repr_tidak_memuat_kunci():
+    k = AnthropicKlienModel(
+        Settings(_env_file=None), kunci_api="KUNCI-RAHASIA-SINTETIS", model="m", effort="low"
+    )
+    assert "KUNCI-RAHASIA-SINTETIS" not in repr(k)
+    assert "m" in repr(k)
 
 
 @pytest.mark.parametrize("status", [400, 429, 500])

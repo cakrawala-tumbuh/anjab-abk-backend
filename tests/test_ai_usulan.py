@@ -42,6 +42,8 @@ from anjab_abk_backend.services.ai_run import hash_masukan
 from anjab_abk_backend.services.ai_run_sql import SqlAiRunService
 from anjab_abk_backend.services.ai_usulan_sql import SqlAiUsulanService
 
+pytestmark = pytest.mark.usefixtures("penyedia_api")
+
 _HIDUP = Settings(_env_file=None, feature_ai_narrative_draft=True)
 _MATI = Settings(_env_file=None, feature_ai_narrative_draft=False)
 _SAMARKAN = Settings(_env_file=None, feature_ai_narrative_draft=True, ai_pii_mode="SAMARKAN")
@@ -249,6 +251,22 @@ _HASIL_AKHIR = [
         lambda mp: None,
         "MANUAL",
         ["MODEL_PERMANEN"],
+    ),
+    (
+        "MANUAL_PENYEDIA_MATI",
+        StatusQaAi.GAGAL,
+        ["PENYEDIA_MATI"],
+        lambda mp: None,
+        "MANUAL",
+        ["PENYEDIA_MATI"],
+    ),
+    (
+        "MANUAL_PENYEDIA_TIDAK_TERSEDIA",
+        StatusQaAi.GAGAL,
+        ["PENYEDIA_TIDAK_TERSEDIA"],
+        lambda mp: None,
+        "MANUAL",
+        ["PENYEDIA_TIDAK_TERSEDIA"],
     ),
     (
         "MANUAL_ATURAN_ISI",

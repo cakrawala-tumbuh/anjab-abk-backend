@@ -56,8 +56,20 @@ class AiRunService(Protocol):
         sumber: list[AiSumber],
         masukan: dict[str, Any],
         dibuat_oleh: str | None = None,
+        penyedia: str | None = None,
     ) -> AiRunRead:
-        """Buat run berstatus ``MENUNGGU``; ``protocol_id`` dan ``input_snapshot_id`` diturunkan."""
+        """Buat run berstatus ``MENUNGGU``; ``protocol_id`` dan ``input_snapshot_id`` diturunkan.
+
+        ``penyedia`` adalah mode penyedia saat pengajuan (null = tidak dicatat).
+        """
+        ...
+
+    def catat_penyedia(self, run_id: str, penyedia: str) -> bool:
+        """Timpa ``penyedia`` run yang masih ``MENUNGGU``; run final tidak diubah.
+
+        Returns:
+            ``True`` bila ditimpa, ``False`` bila run sudah final atau tidak ada.
+        """
         ...
 
     def tutup(

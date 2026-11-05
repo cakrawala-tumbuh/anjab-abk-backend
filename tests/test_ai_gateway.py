@@ -39,6 +39,8 @@ from anjab_abk_backend.services.ai_run_sql import SqlAiRunService
 from anjab_abk_backend.services.ai_saklar_sql import SqlSaklarAiService
 from anjab_abk_backend.services.async_job_sql import SqlAsyncJobService
 
+pytestmark = pytest.mark.usefixtures("penyedia_api")
+
 _HIDUP = Settings(_env_file=None, feature_ai_narrative_draft=True)
 _MATI = Settings(_env_file=None, feature_ai_narrative_draft=False)
 _SAMARKAN = Settings(_env_file=None, feature_ai_narrative_draft=True, ai_pii_mode="SAMARKAN")

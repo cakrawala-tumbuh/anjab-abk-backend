@@ -31,14 +31,19 @@ class SqlAiRunService:
         sumber: list[AiSumber],
         masukan: dict[str, Any],
         dibuat_oleh: str | None = None,
+        penyedia: str | None = None,
     ) -> AiRunRead:
-        """Simpan run ``MENUNGGU`` dengan ``masukan`` utuh sampai ``tutup``."""
+        """Simpan run ``MENUNGGU`` dengan ``masukan`` utuh sampai ``tutup``.
+
+        ``penyedia`` dicatat apa adanya, juga untuk run yang akan langsung ditutup gerbang.
+        """
         rec = AiRunModel(
             id=str(uuid.uuid4()),
             fungsi=fungsi,
             prompt_version=prompt_version,
             prompt_hash=prompt_hash,
             model_diminta=model_diminta,
+            penyedia=penyedia,
             protocol_id=bangun_protocol_id(fungsi, prompt_version, self._settings),
             input_snapshot_id=hash_masukan(masukan),
             sumber=[s.model_dump() for s in sumber],
@@ -50,6 +55,23 @@ class SqlAiRunService:
         self._s.add(rec)
         self._s.flush()
         return AiRunRead.model_validate(rec)
+
+    def catat_penyedia(self, run_id: str, penyedia: str) -> bool:
+        """Timpa ``penyedia`` run yang masih ``MENUNGGU``; run final tidak pernah diubah.
+
+        Args:
+            run_id: Id run.
+            penyedia: Mode penyedia yang dipakai tepat sebelum model dipanggil.
+
+        Returns:
+            ``True`` bila ditimpa, ``False`` bila run tidak ada atau sudah final.
+        """
+        rec = self._s.get(AiRunModel, run_id)
+        if rec is None or rec.status_qa != StatusQaAi.MENUNGGU.value:
+            return False
+        rec.penyedia = penyedia
+        self._s.flush()
+        return True
 
     def tutup(
         self,

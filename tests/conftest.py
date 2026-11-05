@@ -22,7 +22,7 @@ from anjab_abk_backend.db import get_db_settings, get_session
 from anjab_abk_backend.dependencies import get_token_verifier
 from anjab_abk_backend.main import create_app
 from anjab_abk_backend.migrate import upgrade as alembic_upgrade
-from anjab_abk_backend.models import Base
+from anjab_abk_backend.models import AiPenyediaPengaturanModel, Base
 from anjab_abk_backend.security import Principal, TokenVerifier
 from anjab_abk_backend.seed_db import seed_all
 
@@ -93,6 +93,18 @@ def db_session(engine):
         session.close()
         trans.rollback()
         connection.close()
+
+
+@pytest.fixture
+def penyedia_api(db_session: Session) -> None:
+    """Pasang pengaturan penyedia AI ``API_ANTHROPIC`` (tanpa kunci) pada sesi test.
+
+    Bawaan tanpa baris adalah ``MATI``; test yang mengajukan job AI memakai fixture ini.
+    """
+    db_session.add(
+        AiPenyediaPengaturanModel(id="TUNGGAL", mode="API_ANTHROPIC", diperbarui_oleh="uji")
+    )
+    db_session.flush()
 
 
 @pytest.fixture

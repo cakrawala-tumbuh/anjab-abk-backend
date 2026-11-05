@@ -26,6 +26,8 @@ from anjab_abk_backend.services.ai_saklar_sql import SqlSaklarAiService
 
 URL = "/api/v1/narasi/kasus"
 SUMBER = "/api/v1/narasi/sumber"
+pytestmark = pytest.mark.usefixtures("penyedia_api")
+
 _HIDUP = {"_env_file": None, "feature_ai_narrative_draft": True}
 _TEKS = "Guru mengajar kelas lima setiap hari."
 

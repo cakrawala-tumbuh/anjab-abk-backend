@@ -6,16 +6,29 @@ Hanya konstanta dan aturan murni; penyimpanan ada di `services/ai_penyedia_sql.p
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
+from sqlalchemy.orm import Session
+
+from ..config import Settings
 from ..errors import ValidationAppError
+from .klien import AnthropicKlienModel, KlienModel
+
+if TYPE_CHECKING:
+    from ..schemas.ai_penyedia import AiPenyediaStatusRead
 
 __all__ = [
     "AI_EFFORT_BAWAAN",
     "AI_MODEL_BAWAAN",
     "AiEffort",
     "AiPenyediaMode",
+    "KlienTerpilih",
     "ModelDitolak",
+    "PenyediaMati",
+    "PenyediaTidakTersedia",
+    "buat_klien_model",
     "validasi_effort",
     "validasi_model",
 ]
@@ -83,3 +96,71 @@ def validasi_effort(effort: str) -> str:
     if effort not in {e.value for e in AiEffort}:
         raise ValidationAppError("Effort harus salah satu dari low, medium, high, xhigh, max.")
     return effort
+
+
+class PenyediaMati(Exception):
+    """Mode penyedia ``MATI``: tidak ada model yang boleh dipanggil."""
+
+
+class PenyediaTidakTersedia(Exception):
+    """Mode penyedia dipilih tetapi belum punya driver (``LANGGANAN_CLAUDE`` sampai #112)."""
+
+
+@dataclass(frozen=True)
+class KlienTerpilih:
+    """Hasil pabrik: klien siap pakai beserta nilai yang dipakai membuatnya.
+
+    ``repr`` aman: klien (``AnthropicKlienModel``) tidak memuat kunci di ``repr``-nya.
+
+    Attributes:
+        klien: Klien model yang siap memanggil.
+        mode: Mode penyedia saat klien dibuat.
+        model: Model yang diminta.
+        effort: Kedalaman berpikir.
+    """
+
+    klien: KlienModel
+    mode: AiPenyediaMode
+    model: str
+    effort: str
+
+
+def buat_klien_model(
+    session: Session,
+    settings: Settings,
+    *,
+    status: AiPenyediaStatusRead | None = None,
+) -> KlienTerpilih:
+    """Bangun klien model dari pengaturan penyedia di basis data, tanpa cache.
+
+    Dibaca ulang tiap pemanggilan sehingga perubahan admin berlaku pada job berikutnya
+    tanpa restart. Satu-satunya pemanggil ``baca_kunci_api``; kunci tidak disimpan di
+    luar objek klien dan tidak dicatat.
+
+    Args:
+        session: Sesi basis data (dipakai hanya untuk membaca; pemanggil menutupnya
+            sebelum model dipanggil).
+        settings: Pengaturan aplikasi.
+        status: Status penyedia yang sudah dibaca pemanggil (opsional, menghindari
+            pembacaan ganda).
+
+    Returns:
+        ``KlienTerpilih`` untuk mode ``API_ANTHROPIC``.
+
+    Raises:
+        PenyediaMati: Mode ``MATI``.
+        PenyediaTidakTersedia: Mode ``LANGGANAN_CLAUDE`` (driver di #112).
+        KunciModelTidakAda: Kunci kosong, tak terbaca, atau gagal didekripsi.
+    """
+    from ..services.ai_penyedia_sql import SqlAiPenyediaService
+
+    svc = SqlAiPenyediaService(session, settings)
+    st = status or svc.status()
+    if st.mode is AiPenyediaMode.MATI:
+        raise PenyediaMati
+    if st.mode is AiPenyediaMode.LANGGANAN_CLAUDE:
+        raise PenyediaTidakTersedia
+    klien = AnthropicKlienModel(
+        settings, kunci_api=svc.baca_kunci_api(), model=st.model, effort=st.effort.value
+    )
+    return KlienTerpilih(klien=klien, mode=st.mode, model=st.model, effort=st.effort.value)
