@@ -20,6 +20,7 @@ from ...models import (
 from ...schemas.search import Domain, Order
 from ...services.domain import validate_searchable_fields
 from ...services.domain_sql import FieldMap, FieldSpec, compile_domain, order_by_columns
+from ..schemas.antrean import STATUS_ANTREAN, AntreanItemRead, AntreanSumberRead
 from ..schemas.kasus import METADATA_AI_KUNCI, EventKind, RevisionOrigin, StatusNarasi
 from ..schemas.mesin import (
     AKTOR_AI_WORKER,
@@ -367,3 +368,95 @@ class SqlNarasiService:
         self._s.flush()
         self._s.refresh(event)
         return _to_event(event)
+
+    def list_antrean(
+        self,
+        *,
+        status: str | None,
+        instrument_id: str | None,
+        periode: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[AntreanItemRead], int]:
+        """Antrean reviewer, `updated_at` naik; hanya status di `STATUS_ANTREAN`.
+
+        Args:
+            status: Menyempit ke satu status antrean; `None` untuk ketiganya.
+            instrument_id: Filter instrumen.
+            periode: Filter periode.
+            limit: Ukuran halaman.
+            offset: Posisi awal.
+
+        Returns:
+            Pasangan (item, total). Item tidak memuat teks. Versi terbaru dipilih lewat
+            `revision_no` maksimum; kasus berstatus antrean selalu punya versi.
+        """
+        k, v = NarasiKasusModel, NarasiVersiModel
+        terbaru = (
+            select(v.narasi_id, func.max(v.revision_no).label("mx")).group_by(v.narasi_id)
+        ).subquery()
+        n_sumber = (
+            select(func.count())
+            .select_from(NarasiVersiSumberModel)
+            .where(NarasiVersiSumberModel.narasi_versi_id == v.id)
+            .correlate(v)
+            .scalar_subquery()
+        )
+        daftar = [status] if status is not None else [s.value for s in STATUS_ANTREAN]
+        conds = [k.status.in_(daftar)]
+        if instrument_id is not None:
+            conds.append(k.instrument_id == instrument_id)
+        if periode is not None:
+            conds.append(k.periode == periode)
+        dasar = (
+            select(k, v, n_sumber.label("n_sumber"))
+            .join(terbaru, terbaru.c.narasi_id == k.id)
+            .join(v, (v.narasi_id == k.id) & (v.revision_no == terbaru.c.mx))
+            .where(*conds)
+        )
+        total = self._s.scalar(select(func.count()).select_from(dasar.subquery())) or 0
+        rows = self._s.execute(dasar.order_by(k.updated_at, k.id).limit(limit).offset(offset)).all()
+        items: list[AntreanItemRead] = []
+        for kasus, versi, n in rows:
+            meta = versi.metadata_ai or {}
+            kontra = meta.get("contradictions")
+            items.append(
+                AntreanItemRead(
+                    narasi_id=kasus.id,
+                    instrument_id=kasus.instrument_id,
+                    field_key=kasus.field_key,
+                    peran_ref=kasus.peran_ref,
+                    periode=kasus.periode,
+                    narrative_kind=kasus.narrative_kind,
+                    status=kasus.status,
+                    versi_id=versi.id,
+                    revision_no=versi.revision_no,
+                    revision_origin=versi.revision_origin,
+                    label_dokumenter=meta.get("label_dokumenter"),
+                    jumlah_sumber=n or 0,
+                    jumlah_kontradiksi=len(kontra) if isinstance(kontra, list) else 0,
+                    updated_at=kasus.updated_at,
+                )
+            )
+        return items, total
+
+    def sumber_lengkap_versi(self, narasi_versi_id: str) -> list[AntreanSumberRead]:
+        """Sumber sebuah versi beserta judul, versi, dan teksnya, urut kemunculan."""
+        rows = self._s.execute(
+            select(NarasiVersiSumberModel, NarasiSumberModel)
+            .join(NarasiSumberModel, NarasiSumberModel.id == NarasiVersiSumberModel.sumber_id)
+            .where(NarasiVersiSumberModel.narasi_versi_id == narasi_versi_id)
+            .order_by(NarasiVersiSumberModel.id)
+        ).all()
+        return [
+            AntreanSumberRead(
+                sumber_id=ref.sumber_id,
+                judul=sumber.judul,
+                versi=sumber.versi,
+                source_span=ref.source_span,
+                source_hash=ref.source_hash,
+                basis_relation=ref.basis_relation,
+                teks=sumber.teks,
+            )
+            for ref, sumber in rows
+        ]

@@ -9,6 +9,7 @@ from typing import Any, Protocol
 
 from ...errors import ConflictError, ValidationAppError
 from ...schemas.search import Domain, Order
+from ..schemas.antrean import AntreanItemRead, AntreanSumberRead
 from ..schemas.kasus import EventKind, RevisionOrigin, StatusNarasi
 from ..schemas.mesin import (
     AktorNarasi,
@@ -82,6 +83,18 @@ class TransisiTidakSahError(ConflictError):
     """409: perpindahan status di luar `TRANSISI_NARASI`."""
 
     error_code = "transisi_tidak_sah"
+
+
+class NarasiTidakDalamAntreanError(ConflictError):
+    """409: kasus tidak berstatus `AI_DRAFT`/`TEAM_REVIEW`/`NEED_FACT`."""
+
+    error_code = "narasi_tidak_dalam_antrean"
+
+
+class NarasiTanpaTeksError(ConflictError):
+    """409: aksi `TERIMA` atas versi terbaru tanpa teks (kasus `NEED_FACT`)."""
+
+    error_code = "narasi_tanpa_teks"
 
 
 class NarasiService(Protocol):
@@ -159,4 +172,20 @@ class NarasiService(Protocol):
 
     def daftar_event(self, narasi_id: str) -> list[NarasiEventRead]:
         """Seluruh event kasus, urut waktu naik."""
+        ...
+
+    def list_antrean(
+        self,
+        *,
+        status: str | None,
+        instrument_id: str | None,
+        periode: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[AntreanItemRead], int]:
+        """Antrean reviewer: kasus `AI_DRAFT`/`TEAM_REVIEW`/`NEED_FACT`, `updated_at` naik."""
+        ...
+
+    def sumber_lengkap_versi(self, narasi_versi_id: str) -> list[AntreanSumberRead]:
+        """Sumber sebuah versi beserta judul, versi, dan teksnya."""
         ...
