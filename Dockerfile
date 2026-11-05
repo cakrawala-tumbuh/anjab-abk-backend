@@ -46,6 +46,39 @@ RUN apt-get update \
     && apt-get purge -y --auto-remove curl gnupg \
     && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/pgdg.list
 
+# Claude Code (binary `claude`) untuk penyedia LANGGANAN_CLAUDE (backlog 112). Dipasang dari
+# repo apt bertanda tangan kanal `stable` dan DIPIN ke satu versi. Kunci penandatangan
+# diperiksa terhadap sidik jari PENUH (40 heksa, bukan ID pendek); beda satu karakter pun
+# membuat build gagal. Menaikkan versi = mengubah ARG ini (dan memeriksa ulang uji asap).
+# Model baru dapat menuntut versi lebih baru dari yang dipin di sini.
+ARG CLAUDE_CODE_VERSION=2.1.311-1
+ARG CLAUDE_CODE_SIGNING_FPR=31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && install -d -m 0755 /etc/apt/keyrings \
+    && curl -fsSL https://downloads.claude.ai/keys/claude-code.asc -o /etc/apt/keyrings/claude-code.asc \
+    && fpr="$(gpg --show-keys --with-colons /etc/apt/keyrings/claude-code.asc \
+        | awk -F: '/^pub:/ {p=1; next} p && /^fpr:/ {print $10; p=0}')" \
+    && if [ "$fpr" != "${CLAUDE_CODE_SIGNING_FPR}" ]; then \
+        echo "Sidik jari kunci Claude Code tidak cocok: '$fpr' != '${CLAUDE_CODE_SIGNING_FPR}'" >&2; \
+        exit 1; \
+    fi \
+    && echo "deb [signed-by=/etc/apt/keyrings/claude-code.asc] https://downloads.claude.ai/claude-code/apt/stable stable main" \
+        > /etc/apt/sources.list.d/claude-code.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends "claude-code=${CLAUDE_CODE_VERSION}" \
+    && apt-get purge -y --auto-remove curl gnupg \
+    && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/claude-code.list
+
+# Direktori sesi masuk CLI. Berada di image (bukan konfigurasi deployment); isinya diisi
+# operator lewat alur masuk Anthropic sendiri, tidak pernah oleh aplikasi. Mount volume di
+# sini agar sesi masuk bertahan; volume baru milik root bila tak ada direktori ini lebih dulu.
+ENV CLAUDE_CONFIG_DIR=/var/lib/claude-config \
+    DISABLE_UPDATES=1
+RUN mkdir -p "${CLAUDE_CONFIG_DIR}" \
+    && chown appuser:appuser "${CLAUDE_CONFIG_DIR}" \
+    && chmod 700 "${CLAUDE_CONFIG_DIR}"
+
 # Migrasi & entrypoint ikut ke image agar init DB OTOMATIS saat startup (tanpa langkah
 # deploy manual). Paket di-install ke site-packages, jadi alembic.ini + migrations/
 # disalin ke WORKDIR (/app) tempat `migrate._resolve_base()` & alembic CLI menemukannya.

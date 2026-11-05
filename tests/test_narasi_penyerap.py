@@ -256,6 +256,7 @@ def test_gap_sumber_kosong_tanpa_keluaran_output_hash_null(db_session, sumber):
         (StatusQaAi.GAGAL, ["MODEL_PERMANEN"]),
         (StatusQaAi.GAGAL, ["PENYEDIA_MATI"]),
         (StatusQaAi.GAGAL, ["PENYEDIA_TIDAK_TERSEDIA"]),
+        (StatusQaAi.GAGAL, ["LANGGANAN_BELUM_MASUK"]),
     ],
 )
 def test_run_bermasalah_tanpa_versi_kasus_tetap_kode_serap_dari_kode_qa(

@@ -65,10 +65,57 @@ menyalakan AI:
 3. `AI_FUNGSI_AKTIF` (env) mendaftarkan fungsi AI yang boleh dipakai.
 4. Penyedia siap lewat UI admin (disimpan di basis data, berlaku pada job berikutnya tanpa
    restart): `API_ANTHROPIC` dengan kunci API terpasang, atau `LANGGANAN_CLAUDE` dengan CLI
-   yang sudah masuk (paket langganan Anthropic, bukan Anthropic API; driver menyusul).
+   yang sudah masuk (paket langganan Anthropic, bukan Anthropic API; lihat catatan risiko di bawah).
    Mode `MATI` (bawaan) membuat pengajuan ditolak dan job antre selesai manual
    `PENYEDIA_MATI`. `AI_KREDENSIAL_KUNCI_INDUK` (env) wajib untuk menyimpan kunci API.
 5. Keputusan tertulis K-8 untuk membuka jenis sumber di luar `SINTETIS`.
 
 Env `ANTHROPIC_API_KEY`, `AI_MODEL`, dan `AI_EFFORT` tidak lagi dibaca; model, effort, dan
 kunci hanya berasal dari pengaturan penyedia. Tiap `ai_run` mencatat `penyedia`.
+
+### Penyedia `LANGGANAN_CLAUDE` (catatan risiko)
+
+Mode ini memanggil model lewat binary Claude Code (`claude -p`) yang terpasang di image,
+bukan lewat Anthropic API. Aplikasi tidak menerima, menyimpan, membaca, atau mengantarai
+kredensial langganan: tidak ada kolom, env, endpoint, atau formulir untuknya. Pemakaian
+mode ini adalah tanggung jawab pemilik akun yang masuk, dan **README ini tidak menyatakan
+bahwa pemakaian ini diizinkan Anthropic**. Pertanyaan izin diarahkan dokumen Anthropic ke
+tim sales mereka.
+
+Yang tertulis di dokumen Anthropic (dibaca 5 November 2026; periksa ulang sebelum memakai):
+
+- <https://code.claude.com/docs/en/legal-and-compliance.md>: pengembang produk "should use
+  API key authentication"; Anthropic "does not permit third-party developers to offer
+  Claude.ai login into their own applications, or to route requests through Free, Pro, Max,
+  or Ultra plan credentials on behalf of their users"; pengembang "may not collect, store,
+  or intermediate Claude.ai credentials or session tokens"; memasang atau menjalankan
+  Claude Code di produk atau layanan "requires agreeing to our Commercial Terms of
+  Service" dengan binary yang tidak diubah. Batas pemakaian paket "assume ordinary,
+  individual usage", dan Anthropic "reserves the right to take measures to enforce these
+  restrictions and may do so without prior notice".
+- <https://code.claude.com/docs/en/data-usage.md>: untuk paket konsumen, data dipakai
+  melatih model "when this setting is on" (retensi 5 tahun bila aktif, 30 hari bila tidak);
+  pengaturannya ada di <https://claude.ai/settings/data-privacy-controls>.
+
+Akibat teknis: pemakaian dihitung terhadap batas paket langganan (bukan tagihan API), retensi
+dan pelatihan mengikuti pengaturan akun yang masuk, dan `inference_geo`, ZDR, serta batas
+biaya workspace **tidak berlaku** pada mode ini. Hanya grup `admin` yang dapat memilih mode,
+dan menyalakan AI tetap mengikuti K-8.
+
+Cara masuk (dilakukan operator, di dalam kontainer, lewat alur Anthropic sendiri):
+
+```bash
+docker compose exec -u appuser <layanan> claude auth login
+```
+
+Sesi tersimpan di `CLAUDE_CONFIG_DIR=/var/lib/claude-config` (diset di image, milik
+`appuser`); agar bertahan antar-restart, pasang volume di path itu pada deployment.
+`claude` dipin ke versi `CLAUDE_CODE_VERSION` di `Dockerfile` (repo apt bertanda tangan,
+sidik jari kunci diperiksa saat build). Model baru dapat menuntut versi yang lebih baru;
+model yang ditolak binary berakhir sebagai `MODEL_PERMANEN` dan perbaikannya menaikkan ARG
+itu. Mode ini gagal-tertutup tanpa percobaan ulang: `PENYEDIA_TIDAK_TERSEDIA` bila binary
+tidak ada dan `LANGGANAN_BELUM_MASUK` bila CLI belum masuk.
+
+Dampak ukuran image: binary menambah sekitar 280 MiB terpasang (paket 134 MB terkompresi)
+pada target `runtime`, sehingga image kira-kira 2,3 kali lebih besar bagi semua pemakai,
+juga yang tidak pernah memilih mode ini.

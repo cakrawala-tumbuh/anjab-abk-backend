@@ -37,11 +37,13 @@ from .guardrail import susun_instruksi
 from .katalog import daftarkan_fungsi
 from .keluaran import cek_keluaran, skema_dengan_amplop
 from .klien import (
+    BinaryClaudeTidakAda,
     JawabanModel,
     KesalahanModelPermanen,
     KesalahanModelSementara,
     KlienModel,
     KunciModelTidakAda,
+    LanggananBelumMasuk,
 )
 from .penyedia import AiPenyediaMode, PenyediaMati, PenyediaTidakTersedia, buat_klien_model
 from .redaksi import muat_kamus_nama, periksa_pii
@@ -176,7 +178,8 @@ def _siapkan_klien(
 
     Returns:
         ``(klien, None)`` bila siap, atau ``(None, kode_galat)``: ``PENYEDIA_MATI``,
-        ``PENYEDIA_TIDAK_TERSEDIA``, ``KUNCI_MODEL_TIDAK_ADA``, ``GALAT_INTERNAL``.
+        ``PENYEDIA_TIDAK_TERSEDIA`` (binary ``claude`` tidak ada), ``KUNCI_MODEL_TIDAK_ADA``,
+        ``GALAT_INTERNAL``. ``LANGGANAN_BELUM_MASUK`` baru muncul saat panggilan model.
     """
     with fabrik_sesi() as s:
         status = SqlAiPenyediaService(s, settings).status()
@@ -210,7 +213,9 @@ def jalankan_satu(
     saklar, klaim job, baca run. Tahap 1b (sesi singkat, juga di-commit sebelum model
     dipanggil): baca pengaturan penyedia tanpa cache, catat mode di ``ai_run.penyedia``,
     bangun klien. Mode ``MATI`` menutup run ``GAGAL`` ``PENYEDIA_MATI`` tanpa panggilan;
-    ``LANGGANAN_CLAUDE`` ``PENYEDIA_TIDAK_TERSEDIA``. Tahap 2 (tanpa transaksi): panggil
+    ``LANGGANAN_CLAUDE`` tanpa binary ``PENYEDIA_TIDAK_TERSEDIA``, belum masuk
+    ``LANGGANAN_BELUM_MASUK`` (keduanya ``GAGAL`` tanpa percobaan ulang). Tahap 2
+    (tanpa transaksi): panggil
     model. Tahap 3 (satu transaksi): periksa saklar lagi, validasi keluaran, tutup run
     dan pindahkan job.
 
@@ -263,6 +268,10 @@ def jalankan_satu(
         galat = "MODEL_PERMANEN"
     except KunciModelTidakAda:
         galat = "KUNCI_MODEL_TIDAK_ADA"
+    except LanggananBelumMasuk:
+        galat = "LANGGANAN_BELUM_MASUK"
+    except BinaryClaudeTidakAda:
+        galat = "PENYEDIA_TIDAK_TERSEDIA"
     except Exception as exc:
         logger.error("ai_worker_galat_tak_terduga", extra={"jenis": type(exc).__name__})
         galat = "GALAT_INTERNAL"

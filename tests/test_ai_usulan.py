@@ -269,6 +269,14 @@ _HASIL_AKHIR = [
         ["PENYEDIA_TIDAK_TERSEDIA"],
     ),
     (
+        "MANUAL_LANGGANAN_BELUM_MASUK",
+        StatusQaAi.GAGAL,
+        ["LANGGANAN_BELUM_MASUK"],
+        lambda mp: None,
+        "MANUAL",
+        ["LANGGANAN_BELUM_MASUK"],
+    ),
+    (
         "MANUAL_ATURAN_ISI",
         StatusQaAi.LOLOS,
         [],

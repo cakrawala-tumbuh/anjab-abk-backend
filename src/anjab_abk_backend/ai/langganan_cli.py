@@ -13,7 +13,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 
-__all__ = ["StatusCli", "baca_status_cli"]
+__all__ = ["ENV_CLAUDE_P", "StatusCli", "baca_status_cli", "env_claude_p"]
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,10 @@ _BINARY = "claude"
 _BATAS_WAKTU_DETIK = 10
 _ENV_DIIZINKAN = ("PATH", "HOME", "CLAUDE_CONFIG_DIR")
 _PANJANG_VERSI_MAKS = 64
+
+ENV_CLAUDE_P = ("PATH", "HOME", "CLAUDE_CONFIG_DIR", "DISABLE_UPDATES")
+"""Daftar-putih env untuk ``claude -p`` (panggilan model): ``_ENV_DIIZINKAN`` ditambah
+``DISABLE_UPDATES``. Pembaca status (di atas) sengaja tetap tiga nama."""
 
 
 @dataclass(frozen=True)
@@ -41,6 +45,22 @@ class StatusCli:
 def _env_daftar_putih() -> dict[str, str]:
     """Salin hanya variabel `_ENV_DIIZINKAN` yang memang diset di proses ini."""
     return {nama: os.environ[nama] for nama in _ENV_DIIZINKAN if nama in os.environ}
+
+
+def env_claude_p() -> dict[str, str]:
+    """Env persis untuk subprocess ``claude -p``: empat nama `ENV_CLAUDE_P`, tidak lebih.
+
+    ``DISABLE_UPDATES`` bernilai ``1`` bila proses induk tidak menyetelnya, sehingga CLI
+    tidak pernah memperbarui dirinya sendiri. Variabel lain (``ANTHROPIC_API_KEY``,
+    ``AI_KREDENSIAL_KUNCI_INDUK``, ``CLAUDE_CODE_OAUTH_TOKEN``, ``ANTHROPIC_BASE_URL``,
+    dst.) tidak pernah disalin.
+
+    Returns:
+        Kamus env baru; mengubahnya tidak memengaruhi ``os.environ``.
+    """
+    env = {nama: os.environ[nama] for nama in ENV_CLAUDE_P if nama in os.environ}
+    env.setdefault("DISABLE_UPDATES", "1")
+    return env
 
 
 def _catat_gagal(operasi: str, exc: Exception) -> None:

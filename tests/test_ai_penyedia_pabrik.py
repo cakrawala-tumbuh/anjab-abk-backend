@@ -16,13 +16,19 @@ from typing import Any
 import anthropic
 import httpx2
 import pytest
+from _cli_tiruan import SUREL, PopenTiruan, keluaran_cli, pasang
 from cryptography.fernet import Fernet
 from pydantic import SecretStr
 from sqlalchemy.orm import Session
 
 from anjab_abk_backend.ai import penyedia as modul_penyedia
 from anjab_abk_backend.ai.gateway import AiGateway, FungsiAi
-from anjab_abk_backend.ai.klien import AnthropicKlienModel, JawabanModel, KunciModelTidakAda
+from anjab_abk_backend.ai.klien import (
+    AnthropicKlienModel,
+    ClaudeCliKlienModel,
+    JawabanModel,
+    KunciModelTidakAda,
+)
 from anjab_abk_backend.ai.penyedia import (
     AiPenyediaMode,
     KlienTerpilih,
@@ -181,10 +187,36 @@ def test_pabrik_mode_mati_eksplisit(db_session: Session) -> None:
         buat_klien_model(db_session, _CFG)
 
 
-def test_pabrik_langganan_tidak_tersedia(db_session: Session) -> None:
+def test_pabrik_langganan_tanpa_binary_tidak_tersedia(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(modul_penyedia.shutil, "which", lambda _n: None)
     _atur_mode(db_session, AiPenyediaMode.LANGGANAN_CLAUDE)
     with pytest.raises(PenyediaTidakTersedia):
         buat_klien_model(db_session, _CFG)
+
+
+def test_pabrik_langganan_dengan_binary_driver_cli_tanpa_baca_kunci(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch, sdk_dilarang: None
+) -> None:
+    panggilan: list[int] = []
+
+    def _baca_kunci(self: SqlAiPenyediaService) -> str:
+        panggilan.append(1)
+        raise AssertionError("kunci API tidak boleh dibaca pada LANGGANAN_CLAUDE")
+
+    monkeypatch.setattr(SqlAiPenyediaService, "baca_kunci_api", _baca_kunci)
+    monkeypatch.setattr(modul_penyedia.shutil, "which", lambda _n: "/usr/bin/claude")
+    _atur_mode(db_session, AiPenyediaMode.LANGGANAN_CLAUDE)
+    _svc(db_session).ubah_model("claude-haiku-5", "low", _ALASAN, _AKTOR)
+    hasil = buat_klien_model(db_session, _CFG)
+    assert isinstance(hasil.klien, ClaudeCliKlienModel)
+    assert (hasil.mode, hasil.model, hasil.effort) == (
+        AiPenyediaMode.LANGGANAN_CLAUDE,
+        "claude-haiku-5",
+        "low",
+    )
+    assert panggilan == []
 
 
 def test_pabrik_kunci_kosong_env_terisi_diabaikan(
@@ -354,8 +386,9 @@ def test_worker_mati_juga_berlaku_untuk_pembuat_klien_uji(db_session: Session, f
 
 
 def test_worker_mode_diubah_antara_pengajuan_dan_panggilan_mencatat_mode_saat_panggilan(
-    db_session: Session, fab, sdk_dilarang: None
+    db_session: Session, fab, sdk_dilarang: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(modul_penyedia.shutil, "which", lambda _n: None)  # binary tidak ada
     _atur_mode(db_session, AiPenyediaMode.API_ANTHROPIC)
     job = _ajukan(db_session)
     assert _run(db_session, job.id).penyedia == "API_ANTHROPIC"
@@ -367,6 +400,67 @@ def test_worker_mode_diubah_antara_pengajuan_dan_panggilan_mencatat_mode_saat_pa
     akhir = db_session.get(AsyncJobModel, job.id)
     assert akhir.status == StatusJob.MANUAL_REVIEW.value
     assert akhir.error_code == "PENYEDIA_TIDAK_TERSEDIA"
+
+
+def _siapkan_langganan(db: Session) -> Any:
+    """Mode LANGGANAN_CLAUDE dan satu job siap jalan."""
+    _atur_mode(db, AiPenyediaMode.LANGGANAN_CLAUDE)
+    return _ajukan(db)
+
+
+def test_worker_langganan_belum_masuk_gagal_tanpa_ulang_nol_claude_p(
+    db_session: Session,
+    fab,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    sdk_dilarang: None,
+) -> None:
+    pasang(monkeypatch, masuk=False, stdout=SUREL)
+    monkeypatch.setattr(modul_penyedia.shutil, "which", lambda _n: "/usr/bin/claude")
+    monkeypatch.setattr(
+        SqlAiPenyediaService, "baca_kunci_api", lambda self: pytest.fail("kunci dibaca")
+    )
+    job = _siapkan_langganan(db_session)
+    with caplog.at_level(logging.DEBUG):
+        assert jalankan_satu(fab, _CFG, None, _REG) == job.id
+    run = _run(db_session, job.id)
+    assert (run.status_qa, run.kode_qa, run.penyedia) == (
+        "GAGAL",
+        ["LANGGANAN_BELUM_MASUK"],
+        "LANGGANAN_CLAUDE",
+    )
+    akhir = db_session.get(AsyncJobModel, job.id)
+    assert akhir.status == StatusJob.MANUAL_REVIEW.value  # tanpa percobaan ulang
+    assert akhir.error_code == "LANGGANAN_BELUM_MASUK"
+    assert PopenTiruan.daftar == [] and SUREL not in caplog.text
+
+
+def test_worker_langganan_binary_hilang_saat_panggilan_tidak_tersedia(
+    db_session: Session, fab, monkeypatch: pytest.MonkeyPatch, sdk_dilarang: None
+) -> None:
+    pasang(monkeypatch, terpasang=False)
+    monkeypatch.setattr(modul_penyedia.shutil, "which", lambda _n: "/usr/bin/claude")
+    job = _siapkan_langganan(db_session)
+    jalankan_satu(fab, _CFG, None, _REG)
+    run = _run(db_session, job.id)
+    assert (run.status_qa, run.kode_qa) == ("GAGAL", ["PENYEDIA_TIDAK_TERSEDIA"])
+    assert PopenTiruan.daftar == []
+
+
+def test_worker_langganan_sukses_lewat_driver_cli_mencatat_penyedia(
+    db_session: Session, fab, monkeypatch: pytest.MonkeyPatch, sdk_dilarang: None
+) -> None:
+    pasang(monkeypatch, stdout=keluaran_cli(json.loads(_keluaran())))
+    monkeypatch.setattr(modul_penyedia.shutil, "which", lambda _n: "/usr/bin/claude")
+    monkeypatch.setattr(
+        SqlAiPenyediaService, "baca_kunci_api", lambda self: pytest.fail("kunci dibaca")
+    )
+    job = _siapkan_langganan(db_session)
+    assert jalankan_satu(fab, _CFG, None, _REG) == job.id
+    run = _run(db_session, job.id)
+    assert (run.status_qa, run.penyedia) == ("LOLOS", "LANGGANAN_CLAUDE")
+    assert len(PopenTiruan.daftar) == 1
+    assert run.model_dilayani == "claude-opus-5-5"
 
 
 def test_worker_penyedia_dicatat_sebelum_panggilan_dengan_klien_uji(

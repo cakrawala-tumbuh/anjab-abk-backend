@@ -50,6 +50,8 @@ test-arm64:
 	  python -c "import anjab_abk_backend, psycopg; print(psycopg.__version__)"; \
 	  pg_dump --version | grep -q " 16\."; \
 	  pg_dump --version; \
+	  claude --version | grep -q "^2\.1\.311"; \
+	  claude --version; \
 	  echo "uji asap arm64 OK"'
 
 ## migration: buat revisi Alembic baru dari perubahan model — m="deskripsi" (satu berkas/perubahan)

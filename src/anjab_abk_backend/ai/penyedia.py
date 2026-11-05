@@ -6,6 +6,7 @@ Hanya konstanta dan aturan murni; penyimpanan ada di `services/ai_penyedia_sql.p
 from __future__ import annotations
 
 import re
+import shutil
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
@@ -14,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from ..config import Settings
 from ..errors import ValidationAppError
-from .klien import AnthropicKlienModel, KlienModel
+from .klien import AnthropicKlienModel, ClaudeCliKlienModel, KlienModel
 
 if TYPE_CHECKING:
     from ..schemas.ai_penyedia import AiPenyediaStatusRead
@@ -103,14 +104,15 @@ class PenyediaMati(Exception):
 
 
 class PenyediaTidakTersedia(Exception):
-    """Mode penyedia dipilih tetapi belum punya driver (``LANGGANAN_CLAUDE`` sampai #112)."""
+    """Mode ``LANGGANAN_CLAUDE`` dipilih tetapi binary ``claude`` tidak ada di ``PATH``."""
 
 
 @dataclass(frozen=True)
 class KlienTerpilih:
     """Hasil pabrik: klien siap pakai beserta nilai yang dipakai membuatnya.
 
-    ``repr`` aman: klien (``AnthropicKlienModel``) tidak memuat kunci di ``repr``-nya.
+    ``repr`` aman: klien (``AnthropicKlienModel``/``ClaudeCliKlienModel``) tidak memuat
+    kunci di ``repr``-nya.
 
     Attributes:
         klien: Klien model yang siap memanggil.
@@ -145,11 +147,14 @@ def buat_klien_model(
             pembacaan ganda).
 
     Returns:
-        ``KlienTerpilih`` untuk mode ``API_ANTHROPIC``.
+        ``KlienTerpilih`` untuk mode ``API_ANTHROPIC`` (``AnthropicKlienModel``) atau
+        ``LANGGANAN_CLAUDE`` (``ClaudeCliKlienModel``). Pada mode kedua kunci API di
+        basis data tidak dibaca sama sekali, dan status masuk CLI baru diperiksa saat
+        panggilan (``LanggananBelumMasuk``).
 
     Raises:
         PenyediaMati: Mode ``MATI``.
-        PenyediaTidakTersedia: Mode ``LANGGANAN_CLAUDE`` (driver di #112).
+        PenyediaTidakTersedia: Mode ``LANGGANAN_CLAUDE`` tetapi binary ``claude`` tidak ada.
         KunciModelTidakAda: Kunci kosong, tak terbaca, atau gagal didekripsi.
     """
     from ..services.ai_penyedia_sql import SqlAiPenyediaService
@@ -159,7 +164,10 @@ def buat_klien_model(
     if st.mode is AiPenyediaMode.MATI:
         raise PenyediaMati
     if st.mode is AiPenyediaMode.LANGGANAN_CLAUDE:
-        raise PenyediaTidakTersedia
+        if shutil.which("claude") is None:
+            raise PenyediaTidakTersedia
+        cli = ClaudeCliKlienModel(settings, model=st.model, effort=st.effort.value)
+        return KlienTerpilih(klien=cli, mode=st.mode, model=st.model, effort=st.effort.value)
     klien = AnthropicKlienModel(
         settings, kunci_api=svc.baca_kunci_api(), model=st.model, effort=st.effort.value
     )
