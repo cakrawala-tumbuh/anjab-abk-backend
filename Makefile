@@ -14,9 +14,16 @@ DOCKERFILE ?= Dockerfile.test
 DOCKER_RUN  = docker run --rm $(IMAGE_NAME)
 COMPOSE_TEST = docker compose -f docker-compose.test.yml
 
+# Evaluasi perilaku model (`eval-ai`): di luar `make test`. Nilai dari baris perintah/env
+# diteruskan ke resep LEWAT ENVIRONMENT dan dirujuk sebagai "$$VAR" (bukan $(VAR)), sehingga
+# nilai berbahaya ($(...), spasi, ;, path) tidak pernah ditafsirkan shell.
+EVAL_BASE_IMAGE ?= $(shell basename $(CURDIR))-eval-base
+EVAL_IMAGE ?= $(shell basename $(CURDIR))-eval
+export FUNGSI PENYEDIA CLAUDE_VOLUME EVAL_ULANG EVAL_MAKS_TOKEN
+
 .DEFAULT_GOAL := test
 .PHONY: build lint unit test clean shell help \
-        migration backup restore backup-list test-arm64
+        migration backup restore backup-list test-arm64 eval-ai
 
 ## help: tampilkan daftar target
 help:
@@ -53,6 +60,34 @@ test-arm64:
 	  claude --version | grep -q "^2\.1\.311"; \
 	  claude --version; \
 	  echo "uji asap arm64 OK"'
+
+## eval-ai: evaluasi perilaku model di luar `make test` — FUNGSI=P10 PENYEDIA=<API_ANTHROPIC|LANGGANAN_CLAUDE> [CLAUDE_VOLUME=<volume>]; lihat README
+# `make` mengubah kegagalan resep jadi exit 2: baca kode harness dari baris akhir `#EVAL`.
+# Jalur API: kunci dari env `ANTHROPIC_API_KEY` milik operator, diteruskan TANPA nilai di
+# argumen (`-e ANTHROPIC_API_KEY`). Jalur langganan: volume Docker bernama, tanpa env kunci.
+eval-ai:
+	@LC_ALL=C; export LC_ALL; \
+	case "$$FUNGSI" in \
+	  ''|*[!A-Za-z0-9_]*) echo 'FUNGSI wajib berupa kode fungsi, mis. FUNGSI=P10.' >&2; exit 2 ;; \
+	esac; \
+	case "$$PENYEDIA" in \
+	  API_ANTHROPIC) ;; \
+	  LANGGANAN_CLAUDE) \
+	    case "$$CLAUDE_VOLUME" in \
+	      ''|[!A-Za-z0-9]*|*[!A-Za-z0-9_.-]*) \
+	        echo 'CLAUDE_VOLUME wajib nama volume Docker bernama (huruf/angka/_/./-), bukan path.' >&2; exit 2 ;; \
+	    esac ;; \
+	  *) echo 'PENYEDIA wajib API_ANTHROPIC atau LANGGANAN_CLAUDE.' >&2; exit 2 ;; \
+	esac
+	docker build --target runtime -t $(EVAL_BASE_IMAGE) .
+	docker build -f Dockerfile.eval --build-arg BASE_IMAGE=$(EVAL_BASE_IMAGE) -t $(EVAL_IMAGE) .
+	@if [ "$$PENYEDIA" = API_ANTHROPIC ]; then \
+	  docker run --rm -e ANTHROPIC_API_KEY -e AI_INFERENCE_GEO=us -e AI_REFUSAL_FALLBACK=false \
+	    -e EVAL_ULANG -e EVAL_MAKS_TOKEN $(EVAL_IMAGE) --fungsi "$$FUNGSI" --penyedia "$$PENYEDIA"; \
+	else \
+	  docker run --rm -v "$$CLAUDE_VOLUME":/var/lib/claude-config \
+	    -e EVAL_ULANG -e EVAL_MAKS_TOKEN $(EVAL_IMAGE) --fungsi "$$FUNGSI" --penyedia "$$PENYEDIA"; \
+	fi
 
 ## migration: buat revisi Alembic baru dari perubahan model — m="deskripsi" (satu berkas/perubahan)
 migration: build

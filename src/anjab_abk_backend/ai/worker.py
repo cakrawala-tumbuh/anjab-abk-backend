@@ -45,6 +45,7 @@ from .klien import (
     KunciModelTidakAda,
     LanggananBelumMasuk,
 )
+from .masukan import peta_sumber, susun_masukan_json
 from .penyedia import AiPenyediaMode, PenyediaMati, PenyediaTidakTersedia, buat_klien_model
 from .redaksi import muat_kamus_nama, periksa_pii
 
@@ -249,12 +250,8 @@ def jalankan_satu(
             return job.id
         run_id = run.id
 
-    sumber_peta = {x["source_id"]: (x["source_hash"], x["teks"]) for x in masukan["sumber"]}
-    masukan_json = json.dumps(
-        {"sumber": masukan["sumber"], "parameter": masukan["parameter"]},
-        ensure_ascii=False,
-        sort_keys=True,
-    )
+    sumber_peta = peta_sumber(masukan["sumber"])
+    masukan_json = susun_masukan_json(masukan)
     skema = skema_dengan_amplop(fungsi.skema_isi)
     jawaban: JawabanModel | None = None
     sementara = False

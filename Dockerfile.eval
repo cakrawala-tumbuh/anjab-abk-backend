@@ -1,0 +1,14 @@
+# Image EVALUASI perilaku model (bukan image test, bukan image produksi).
+#
+# Dibangun oleh `make eval-ai` di atas target `runtime` dari `Dockerfile` (BASE_IMAGE), sehingga
+# binary `claude`, CLAUDE_CONFIG_DIR=/var/lib/claude-config, dan USER appuser sama dengan produksi.
+# `evals/` hanya ada di image ini dan TIDAK ikut image runtime produksi. ENTRYPOINT diganti
+# agar `docker-entrypoint.sh` (initdb: migrasi + seed) tidak berjalan; harness tidak punya
+# basis data. Kredensial tidak ada di image; operator menyuplainya saat `docker run`.
+ARG BASE_IMAGE=anjab-abk-backend-eval-base
+FROM ${BASE_IMAGE}
+
+COPY evals /app/evals
+
+ENTRYPOINT ["python", "-m", "evals.jalankan"]
+CMD []

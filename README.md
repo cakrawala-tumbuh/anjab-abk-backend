@@ -119,3 +119,60 @@ tidak ada dan `LANGGANAN_BELUM_MASUK` bila CLI belum masuk.
 Dampak ukuran image: binary menambah sekitar 280 MiB terpasang (paket 134 MB terkompresi)
 pada target `runtime`, sehingga image kira-kira 2,3 kali lebih besar bagi semua pemakai,
 juga yang tidak pernah memilih mode ini.
+
+### Evaluasi perilaku model (`make eval-ai`)
+
+Harness `evals/` menjalankan kasus **sintetis** fungsi AI lewat jalur yang dipilih operator
+dan menghasilkan vonis ber-exit-code. Ia berjalan **di luar** `make test` (yang tanpa jaringan
+dan tanpa kredensial) dan di luar CI: `.github/workflows/` tidak memanggilnya. Tanpa basis
+data, tanpa `AiGateway`, tanpa menyalakan flag. Kredensial tidak pernah masuk repo, `Settings`,
+`.env`, argumen perintah, secret GitHub, log, maupun laporan.
+
+**Menutup issue harness BUKAN bukti perilaku model.** Hasil hanya berlaku untuk jalur dan model
+yang tercantum di baris `#EVAL`, bukan untuk jalur atau model lain yang kelak dipilih admin.
+Evaluasi nyata dijalankan operator setelah kredensial tersedia.
+
+```bash
+# Jalur API: kunci workspace evaluasi di env proses (terpisah dari kunci produksi).
+# Diteruskan sebagai `docker run -e ANTHROPIC_API_KEY` tanpa nilai. Tujuan inferensi geo `us`
+# dan fallback penolakan mati dipasang oleh target ini.
+ANTHROPIC_API_KEY=... make eval-ai FUNGSI=P10 PENYEDIA=API_ANTHROPIC
+
+# Jalur langganan: volume Docker BERNAMA berisi sesi masuk CLI (path host ditolak).
+make eval-ai FUNGSI=P10 PENYEDIA=LANGGANAN_CLAUDE CLAUDE_VOLUME=eval-claude
+```
+
+`PENYEDIA` wajib dan tanpa nilai bawaan; kosong atau tak dikenal ditolak sebelum build dan
+sebelum `docker run`. `CLAUDE_VOLUME` wajib untuk jalur langganan dan harus berupa nama volume
+(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`). Opsional: `EVAL_ULANG` (bawaan 3; kasus lulus hanya bila
+semua ulangan lulus) dan `EVAL_MAKS_TOKEN` (bawaan 500000, dihitung dari token masukan +
+keluaran). Model dan effort dari konstanta bawaan (`ai/penyedia.py`), bukan env.
+
+Masuk untuk jalur langganan (sekali, oleh operator; alur Anthropic sendiri di dalam kontainer):
+
+```bash
+docker volume create eval-claude
+docker run --rm -it -v eval-claude:/var/lib/claude-config --entrypoint claude \
+  <image-eval> auth login      # image-eval: <nama-direktori-repo>-eval, hasil `make eval-ai`
+```
+
+`make` mengubah semua kegagalan resep menjadi exit 2, jadi **kode harness dibaca dari baris
+akhir `#EVAL`** yang selalu tercetak (juga pada exit 2 dan galat tak terduga). Laporan hanya
+ke stdout: satu baris JSON per ulangan, lalu `#EVAL penyedia=... model=... kode=... exit=...`.
+
+| exit | Arti |
+|---|---|
+| 0 | semua kasus lulus |
+| 1 | gagal perilaku (`GAGAL_PERILAKU`) |
+| 2 | argumen atau kasus rusak, atau galat tak terduga |
+| 3 | kunci API tak ada (`KUNCI_TIDAK_ADA`) |
+| 4 | tak konklusif: galat sementara berulang atau batas token (`TAK_KONKLUSIF`, `BATAS_TOKEN`); tidak dihitung gagal perilaku |
+| 5 | gagal permanen: `SKEMA_DITOLAK_API` (jalur API) atau `CLI_GAGAL_PERMANEN` (langganan); evaluasi berhenti |
+| 6 | langganan belum masuk (`LANGGANAN_BELUM_MASUK`), nol panggilan model |
+| 7 | binary `claude` tak ada (`BINARY_CLAUDE_TIDAK_ADA`), nol panggilan model |
+
+Kasus ada di `evals/<kode>/kasus.json` (satu berkas per fungsi). Seluruhnya sintetis dengan
+nama fiktif; `jenis` sumber selain `SINTETIS` ditolak (exit 2), kecuali kasus tanpa model yang
+justru menguji penolakan jenis berawalan `WCP`/`DCS`/`KONSELING`/`MURID`. Penilai
+deterministik (tanpa model penilai). Bagian manusia R11-016 (blind reviewer) tidak
+digantikan harness.
