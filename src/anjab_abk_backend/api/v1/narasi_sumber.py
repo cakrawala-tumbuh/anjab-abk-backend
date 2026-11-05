@@ -6,10 +6,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response
 
+from ...config import Settings, get_settings
 from ...dependencies import (
     READ_GUARDS,
     Idempotency,
     Pagination,
+    SessionDep,
     get_current_principal,
     get_narasi_sumber_service,
     idempotency,
@@ -23,7 +25,9 @@ from ...narasi.schemas.sumber import (
     NarasiSumberRead,
     NarasiSumberRingkas,
 )
+from ...narasi.schemas.uji_kering import UjiKeringRead, UjiKeringRequest
 from ...narasi.services.sumber import NarasiSumberService
+from ...narasi.services.uji_kering import jalankan_uji_kering
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
 from ...security import Principal
@@ -118,6 +122,34 @@ def search_sumber(
         domain=req.domain, order=req.order, limit=req.limit, offset=req.offset
     )
     return Page[NarasiSumberRingkas](items=items, total=total, limit=req.limit, offset=req.offset)
+
+
+@router.post(
+    "/uji-kering",
+    response_model=UjiKeringRead,
+    summary="Uji kering gerbang PII atas sumber narasi (tim-kajian)",
+    operation_id="narasi_sumber_uji_kering",
+    dependencies=_WRITE,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        422: {
+            "model": ErrorResponse,
+            "description": "Id tak dikenal atau lebih dari 500 sumber (uji_kering_terlalu_banyak).",
+        },
+    },
+)
+def uji_kering_sumber(
+    req: UjiKeringRequest,
+    session: SessionDep,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> UjiKeringRead:
+    """Hitung berapa sumber ditolak gerbang PII (mode BLOKIR) dan mengapa.
+
+    Tanpa model, tanpa tulisan, dan tanpa nilai PII pada respons. Berjalan walau flag AI mati.
+    """
+    return jalankan_uji_kering(session, settings, req.sumber_ids)
 
 
 @router.get(
