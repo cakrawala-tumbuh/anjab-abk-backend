@@ -45,6 +45,8 @@ from .dcs.services.subskala import DcsSubSkalaService
 from .dcs.services.subskala_sql import SqlDcsSubSkalaService
 from .errors import ForbiddenError, RateLimitedError, UnauthorizedError
 from .logging import AUDIT_LOGGER_NAME
+from .narasi.services.narasi import NarasiService
+from .narasi.services.narasi_sql import SqlNarasiService
 from .narasi.services.sumber import NarasiSumberService
 from .narasi.services.sumber_sql import SqlNarasiSumberService
 from .opm.services.jawaban import OpmJawabanService
@@ -409,6 +411,11 @@ def get_bukti_service(session: SessionDep) -> BuktiService:
 def get_narasi_sumber_service(session: SessionDep) -> NarasiSumberService:
     """SEAM: `NarasiSumberService` PostgreSQL (teks sumber narasi yang tak dapat diubah)."""
     return SqlNarasiSumberService(session)
+
+
+def get_narasi_service(session: SessionDep) -> NarasiService:
+    """SEAM: `NarasiService` PostgreSQL (satu-satunya jalur tulis kasus, versi, dan event)."""
+    return SqlNarasiService(session)
 
 
 def get_penilaian_service(session: SessionDep) -> PenilaianService:

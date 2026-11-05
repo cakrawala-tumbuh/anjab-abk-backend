@@ -43,6 +43,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from anjab_abk_backend.narasi.schemas.kasus import (
     BasisRelation,
+    EventKind,
     NarrativeKind,
     RevisionOrigin,
     StatusNarasi,
@@ -1612,3 +1613,36 @@ class NarasiVersiSumberModel(Base):
     source_span: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     basis_relation: Mapped[str] = mapped_column(String(20), nullable=False)
+
+
+class NarasiEventModel(Base):
+    """Tindakan manusia atas sebuah kasus narasi; append-only (trigger `narasi_tolak_ubah`).
+
+    Hanya service `NarasiService` yang menulis; aktor `system:ai-worker` tidak pernah
+    tercatat di sini (transisi sistem dibuktikan baris `narasi_versi`).
+    """
+
+    __tablename__ = "narasi_event"
+    __table_args__ = (
+        CheckConstraint(_in_check("event_kind", EventKind), name="event_kind"),
+        CheckConstraint(_in_check("dari_status", StatusNarasi), name="dari_status"),
+        CheckConstraint(_in_check("ke_status", StatusNarasi), name="ke_status"),
+        Index("ix_narasi_event_narasi_id_event_at", "narasi_id", "event_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    narasi_id: Mapped[str] = mapped_column(
+        ForeignKey("narasi_kasus.id", name="fk_narasi_event_narasi_id_narasi_kasus"),
+        nullable=False,
+    )
+    narasi_versi_id: Mapped[str | None] = mapped_column(
+        ForeignKey("narasi_versi.id", name="fk_narasi_event_narasi_versi_id_narasi_versi"),
+        nullable=True,
+    )
+    actor_key: Mapped[str] = mapped_column(String(254), nullable=False)
+    actor_role: Mapped[str] = mapped_column(String(40), nullable=False)
+    event_kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    dari_status: Mapped[str] = mapped_column(String(30), nullable=False)
+    ke_status: Mapped[str] = mapped_column(String(30), nullable=False)
+    event_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    event_at: Mapped[datetime] = _ts()

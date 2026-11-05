@@ -38,6 +38,22 @@ class StatusNarasi(StrEnum):
     RETURN_FOR_CLARIFICATION = "RETURN_FOR_CLARIFICATION"
 
 
+class EventKind(StrEnum):
+    """Jenis tindakan manusia pada tabel `narasi_event` (11 nilai paket)."""
+
+    TEAM_APPROVE = "TEAM_APPROVE"
+    TEAM_REVISE = "TEAM_REVISE"
+    TEAM_REJECT = "TEAM_REJECT"
+    NEED_SOURCE = "NEED_SOURCE"
+    SUBJECT_CONFIRM = "SUBJECT_CONFIRM"
+    SUBJECT_CORRECT = "SUBJECT_CORRECT"
+    SUBJECT_REJECT = "SUBJECT_REJECT"
+    SUBJECT_UNSURE = "SUBJECT_UNSURE"
+    FINAL_TEAM_APPROVE = "FINAL_TEAM_APPROVE"
+    RELEASE_LIMITED = "RELEASE_LIMITED"
+    RETURN_CLARIFICATION = "RETURN_CLARIFICATION"
+
+
 class RevisionOrigin(StrEnum):
     """Asal sebuah versi narasi."""
 
