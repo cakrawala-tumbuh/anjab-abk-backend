@@ -177,6 +177,11 @@ def test_otorisasi(client_as, anon_client):
 def test_openapi_tanpa_patch_delete(client):
     paths = client.get("/openapi.json").json()["paths"]
     narasi = {p: v for p, v in paths.items() if p.startswith("/api/v1/narasi/kasus")}
-    assert len(narasi) == 6
+    # 6 path kasus bawaan + 2 path rute pengaju draf AI (#98: draf-ai, permintaan-ai).
+    assert len(narasi) == 8
+    assert {p.rsplit("/", 1)[1] for p in narasi if p.endswith(("/draf-ai", "/permintaan-ai"))} == {
+        "draf-ai",
+        "permintaan-ai",
+    }
     for p, ops in narasi.items():
         assert not ({"patch", "delete", "put"} & set(ops)), p

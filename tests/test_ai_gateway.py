@@ -396,10 +396,17 @@ def test_dua_klaim_bersamaan_tidak_mengambil_job_yang_sama(engine) -> None:
         s0.close()
 
 
-def test_registri_produksi_kosong_dan_tidak_ada_rute_pengaju(app) -> None:
+def test_registri_produksi_kosong_dan_rute_pengaju_hanya_di_kasus_narasi(app) -> None:
+    """Pengganti uji #90 "OpenAPI tidak memuat rute pengaju" (diganti oleh #98).
+
+    Rute pengaju kini ada, tetapi hanya satu: ``POST /narasi/kasus/{id}/draf-ai``. Perilaku
+    flag mati (409 tanpa baris) diuji di ``test_narasi_draf_ai.py``.
+    """
     assert FUNGSI_TERDAFTAR == {} and modul_gateway.FUNGSI_TERDAFTAR is FUNGSI_TERDAFTAR
     with TestClient(app) as c:
         paths = c.get("/openapi.json").json()["paths"]
+    pengaju = [p for p, ops in paths.items() if "post" in ops and p.endswith("/draf-ai")]
+    assert pengaju == ["/api/v1/narasi/kasus/{narasi_id}/draf-ai"]
     assert not [p for p in paths if "ajukan" in p or "/ai/jobs" in p or "/ai/job" in p]
     assert not [p for p in paths if p.endswith("/ai") or "/ai/ajukan" in p]
 

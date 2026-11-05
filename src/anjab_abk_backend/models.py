@@ -1589,6 +1589,42 @@ class NarasiVersiModel(Base):
     created_at: Mapped[datetime] = _ts()
 
 
+class NarasiAiPermintaanModel(Base):
+    """Permintaan draf AI atas satu kasus narasi: satu-satunya tautan kasus dan `ai_run`.
+
+    `ai_run_id` UNIQUE (satu run, satu permintaan) diisi dari `async_job.ref_id`. Kolom
+    `diserap_at`, `hasil_serap`, `kode_serap` null sampai penyerap hasil run menulisnya.
+    """
+
+    __tablename__ = "narasi_ai_permintaan"
+    __table_args__ = (
+        Index("ix_narasi_ai_permintaan_narasi_id_created_at", "narasi_id", "created_at"),
+        Index(
+            "ix_narasi_ai_permintaan_belum_diserap",
+            "narasi_id",
+            postgresql_where=text("diserap_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    narasi_id: Mapped[str] = mapped_column(
+        ForeignKey("narasi_kasus.id", name="fk_narasi_ai_permintaan_narasi_id_narasi_kasus"),
+        nullable=False,
+    )
+    job_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    ai_run_id: Mapped[str] = mapped_column(
+        ForeignKey("ai_run.id", name="fk_narasi_ai_permintaan_ai_run_id_ai_run"),
+        nullable=False,
+        unique=True,
+    )
+    sumber_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    diminta_oleh: Mapped[str] = mapped_column(String(254), nullable=False)
+    created_at: Mapped[datetime] = _ts()
+    diserap_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hasil_serap: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    kode_serap: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+
+
 class NarasiVersiSumberModel(Base):
     """Tautan versi narasi ke kutipan teks sumber; append-only (trigger `narasi_tolak_ubah`).
 

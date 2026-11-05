@@ -21,6 +21,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from .ai.gateway import AiGateway
 from .anjab.services.jabatan import JabatanService
 from .anjab.services.jabatan_sql import SqlJabatanService
 from .anjab.services.sme_panel import SMEPanelService
@@ -47,6 +48,8 @@ from .errors import ForbiddenError, RateLimitedError, UnauthorizedError
 from .logging import AUDIT_LOGGER_NAME
 from .narasi.services.narasi import NarasiService
 from .narasi.services.narasi_sql import SqlNarasiService
+from .narasi.services.permintaan_ai import PermintaanAiService
+from .narasi.services.permintaan_ai_sql import SqlPermintaanAiService
 from .narasi.services.sumber import NarasiSumberService
 from .narasi.services.sumber_sql import SqlNarasiSumberService
 from .opm.services.jawaban import OpmJawabanService
@@ -416,6 +419,18 @@ def get_narasi_sumber_service(session: SessionDep) -> NarasiSumberService:
 def get_narasi_service(session: SessionDep) -> NarasiService:
     """SEAM: `NarasiService` PostgreSQL (satu-satunya jalur tulis kasus, versi, dan event)."""
     return SqlNarasiService(session)
+
+
+def get_permintaan_ai_service(session: SessionDep) -> PermintaanAiService:
+    """SEAM: `PermintaanAiService` PostgreSQL (tautan kasus narasi, job, dan `ai_run`)."""
+    return SqlPermintaanAiService(session)
+
+
+def get_ai_gateway(
+    session: SessionDep, settings: Annotated[Settings, Depends(get_settings)]
+) -> AiGateway:
+    """SEAM: `AiGateway` di atas sesi request; registri fungsi dari `FUNGSI_TERDAFTAR`."""
+    return AiGateway(session, settings)
 
 
 def get_penilaian_service(session: SessionDep) -> PenilaianService:
