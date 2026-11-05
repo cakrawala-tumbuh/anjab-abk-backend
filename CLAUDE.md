@@ -82,6 +82,25 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-05] Narasi: tabel `narasi_sumber` — teks sumber tak berubah, rute Tim
+
+Backlog `#91` (BE-1 pemanggil AI; berguna juga untuk jalur manual). Aplikasi belum punya
+penyimpanan teks sumber; `RedesainBuktiModel` hanya rujukan teks.
+
+- **Tabel `narasi_sumber`** (migrasi `5a0f1cc6d400`): `id` UUID v4 = Source_ID, `teks`,
+  `teks_hash` (SHA-256 hex atas UTF-8 teks), `jenis`/`versi`/`periode`/`judul`, `izin_ai`
+  (boolean, bawaan false; hanya catatan, tidak menyalakan AI) + `izin_catatan`,
+  `menggantikan_id` (FK ke tabel sendiri), `dibuat_oleh` (= `principal.subject`).
+- **Baris tak dapat diubah**: tidak ada PATCH/DELETE (pengecualian sengaja dari CRUD agar hash
+  stabil). Revisi teks atau perubahan izin = baris baru dengan `menggantikan_id`.
+- `JenisSumberNarasi` (`StrEnum`) hanya `SINTETIS`, `DOKUMEN_RESMI`; nilai lain 422.
+  `izin_ai=true` tanpa `izin_catatan` berisi → 422.
+- Rute `/api/v1/narasi/sumber` (paket `narasi/`): `POST ''` (idempotency), `GET ''`
+  (filter `jenis`, `periode`), `GET /{id}`, `POST /search` (whitelist `jenis, periode, judul,
+  izin_ai, created_at`); semua `require_tim_kajian` (admin tidak otomatis lolos). List dan
+  search memakai `NarasiSumberRingkas` tanpa `teks`. `teks` tidak masuk log maupun galat.
+- Tidak menyentuh `FEATURE_AI_NARRATIVE_DRAFT`; pemeriksaan PII saat simpan = item `#96`.
+
 ### [2026-11-03] WCP/DCS/TI: tolak hapus/ubah bila sudah ada jawaban (A27 minimum)
 
 Backlog `#71` (paket R1.1 melarang menimpa respons atau menghapus item yang pernah

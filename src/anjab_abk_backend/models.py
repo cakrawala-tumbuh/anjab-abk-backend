@@ -1452,3 +1452,34 @@ class RedesainVersiMetodeModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
     )
+
+
+class NarasiSumberModel(Base):
+    """Teks sumber narasi yang ditempel Tim (Source_ID = `id`); baris TIDAK PERNAH diubah.
+
+    `teks_hash` = SHA-256 hex atas UTF-8 `teks`. Revisi teks atau perubahan izin = baris baru
+    dengan `menggantikan_id` menunjuk baris lama. `izin_ai` hanya catatan, tidak menyalakan AI.
+    Tidak ada operasi ubah/hapus.
+    """
+
+    __tablename__ = "narasi_sumber"
+    __table_args__ = (Index("ix_narasi_sumber_jenis_periode", "jenis", "periode"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    judul: Mapped[str] = mapped_column(String(200), nullable=False)
+    jenis: Mapped[str] = mapped_column(String(40), nullable=False)
+    versi: Mapped[str] = mapped_column(String(50), nullable=False)
+    periode: Mapped[str] = mapped_column(String(20), nullable=False)
+    teks: Mapped[str] = mapped_column(Text, nullable=False)
+    teks_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    izin_ai: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    izin_catatan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    menggantikan_id: Mapped[str | None] = mapped_column(
+        ForeignKey("narasi_sumber.id", name="fk_narasi_sumber_menggantikan"), nullable=True
+    )
+    dibuat_oleh: Mapped[str] = mapped_column(String(254), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )

@@ -13,6 +13,7 @@ from .v1 import (
     jabatan,
     jenjang_pendidikan,
     mata_pelajaran,
+    narasi_sumber,
     opm_hasil,
     opm_kuesioner,
     opm_responden,
@@ -279,6 +280,11 @@ api_router.include_router(
     redesain_sesi.router,
     prefix="/redesain/sesi",
     tags=["redesain"],
+)
+api_router.include_router(
+    narasi_sumber.router,
+    prefix="/narasi/sumber",
+    tags=["narasi"],
 )
 api_router.include_router(
     redesain_bukti.router,
