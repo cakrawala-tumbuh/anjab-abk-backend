@@ -144,7 +144,8 @@ make eval-ai FUNGSI=P10 PENYEDIA=LANGGANAN_CLAUDE CLAUDE_VOLUME=eval-claude
 
 `FUNGSI` menerima `P10` (draf narasi) dan `P09` (kritik AI atas versi narasi; 12 kasus di
 `evals/p09/kasus.json`, dinilai atas kategori temuan, draf bersih, dan span, bukan atas
-`draft_text`). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
+`draft_text`). `P01` (ekstraksi fakta dari dokumen sumber; 10 kasus di `evals/p01/kasus.json`, dinilai atas
+sifat fakta, angka baru, pola klaim terlaksana, dan span fakta, bukan atas `draft_text`). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
 `AI_FUNGSI_AKTIF`.
 
 `PENYEDIA` wajib dan tanpa nilai bawaan; kosong atau tak dikenal ditolak sebelum build dan

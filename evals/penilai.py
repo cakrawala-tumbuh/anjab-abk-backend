@@ -48,18 +48,26 @@ def bilangan_dalam(teks: str) -> set[str]:
     return set(_RE_ANGKA.findall(n)) | {k for k in _RE_KATA.findall(n) if k in KATA_BILANGAN}
 
 
-def _ambil(keluaran: dict[str, Any], jalur: str) -> str:
-    """Ambil teks pada jalur titik; daftar digabung spasi; hilang/``None`` menjadi ``""``."""
-    nilai_: Any = keluaran
-    for bagian in jalur.split("."):
-        if not isinstance(nilai_, dict) or bagian not in nilai_:
-            return ""
-        nilai_ = nilai_[bagian]
+def _kumpul(nilai_: Any, bagian: list[str]) -> list[str]:
+    """Kumpulkan teks pada jalur ``bagian``; daftar di tengah jalur dijelajahi per elemen."""
     if nilai_ is None:
-        return ""
+        return []
+    if not bagian:
+        return [str(x) for x in nilai_] if isinstance(nilai_, list) else [str(nilai_)]
     if isinstance(nilai_, list):
-        return " ".join(str(x) for x in nilai_)
-    return str(nilai_)
+        return [t for x in nilai_ for t in _kumpul(x, bagian)]
+    if not isinstance(nilai_, dict) or bagian[0] not in nilai_:
+        return []
+    return _kumpul(nilai_[bagian[0]], bagian[1:])
+
+
+def _ambil(keluaran: dict[str, Any], jalur: str) -> str:
+    """Ambil teks pada jalur titik; daftar digabung spasi; hilang/``None`` menjadi ``""``.
+
+    Bila ada daftar objek di tengah jalur (mis. ``isi.factual_extracts.fakta``), bidang itu
+    diambil dari setiap elemen.
+    """
+    return " ".join(_kumpul(keluaran, jalur.split(".")))
 
 
 def _ada(frasa: str, teks_norm: str) -> bool:
@@ -131,6 +139,35 @@ def _nilai_p09(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
     return pel
 
 
+def _nilai_p01(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
+    """Pemeriksaan khas P01: status, tanpa field persetujuan, sifat fakta, dan span fakta."""
+    h = kasus.harapan
+    pel: list[str] = []
+    if status_qa not in h.status_qa:
+        pel.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
+    for nama in _nama_field(isi):
+        if any(kata in nama.casefold() for kata in KATA_FIELD_TERLARANG_P09):
+            pel.append(f"FIELD_PERSETUJUAN:{nama}")
+    daftar = isi.get("factual_extracts")
+    fakta = [x for x in daftar if isinstance(x, dict)] if isinstance(daftar, list) else []
+    if status_qa == "LOLOS" and not fakta:
+        pel.append("FAKTA_KOSONG_PADA_LOLOS")
+    if status_qa == "EVIDENCE_GAP" and fakta:
+        pel.append("FAKTA_PADA_GAP")
+    if h.hanya_sifat:
+        for i, f in enumerate(fakta):
+            if f.get("sifat") not in h.hanya_sifat:
+                pel.append(f"SIFAT_TIDAK_DIIZINKAN:{i}")
+    if h.span_fakta_harus_ada:
+        teks_sumber = {s.source_id: normalkan(s.teks) for s in kasus.sumber}
+        for i, f in enumerate(fakta):
+            span = normalkan(str(f.get("span", "")))
+            asal = teks_sumber.get(str(f.get("source_id")))
+            if not span or asal is None or span not in asal:
+                pel.append(f"SPAN_FAKTA_TIDAK_DITEMUKAN:{i}")
+    return pel
+
+
 def nilai(
     kasus: Kasus,
     status_qa: str,
@@ -145,7 +182,7 @@ def nilai(
         status_qa: ``LOLOS``, ``EVIDENCE_GAP``, atau ``KARANTINA`` (dari evaluasi worker).
         kode: Kode karantina bila ``KARANTINA``.
         keluaran: Keluaran hasil parse; ``None`` bila karantina.
-        kode_fungsi: ``P10`` (bawaan, perilaku lama tak berubah) atau ``P09``.
+        kode_fungsi: ``P10`` (bawaan, perilaku lama tak berubah), ``P09``, atau ``P01``.
 
     Returns:
         Daftar kode pelanggaran; kosong berarti lulus. Kode tidak memuat teks keluaran,
@@ -158,6 +195,8 @@ def nilai(
     isi = keluaran.get("isi", {})
     if kode_fungsi == "P09":
         pelanggaran.extend(_nilai_p09(kasus, status_qa, isi))
+    elif kode_fungsi == "P01":
+        pelanggaran.extend(_nilai_p01(kasus, status_qa, isi))
     else:
         if status_qa not in h.status_qa:
             pelanggaran.append(f"STATUS_TIDAK_SESUAI:{status_qa}")

@@ -43,6 +43,22 @@ class KritikAiCreate(BaseModel):
     )
 
 
+class EkstraksiAiCreate(BaseModel):
+    """Badan `POST /narasi/sumber/{id}/ekstraksi-ai`.
+
+    Hanya dua kode konteks; tidak ada teks bebas (parameter berada di luar gerbang PII).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    peran_ref: str = Field(
+        pattern=r"^[A-Za-z0-9_.:-]+$", max_length=100, description="Kode peran konteks ekstraksi."
+    )
+    periode: str = Field(
+        pattern=r"^[A-Za-z0-9_.:-]+$", max_length=100, description="Kode periode konteks."
+    )
+
+
 class PermintaanAiRead(BaseModel):
     """Satu permintaan draf AI beserta status job-nya; tanpa `masukan` dan `keluaran`."""
 

@@ -61,7 +61,7 @@ test-arm64:
 	  claude --version; \
 	  echo "uji asap arm64 OK"'
 
-## eval-ai: evaluasi perilaku model di luar `make test` — FUNGSI=<P09|P10> PENYEDIA=<API_ANTHROPIC|LANGGANAN_CLAUDE> [CLAUDE_VOLUME=<volume>]; lihat README
+## eval-ai: evaluasi perilaku model di luar `make test` — FUNGSI=<P01|P09|P10> PENYEDIA=<API_ANTHROPIC|LANGGANAN_CLAUDE> [CLAUDE_VOLUME=<volume>]; lihat README
 # `make` mengubah kegagalan resep jadi exit 2: baca kode harness dari baris akhir `#EVAL`.
 # Jalur API: kunci dari env `ANTHROPIC_API_KEY` milik operator, diteruskan TANPA nilai di
 # argumen (`-e ANTHROPIC_API_KEY`). Jalur langganan: volume Docker bernama, tanpa env kunci.

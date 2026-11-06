@@ -16,6 +16,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from anjab_abk_backend.ai.fungsi_p01 import FUNGSI_P01, SIFAT_FAKTA_P01, ParameterP01
 from anjab_abk_backend.ai.fungsi_p09 import FUNGSI_P09, ParameterP09
 from anjab_abk_backend.ai.fungsi_p10 import FUNGSI_P10, ParameterP10
 from anjab_abk_backend.ai.gateway import FungsiAi
@@ -56,6 +57,11 @@ class DefinisiFungsi:
 
 
 DEFINISI_FUNGSI: dict[str, DefinisiFungsi] = {
+    "P01": DefinisiFungsi(
+        fungsi=FUNGSI_P01,
+        parameter=ParameterP01,
+        berkas=Path(__file__).parent / "p01" / "kasus.json",
+    ),
     "P09": DefinisiFungsi(
         fungsi=FUNGSI_P09,
         parameter=ParameterP09,
@@ -107,6 +113,10 @@ class HarapanKasus(BaseModel):
             kosong (draf bersih).
         span_temuan_harus_ada: Khusus P09; tiap temuan harus menunjuk ``source_id`` yang ada di
             kasus dengan ``span`` yang benar-benar terkandung di teks sumber itu.
+        hanya_sifat: Khusus P01; ``sifat`` tiap fakta pada ``factual_extracts`` harus salah satu
+            nilai ini (mis. ``["NORMATIF"]`` untuk dokumen normatif); kosong = tidak diperiksa.
+        span_fakta_harus_ada: Khusus P01; tiap fakta harus menunjuk ``source_id`` yang ada di
+            kasus dengan ``span`` yang benar-benar terkandung di teks sumber itu.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -122,6 +132,8 @@ class HarapanKasus(BaseModel):
     kategori_wajib: list[str | list[str]] = Field(default_factory=list)
     tanpa_temuan_berat: bool = False
     span_temuan_harus_ada: bool = False
+    hanya_sifat: list[str] = Field(default_factory=list)
+    span_fakta_harus_ada: bool = False
 
     @model_validator(mode="after")
     def _konsisten(self) -> HarapanKasus:
@@ -136,6 +148,8 @@ class HarapanKasus(BaseModel):
                 raise ValueError("alasan_gerbang hanya untuk TANPA_MODEL")
         if not self.bidang_teks:
             raise ValueError("bidang_teks tidak boleh kosong")
+        if any(x not in SIFAT_FAKTA_P01 for x in self.hanya_sifat):
+            raise ValueError("hanya_sifat harus berisi sifat fakta P01 yang sah")
         return self
 
 
@@ -190,21 +204,34 @@ def _periksa_jenis(kasus: Kasus) -> None:
         raise KasusRusak(f"kasus {kasus.id}: jenis sumber '{s.jenis}' tidak diizinkan")
 
 
-_KHAS_P09 = ("kategori_wajib", "tanpa_temuan_berat", "span_temuan_harus_ada")
+_KHAS_FUNGSI = {
+    "P09": ("kategori_wajib", "tanpa_temuan_berat", "span_temuan_harus_ada"),
+    "P01": ("hanya_sifat", "span_fakta_harus_ada"),
+}
+"""Isian ``HarapanKasus`` yang hanya sah untuk satu fungsi."""
+
+_TANPA_DRAFT_TEXT = ("P01", "P09")
+"""Fungsi yang keluarannya tidak punya ``isi.draft_text``."""
 
 
 def _periksa_khas_fungsi(kasus: Kasus, kode_fungsi: str) -> None:
     """Pastikan isian khas satu fungsi tidak dipakai fungsi lain dan bidang teks sesuai.
 
     Raises:
-        KasusRusak: isian khas P09 dipakai di fungsi lain, atau kasus P09 berjalur ``MODEL``
-            masih memakai bidang teks bawaan P10 (``isi.draft_text``).
+        KasusRusak: isian khas fungsi lain dipakai (mis. isian P09 pada P01 atau P10), atau
+            kasus P01/P09 berjalur ``MODEL`` masih memakai bidang teks bawaan P10
+            (``isi.draft_text``).
     """
     h = kasus.harapan
-    if kode_fungsi != "P09" and any(getattr(h, f) for f in _KHAS_P09):
-        raise KasusRusak(f"kasus {kasus.id}: isian khas P09 dipakai pada {kode_fungsi}")
-    if kode_fungsi == "P09" and h.jalur == "MODEL" and "isi.draft_text" in h.bidang_teks:
-        raise KasusRusak(f"kasus {kasus.id}: P09 tidak punya isi.draft_text")
+    for pemilik, isian in _KHAS_FUNGSI.items():
+        if pemilik != kode_fungsi and any(getattr(h, f) for f in isian):
+            raise KasusRusak(f"kasus {kasus.id}: isian khas {pemilik} dipakai pada {kode_fungsi}")
+    if (
+        kode_fungsi in _TANPA_DRAFT_TEXT
+        and h.jalur == "MODEL"
+        and "isi.draft_text" in h.bidang_teks
+    ):
+        raise KasusRusak(f"kasus {kasus.id}: {kode_fungsi} tidak punya isi.draft_text")
 
 
 def muat_kasus(berkas: Path, kode_fungsi: str, definisi: DefinisiFungsi) -> list[Kasus]:
