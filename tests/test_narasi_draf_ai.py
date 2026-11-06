@@ -143,6 +143,22 @@ def test_positif_202_dan_tautan_benar(app, client_as, db_session, p10):
     assert run.masukan["sumber"][0]["source_id"] == sid
 
 
+def test_periode_garis_miring_lolos_pola_dan_spasi_422(app, client_as, db_session, p10):
+    c = _tim(client_as, "tim-periode")
+    _atur(app)
+    k = _kasus(c, periode="2026/27")
+    r = c.post(f"{URL}/{k['id']}/draf-ai", json={"sumber_ids": [_sumber(c)]})
+    assert r.status_code == 202, r.text
+    rec = db_session.get(NarasiAiPermintaanModel, r.json()["id"])
+    run = db_session.get(AiRunModel, rec.ai_run_id)
+    assert run.masukan["parameter"]["periode"] == "2026/27"
+    k2 = _kasus(c, periode="2026/27 ganjil")
+    awal = _hitung(db_session)
+    r2 = c.post(f"{URL}/{k2['id']}/draf-ai", json={"sumber_ids": []})
+    assert r2.status_code == 422, r2.text
+    assert _hitung(db_session) == awal
+
+
 def test_sumber_kosong_berakhir_evidence_gap_tanpa_model(app, client_as, db_session, p10):
     c = _tim(client_as)
     _atur(app)

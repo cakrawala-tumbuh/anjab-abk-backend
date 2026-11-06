@@ -11,12 +11,12 @@ import hashlib
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
+from pydantic import ValidationError
 
 from ...ai.fungsi_p04 import (
     ParameterP04,
     id_sumber_keputusan,
     id_sumber_klaim,
-    kode_periode_p04,
 )
 from ...ai.redaksi import SumberAi
 from ...config import Settings, get_settings
@@ -87,7 +87,10 @@ def _sumber_teks(source_id: str, teks: str, jenis: str) -> SumberAi:
         },
         422: {
             "model": ErrorResponse,
-            "description": "Badan tidak sah atau sumber tak dikenal.",
+            "description": (
+                "Badan tidak sah, sumber tak dikenal, atau periode kasus di luar pola "
+                "parameter AI (garis miring sah, spasi tidak)."
+            ),
         },
     },
 )
@@ -107,8 +110,10 @@ def ajukan_tanya_bukti_ai(
 
     Seluruh pemeriksaan berada di dalam aksi idempoten, jadi ulangan dengan
     `Idempotency-Key` yang sama membalas respons tersimpan (200). Urutan: flag AI (sebelum
-    membaca apa pun), kasus 404, sumber (tak dikenal 422, tanpa izin AI 409), lalu
-    `AiUsulanService.ajukan`. `klaim` dan `keputusan_terkait` dikirim sebagai sumber
+    membaca apa pun), kasus 404, sumber (tak dikenal 422, tanpa izin AI 409), `periode` kasus
+    (di luar pola parameter AI 422, tanpa menyalin nilainya ke pesan; kegagalan melepas
+    reservasi idempotensi), lalu `AiUsulanService.ajukan`. `periode` dikirim apa adanya.
+    `klaim` dan `keputusan_terkait` dikirim sebagai sumber
     `klaim:<uuid>` dan `keputusan:<uuid>` (jenis = jenis sumber pertama) agar ikut gerbang PII;
     keduanya tidak masuk `parameter`. Tidak ada tabel `narasi_*` yang ditulis dan tidak ada
     notifikasi.
@@ -137,9 +142,12 @@ def ajukan_tanya_bukti_ai(
         calon.append(
             _sumber_teks(id_sumber_keputusan(data.keputusan_terkait), data.keputusan_terkait, jenis)
         )
-        parameter = ParameterP04(
-            narasi_id=kasus.id, periode=kode_periode_p04(kasus.periode)
-        ).model_dump(mode="json")
+        try:
+            parameter = ParameterP04(narasi_id=kasus.id, periode=kasus.periode).model_dump(
+                mode="json"
+            )
+        except ValidationError as exc:
+            raise ValidationAppError("Periode kasus tidak sesuai pola parameter AI.") from exc
         return usulan.ajukan(
             KODE_FUNGSI, SasaranUsulan.NARASI_KASUS, kasus.id, calon, parameter, principal
         )

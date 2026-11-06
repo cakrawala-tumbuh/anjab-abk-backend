@@ -479,18 +479,56 @@ def test_pengajuan_ulang_klaim_sama_menghasilkan_source_id_dan_snapshot_sama(
     assert db_session.get(AiRunModel, rec.ai_run_id).input_snapshot_id != snapshot[0]
 
 
-def test_kasus_periode_di_luar_pola_menjadi_kode_sah_bukan_500_atau_422(
+def test_periode_garis_miring_diterima_apa_adanya_dan_tanda_hubung_tetap_sah(
     app, client_as, db_session, p04
 ):
     c = _tim(client_as)
     _atur(app)
     sid = _sumber(c)
-    for periode, kode in (("2026/27", "2026-27"), ("2026/27 ganjil", "2026-27-ganjil"), (" ", "-")):
+    for periode in ("2026/27", "2026-27"):
         k = _kasus(c, periode=periode)
         r = _tanya(c, k["id"], _badan([sid]))
         assert r.status_code == 202, (periode, r.text)
         run = db_session.get(AiRunModel, db_session.get(AiUsulanModel, r.json()["id"]).ai_run_id)
-        assert run.masukan["parameter"] == {"narasi_id": k["id"], "periode": kode}
+        assert run.masukan["parameter"] == {"narasi_id": k["id"], "periode": periode}
+
+
+def test_periode_di_luar_pola_422_tanpa_baris_dan_pesan_tanpa_nilai(
+    app, client_as, db_session, p04
+):
+    c = _tim(client_as)
+    _atur(app)
+    sid = _sumber(c)
+    awal = _hitung(db_session)
+    for periode in ("2026/27 ganjil", " "):
+        k = _kasus(c, periode=periode)
+        r = _tanya(c, k["id"], _badan([sid]))
+        assert r.status_code == 422, (periode, r.text)
+        assert r.json()["error"] == "validation_error"
+        assert r.json()["message"] == "Periode kasus tidak sesuai pola parameter AI."
+        assert "ganjil" not in r.text
+        assert _hitung(db_session) == awal
+
+
+def test_periode_di_luar_pola_flag_mati_409_bukan_422(app, client_as, db_session, p04):
+    c = _tim(client_as)
+    _atur(app)
+    sid = _sumber(c)
+    k = _kasus(c, periode="2026/27 ganjil")
+    _atur(app, feature_ai_narrative_draft=False)
+    r = _tanya(c, k["id"], _badan([sid]))
+    assert r.status_code == 409 and r.json()["error"] == "feature_disabled", r.text
+
+
+def test_periode_di_luar_pola_idempotency_key_sama_keduanya_422(app, client_as, db_session, p04):
+    c = _tim(client_as)
+    _atur(app)
+    sid = _sumber(c)
+    k = _kasus(c, periode="2026/27 ganjil")
+    h = {"Idempotency-Key": "kunci-periode-buruk"}
+    r1 = _tanya(c, k["id"], _badan([sid]), headers=h)
+    r2 = _tanya(c, k["id"], _badan([sid]), headers=h)
+    assert r1.status_code == 422 and r2.status_code == 422, (r1.text, r2.text)
 
 
 def test_idempotency_retry_membalas_tersimpan_dan_pemeriksaan_di_dalam_aksi(

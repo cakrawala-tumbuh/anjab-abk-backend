@@ -6,6 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ...ai.masukan import POLA_PERIODE_AI
 from ...schemas.async_job import StatusJob
 
 BATAS_SUMBER_PERMINTAAN = 50
@@ -55,7 +56,7 @@ class EkstraksiAiCreate(BaseModel):
         pattern=r"^[A-Za-z0-9_.:-]+$", max_length=100, description="Kode peran konteks ekstraksi."
     )
     periode: str = Field(
-        pattern=r"^[A-Za-z0-9_.:-]+$", max_length=100, description="Kode periode konteks."
+        pattern=POLA_PERIODE_AI, max_length=100, description="Kode periode konteks."
     )
 
 

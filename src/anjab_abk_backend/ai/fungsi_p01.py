@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .gateway import FungsiAi
 from .keluaran import normalkan_kutipan
+from .masukan import POLA_PERIODE_AI
 
 __all__ = [
     "FUNGSI_P01",
@@ -119,13 +120,13 @@ class ParameterP01(BaseModel):
 
     Attributes:
         peran_ref: Kode peran yang menjadi konteks ekstraksi.
-        periode: Kode periode konteks ekstraksi.
+        periode: Kode periode konteks ekstraksi; pola ``POLA_PERIODE_AI`` (mis. ``2026/27``).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     peran_ref: str = Field(pattern=POLA_KODE_P01, max_length=100)
-    periode: str = Field(pattern=POLA_KODE_P01, max_length=100)
+    periode: str = Field(pattern=POLA_PERIODE_AI, max_length=100)
 
 
 KODE_SPAN_FAKTA_TIDAK_DITEMUKAN = "SPAN_FAKTA_TIDAK_DITEMUKAN"

@@ -201,7 +201,7 @@ def test_parameter_sah_dan_menolak_teks_bebas():
     "buruk",
     [
         "", "tahun ajaran", "a b", " a", "a ", "a\nb", "a\n", "\n", "a\r", "a\tb", "a\x00",
-        "a;b", "a/b", "a,b", "a$", "<b>", "é", "x" * 101, "teks bebas tentang murid",
+        "a;b", "a,b", "a$", "<b>", "é", "x" * 101, "teks bebas tentang murid",
     ],
 )  # fmt: skip
 @pytest.mark.parametrize("kolom", ["peran_ref", "periode"])
@@ -209,6 +209,14 @@ def test_parameter_menolak_spasi_newline_karakter_terlarang_dan_panjang(kolom, b
     nilai = {"peran_ref": "guru", "periode": "2026-27", kolom: buruk}
     with pytest.raises(ValidationError):
         ParameterP01(**nilai)
+
+
+def test_parameter_periode_menerima_garis_miring_tapi_peran_ref_tidak():
+    assert ParameterP01(peran_ref="guru", periode="2026/27").periode == "2026/27"
+    with pytest.raises(ValidationError):
+        ParameterP01(peran_ref="a/b", periode="2026-27")
+    with pytest.raises(ValidationError):
+        ParameterP01(peran_ref="guru", periode="2026/27 ganjil")
 
 
 def test_parameter_menerima_panjang_maksimum():

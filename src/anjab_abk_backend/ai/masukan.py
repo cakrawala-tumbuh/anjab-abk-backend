@@ -12,7 +12,14 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-__all__ = ["peta_sumber", "susun_masukan_json"]
+__all__ = ["POLA_PERIODE_AI", "peta_sumber", "susun_masukan_json"]
+
+POLA_PERIODE_AI = r"^[A-Za-z0-9_.:/-]+$"
+"""Pola ``periode`` pada parameter fungsi AI (P01, P04, P10).
+
+Sama dengan pola parameter kode lain ditambah garis miring, agar ``2026/27`` sah. Spasi tetap
+ditolak.
+"""
 
 
 def peta_sumber(sumber: Sequence[Mapping[str, Any]]) -> dict[str, tuple[str, str]]:

@@ -145,6 +145,15 @@ def test_parameter_sah():
     assert p.periode == "2026-11"
 
 
+def test_parameter_periode_garis_miring_sah_tapi_spasi_dan_instrument_id_tidak():
+    dasar = {"narrative_kind": "F1_FORMAL", "instrument_id": "i", "field_key": "f"}
+    assert ParameterP10(**dasar, periode="2026/27").periode == "2026/27"
+    with pytest.raises(ValidationError):
+        ParameterP10(**dasar, periode="2026/27 ganjil")
+    with pytest.raises(ValidationError):
+        ParameterP10(**{**dasar, "instrument_id": "a/b"}, periode="2026/27")
+
+
 @pytest.mark.parametrize(
     "ubah",
     [

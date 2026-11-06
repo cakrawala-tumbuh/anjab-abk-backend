@@ -12,13 +12,13 @@ baris ``narasi_sumber``.
 
 from __future__ import annotations
 
-import re
 import uuid
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from .gateway import FungsiAi
+from .masukan import POLA_PERIODE_AI
 
 __all__ = [
     "AWALAN_SUMBER_KEPUTUSAN",
@@ -32,7 +32,6 @@ __all__ = [
     "aturan_p04",
     "id_sumber_keputusan",
     "id_sumber_klaim",
-    "kode_periode_p04",
 ]
 
 AWALAN_SUMBER_KLAIM = "klaim:"
@@ -48,8 +47,6 @@ KODE_LEBIH_DARI_SATU_PERTANYAAN = "LEBIH_DARI_SATU_PERTANYAAN"
 """Kode ``kode_serap``: pertanyaan memuat lebih dari satu tanda tanya."""
 
 _POLA_UUID = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-_POLA_KODE = r"^[A-Za-z0-9_.:-]+$"
-_RE_TAK_SAH = re.compile(r"[^A-Za-z0-9_.:-]")
 _NAMESPACE_SUMBER = uuid.UUID("5d6f8a52-3c1e-4b0a-9a57-0a4f2d1c7e04")
 
 INSTRUKSI_P04 = """\
@@ -144,22 +141,6 @@ def id_sumber_keputusan(keputusan: str) -> str:
     return _id_sumber(AWALAN_SUMBER_KEPUTUSAN, keputusan)
 
 
-def kode_periode_p04(periode: str) -> str:
-    """Ubah ``periode`` kasus menjadi kode berpola ``^[A-Za-z0-9_.:-]+$``.
-
-    ``narasi_kasus.periode`` boleh memuat karakter di luar pola (mis. ``2026/27``); karakter
-    itu diganti ``-`` agar kasus yang sah tidak ditolak. Hasil tidak pernah kosong.
-
-    Args:
-        periode: Nilai ``periode`` pada kasus.
-
-    Returns:
-        Kode periode sah, paling banyak 100 karakter.
-    """
-    kode = _RE_TAK_SAH.sub("-", periode.strip())[:100]
-    return kode or "-"
-
-
 def aturan_p04(isi: dict[str, Any], amplop: dict[str, Any]) -> list[str]:
     """Periksa keluaran P04 yang sudah lolos skema (terdaftar di ``ATURAN_ISI``).
 
@@ -193,10 +174,10 @@ class ParameterP04(BaseModel):
 
     Attributes:
         narasi_id: Id kasus narasi yang menjadi sasaran.
-        periode: Kode periode kasus.
+        periode: Periode kasus apa adanya; pola ``POLA_PERIODE_AI`` (mis. ``2026/27``).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     narasi_id: str = Field(pattern=_POLA_UUID, max_length=36)
-    periode: str = Field(pattern=_POLA_KODE, max_length=100)
+    periode: str = Field(pattern=POLA_PERIODE_AI, max_length=100)

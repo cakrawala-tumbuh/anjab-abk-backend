@@ -408,7 +408,7 @@ def test_sumber_yang_digantikan_tetap_dapat_diekstraksi_tanpa_aturan_baru(
     "buruk",
     [
         "", "tahun ajaran", "a b", " a", "a ", "a\nb", "a\n", "\n", "a\r\n", "a\tb", "a\x00",
-        "a;b", "a/b", "a$", "<b>", "é", "x" * 101,
+        "a;b", "a$", "<b>", "é", "x" * 101,
     ],
 )  # fmt: skip
 @pytest.mark.parametrize("kolom", ["peran_ref", "periode"])
@@ -422,6 +422,14 @@ def test_parameter_teks_bebas_atau_berbahaya_422_tanpa_baris(
     r = _ekstrak(c, sid, {**_BADAN, kolom: buruk})
     assert r.status_code == 422, (kolom, repr(buruk), r.text)
     assert _hitung(db_session) == awal
+
+
+def test_periode_garis_miring_202_dan_peran_ref_garis_miring_422(app, client_as, p01):
+    c = _tim(client_as)
+    _atur(app)
+    sid = _sumber(c)
+    assert _ekstrak(c, sid, {"peran_ref": "guru", "periode": "2026/27"}).status_code == 202
+    assert _ekstrak(c, sid, {"peran_ref": "a/b", "periode": "2026-27"}).status_code == 422
 
 
 def test_parameter_badan_kurang_atau_lebih_422_dan_nilai_sah_202(app, client_as, p01):

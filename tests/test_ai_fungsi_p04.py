@@ -18,7 +18,6 @@ from anjab_abk_backend.ai.fungsi_p04 import (
     aturan_p04,
     id_sumber_keputusan,
     id_sumber_klaim,
-    kode_periode_p04,
 )
 from anjab_abk_backend.ai.gateway import FUNGSI_TERDAFTAR
 from anjab_abk_backend.ai.guardrail import susun_instruksi
@@ -217,22 +216,15 @@ def test_aturan_terdaftar_hanya_untuk_p04():
 def test_parameter_sah_dan_menolak_teks_bebas():
     nid = str(uuid.uuid4())
     assert ParameterP04(narasi_id=nid, periode="2026-27").periode == "2026-27"
+    assert ParameterP04(narasi_id=nid, periode="2026/27").periode == "2026/27"
     for buruk in ("bukan-uuid", "", nid.upper(), nid + "x"):
         with pytest.raises(ValidationError):
             ParameterP04(narasi_id=buruk, periode="2026-27")
-    for buruk in ("2026/27", "", "teks bebas tentang murid", "a" * 101):
+    for buruk in ("2026/27 ganjil", " ", "", "teks bebas tentang murid", "a" * 101):
         with pytest.raises(ValidationError):
             ParameterP04(narasi_id=nid, periode=buruk)
     with pytest.raises(ValidationError):
         ParameterP04(narasi_id=nid, periode="2026-27", klaim="x")  # type: ignore[call-arg]
-
-
-def test_kode_periode_mengganti_karakter_di_luar_pola_dan_tidak_pernah_kosong():
-    assert kode_periode_p04("2026-27") == "2026-27"
-    assert kode_periode_p04("2026/27 ganjil") == "2026-27-ganjil"
-    assert kode_periode_p04("   ") == "-"
-    assert kode_periode_p04("") == "-"
-    assert ParameterP04(narasi_id=str(uuid.uuid4()), periode=kode_periode_p04("a/b c")).periode
 
 
 def test_id_sumber_deterministik_berawalan_dan_tidak_memuat_teks():

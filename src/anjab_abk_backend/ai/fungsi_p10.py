@@ -15,6 +15,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from .gateway import FungsiAi
+from .masukan import POLA_PERIODE_AI
 
 __all__ = ["FUNGSI_P10", "INSTRUKSI_P10", "SKEMA_ISI_P10", "ParameterP10"]
 
@@ -89,7 +90,7 @@ class ParameterP10(BaseModel):
         narrative_kind: Jenis narasi; hanya ``F1_FORMAL``.
         instrument_id: Pengenal instrumen sasaran.
         field_key: Kunci isian sasaran.
-        periode: Periode sasaran.
+        periode: Periode sasaran; pola ``POLA_PERIODE_AI`` (garis miring sah, mis. ``2026/27``).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -97,4 +98,4 @@ class ParameterP10(BaseModel):
     narrative_kind: Literal["F1_FORMAL"]
     instrument_id: str = Field(pattern=_POLA_PARAMETER, max_length=100)
     field_key: str = Field(pattern=_POLA_PARAMETER, max_length=100)
-    periode: str = Field(pattern=_POLA_PARAMETER, max_length=100)
+    periode: str = Field(pattern=POLA_PERIODE_AI, max_length=100)
