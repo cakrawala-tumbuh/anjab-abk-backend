@@ -232,7 +232,7 @@ def test_skema_ringkas_tanpa_keluaran_model_dan_run_tetap_tertutup():
     assert not ({"masukan", "keluaran"} & set(AiRunRead.model_fields))
 
 
-def test_openapi_tiga_rute_tanpa_ubah_hapus_dan_skema_tertutup(client):
+def test_openapi_rute_usulan_tanpa_ubah_hapus_dan_skema_tertutup(client):
     spec = client.get("/openapi.json").json()
     paths = spec["paths"]
     ops = {(m.upper(), p) for p, v in paths.items() if p.startswith(URL) for m in v}
@@ -240,6 +240,7 @@ def test_openapi_tiga_rute_tanpa_ubah_hapus_dan_skema_tertutup(client):
         ("GET", URL),
         ("GET", f"{URL}/{{usulan_id}}"),
         ("POST", f"{URL}/search"),
+        ("POST", f"{URL}/{{usulan_id}}/putusan"),
     }
     for p, v in paths.items():
         if p.startswith(URL):

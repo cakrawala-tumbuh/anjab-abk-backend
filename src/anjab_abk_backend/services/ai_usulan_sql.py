@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
@@ -13,8 +15,16 @@ from ..ai.redaksi import SumberAi
 from ..config import Settings
 from ..errors import NotFoundError
 from ..fitur import FiturNonaktifError, ai_boleh_jalan
-from ..models import AiUsulanModel
-from ..schemas.ai_usulan import AiUsulanRead, AiUsulanRingkas, SasaranUsulan
+from ..models import AiUsulanModel, AiUsulanPutusanModel
+from ..schemas.ai_usulan import (
+    AiUsulanPutusanCreate,
+    AiUsulanPutusanRead,
+    AiUsulanPutusanTerakhir,
+    AiUsulanRead,
+    AiUsulanRingkas,
+    HasilSerapUsulan,
+    SasaranUsulan,
+)
 from ..schemas.common import FiturKode
 from ..schemas.search import Domain, Order
 from ..security import Principal
@@ -22,6 +32,7 @@ from .ai_usulan import (
     SEARCHABLE_FIELDS,
     FungsiAiBelumAktifError,
     PiiModeAiBelumDidukungError,
+    UsulanBelumBisaDiputusError,
     UsulanBerjalanError,
 )
 from .domain import validate_searchable_fields
@@ -39,6 +50,17 @@ def _field_map() -> FieldMap:
         "hasil_serap": FieldSpec(column=m.hasil_serap),
         "created_at": FieldSpec(column=m.created_at),
     }
+
+
+_BISA_DIPUTUS = frozenset(
+    {HasilSerapUsulan.USULAN_DIBUAT.value, HasilSerapUsulan.EVIDENCE_GAP.value}
+)
+"""Nilai `hasil_serap` yang boleh diputus; `MANUAL` dan belum diserap tidak."""
+
+
+def _sekarang() -> datetime:
+    """Waktu putusan (UTC aware); dipisah agar tes dapat membekukan jam."""
+    return datetime.now(UTC)
 
 
 def _tanpa_isi() -> tuple[Any, ...]:
@@ -136,6 +158,87 @@ class SqlAiUsulanService:
         self._s.refresh(rec)
         return AiUsulanRingkas.model_validate(rec)
 
+    def putuskan(
+        self, usulan_id: str, data: AiUsulanPutusanCreate, actor_key: str
+    ) -> AiUsulanPutusanRead:
+        """Tambah satu baris `ai_usulan_putusan`; tidak mengubah usulan maupun tabel `narasi_*`.
+
+        Baris usulan dikunci (`FOR UPDATE`) agar putusan serentak atas usulan yang sama
+        berurutan, lalu `created_at` dipaksa naik ketat (minimal satu mikrodetik di atas
+        putusan sebelumnya) sehingga "putusan terbaru" tidak pernah bergantung pada jam
+        yang bernilai sama dalam satu transaksi.
+
+        Args:
+            usulan_id: Id usulan yang diputus.
+            data: Putusan tervalidasi (kombinasi sudah diperiksa skema).
+            actor_key: Subjek reviewer dari token; aktor pada body tidak dipakai.
+
+        Returns:
+            Putusan yang baru dicatat.
+
+        Raises:
+            NotFoundError: usulan tidak ada (404).
+            UsulanBelumBisaDiputusError: belum diserap atau `hasil_serap` bukan
+                `USULAN_DIBUAT`/`EVIDENCE_GAP` (409).
+        """
+        rec = self._s.scalar(
+            select(AiUsulanModel).where(AiUsulanModel.id == usulan_id).with_for_update()
+        )
+        if rec is None:
+            raise NotFoundError(f"Usulan AI '{usulan_id}' tidak ditemukan.")
+        if rec.diserap_at is None or rec.hasil_serap not in _BISA_DIPUTUS:
+            raise UsulanBelumBisaDiputusError("Usulan ini belum bisa diputus.")
+        P = AiUsulanPutusanModel
+        terakhir = self._s.scalar(select(func.max(P.created_at)).where(P.usulan_id == usulan_id))
+        waktu = _sekarang()
+        if terakhir is not None and waktu <= terakhir:
+            waktu = terakhir + timedelta(microseconds=1)
+        putusan = P(
+            id=str(uuid.uuid4()),
+            usulan_id=usulan_id,
+            putusan=data.putusan.value,
+            tingkat_koreksi=data.tingkat_koreksi.value if data.tingkat_koreksi else None,
+            catatan=data.catatan,
+            teks_koreksi=data.teks_koreksi,
+            actor_key=actor_key,
+            created_at=waktu,
+        )
+        self._s.add(putusan)
+        self._s.flush()
+        return AiUsulanPutusanRead.model_validate(putusan)
+
+    def _putusan_terakhir(self, usulan_ids: Sequence[str]) -> dict[str, AiUsulanPutusanTerakhir]:
+        """Putusan terbaru per usulan dalam SATU kueri (`DISTINCT ON`), tanpa teks bebas."""
+        if not usulan_ids:
+            return {}
+        P = AiUsulanPutusanModel
+        rows = self._s.execute(
+            select(P.usulan_id, P.id, P.putusan, P.tingkat_koreksi, P.actor_key, P.created_at)
+            .where(P.usulan_id.in_(usulan_ids))
+            .distinct(P.usulan_id)
+            .order_by(P.usulan_id, P.created_at.desc(), P.id.desc())
+        ).all()
+        return {
+            r.usulan_id: AiUsulanPutusanTerakhir(
+                id=r.id,
+                putusan=r.putusan,
+                tingkat_koreksi=r.tingkat_koreksi,
+                actor_key=r.actor_key,
+                created_at=r.created_at,
+            )
+            for r in rows
+        }
+
+    def _ringkas(self, rows: Sequence[AiUsulanModel]) -> list[AiUsulanRingkas]:
+        """Proyeksi ringkas halaman ini dengan `putusan_terakhir` (satu kueri tambahan)."""
+        terakhir = self._putusan_terakhir([r.id for r in rows])
+        return [
+            AiUsulanRingkas.model_validate(r).model_copy(
+                update={"putusan_terakhir": terakhir.get(r.id)}
+            )
+            for r in rows
+        ]
+
     def get(self, usulan_id: str) -> AiUsulanRead:
         """Ambil satu usulan lengkap dengan `isi`, `amplop`, dan `output_hash`.
 
@@ -151,7 +254,19 @@ class SqlAiUsulanService:
         rec = self._s.get(AiUsulanModel, usulan_id)
         if rec is None:
             raise NotFoundError(f"Usulan AI '{usulan_id}' tidak ditemukan.")
-        return AiUsulanRead.model_validate(rec)
+        P = AiUsulanPutusanModel
+        daftar = self._s.scalars(
+            select(P).where(P.usulan_id == usulan_id).order_by(P.created_at, P.id)
+        ).all()
+        putusan = [AiUsulanPutusanRead.model_validate(p) for p in daftar]
+        return AiUsulanRead.model_validate(rec).model_copy(
+            update={
+                "putusan": putusan,
+                "putusan_terakhir": (
+                    AiUsulanPutusanTerakhir.model_validate(daftar[-1]) if daftar else None
+                ),
+            }
+        )
 
     def list(
         self,
@@ -195,7 +310,7 @@ class SqlAiUsulanService:
             .limit(limit)
             .offset(offset)
         ).all()
-        return [AiUsulanRingkas.model_validate(r) for r in rows], total
+        return self._ringkas(rows), total
 
     def search(
         self, *, domain: Domain, order: Order, limit: int, offset: int
@@ -228,4 +343,4 @@ class SqlAiUsulanService:
             .limit(limit)
             .offset(offset)
         ).all()
-        return [AiUsulanRingkas.model_validate(r) for r in rows], total
+        return self._ringkas(rows), total

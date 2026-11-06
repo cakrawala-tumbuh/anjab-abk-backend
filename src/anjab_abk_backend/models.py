@@ -48,7 +48,7 @@ from anjab_abk_backend.narasi.schemas.kasus import (
     RevisionOrigin,
     StatusNarasi,
 )
-from anjab_abk_backend.schemas.ai_usulan import SasaranUsulan
+from anjab_abk_backend.schemas.ai_usulan import PutusanUsulan, SasaranUsulan, TingkatKoreksi
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -1703,6 +1703,37 @@ class AiUsulanModel(Base):
     isi: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     amplop: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     output_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class AiUsulanPutusanModel(Base):
+    """Putusan reviewer manusia atas satu usulan AI; append-only, hanya catatan audit.
+
+    Tidak ada jalur ubah/hapus di service maupun rute (pola `ai_saklar_event`; tanpa trigger).
+    Putusan tidak menulis `narasi_*`. `catatan` dan `teks_koreksi` adalah teks bebas reviewer
+    dan tidak boleh masuk log maupun daftar.
+    """
+
+    __tablename__ = "ai_usulan_putusan"
+    __table_args__ = (
+        CheckConstraint(_in_check("putusan", PutusanUsulan), name="putusan"),
+        CheckConstraint(
+            "tingkat_koreksi IS NULL OR " + _in_check("tingkat_koreksi", TingkatKoreksi),
+            name="tingkat_koreksi",
+        ),
+        Index("ix_ai_usulan_putusan_usulan_id_created_at", "usulan_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    usulan_id: Mapped[str] = mapped_column(
+        ForeignKey("ai_usulan.id", name="fk_ai_usulan_putusan_usulan_id_ai_usulan"),
+        nullable=False,
+    )
+    putusan: Mapped[str] = mapped_column(String(10), nullable=False)
+    tingkat_koreksi: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    catatan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    teks_koreksi: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor_key: Mapped[str] = mapped_column(String(254), nullable=False)
+    created_at: Mapped[datetime] = _ts()
 
 
 class NarasiVersiSumberModel(Base):

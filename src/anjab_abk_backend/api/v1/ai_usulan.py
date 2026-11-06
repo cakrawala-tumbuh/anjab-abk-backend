@@ -4,23 +4,36 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 
 from ...dependencies import (
     READ_GUARDS,
+    Idempotency,
     Pagination,
     get_ai_usulan_service,
+    idempotency,
     pagination_params,
+    rate_limit,
     require_tim_kajian,
 )
-from ...schemas.ai_usulan import AiUsulanRead, AiUsulanRingkas, HasilSerapUsulan, SasaranUsulan
+from ...schemas.ai_usulan import (
+    AiUsulanPutusanCreate,
+    AiUsulanPutusanRead,
+    AiUsulanRead,
+    AiUsulanRingkas,
+    HasilSerapUsulan,
+    SasaranUsulan,
+)
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
+from ...security import Principal
 from ...services.ai_usulan import AiUsulanService
+from ..concurrency import IDEMPOTENCY_RESPONSES, run_idempotent
 
 router = APIRouter()
 
 _READ = [*READ_GUARDS, Depends(require_tim_kajian)]
+_WRITE = [Depends(require_tim_kajian), Depends(rate_limit)]
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 _FORBIDDEN = {403: {"model": ErrorResponse, "description": "Bukan anggota grup tim-kajian."}}
@@ -99,3 +112,48 @@ def get_usulan(
 ) -> AiUsulanRead:
     """Ambil satu usulan lengkap dengan `isi`, `amplop`, dan `output_hash`."""
     return service.get(usulan_id)
+
+
+@router.post(
+    "/{usulan_id}/putusan",
+    response_model=AiUsulanPutusanRead,
+    status_code=201,
+    summary="Catat putusan reviewer atas usulan AI (tim-kajian)",
+    operation_id="ai_usulan_putusan_create",
+    dependencies=_WRITE,
+    responses={
+        **IDEMPOTENCY_RESPONSES,
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOTFOUND,
+        409: {
+            "model": ErrorResponse,
+            "description": (
+                "`usulan_belum_bisa_diputus` (belum diserap atau `MANUAL`) atau "
+                "Idempotency-Key ini sedang diproses."
+            ),
+        },
+        422: {"model": ErrorResponse, "description": "Payload atau kombinasi putusan tidak valid."},
+    },
+)
+def create_putusan(
+    usulan_id: str,
+    data: AiUsulanPutusanCreate,
+    service: Annotated[AiUsulanService, Depends(get_ai_usulan_service)],
+    principal: Annotated[Principal, Depends(require_tim_kajian)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> AiUsulanPutusanRead:
+    """Catat putusan `APPROVE`/`REVISE`/`REJECT` (append-only); aktor dari token.
+
+    Hanya catatan audit: tidak menulis `narasi_*`, tidak mengubah status kasus, tidak
+    mengirim apa pun. Putusan berulang boleh; yang terbaru menjadi `putusan_terakhir`.
+    Pemeriksaan 404/409 berada di dalam aksi idempoten, jadi ulangan dengan key yang sama
+    membalas respons tersimpan (200), bukan galat.
+    """
+
+    def _aksi() -> AiUsulanPutusanRead:
+        return service.putuskan(usulan_id, data, principal.subject)
+
+    return run_idempotent(idem, response, AiUsulanPutusanRead, _aksi)

@@ -6,7 +6,13 @@ from typing import Any, Protocol
 
 from ..ai.redaksi import SumberAi
 from ..errors import ConflictError
-from ..schemas.ai_usulan import AiUsulanRead, AiUsulanRingkas, SasaranUsulan
+from ..schemas.ai_usulan import (
+    AiUsulanPutusanCreate,
+    AiUsulanPutusanRead,
+    AiUsulanRead,
+    AiUsulanRingkas,
+    SasaranUsulan,
+)
 from ..schemas.search import Domain, Order
 from ..security import Principal
 
@@ -15,6 +21,7 @@ __all__ = [
     "AiUsulanService",
     "FungsiAiBelumAktifError",
     "PiiModeAiBelumDidukungError",
+    "UsulanBelumBisaDiputusError",
     "UsulanBerjalanError",
 ]
 
@@ -34,6 +41,12 @@ class UsulanBerjalanError(ConflictError):
     """409: sasaran dan fungsi yang sama masih punya usulan yang belum diserap."""
 
     error_code = "usulan_berjalan"
+
+
+class UsulanBelumBisaDiputusError(ConflictError):
+    """409: usulan belum diserap, atau `hasil_serap`-nya bukan `USULAN_DIBUAT`/`EVIDENCE_GAP`."""
+
+    error_code = "usulan_belum_bisa_diputus"
 
 
 class FungsiAiBelumAktifError(ConflictError):
@@ -59,6 +72,17 @@ class AiUsulanService(Protocol):
 
     def get(self, usulan_id: str) -> AiUsulanRead:
         """Ambil satu usulan lengkap dengan `isi`/`amplop`; `NotFoundError` (404) bila tak ada."""
+        ...
+
+    def putuskan(
+        self, usulan_id: str, data: AiUsulanPutusanCreate, actor_key: str
+    ) -> AiUsulanPutusanRead:
+        """Catat satu putusan reviewer (append-only); tidak menyentuh narasi.
+
+        Raises:
+            NotFoundError: usulan tidak ada (404).
+            UsulanBelumBisaDiputusError: belum diserap atau `MANUAL` (409).
+        """
         ...
 
     def list(
