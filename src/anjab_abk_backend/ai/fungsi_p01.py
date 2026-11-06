@@ -8,18 +8,23 @@ darinya. Fungsi ini tidak mengubah sumber dan tidak membuat narasi.
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from .gateway import FungsiAi
+from .keluaran import normalkan_kutipan
 
 __all__ = [
     "FUNGSI_P01",
     "INSTRUKSI_P01",
+    "KODE_SPAN_FAKTA_TIDAK_DITEMUKAN",
     "PENILAIAN_SUMBER_P01",
     "POLA_KODE_P01",
     "SIFAT_FAKTA_P01",
     "SKEMA_ISI_P01",
     "ParameterP01",
+    "aturan_p01",
 ]
 
 SIFAT_FAKTA_P01 = ("NORMATIF", "DESKRIPTIF_DOKUMEN")
@@ -121,3 +126,35 @@ class ParameterP01(BaseModel):
 
     peran_ref: str = Field(pattern=POLA_KODE_P01, max_length=100)
     periode: str = Field(pattern=POLA_KODE_P01, max_length=100)
+
+
+KODE_SPAN_FAKTA_TIDAK_DITEMUKAN = "SPAN_FAKTA_TIDAK_DITEMUKAN"
+"""Kode pelanggaran: ada ``factual_extracts[].span`` kosong, ber-``source_id`` asing, atau tak
+terbukti lewat ``cited_spans``."""
+
+
+def aturan_p01(isi: dict[str, Any], amplop: dict[str, Any]) -> list[str]:
+    """Periksa keluaran P01 yang sudah lolos skema (terdaftar di ``ATURAN_ISI``).
+
+    Satu fakta terbukti bila ``span``-nya (setelah ``normalkan_kutipan``) tidak kosong dan
+    merupakan substring dari kutipan ternormalkan pada setidaknya satu elemen
+    ``amplop["cited_spans"]`` ber-``source_id`` sama; perbandingan peka huruf besar-kecil.
+    ``cited_spans`` sudah diverifikasi terhadap sumber oleh ``cek_keluaran`` sebelum run
+    ``LOLOS``, jadi teks sumber tidak perlu dibaca ulang (``ai_run.masukan`` dikosongkan saat
+    ``tutup``). Kode dikembalikan paling banyak sekali, tanpa indeks maupun teks keluaran.
+
+    Args:
+        isi: Field ``isi`` keluaran.
+        amplop: Amplop keluaran (hasil ``_amplop``), memuat ``cited_spans``.
+
+    Returns:
+        ``[KODE_SPAN_FAKTA_TIDAK_DITEMUKAN]`` bila ada fakta tak terbukti; kosong bila sesuai.
+    """
+    kutipan: dict[str, list[str]] = {}
+    for kutip in amplop.get("cited_spans") or []:
+        kutipan.setdefault(kutip["source_id"], []).append(normalkan_kutipan(kutip["span"]))
+    for fakta in isi.get("factual_extracts") or []:
+        span = normalkan_kutipan(fakta["span"])
+        if not span or not any(span in k for k in kutipan.get(fakta["source_id"], [])):
+            return [KODE_SPAN_FAKTA_TIDAK_DITEMUKAN]
+    return []

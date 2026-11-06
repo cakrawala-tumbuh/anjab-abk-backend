@@ -38,6 +38,7 @@ from anjab_abk_backend.models import (
 )
 from anjab_abk_backend.narasi import penyerap
 from anjab_abk_backend.schemas.ai_run import StatusQaAi
+from anjab_abk_backend.schemas.ai_usulan import HasilSerapUsulan
 from anjab_abk_backend.services.ai_run_sql import SqlAiRunService
 
 URL = "/api/v1/narasi/sumber"
@@ -509,3 +510,35 @@ def test_openapi_memuat_rute_dan_registri_produksi_tanpa_p01(app, anon_client):
     rute = paths["/api/v1/narasi/sumber/{sumber_id}/ekstraksi-ai"]["post"]
     assert "202" in rute["responses"] and rute["operationId"] == "narasi_sumber_ekstraksi_ai_ajukan"
     assert "P01" not in FUNGSI_TERDAFTAR
+
+
+def test_e2e_span_fakta_palsu_dengan_cited_spans_sah_usulan_manual_tanpa_isi(
+    app, client_as, db_session, p01, fab
+):
+    c = _tim(client_as)
+    _atur(app)
+    sid = _sumber(c)
+    r = _ekstrak(c, sid)
+    assert r.status_code == 202, r.text
+    uid = r.json()["id"]
+    jawab = _keluaran(sid)
+    jawab["isi"]["factual_extracts"][0]["span"] = "kalimat karangan model"
+    assert jalankan_satu(fab, Settings(**_HIDUP), lambda: KlienTiruan(jawab), {"P01": FUNGSI_P01})
+    assert serap_usulan(db_session, uid) is not None
+    db_session.flush()
+    db_session.expire_all()
+    d = c.get(f"{USULAN}/{uid}").json()
+    assert d["hasil_serap"] == "MANUAL" and d["kode_serap"] == ["SPAN_FAKTA_TIDAK_DITEMUKAN"]
+    assert d["isi"] is None
+    run = db_session.scalar(select(AiRunModel).where(AiRunModel.fungsi == "P01"))
+    assert run.status_qa == "LOLOS"
+
+
+def test_e2e_evidence_gap_tidak_diperiksa_aturan_span(app, client_as, db_session, p01, fab):
+    c = _tim(client_as)
+    _atur(app)
+    sid = _sumber(c)
+    uid = _ekstrak(c, sid).json()["id"]
+    klien = KlienTiruan(_keluaran(sid, gap=True))
+    assert jalankan_satu(fab, Settings(**_HIDUP), lambda: klien, {"P01": FUNGSI_P01})
+    assert serap_usulan(db_session, uid) == HasilSerapUsulan.EVIDENCE_GAP

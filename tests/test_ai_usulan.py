@@ -19,6 +19,7 @@ from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session
 
 from anjab_abk_backend.ai import penyerap_usulan
+from anjab_abk_backend.ai.fungsi_p01 import aturan_p01
 from anjab_abk_backend.ai.fungsi_p04 import aturan_p04
 from anjab_abk_backend.ai.gateway import FUNGSI_TERDAFTAR, AiGateway, FungsiAi
 from anjab_abk_backend.ai.penyerap_usulan import ATURAN_ISI, serap_usulan, serap_usulan_tertunda
@@ -188,7 +189,7 @@ def test_usulan_sama_belum_diserap_409_usulan_berjalan_lalu_lepas_setelah_serap(
 
 
 def test_registri_bawaan_kosong_dan_aturan_isi_hanya_p04():
-    assert FUNGSI_TERDAFTAR == {} and ATURAN_ISI == {"P04": aturan_p04}
+    assert FUNGSI_TERDAFTAR == {} and ATURAN_ISI == {"P01": aturan_p01, "P04": aturan_p04}
 
 
 # --- penyerapan ---------------------------------------------------------------------------
@@ -199,12 +200,12 @@ def _isi_hijau() -> dict[str, Any]:
 
 
 def _lolos_aturan_melapor(monkeypatch) -> dict[str, Any]:
-    monkeypatch.setitem(ATURAN_ISI, "UJI", lambda isi: ["ISI_TAK_SAH", "LAIN"])
+    monkeypatch.setitem(ATURAN_ISI, "UJI", lambda isi, amplop: ["ISI_TAK_SAH", "LAIN"])
     return _keluaran()
 
 
 def _lolos_aturan_meledak(monkeypatch) -> dict[str, Any]:
-    def _meledak(isi: dict[str, Any]) -> list[str]:
+    def _meledak(isi: dict[str, Any], amplop: dict[str, Any]) -> list[str]:
         raise RuntimeError("galat aturan")
 
     monkeypatch.setitem(ATURAN_ISI, "UJI", _meledak)

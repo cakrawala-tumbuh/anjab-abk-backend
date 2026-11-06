@@ -7,6 +7,10 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diperbaiki
+
+- **Span fakta P01 kini ditagih server** (backlog #116): usulan P01 berstatus `USULAN_DIBUAT` hanya bila setiap `factual_extracts[].span` (setelah spasi dinormalkan, peka huruf besar-kecil) merupakan potongan dari kutipan pada `cited_spans` ber-`source_id` sama; selain itu usulan `MANUAL` tanpa `isi`, `amplop`, dan `output_hash` dengan `kode_serap == ["SPAN_FAKTA_TIDAK_DITEMUKAN"]` (satu kali per usulan; mencakup span kosong, `source_id` asing, dan span tak terbukti), sedangkan `ai_run.status_qa` tetap `LOLOS`. Pembuktian lewat `cited_spans` karena `ai_run.masukan` dikosongkan saat run ditutup. `EVIDENCE_GAP` dan P04 tidak berubah. Perubahan internal: signature `ATURAN_ISI` menjadi `(isi, amplop)` untuk semua fungsi dan `_norm` di `ai/keluaran.py` menjadi `normalkan_kutipan`. Tanpa migrasi, tanpa perubahan kontrak HTTP. **P01 tidak boleh masuk `AI_FUNGSI_AKTIF` sebelum item ini selesai** dan evaluasi nyata P01 tetap wajib lulus.
+
 ### Diubah
 
 - **`actor_key` keluar dari `putusan_terakhir` pada daftar dan pencarian usulan AI** (backlog #115): `GET /api/v1/ai/usulan` dan `POST .../search` kini memuat `putusan_terakhir` berisi persis `id`, `putusan`, `tingkat_koreksi`, `created_at` (skema baru `AiUsulanPutusanRingkas`); subjek reviewer tidak lagi keluar di baris daftar dan kueri daftar tidak lagi memilih kolom `actor_key` (jumlah kueri tetap). **Perubahan kontrak yang memutus pemakai daftar dan pencarian**: `components.schemas.AiUsulanRingkas.putusan_terakhir` merujuk `AiUsulanPutusanRingkas`. Detail `GET .../{id}` (`putusan_terakhir` dan tiap `putusan[]`) dan respons `POST .../putusan` (termasuk replay `Idempotency-Key`) tetap memuat `actor_key`. Domain atau urutan pada `actor_key` tetap 422 dan `?actor_key=` pada `GET` tetap diabaikan (200, hasil sama). Belum ada tag yang memuat rute ini, tanpa masa transisi; tanpa migrasi.

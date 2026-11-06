@@ -22,6 +22,7 @@ from ..schemas.ai_run import StatusQaAi
 from ..schemas.ai_usulan import HasilSerapUsulan
 from ..services.ai_run import hash_masukan
 from ..services.ai_run_sql import SqlAiRunService
+from .fungsi_p01 import aturan_p01
 from .fungsi_p04 import aturan_p04
 
 __all__ = ["ATURAN_ISI", "serap_usulan", "serap_usulan_tertunda"]
@@ -41,11 +42,15 @@ KODE_GALAT_SERAP = "GALAT_SERAP"
 KUNCI_AMPLOP = ("source_refs", "cited_spans", "confidence_reason", "unknowns", "contradictions")
 """Kunci amplop keluaran yang disimpan di `ai_usulan.amplop`."""
 
-ATURAN_ISI: dict[str, Callable[[dict[str, Any]], list[str]]] = {"P04": aturan_p04}
+ATURAN_ISI: dict[str, Callable[[dict[str, Any], dict[str, Any]], list[str]]] = {
+    "P01": aturan_p01,
+    "P04": aturan_p04,
+}
 """Pemeriksaan pasca-validasi `isi` per kode fungsi; mengembalikan daftar kode pelanggaran.
 
-Hanya P04 yang punya aturan (`FungsiAi` tidak punya kolom validator); fungsi lain tanpa entri
-berarti tanpa pemeriksaan tambahan. Daftar tak kosong membuat usulan `MANUAL` tanpa `isi`.
+Signature aturan `(isi, amplop)`; `amplop` hasil `_amplop(keluaran)`. P01 dan P04 punya aturan
+(`FungsiAi` tidak punya kolom validator); fungsi lain tanpa entri berarti tanpa pemeriksaan
+tambahan. Daftar tak kosong membuat usulan `MANUAL` tanpa `isi`.
 """
 
 
@@ -83,11 +88,12 @@ def _terapkan(session: Session, rec: AiUsulanModel, run: AiRunModel) -> HasilSer
     if keluaran is None or not isinstance(isi, dict):
         return _manual(rec, [KODE_KELUARAN_TIDAK_SAH])
     aturan = ATURAN_ISI.get(rec.fungsi)
-    pelanggaran = aturan(isi) if aturan is not None else []
+    amplop = _amplop(keluaran)
+    pelanggaran = aturan(isi, amplop) if aturan is not None else []
     if pelanggaran:
         return _manual(rec, list(pelanggaran))
     rec.isi = isi
-    rec.amplop = _amplop(keluaran)
+    rec.amplop = amplop
     rec.output_hash = hash_masukan(keluaran)
     return _tandai(rec, HasilSerapUsulan.USULAN_DIBUAT, None)
 

@@ -17,7 +17,7 @@ from typing import Any, Literal
 
 from jsonschema import Draft202012Validator
 
-__all__ = ["HasilCek", "KODE_KARANTINA", "cek_keluaran", "skema_dengan_amplop"]
+__all__ = ["HasilCek", "KODE_KARANTINA", "cek_keluaran", "normalkan_kutipan", "skema_dengan_amplop"]
 
 StatusQa = Literal["LOLOS", "EVIDENCE_GAP", "KARANTINA"]
 
@@ -102,8 +102,18 @@ def skema_dengan_amplop(skema_isi: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _norm(teks: str) -> str:
-    """Menormalkan spasi: rangkaian spasi/baris menjadi satu spasi, tepi dipangkas."""
+def normalkan_kutipan(teks: str) -> str:
+    """Menormalkan spasi kutipan: rangkaian spasi/baris menjadi satu spasi, tepi dipangkas.
+
+    Dipakai bersama oleh ``cek_keluaran`` dan aturan isi per fungsi (mis. ``aturan_p01``) agar
+    perbandingan kutipan memakai satu definisi spasi. Huruf besar-kecil dipertahankan.
+
+    Args:
+        teks: Teks kutipan mentah.
+
+    Returns:
+        Teks dengan spasi ternormalkan; string kosong bila ``teks`` hanya spasi.
+    """
     return _RE_SPASI.sub(" ", teks).strip()
 
 
@@ -158,16 +168,16 @@ def cek_keluaran(
         if sid not in sumber:
             tandai("SUMBER_FIKTIF")
             continue
-        span = _norm(kutip["span"])
+        span = normalkan_kutipan(kutip["span"])
         if not span:
             tandai("KUTIPAN_KOSONG")
-        elif span not in _norm(sumber[sid][1]):
+        elif span not in normalkan_kutipan(sumber[sid][1]):
             tandai("KUTIPAN_TIDAK_DITEMUKAN")
 
     status = data["status"]
     if status == "AI_DRAFT" and not data["cited_spans"]:
         tandai("TANPA_SITASI")
-    if status == "EVIDENCE_GAP" and not any(_norm(u) for u in data["unknowns"]):
+    if status == "EVIDENCE_GAP" and not any(normalkan_kutipan(u) for u in data["unknowns"]):
         tandai("GAP_TANPA_ALASAN")
 
     if kode:

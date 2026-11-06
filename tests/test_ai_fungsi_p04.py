@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from anjab_abk_backend.ai.fungsi_p01 import aturan_p01
 from anjab_abk_backend.ai.fungsi_p04 import (
     FUNGSI_P04,
     SKEMA_ISI_P04,
@@ -172,7 +173,7 @@ def test_sitasi_ke_sumber_klaim_tervalidasi_dan_span_karangan_dikarantina():
     ],
 )
 def test_aturan_empat_kombinasi_material_dan_pertanyaan(material, pertanyaan, harapan):
-    assert aturan_p04(_isi(material=material, one_neutral_question=pertanyaan)) == harapan
+    assert aturan_p04(_isi(material=material, one_neutral_question=pertanyaan), {}) == harapan
 
 
 @pytest.mark.parametrize(
@@ -185,29 +186,29 @@ def test_aturan_empat_kombinasi_material_dan_pertanyaan(material, pertanyaan, ha
     ],
 )
 def test_aturan_pertanyaan_kosong_dan_hanya_spasi_dianggap_tidak_ada(material, pertanyaan, harapan):
-    assert aturan_p04(_isi(material=material, one_neutral_question=pertanyaan)) == harapan
+    assert aturan_p04(_isi(material=material, one_neutral_question=pertanyaan), {}) == harapan
 
 
 def test_aturan_dua_tanda_tanya_lebih_dari_satu_pertanyaan():
     dua = "Siapa yang mencatat? Kapan dicatat?"
-    assert aturan_p04(_isi(one_neutral_question=dua)) == ["LEBIH_DARI_SATU_PERTANYAAN"]
+    assert aturan_p04(_isi(one_neutral_question=dua), {}) == ["LEBIH_DARI_SATU_PERTANYAAN"]
     # material=false + dua tanda tanya melanggar keduanya.
-    assert aturan_p04(_isi(material=False, one_neutral_question=dua)) == [
+    assert aturan_p04(_isi(material=False, one_neutral_question=dua), {}) == [
         "ATURAN_P04_DILANGGAR",
         "LEBIH_DARI_SATU_PERTANYAAN",
     ]
-    assert aturan_p04(_isi(one_neutral_question="Satu? Dua? Tiga?")) == [
+    assert aturan_p04(_isi(one_neutral_question="Satu? Dua? Tiga?"), {}) == [
         "LEBIH_DARI_SATU_PERTANYAAN"
     ]
 
 
 def test_aturan_material_true_tanpa_tanda_tanya_tidak_ditambah_aturan():
     """Perilaku yang dilaporkan, bukan diperbaiki: pertanyaan tanpa tanda tanya lolos."""
-    assert aturan_p04(_isi(one_neutral_question="Jelaskan pencatatan pelatihan itu")) == []
+    assert aturan_p04(_isi(one_neutral_question="Jelaskan pencatatan pelatihan itu"), {}) == []
 
 
 def test_aturan_terdaftar_hanya_untuk_p04():
-    assert ATURAN_ISI == {"P04": aturan_p04}
+    assert ATURAN_ISI == {"P01": aturan_p01, "P04": aturan_p04}
 
 
 # --- parameter dan id sumber ---

@@ -15,6 +15,7 @@ from anjab_abk_backend.ai.fungsi_p01 import (
     SIFAT_FAKTA_P01,
     SKEMA_ISI_P01,
     ParameterP01,
+    aturan_p01,
 )
 from anjab_abk_backend.ai.gateway import FUNGSI_TERDAFTAR
 from anjab_abk_backend.ai.guardrail import susun_instruksi
@@ -233,3 +234,48 @@ def test_katalog_memuat_p01_dan_terdaftar_hanya_bila_disebut():
     assert "P01" not in FUNGSI_TERDAFTAR
     daftarkan_fungsi(Settings(ai_fungsi_aktif=["P01"]))
     assert FUNGSI_TERDAFTAR == {"P01": FUNGSI_P01}
+
+
+# --- aturan_p01 ---
+
+
+def _fakta(span: str, source_id: str = "s1") -> dict[str, Any]:
+    return {"fakta": "f", "sifat": "NORMATIF", "source_id": source_id, "span": span}
+
+
+def _amplop_cited(*pasangan: tuple[str, str]) -> dict[str, Any]:
+    return {"cited_spans": [{"source_id": sid, "span": sp} for sid, sp in pasangan]}
+
+
+def test_aturan_p01_span_sama_setelah_spasi_dinormalkan_lolos():
+    isi = {"factual_extracts": [_fakta("Guru  wajib\nmenyusun")]}
+    assert aturan_p01(isi, _amplop_cited(("s1", " Guru wajib menyusun "))) == []
+
+
+def test_aturan_p01_span_potongan_kutipan_lebih_panjang_lolos():
+    isi = {"factual_extracts": [_fakta("wajib menyusun")]}
+    assert aturan_p01(isi, _amplop_cited(("s1", "Guru wajib menyusun perangkat"))) == []
+
+
+def test_aturan_p01_tanpa_fakta_lolos():
+    assert aturan_p01({"factual_extracts": []}, _amplop_cited()) == []
+
+
+@pytest.mark.parametrize(
+    ("fakta", "kutipan"),
+    [
+        (_fakta("karangan model"), [("s1", "Guru wajib menyusun")]),
+        (_fakta("Guru wajib menyusun", "s2"), [("s1", "Guru wajib menyusun")]),
+        (_fakta("   "), [("s1", "Guru wajib menyusun")]),
+        (_fakta("guru wajib"), [("s1", "Guru wajib menyusun")]),  # peka huruf besar-kecil
+    ],
+)
+def test_aturan_p01_fakta_tak_terbukti_satu_kode(fakta, kutipan):
+    assert aturan_p01({"factual_extracts": [fakta]}, _amplop_cited(*kutipan)) == [
+        "SPAN_FAKTA_TIDAK_DITEMUKAN"
+    ]
+
+
+def test_aturan_p01_dua_fakta_melanggar_kode_sekali():
+    isi = {"factual_extracts": [_fakta("palsu satu"), _fakta("palsu dua")]}
+    assert aturan_p01(isi, _amplop_cited(("s1", "Guru"))) == ["SPAN_FAKTA_TIDAK_DITEMUKAN"]

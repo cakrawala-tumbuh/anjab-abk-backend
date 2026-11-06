@@ -160,7 +160,7 @@ def kode_periode_p04(periode: str) -> str:
     return kode or "-"
 
 
-def aturan_p04(isi: dict[str, Any]) -> list[str]:
+def aturan_p04(isi: dict[str, Any], amplop: dict[str, Any]) -> list[str]:
     """Periksa keluaran P04 yang sudah lolos skema (terdaftar di ``ATURAN_ISI``).
 
     ``material=true`` tanpa pertanyaan, atau ``material=false`` dengan pertanyaan, melanggar
@@ -170,6 +170,7 @@ def aturan_p04(isi: dict[str, Any]) -> list[str]:
 
     Args:
         isi: Field ``isi`` keluaran.
+        amplop: Amplop keluaran; diterima demi signature ``ATURAN_ISI`` dan tidak dipakai.
 
     Returns:
         Daftar kode pelanggaran; kosong bila sesuai.
