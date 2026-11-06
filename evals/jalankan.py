@@ -306,7 +306,7 @@ def _jalankan_kasus(
         status_enum, kode, keluaran = _evaluasi(
             jawaban, definisi_fungsi.fungsi, peta_sumber(masukan["sumber"]), list(kasus.kamus_nama)
         )
-        pel = nilai(kasus, status_enum.value, kode, keluaran)
+        pel = nilai(kasus, status_enum.value, kode, keluaran, definisi_fungsi.fungsi.kode)
         _laporan(
             out,
             {

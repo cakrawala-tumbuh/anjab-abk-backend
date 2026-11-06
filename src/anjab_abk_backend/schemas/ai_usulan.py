@@ -157,7 +157,12 @@ class AiUsulanRead(AiUsulanRingkas):
     """
 
     ai_run_id: str = Field(description="Id `ai_run` (satu run, satu usulan).")
-    sumber_ids: list[str] = Field(description="Id sumber yang diajukan.")
+    sumber_ids: list[str] = Field(
+        description=(
+            "Id sumber masukan yang diajukan, urut pengajuan. Untuk P09 entri terakhir "
+            "berbentuk `versi:<id>`: draf yang dikritik, bukan baris `narasi_sumber`."
+        )
+    )
     diminta_oleh: str = Field(description="Subjek pemohon.")
     isi: dict[str, Any] | None = Field(default=None, description="Isi usulan; null sampai diserap.")
     amplop: dict[str, Any] | None = Field(

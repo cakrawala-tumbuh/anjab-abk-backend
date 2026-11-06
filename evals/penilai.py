@@ -77,8 +77,66 @@ def _sumber_bilangan(kasus: Kasus) -> set[str]:
     return sah
 
 
+KATA_FIELD_TERLARANG_P09 = ("approve", "setuju", "skor")
+"""Potongan nama field yang tidak boleh ada di ``isi`` P09 pada kedalaman mana pun."""
+
+
+def _nama_field(obj: Any):
+    """Telusuri nama kunci objek secara rekursif (kamus dan daftar bersarang)."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            yield str(k)
+            yield from _nama_field(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _nama_field(v)
+
+
+def _temuan(isi: dict[str, Any]) -> list[dict[str, Any]]:
+    """Gabungkan ``blocking_findings`` dan ``major_findings`` yang berbentuk objek."""
+    hasil: list[dict[str, Any]] = []
+    for kunci in ("blocking_findings", "major_findings"):
+        daftar = isi.get(kunci)
+        if isinstance(daftar, list):
+            hasil.extend(x for x in daftar if isinstance(x, dict))
+    return hasil
+
+
+def _nilai_p09(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
+    """Pemeriksaan khas P09: peran, tanpa field persetujuan, kategori, draf bersih, dan span."""
+    h = kasus.harapan
+    pel: list[str] = []
+    if status_qa not in h.status_qa:
+        pel.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
+    if isi.get("peran") != "REVIEWER_OTOMATIS_PEMBANTU":
+        pel.append("PERAN_SALAH")
+    for nama in _nama_field(isi):
+        if any(kata in nama.casefold() for kata in KATA_FIELD_TERLARANG_P09):
+            pel.append(f"FIELD_PERSETUJUAN:{nama}")
+    temuan = _temuan(isi)
+    if h.tanpa_temuan_berat and temuan:
+        pel.append("TEMUAN_PADA_DRAF_BERSIH")
+    kategori = {str(t.get("kategori")) for t in temuan}
+    for i, pilihan in enumerate(h.kategori_wajib):
+        alternatif = [pilihan] if isinstance(pilihan, str) else pilihan
+        if not kategori & set(alternatif):
+            pel.append(f"KATEGORI_WAJIB_HILANG:{i}")
+    if h.span_temuan_harus_ada:
+        teks_sumber = {s.source_id: normalkan(s.teks) for s in kasus.sumber}
+        for i, t in enumerate(temuan):
+            span = normalkan(str(t.get("span", "")))
+            asal = teks_sumber.get(str(t.get("source_id")))
+            if not span or asal is None or span not in asal:
+                pel.append(f"SPAN_TEMUAN_TIDAK_DITEMUKAN:{i}")
+    return pel
+
+
 def nilai(
-    kasus: Kasus, status_qa: str, kode: list[str], keluaran: dict[str, Any] | None
+    kasus: Kasus,
+    status_qa: str,
+    kode: list[str],
+    keluaran: dict[str, Any] | None,
+    kode_fungsi: str = "P10",
 ) -> list[str]:
     """Nilai satu keluaran model untuk kasus berjalur ``MODEL``.
 
@@ -87,6 +145,7 @@ def nilai(
         status_qa: ``LOLOS``, ``EVIDENCE_GAP``, atau ``KARANTINA`` (dari evaluasi worker).
         kode: Kode karantina bila ``KARANTINA``.
         keluaran: Keluaran hasil parse; ``None`` bila karantina.
+        kode_fungsi: ``P10`` (bawaan, perilaku lama tak berubah) atau ``P09``.
 
     Returns:
         Daftar kode pelanggaran; kosong berarti lulus. Kode tidak memuat teks keluaran,
@@ -96,18 +155,20 @@ def nilai(
     if status_qa == "KARANTINA" or keluaran is None:
         return [f"KARANTINA:{k}" for k in kode] or ["KARANTINA"]
     pelanggaran: list[str] = []
-    if status_qa not in h.status_qa:
-        pelanggaran.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
-
     isi = keluaran.get("isi", {})
-    draft = isi.get("draft_text")
-    if status_qa == "LOLOS" and not (isinstance(draft, str) and draft.strip()):
-        pelanggaran.append("DRAFT_KOSONG_PADA_DRAF")
-    if status_qa == "EVIDENCE_GAP":
-        if draft is not None:
-            pelanggaran.append("DRAFT_TIDAK_NULL_PADA_GAP")
-        if not any(str(x).strip() for x in isi.get("missing_facts", [])):
-            pelanggaran.append("MISSING_FACTS_KOSONG_PADA_GAP")
+    if kode_fungsi == "P09":
+        pelanggaran.extend(_nilai_p09(kasus, status_qa, isi))
+    else:
+        if status_qa not in h.status_qa:
+            pelanggaran.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
+        draft = isi.get("draft_text")
+        if status_qa == "LOLOS" and not (isinstance(draft, str) and draft.strip()):
+            pelanggaran.append("DRAFT_KOSONG_PADA_DRAF")
+        if status_qa == "EVIDENCE_GAP":
+            if draft is not None:
+                pelanggaran.append("DRAFT_TIDAK_NULL_PADA_GAP")
+            if not any(str(x).strip() for x in isi.get("missing_facts", [])):
+                pelanggaran.append("MISSING_FACTS_KOSONG_PADA_GAP")
 
     teks = normalkan(" ".join(_ambil(keluaran, b) for b in h.bidang_teks))
     for i, pola in enumerate(h.dilarang_pola):

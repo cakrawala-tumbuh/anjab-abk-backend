@@ -27,6 +27,22 @@ class PermintaanAiCreate(BaseModel):
     )
 
 
+class KritikAiCreate(BaseModel):
+    """Badan `POST /narasi/kasus/{id}/kritik-ai`.
+
+    Hanya mengacu satu versi; teks draf tidak pernah dikirim klien, server membacanya dari
+    versi itu supaya ikut gerbang PII.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    narasi_versi_id: str = Field(
+        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        max_length=36,
+        description="Id versi narasi yang dikritik; harus versi terbaru kasus.",
+    )
+
+
 class PermintaanAiRead(BaseModel):
     """Satu permintaan draf AI beserta status job-nya; tanpa `masukan` dan `keluaran`."""
 

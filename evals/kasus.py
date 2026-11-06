@@ -16,6 +16,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from anjab_abk_backend.ai.fungsi_p09 import FUNGSI_P09, ParameterP09
 from anjab_abk_backend.ai.fungsi_p10 import FUNGSI_P10, ParameterP10
 from anjab_abk_backend.ai.gateway import FungsiAi
 
@@ -55,6 +56,11 @@ class DefinisiFungsi:
 
 
 DEFINISI_FUNGSI: dict[str, DefinisiFungsi] = {
+    "P09": DefinisiFungsi(
+        fungsi=FUNGSI_P09,
+        parameter=ParameterP09,
+        berkas=Path(__file__).parent / "p09" / "kasus.json",
+    ),
     "P10": DefinisiFungsi(
         fungsi=FUNGSI_P10,
         parameter=ParameterP10,
@@ -95,6 +101,12 @@ class HarapanKasus(BaseModel):
         harus_memuat: Frasa wajib; elemen berupa daftar berarti salah satu cukup.
         angka_baru_dilarang: Bilangan pada teks harus ada di sumber atau parameter.
         kontradiksi_wajib: ``contradictions`` pada keluaran harus terisi.
+        kategori_wajib: Khusus P09; kategori temuan (``blocking_findings`` atau
+            ``major_findings``) yang wajib muncul; elemen berupa daftar berarti salah satu cukup.
+        tanpa_temuan_berat: Khusus P09; ``blocking_findings`` dan ``major_findings`` harus
+            kosong (draf bersih).
+        span_temuan_harus_ada: Khusus P09; tiap temuan harus menunjuk ``source_id`` yang ada di
+            kasus dengan ``span`` yang benar-benar terkandung di teks sumber itu.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -107,6 +119,9 @@ class HarapanKasus(BaseModel):
     harus_memuat: list[str | list[str]] = Field(default_factory=list)
     angka_baru_dilarang: bool = False
     kontradiksi_wajib: bool = False
+    kategori_wajib: list[str | list[str]] = Field(default_factory=list)
+    tanpa_temuan_berat: bool = False
+    span_temuan_harus_ada: bool = False
 
     @model_validator(mode="after")
     def _konsisten(self) -> HarapanKasus:
@@ -175,6 +190,23 @@ def _periksa_jenis(kasus: Kasus) -> None:
         raise KasusRusak(f"kasus {kasus.id}: jenis sumber '{s.jenis}' tidak diizinkan")
 
 
+_KHAS_P09 = ("kategori_wajib", "tanpa_temuan_berat", "span_temuan_harus_ada")
+
+
+def _periksa_khas_fungsi(kasus: Kasus, kode_fungsi: str) -> None:
+    """Pastikan isian khas satu fungsi tidak dipakai fungsi lain dan bidang teks sesuai.
+
+    Raises:
+        KasusRusak: isian khas P09 dipakai di fungsi lain, atau kasus P09 berjalur ``MODEL``
+            masih memakai bidang teks bawaan P10 (``isi.draft_text``).
+    """
+    h = kasus.harapan
+    if kode_fungsi != "P09" and any(getattr(h, f) for f in _KHAS_P09):
+        raise KasusRusak(f"kasus {kasus.id}: isian khas P09 dipakai pada {kode_fungsi}")
+    if kode_fungsi == "P09" and h.jalur == "MODEL" and "isi.draft_text" in h.bidang_teks:
+        raise KasusRusak(f"kasus {kasus.id}: P09 tidak punya isi.draft_text")
+
+
 def muat_kasus(berkas: Path, kode_fungsi: str, definisi: DefinisiFungsi) -> list[Kasus]:
     """Baca dan validasi seluruh kasus satu fungsi.
 
@@ -210,4 +242,5 @@ def muat_kasus(berkas: Path, kode_fungsi: str, definisi: DefinisiFungsi) -> list
         except ValidationError as exc:
             raise KasusRusak(f"kasus {k.id}: parameter tidak sah") from exc
         _periksa_jenis(k)
+        _periksa_khas_fungsi(k, kode_fungsi)
     return isi.kasus

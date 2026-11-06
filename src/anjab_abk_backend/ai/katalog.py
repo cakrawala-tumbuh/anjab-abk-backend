@@ -8,12 +8,13 @@ tidak ada fungsi AI yang dapat diajukan.
 from __future__ import annotations
 
 from ..config import Settings
+from .fungsi_p09 import FUNGSI_P09
 from .fungsi_p10 import FUNGSI_P10
 from .gateway import FUNGSI_TERDAFTAR, FungsiAi
 
 __all__ = ["KATALOG_FUNGSI", "daftarkan_fungsi"]
 
-KATALOG_FUNGSI: dict[str, FungsiAi] = {"P10": FUNGSI_P10}
+KATALOG_FUNGSI: dict[str, FungsiAi] = {"P09": FUNGSI_P09, "P10": FUNGSI_P10}
 """Semua fungsi AI yang tersedia di kode, menurut kode."""
 
 

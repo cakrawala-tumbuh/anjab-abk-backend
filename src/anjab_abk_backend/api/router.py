@@ -17,6 +17,7 @@ from .v1 import (
     narasi_antrean,
     narasi_draf_ai,
     narasi_kasus,
+    narasi_kritik_ai,
     narasi_sumber,
     opm_hasil,
     opm_kuesioner,
@@ -302,6 +303,11 @@ api_router.include_router(
 )
 api_router.include_router(
     narasi_draf_ai.router,
+    prefix="/narasi/kasus",
+    tags=["narasi"],
+)
+api_router.include_router(
+    narasi_kritik_ai.router,
     prefix="/narasi/kasus",
     tags=["narasi"],
 )

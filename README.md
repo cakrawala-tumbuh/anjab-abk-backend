@@ -142,6 +142,11 @@ ANTHROPIC_API_KEY=... make eval-ai FUNGSI=P10 PENYEDIA=API_ANTHROPIC
 make eval-ai FUNGSI=P10 PENYEDIA=LANGGANAN_CLAUDE CLAUDE_VOLUME=eval-claude
 ```
 
+`FUNGSI` menerima `P10` (draf narasi) dan `P09` (kritik AI atas versi narasi; 12 kasus di
+`evals/p09/kasus.json`, dinilai atas kategori temuan, draf bersih, dan span, bukan atas
+`draft_text`). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
+`AI_FUNGSI_AKTIF`.
+
 `PENYEDIA` wajib dan tanpa nilai bawaan; kosong atau tak dikenal ditolak sebelum build dan
 sebelum `docker run`. `CLAUDE_VOLUME` wajib untuk jalur langganan dan harus berupa nama volume
 (`^[A-Za-z0-9][A-Za-z0-9_.-]*$`). Opsional: `EVAL_ULANG` (bawaan 3; kasus lulus hanya bila

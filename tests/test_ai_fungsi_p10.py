@@ -71,7 +71,7 @@ def test_daftar_p10_idempoten_dan_dikosongkan():
     daftarkan_fungsi(_settings(["P10"]))
     daftarkan_fungsi(_settings(["P10"]))
     assert FUNGSI_TERDAFTAR == {"P10": FUNGSI_P10}
-    assert KATALOG_FUNGSI == {"P10": FUNGSI_P10}
+    assert KATALOG_FUNGSI["P10"] is FUNGSI_P10 and set(KATALOG_FUNGSI) == {"P09", "P10"}
     daftarkan_fungsi(_settings([]))
     assert FUNGSI_TERDAFTAR == {}
 
