@@ -23,6 +23,29 @@ PENANDA_AMPLOP = "AMPLOP-RAHASIA-SINTETIS-4419"
 PENANDA_MASUKAN = "MASUKAN-RAHASIA-SINTETIS-2208"
 PENANDA_KELUARAN = "KELUARAN-RAHASIA-SINTETIS-9054"
 _DASAR = datetime(2026, 11, 1, tzinfo=UTC)
+# Himpunan LITERAL (bukan `model_fields`): sembilan field #102 + `putusan_terakhir` (#103).
+KUNCI_RINGKAS = {
+    "id",
+    "fungsi",
+    "sasaran_jenis",
+    "sasaran_id",
+    "job_id",
+    "created_at",
+    "diserap_at",
+    "hasil_serap",
+    "kode_serap",
+    "putusan_terakhir",
+}
+# Lima belas field detail + `putusan_terakhir` + `putusan` (#103).
+KUNCI_DETAIL = KUNCI_RINGKAS | {
+    "ai_run_id",
+    "sumber_ids",
+    "diminta_oleh",
+    "isi",
+    "amplop",
+    "output_hash",
+    "putusan",
+}
 
 
 def _tim(client_as, subject: str = "tim-1"):
@@ -79,11 +102,19 @@ def _usulan(
     return rec
 
 
+def _tanpa_identitas(teks: str, rec: AiUsulanModel) -> None:
+    """Teks respons daftar tidak memuat pemohon maupun id run fixture."""
+    assert rec.diminta_oleh not in teks
+    assert rec.ai_run_id not in teks
+
+
 def test_detail_memuat_isi_amplop_dan_hash(client_as, db_session):
     rec = _usulan(db_session)
     r = _tim(client_as).get(f"{URL}/{rec.id}")
     assert r.status_code == 200, r.text
     d = r.json()
+    assert set(d) == KUNCI_DETAIL
+    assert d["ai_run_id"] == rec.ai_run_id and d["diminta_oleh"] == "tim-1"
     assert d["isi"] == {"ringkasan": PENANDA_ISI}
     assert d["amplop"] == {"catatan": PENANDA_AMPLOP}
     assert d["output_hash"] == "c" * 64
@@ -119,9 +150,10 @@ def test_list_filter_dan_tanpa_isi(client_as, db_session):
     body = r.json()
     assert body["total"] == 1
     assert [i["id"] for i in body["items"]] == [a.id]
-    assert set(body["items"][0]) == set(AiUsulanRingkas.model_fields)
-    for kunci in ("isi", "amplop", "output_hash"):
+    assert set(body["items"][0]) == KUNCI_RINGKAS
+    for kunci in ("isi", "amplop", "output_hash", "ai_run_id", "sumber_ids", "diminta_oleh"):
         assert kunci not in body["items"][0]
+    _tanpa_identitas(r.text, a)
     assert PENANDA_ISI not in r.text and PENANDA_AMPLOP not in r.text
     assert PENANDA_MASUKAN not in r.text and PENANDA_KELUARAN not in r.text
 
@@ -163,7 +195,9 @@ def test_search_domain_sah_dan_belum_diserap(client_as, db_session):
     assert r2.json()["total"] == 2
     assert [i["id"] for i in r2.json()["items"]] == [sudah.id]
     for i in r.json()["items"] + r2.json()["items"]:
-        assert "isi" not in i and "amplop" not in i
+        assert set(i) == KUNCI_RINGKAS
+    _tanpa_identitas(r.text, belum)
+    _tanpa_identitas(r2.text, sudah)
     assert PENANDA_ISI not in r2.text and PENANDA_AMPLOP not in r2.text
 
 
@@ -174,6 +208,9 @@ def test_search_domain_sah_dan_belum_diserap(client_as, db_session):
         {"domain": [["amplop", "ilike", "x"]]},
         {"domain": [["output_hash", "=", "x"]]},
         {"domain": [["ai_run_id", "=", "x"]]},
+        {"domain": [["diminta_oleh", "=", "tim-1"]]},
+        {"domain": [["sumber_ids", "=", ["s1"]]]},
+        {"domain": [["fungsi", "=", "P09"]], "order": [["diminta_oleh", "asc"]]},
         {"domain": [["diserap_at", "=", None]]},
         {"domain": [["fungsi", "=", "P09"]], "order": [["isi", "asc"]]},
         {"domain": [["isi", "like", "RAHASIA"]]},
@@ -225,9 +262,8 @@ def test_isi_dan_amplop_tidak_masuk_log_maupun_galat(client_as, db_session, capl
 
 
 def test_skema_ringkas_tanpa_keluaran_model_dan_run_tetap_tertutup():
-    ringkas = set(AiUsulanRingkas.model_fields)
-    assert not ({"isi", "amplop", "output_hash", "masukan", "keluaran"} & ringkas)
-    assert {"isi", "amplop", "output_hash"} <= set(AiUsulanRead.model_fields)
+    assert set(AiUsulanRingkas.model_fields) == KUNCI_RINGKAS
+    assert set(AiUsulanRead.model_fields) == KUNCI_DETAIL
     assert not ({"masukan", "keluaran"} & set(AiUsulanRead.model_fields))
     assert not ({"masukan", "keluaran"} & set(AiRunRead.model_fields))
 
@@ -250,4 +286,8 @@ def test_openapi_rute_usulan_tanpa_ubah_hapus_dan_skema_tertutup(client):
     skema = spec["components"]["schemas"]
     assert not ({"masukan", "keluaran"} & set(skema["AiUsulanRead"]["properties"]))
     assert not ({"masukan", "keluaran"} & set(skema["AiRunRead"]["properties"]))
-    assert not ({"isi", "amplop"} & set(skema["AiUsulanRingkas"]["properties"]))
+    assert set(skema["AiUsulanRingkas"]["properties"]) == KUNCI_RINGKAS
+    assert set(skema["AiUsulanRead"]["properties"]) == KUNCI_DETAIL
+    for nama in ("ai_run_id", "sumber_ids", "diminta_oleh"):
+        assert nama in skema["AiUsulanRead"]["required"]
+        assert nama not in skema["AiUsulanRingkas"]["properties"]

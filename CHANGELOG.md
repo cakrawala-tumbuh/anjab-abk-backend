@@ -9,6 +9,7 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ### Diubah
 
+- **Daftar dan pencarian usulan AI dibatasi ke sembilan field** (backlog #114): `GET /api/v1/ai/usulan` dan `POST .../search` tidak lagi memuat `ai_run_id`, `sumber_ids`, dan `diminta_oleh` (identitas pemohon); item berisi sembilan field #102 ditambah `putusan_terakhir` (#103). **Perubahan kontrak yang memutus pemakai daftar dan pencarian**: `components.schemas.AiUsulanRingkas` kehilangan tiga properti wajib. Detail `GET .../{id}` tetap memuat ketiganya (wajib terisi; `AiUsulanRead` kini mendeklarasikannya sendiri), jadi himpunan kunci dan nilainya tidak berubah. `AiUsulanService.ajukan` ikut mengembalikan proyeksi yang menyempit. Whitelist pencarian dan filter daftar tidak berubah (domain atau urutan pada ketiga field tetap 422). Belum ada tag yang memuat rute ini, tanpa masa transisi; tanpa migrasi.
 - **Tujuan dan header klien Anthropic dikunci dari env SDK** (backlog #113): `AnthropicKlienModel` selalu memakai `base_url=https://api.anthropic.com` dan mengosongkan header dari `ANTHROPIC_CUSTOM_HEADERS` setelah konstruksi, sehingga `ANTHROPIC_BASE_URL`/`ANTHROPIC_CUSTOM_HEADERS` tidak lagi dapat mengalihkan kunci dan prompt atau menimpa header kredensial. Bila klien SDK tidak punya `_custom_headers` (SDK berubah), `KesalahanModelPermanen` dilempar tanpa permintaan. `pyproject.toml` memakai `anthropic==2.5.0` (sebelumnya `>=2.4,<3`); menaikkan versi wajib lewat uji. Tanpa migrasi, tanpa env baru.
 
 ### Ditambahkan

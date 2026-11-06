@@ -122,7 +122,14 @@ class AiUsulanPutusanRead(AiUsulanPutusanTerakhir):
 
 
 class AiUsulanRingkas(BaseModel):
-    """Proyeksi usulan tanpa `isi`, `amplop`, maupun `output_hash` (keluaran model)."""
+    """Proyeksi daftar, pencarian, dan hasil pengajuan: sembilan field kontrak #102.
+
+    Tidak memuat `isi`, `amplop`, `output_hash` (keluaran model) maupun `ai_run_id`,
+    `sumber_ids`, dan `diminta_oleh`; ketiga terakhir (identitas pemohon dan rujukan run)
+    hanya keluar dari rute detail lewat `AiUsulanRead`. Ditambah `putusan_terakhir` (#103).
+    Karena `from_attributes`, objek ORM yang memuat kolom itu tetap dapat divalidasi, dan
+    kolom yang tidak dideklarasikan di sini dibuang.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -131,9 +138,6 @@ class AiUsulanRingkas(BaseModel):
     sasaran_jenis: SasaranUsulan = Field(description="Jenis objek sasaran.")
     sasaran_id: str = Field(description="Id objek sasaran (polimorfik, tanpa FK).")
     job_id: str = Field(description="Id `async_job` hasil pengajuan.")
-    ai_run_id: str = Field(description="Id `ai_run` (satu run, satu usulan).")
-    sumber_ids: list[str] = Field(description="Id sumber yang diajukan.")
-    diminta_oleh: str = Field(description="Subjek pemohon.")
     created_at: datetime = Field(description="Waktu pengajuan.")
     diserap_at: datetime | None = Field(default=None, description="Null sampai run diserap.")
     hasil_serap: HasilSerapUsulan | None = Field(default=None, description="Hasil serap.")
@@ -144,12 +148,17 @@ class AiUsulanRingkas(BaseModel):
 
 
 class AiUsulanRead(AiUsulanRingkas):
-    """Satu usulan lengkap untuk Tim Kajian: ringkas ditambah keluaran model.
+    """Satu usulan lengkap untuk Tim Kajian: ringkas ditambah rujukan run dan keluaran model.
 
+    `ai_run_id`, `sumber_ids`, dan `diminta_oleh` hanya ada di sini (tidak di daftar atau
+    pencarian) dan wajib terisi.
     `isi` dan `amplop` adalah keluaran model (null sampai diserap) dan hanya keluar dari
     rute detail; `masukan` run tidak pernah dibuka dan `keluaran` run tidak lewat sini.
     """
 
+    ai_run_id: str = Field(description="Id `ai_run` (satu run, satu usulan).")
+    sumber_ids: list[str] = Field(description="Id sumber yang diajukan.")
+    diminta_oleh: str = Field(description="Subjek pemohon.")
     isi: dict[str, Any] | None = Field(default=None, description="Isi usulan; null sampai diserap.")
     amplop: dict[str, Any] | None = Field(
         default=None, description="Amplop keluaran model; null sampai diserap."
