@@ -19,6 +19,7 @@ from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session
 
 from anjab_abk_backend.ai import penyerap_usulan
+from anjab_abk_backend.ai.fungsi_p04 import aturan_p04
 from anjab_abk_backend.ai.gateway import FUNGSI_TERDAFTAR, AiGateway, FungsiAi
 from anjab_abk_backend.ai.penyerap_usulan import ATURAN_ISI, serap_usulan, serap_usulan_tertunda
 from anjab_abk_backend.ai.redaksi import SumberAi
@@ -186,8 +187,8 @@ def test_usulan_sama_belum_diserap_409_usulan_berjalan_lalu_lepas_setelah_serap(
     _ajukan(db_session)  # tidak lagi tertahan
 
 
-def test_registri_dan_aturan_isi_bawaan_kosong():
-    assert FUNGSI_TERDAFTAR == {} and ATURAN_ISI == {}
+def test_registri_bawaan_kosong_dan_aturan_isi_hanya_p04():
+    assert FUNGSI_TERDAFTAR == {} and ATURAN_ISI == {"P04": aturan_p04}
 
 
 # --- penyerapan ---------------------------------------------------------------------------

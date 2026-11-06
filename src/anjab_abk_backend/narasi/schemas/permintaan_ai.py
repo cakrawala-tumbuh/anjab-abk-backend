@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ...schemas.async_job import StatusJob
 
@@ -57,6 +57,39 @@ class EkstraksiAiCreate(BaseModel):
     periode: str = Field(
         pattern=r"^[A-Za-z0-9_.:-]+$", max_length=100, description="Kode periode konteks."
     )
+
+
+class TanyaBuktiAiCreate(BaseModel):
+    """Badan `POST /narasi/kasus/{id}/tanya-bukti-ai`.
+
+    `klaim` dan `keputusan_terkait` adalah teks bebas; server mengirimnya ke model sebagai
+    sumber (bukan `parameter`) agar ikut gerbang PII. Spasi tepi dipangkas sebelum panjang
+    diperiksa. `sumber_ids` wajib berisi minimal satu id.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    klaim: str = Field(
+        min_length=5,
+        max_length=2000,
+        description="Klaim yang buktinya dinilai (5-2.000 karakter, spasi tepi dipangkas).",
+    )
+    keputusan_terkait: str = Field(
+        min_length=5,
+        max_length=500,
+        description="Keputusan yang bergantung pada klaim (5-500 karakter, spasi tepi dipangkas).",
+    )
+    sumber_ids: list[str] = Field(
+        min_length=1,
+        max_length=BATAS_SUMBER_PERMINTAAN,
+        description="Id sumber narasi yang menjadi materi bukti; minimal satu.",
+    )
+
+    @field_validator("klaim", "keputusan_terkait", mode="before")
+    @classmethod
+    def _pangkas(cls, nilai: object) -> object:
+        """Pangkas spasi tepi sebelum batas panjang diperiksa."""
+        return nilai.strip() if isinstance(nilai, str) else nilai
 
 
 class PermintaanAiRead(BaseModel):

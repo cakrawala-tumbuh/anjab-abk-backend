@@ -22,6 +22,7 @@ from ..schemas.ai_run import StatusQaAi
 from ..schemas.ai_usulan import HasilSerapUsulan
 from ..services.ai_run import hash_masukan
 from ..services.ai_run_sql import SqlAiRunService
+from .fungsi_p04 import aturan_p04
 
 __all__ = ["ATURAN_ISI", "serap_usulan", "serap_usulan_tertunda"]
 
@@ -40,11 +41,11 @@ KODE_GALAT_SERAP = "GALAT_SERAP"
 KUNCI_AMPLOP = ("source_refs", "cited_spans", "confidence_reason", "unknowns", "contradictions")
 """Kunci amplop keluaran yang disimpan di `ai_usulan.amplop`."""
 
-ATURAN_ISI: dict[str, Callable[[dict[str, Any]], list[str]]] = {}
+ATURAN_ISI: dict[str, Callable[[dict[str, Any]], list[str]]] = {"P04": aturan_p04}
 """Pemeriksaan pasca-validasi `isi` per kode fungsi; mengembalikan daftar kode pelanggaran.
 
-Bawaan kosong (`FungsiAi` tidak punya kolom validator). Daftar tak kosong membuat usulan
-`MANUAL` tanpa `isi`.
+Hanya P04 yang punya aturan (`FungsiAi` tidak punya kolom validator); fungsi lain tanpa entri
+berarti tanpa pemeriksaan tambahan. Daftar tak kosong membuat usulan `MANUAL` tanpa `isi`.
 """
 
 

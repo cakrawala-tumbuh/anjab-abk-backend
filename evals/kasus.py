@@ -17,6 +17,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from anjab_abk_backend.ai.fungsi_p01 import FUNGSI_P01, SIFAT_FAKTA_P01, ParameterP01
+from anjab_abk_backend.ai.fungsi_p04 import FUNGSI_P04, ParameterP04
 from anjab_abk_backend.ai.fungsi_p09 import FUNGSI_P09, ParameterP09
 from anjab_abk_backend.ai.fungsi_p10 import FUNGSI_P10, ParameterP10
 from anjab_abk_backend.ai.gateway import FungsiAi
@@ -61,6 +62,11 @@ DEFINISI_FUNGSI: dict[str, DefinisiFungsi] = {
         fungsi=FUNGSI_P01,
         parameter=ParameterP01,
         berkas=Path(__file__).parent / "p01" / "kasus.json",
+    ),
+    "P04": DefinisiFungsi(
+        fungsi=FUNGSI_P04,
+        parameter=ParameterP04,
+        berkas=Path(__file__).parent / "p04" / "kasus.json",
     ),
     "P09": DefinisiFungsi(
         fungsi=FUNGSI_P09,
@@ -117,6 +123,10 @@ class HarapanKasus(BaseModel):
             nilai ini (mis. ``["NORMATIF"]`` untuk dokumen normatif); kosong = tidak diperiksa.
         span_fakta_harus_ada: Khusus P01; tiap fakta harus menunjuk ``source_id`` yang ada di
             kasus dengan ``span`` yang benar-benar terkandung di teks sumber itu.
+        material_harapan: Khusus P04; nilai ``material`` yang diharapkan pada keluaran
+            (``None`` = tidak diperiksa).
+        pertanyaan_tunggal: Khusus P04; bila ``material`` benar, ``one_neutral_question`` harus
+            berisi tepat satu tanda tanya; bila salah, pertanyaan harus kosong atau ``null``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -134,6 +144,8 @@ class HarapanKasus(BaseModel):
     span_temuan_harus_ada: bool = False
     hanya_sifat: list[str] = Field(default_factory=list)
     span_fakta_harus_ada: bool = False
+    material_harapan: bool | None = None
+    pertanyaan_tunggal: bool = False
 
     @model_validator(mode="after")
     def _konsisten(self) -> HarapanKasus:
@@ -207,11 +219,18 @@ def _periksa_jenis(kasus: Kasus) -> None:
 _KHAS_FUNGSI = {
     "P09": ("kategori_wajib", "tanpa_temuan_berat", "span_temuan_harus_ada"),
     "P01": ("hanya_sifat", "span_fakta_harus_ada"),
+    "P04": ("material_harapan", "pertanyaan_tunggal"),
 }
 """Isian ``HarapanKasus`` yang hanya sah untuk satu fungsi."""
 
-_TANPA_DRAFT_TEXT = ("P01", "P09")
+_TANPA_DRAFT_TEXT = ("P01", "P04", "P09")
 """Fungsi yang keluarannya tidak punya ``isi.draft_text``."""
+
+
+def _terisi(h: HarapanKasus, nama: str) -> bool:
+    """Apakah isian ``nama`` dipakai; ``material_harapan=false`` tetap terhitung terisi."""
+    nilai = getattr(h, nama)
+    return nilai is not None if nama == "material_harapan" else bool(nilai)
 
 
 def _periksa_khas_fungsi(kasus: Kasus, kode_fungsi: str) -> None:
@@ -219,12 +238,12 @@ def _periksa_khas_fungsi(kasus: Kasus, kode_fungsi: str) -> None:
 
     Raises:
         KasusRusak: isian khas fungsi lain dipakai (mis. isian P09 pada P01 atau P10), atau
-            kasus P01/P09 berjalur ``MODEL`` masih memakai bidang teks bawaan P10
+            kasus P01/P04/P09 berjalur ``MODEL`` masih memakai bidang teks bawaan P10
             (``isi.draft_text``).
     """
     h = kasus.harapan
     for pemilik, isian in _KHAS_FUNGSI.items():
-        if pemilik != kode_fungsi and any(getattr(h, f) for f in isian):
+        if pemilik != kode_fungsi and any(_terisi(h, f) for f in isian):
             raise KasusRusak(f"kasus {kasus.id}: isian khas {pemilik} dipakai pada {kode_fungsi}")
     if (
         kode_fungsi in _TANPA_DRAFT_TEXT

@@ -168,6 +168,28 @@ def _nilai_p01(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
     return pel
 
 
+def _nilai_p04(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
+    """Pemeriksaan khas P04: status, tanpa field persetujuan, ``material``, pertanyaan tunggal."""
+    h = kasus.harapan
+    pel: list[str] = []
+    if status_qa not in h.status_qa:
+        pel.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
+    for nama in _nama_field(isi):
+        if any(kata in nama.casefold() for kata in KATA_FIELD_TERLARANG_P09):
+            pel.append(f"FIELD_PERSETUJUAN:{nama}")
+    material = isi.get("material")
+    if h.material_harapan is not None and material is not h.material_harapan:
+        pel.append(f"MATERIAL_TIDAK_SESUAI:{material}")
+    if h.pertanyaan_tunggal:
+        pertanyaan = isi.get("one_neutral_question")
+        teks = pertanyaan.strip() if isinstance(pertanyaan, str) else ""
+        if material is True and (not teks or teks.count("?") != 1):
+            pel.append("PERTANYAAN_TUNGGAL_TIDAK_TERPENUHI")
+        if material is False and teks:
+            pel.append("PERTANYAAN_PADA_TIDAK_MATERIAL")
+    return pel
+
+
 def nilai(
     kasus: Kasus,
     status_qa: str,
@@ -182,7 +204,7 @@ def nilai(
         status_qa: ``LOLOS``, ``EVIDENCE_GAP``, atau ``KARANTINA`` (dari evaluasi worker).
         kode: Kode karantina bila ``KARANTINA``.
         keluaran: Keluaran hasil parse; ``None`` bila karantina.
-        kode_fungsi: ``P10`` (bawaan, perilaku lama tak berubah), ``P09``, atau ``P01``.
+        kode_fungsi: ``P10`` (bawaan, perilaku lama tak berubah), ``P09``, ``P01``, atau ``P04``.
 
     Returns:
         Daftar kode pelanggaran; kosong berarti lulus. Kode tidak memuat teks keluaran,
@@ -197,6 +219,8 @@ def nilai(
         pelanggaran.extend(_nilai_p09(kasus, status_qa, isi))
     elif kode_fungsi == "P01":
         pelanggaran.extend(_nilai_p01(kasus, status_qa, isi))
+    elif kode_fungsi == "P04":
+        pelanggaran.extend(_nilai_p04(kasus, status_qa, isi))
     else:
         if status_qa not in h.status_qa:
             pelanggaran.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
