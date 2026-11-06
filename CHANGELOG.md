@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.49.0] - 2026-11-06
+
 ### Diperbaiki
 
 - **Span fakta P01 kini ditagih server** (backlog #116): usulan P01 berstatus `USULAN_DIBUAT` hanya bila setiap `factual_extracts[].span` (setelah spasi dinormalkan, peka huruf besar-kecil) merupakan potongan dari kutipan pada `cited_spans` ber-`source_id` sama; selain itu usulan `MANUAL` tanpa `isi`, `amplop`, dan `output_hash` dengan `kode_serap == ["SPAN_FAKTA_TIDAK_DITEMUKAN"]` (satu kali per usulan; mencakup span kosong, `source_id` asing, dan span tak terbukti), sedangkan `ai_run.status_qa` tetap `LOLOS`. Pembuktian lewat `cited_spans` karena `ai_run.masukan` dikosongkan saat run ditutup. `EVIDENCE_GAP` dan P04 tidak berubah. Perubahan internal: signature `ATURAN_ISI` menjadi `(isi, amplop)` untuk semua fungsi dan `_norm` di `ai/keluaran.py` menjadi `normalkan_kutipan`. Tanpa migrasi, tanpa perubahan kontrak HTTP. **P01 tidak boleh masuk `AI_FUNGSI_AKTIF` sebelum item ini selesai** dan evaluasi nyata P01 tetap wajib lulus.
