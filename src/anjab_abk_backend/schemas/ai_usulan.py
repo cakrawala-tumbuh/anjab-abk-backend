@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 __all__ = [
     "AiUsulanPutusanCreate",
     "AiUsulanPutusanRead",
+    "AiUsulanPutusanRingkas",
     "AiUsulanPutusanTerakhir",
     "AiUsulanRead",
     "AiUsulanRingkas",
@@ -101,16 +102,30 @@ class AiUsulanPutusanCreate(BaseModel):
         return self
 
 
-class AiUsulanPutusanTerakhir(BaseModel):
-    """Putusan terbaru atas satu usulan, tanpa teks bebas (`catatan`, `teks_koreksi`)."""
+class AiUsulanPutusanRingkas(BaseModel):
+    """Putusan terbaru atas satu usulan untuk daftar dan pencarian, tanpa teks bebas.
+
+    Sengaja tanpa `actor_key` (subjek reviewer): identitas itu hanya keluar dari detail
+    usulan (`AiUsulanPutusanTerakhir`) dan respons `POST .../putusan`, bukan dari baris
+    daftar. Tanpa `catatan` dan `teks_koreksi`.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
     id: str = Field(description="UUID v4 putusan.")
     putusan: PutusanUsulan = Field(description="Putusan reviewer.")
     tingkat_koreksi: TingkatKoreksi | None = Field(default=None, description="Tingkat koreksi.")
-    actor_key: str = Field(description="Subjek reviewer (dari token).")
     created_at: datetime = Field(description="Waktu putusan.")
+
+
+class AiUsulanPutusanTerakhir(AiUsulanPutusanRingkas):
+    """Putusan terbaru atas satu usulan untuk detail: ringkas ditambah `actor_key`.
+
+    Tanpa teks bebas (`catatan`, `teks_koreksi`). Dipakai `AiUsulanRead.putusan_terakhir`;
+    daftar dan pencarian memakai `AiUsulanPutusanRingkas`.
+    """
+
+    actor_key: str = Field(description="Subjek reviewer (dari token).")
 
 
 class AiUsulanPutusanRead(AiUsulanPutusanTerakhir):
@@ -142,8 +157,9 @@ class AiUsulanRingkas(BaseModel):
     diserap_at: datetime | None = Field(default=None, description="Null sampai run diserap.")
     hasil_serap: HasilSerapUsulan | None = Field(default=None, description="Hasil serap.")
     kode_serap: list[str] | None = Field(default=None, description="Kode alasan hasil `MANUAL`.")
-    putusan_terakhir: AiUsulanPutusanTerakhir | None = Field(
-        default=None, description="Putusan reviewer terbaru; null bila belum ada."
+    putusan_terakhir: AiUsulanPutusanRingkas | None = Field(
+        default=None,
+        description="Putusan reviewer terbaru tanpa `actor_key`; null bila belum ada.",
     )
 
 
@@ -154,8 +170,15 @@ class AiUsulanRead(AiUsulanRingkas):
     pencarian) dan wajib terisi.
     `isi` dan `amplop` adalah keluaran model (null sampai diserap) dan hanya keluar dari
     rute detail; `masukan` run tidak pernah dibuka dan `keluaran` run tidak lewat sini.
+
+    `putusan_terakhir` WAJIB dideklarasikan ulang sebagai `AiUsulanPutusanTerakhir`: Pydantic
+    menyerialkan menurut tipe deklarasi dan `model_copy(update=...)` tidak memvalidasi, jadi
+    tanpa deklarasi ulang ini `actor_key` hilang diam-diam dari detail.
     """
 
+    putusan_terakhir: AiUsulanPutusanTerakhir | None = Field(
+        default=None, description="Putusan terbaru dengan `actor_key`; null bila belum ada."
+    )
     ai_run_id: str = Field(description="Id `ai_run` (satu run, satu usulan).")
     sumber_ids: list[str] = Field(
         description=(

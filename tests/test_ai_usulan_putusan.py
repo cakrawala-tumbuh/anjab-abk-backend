@@ -29,6 +29,8 @@ from anjab_abk_backend.services import ai_usulan_sql
 URL = "/api/v1/ai/usulan"
 PENANDA_CATATAN = "CATATAN-RAHASIA-SINTETIS-5521"
 PENANDA_KOREKSI = "KOREKSI-RAHASIA-SINTETIS-8837"
+PENANDA_REVIEWER = "REVIEWER-SINTETIS-7743"
+PENANDA_REVIEWER_LAMA = "REVIEWER-SINTETIS-1109"
 _DASAR = datetime(2026, 11, 1, tzinfo=UTC)
 
 
@@ -310,31 +312,72 @@ def test_putusan_terakhir_deterministik_walau_jam_bernilai_sama(client_as, db_se
 # --- daftar, pencarian, kebocoran, N+1 -----------------------------------------------------
 
 
-def test_list_dan_search_memuat_putusan_terakhir_tanpa_teks_bebas(client_as, db_session):
+KUNCI_PUTUSAN_RINGKAS = {"id", "putusan", "tingkat_koreksi", "created_at"}
+KUNCI_PUTUSAN_TERAKHIR = KUNCI_PUTUSAN_RINGKAS | {"actor_key"}
+
+
+def _bentuk_daftar(client_as, db_session):
+    """Dua usulan berputusan (oleh `PENANDA_REVIEWER`) dan satu tanpa putusan."""
     a = _usulan(db_session, menit=1)
     b = _usulan(db_session, menit=2)
     _usulan(db_session, menit=3)
-    c = _tim(client_as, "r-1")
+    c = _tim(client_as, PENANDA_REVIEWER)
     c.post(f"{URL}/{a.id}/putusan", json={"putusan": "APPROVE", "catatan": PENANDA_CATATAN})
     c.post(f"{URL}/{a.id}/putusan", json=_revise(teks_koreksi=PENANDA_KOREKSI))
     c.post(
         f"{URL}/{b.id}/putusan",
         json={"putusan": "REJECT", "tingkat_koreksi": "CRITICAL", "catatan": PENANDA_CATATAN},
     )
-    for r in (c.get(URL), c.post(f"{URL}/search", json={"domain": [], "limit": 10})):
+    return a, b, c
+
+
+def _bentuk_search(c):
+    """Dua bentuk search: domain kosong dan domain bertuju fungsi."""
+    return (
+        c.post(f"{URL}/search", json={"domain": [], "limit": 10}),
+        c.post(f"{URL}/search", json={"domain": [["fungsi", "=", "P09"]], "limit": 10}),
+    )
+
+
+def test_list_dan_search_memuat_putusan_terakhir_tanpa_teks_bebas_dan_tanpa_actor_key(
+    client_as, db_session
+):
+    a, b, c = _bentuk_daftar(client_as, db_session)
+    for r in (c.get(URL), *_bentuk_search(c)):
         assert r.status_code == 200, r.text
         assert PENANDA_CATATAN not in r.text and PENANDA_KOREKSI not in r.text
+        assert "actor_key" not in r.text
+        assert PENANDA_REVIEWER not in r.text
         items = {i["id"]: i for i in r.json()["items"]}
         assert items[a.id]["putusan_terakhir"]["putusan"] == "REVISE"
         assert items[a.id]["putusan_terakhir"]["tingkat_koreksi"] == "MINOR"
         assert items[b.id]["putusan_terakhir"]["putusan"] == "REJECT"
-        assert items[b.id]["putusan_terakhir"]["actor_key"] == "r-1"
+        assert set(items[a.id]["putusan_terakhir"]) == KUNCI_PUTUSAN_RINGKAS
+        assert set(items[b.id]["putusan_terakhir"]) == KUNCI_PUTUSAN_RINGKAS
         sisa = [i for i in items.values() if i["id"] not in (a.id, b.id)]
         assert sisa and all(i["putusan_terakhir"] is None for i in sisa)
         for i in items.values():
             assert not ({"isi", "amplop", "output_hash", "putusan"} & set(i))
-            if i["putusan_terakhir"]:
-                assert not ({"catatan", "teks_koreksi"} & set(i["putusan_terakhir"]))
+
+
+def test_kueri_list_dan_search_tidak_memuat_actor_key_dan_kueri_putusan_tertangkap(
+    client_as, db_session
+):
+    _a, _b, c = _bentuk_daftar(client_as, db_session)
+    kalimat: list[str] = []
+
+    def _tangkap(conn, cursor, statement, *_a):
+        kalimat.append(statement)
+
+    event.listen(db_session.get_bind(), "before_cursor_execute", _tangkap)
+    try:
+        c.get(URL, params={"limit": 50})
+        c.post(f"{URL}/search", json={"domain": [], "limit": 50})
+    finally:
+        event.remove(db_session.get_bind(), "before_cursor_execute", _tangkap)
+    putusan = [k for k in kalimat if "ai_usulan_putusan" in k]
+    assert len(putusan) == 2, kalimat  # kontrol positif: satu kueri putusan per rute
+    assert not [k for k in kalimat if "actor_key" in k]
 
 
 def _hitung_kueri(db: Session, panggil) -> int:
@@ -390,6 +433,61 @@ def test_detail_memuat_putusan_lengkap_urut_naik(client_as, db_session):
     d = c.get(f"{URL}/{rec.id}").json()
     assert d["putusan"][0]["catatan"] == PENANDA_CATATAN
     assert d["putusan"][0]["teks_koreksi"] == PENANDA_KOREKSI
+
+
+def test_detail_putusan_terakhir_memuat_actor_key_terbaru_dan_putusan_memuat_kedua_subjek(
+    client_as, db_session
+):
+    """Penjaga deklarasi ulang `putusan_terakhir` pada `AiUsulanRead`."""
+    rec = _usulan(db_session)
+    _tim(client_as, PENANDA_REVIEWER_LAMA).post(
+        f"{URL}/{rec.id}/putusan", json={"putusan": "APPROVE"}
+    )
+    _tim(client_as, PENANDA_REVIEWER).post(f"{URL}/{rec.id}/putusan", json={"putusan": "APPROVE"})
+    d = _tim(client_as).get(f"{URL}/{rec.id}").json()
+    assert d["putusan_terakhir"]["actor_key"] == PENANDA_REVIEWER
+    assert set(d["putusan_terakhir"]) == KUNCI_PUTUSAN_TERAKHIR
+    assert [p["actor_key"] for p in d["putusan"]] == [PENANDA_REVIEWER_LAMA, PENANDA_REVIEWER]
+
+
+def test_post_putusan_membalas_actor_key_token_dan_replay_sama(client_as, db_session):
+    rec = _usulan(db_session)
+    c = _tim(client_as, PENANDA_REVIEWER)
+    h = {"Idempotency-Key": "kunci-actor-key"}
+    body = {"putusan": "APPROVE", "actor_key": "penyamar"}
+    r1 = c.post(f"{URL}/{rec.id}/putusan", json=body, headers=h)
+    r2 = c.post(f"{URL}/{rec.id}/putusan", json=body, headers=h)
+    assert r1.status_code == 201 and r2.status_code == 200
+    assert r1.json()["actor_key"] == PENANDA_REVIEWER == r2.json()["actor_key"]
+    assert r1.json() == r2.json()
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"domain": [["actor_key", "=", PENANDA_REVIEWER]]},
+        {"domain": [["putusan_terakhir.actor_key", "=", PENANDA_REVIEWER]]},
+        {"domain": [["fungsi", "=", "P09"]], "order": [["actor_key", "asc"]]},
+        {"domain": [["fungsi", "=", "P09"]], "order": [["putusan_terakhir.actor_key", "asc"]]},
+    ],
+)
+def test_search_actor_key_ditolak_422(client_as, db_session, body):
+    _usulan(db_session)
+    r = _tim(client_as).post(f"{URL}/search", json=body)
+    assert r.status_code == 422, r.text
+    assert PENANDA_REVIEWER not in r.text
+
+
+def test_filter_get_actor_key_diabaikan(client_as, db_session):
+    _a, _b, c = _bentuk_daftar(client_as, db_session)
+    polos = c.get(URL).json()
+    r = c.get(URL, params={"actor_key": PENANDA_REVIEWER})
+    assert r.status_code == 200, r.text
+    assert r.json()["total"] == polos["total"] == 3
+    assert [i["id"] for i in r.json()["items"]] == [i["id"] for i in polos["items"]]
+    salah = c.get(URL, params={"actor_key": "tidak-ada-reviewer-ini"})
+    assert salah.status_code == 200
+    assert salah.json()["total"] == 3
 
 
 # --- tulisan terbatas ----------------------------------------------------------------------
@@ -453,3 +551,14 @@ def test_openapi_putusan_hanya_post_dan_skema_lama_hanya_bertambah(client):
         "teks_koreksi",
     }
     assert not ({"catatan", "teks_koreksi"} & set(skema["AiUsulanPutusanTerakhir"]["properties"]))
+    assert set(skema["AiUsulanPutusanRingkas"]["properties"]) == KUNCI_PUTUSAN_RINGKAS
+    assert set(skema["AiUsulanPutusanTerakhir"]["properties"]) == KUNCI_PUTUSAN_TERAKHIR
+    assert set(skema["AiUsulanPutusanRead"]["properties"]) == KUNCI_PUTUSAN_TERAKHIR | {
+        "usulan_id",
+        "catatan",
+        "teks_koreksi",
+    }
+    ringkas = skema["AiUsulanRingkas"]["properties"]["putusan_terakhir"]
+    detail = skema["AiUsulanRead"]["properties"]["putusan_terakhir"]
+    assert "#/components/schemas/AiUsulanPutusanRingkas" in str(ringkas)
+    assert "#/components/schemas/AiUsulanPutusanTerakhir" in str(detail)

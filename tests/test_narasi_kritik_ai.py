@@ -209,6 +209,7 @@ def test_positif_202_kunci_kontrak_dan_masukan_memuat_draf_sebagai_sumber(
         assert dilarang not in body
     assert body["fungsi"] == "P09" and body["sasaran_jenis"] == "NARASI_KASUS"
     assert body["sasaran_id"] == k["id"] and body["diserap_at"] is None
+    assert "actor_key" not in r.text and body["putusan_terakhir"] is None  # #115
     rec = db_session.get(AiUsulanModel, body["id"])
     run = db_session.get(AiRunModel, rec.ai_run_id)
     assert run.fungsi == "P09" and run.status_qa == "MENUNGGU"

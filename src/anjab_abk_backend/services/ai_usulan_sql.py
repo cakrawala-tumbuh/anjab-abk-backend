@@ -19,6 +19,7 @@ from ..models import AiUsulanModel, AiUsulanPutusanModel
 from ..schemas.ai_usulan import (
     AiUsulanPutusanCreate,
     AiUsulanPutusanRead,
+    AiUsulanPutusanRingkas,
     AiUsulanPutusanTerakhir,
     AiUsulanRead,
     AiUsulanRingkas,
@@ -207,23 +208,26 @@ class SqlAiUsulanService:
         self._s.flush()
         return AiUsulanPutusanRead.model_validate(putusan)
 
-    def _putusan_terakhir(self, usulan_ids: Sequence[str]) -> dict[str, AiUsulanPutusanTerakhir]:
-        """Putusan terbaru per usulan dalam SATU kueri (`DISTINCT ON`), tanpa teks bebas."""
+    def _putusan_terakhir(self, usulan_ids: Sequence[str]) -> dict[str, AiUsulanPutusanRingkas]:
+        """Putusan terbaru per usulan dalam SATU kueri (`DISTINCT ON`), untuk daftar dan pencarian.
+
+        Kolom `catatan`, `teks_koreksi`, dan `actor_key` tidak dipilih dari basis data;
+        `actor_key` hanya keluar lewat `get` (`AiUsulanPutusanTerakhir`).
+        """
         if not usulan_ids:
             return {}
         P = AiUsulanPutusanModel
         rows = self._s.execute(
-            select(P.usulan_id, P.id, P.putusan, P.tingkat_koreksi, P.actor_key, P.created_at)
+            select(P.usulan_id, P.id, P.putusan, P.tingkat_koreksi, P.created_at)
             .where(P.usulan_id.in_(usulan_ids))
             .distinct(P.usulan_id)
             .order_by(P.usulan_id, P.created_at.desc(), P.id.desc())
         ).all()
         return {
-            r.usulan_id: AiUsulanPutusanTerakhir(
+            r.usulan_id: AiUsulanPutusanRingkas(
                 id=r.id,
                 putusan=r.putusan,
                 tingkat_koreksi=r.tingkat_koreksi,
-                actor_key=r.actor_key,
                 created_at=r.created_at,
             )
             for r in rows
