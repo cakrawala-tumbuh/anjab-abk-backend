@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
@@ -24,6 +26,7 @@ from ..schemas.ai_usulan import (
     AiUsulanRead,
     AiUsulanRingkas,
     HasilSerapUsulan,
+    PutusanUsulan,
     SasaranUsulan,
 )
 from ..schemas.common import FiturKode
@@ -34,12 +37,20 @@ from .ai_usulan import (
     FungsiAiBelumAktifError,
     PiiModeAiBelumDidukungError,
     UsulanBelumBisaDiputusError,
+    UsulanBelumDiterimaError,
     UsulanBerjalanError,
 )
 from .domain import validate_searchable_fields
 from .domain_sql import FieldMap, FieldSpec, compile_domain, order_by_columns
 
-__all__ = ["SqlAiUsulanService"]
+__all__ = ["AWALAN_SUMBER_USULAN", "JENIS_SUMBER_USULAN_AI", "SqlAiUsulanService"]
+
+JENIS_SUMBER_USULAN_AI = "USULAN_AI"
+"""Jenis sumber untuk usulan AI yang dirangkai menjadi masukan fungsi lain. Baru boleh dikirim
+ke model bila operator mencantumkannya di ``AI_JENIS_SUMBER_DIIZINKAN``."""
+
+AWALAN_SUMBER_USULAN = "usulan:"
+"""Awalan ``source_id`` sumber rangkaian: ``usulan:<ai_usulan.id>``."""
 
 
 def _field_map() -> FieldMap:
@@ -207,6 +218,50 @@ class SqlAiUsulanService:
         self._s.add(putusan)
         self._s.flush()
         return AiUsulanPutusanRead.model_validate(putusan)
+
+    def sumber_dari_usulan(self, usulan_id: str) -> SumberAi:
+        """Bungkus usulan yang sudah diterima reviewer sebagai sumber fungsi AI lain.
+
+        Hanya putusan TERAKHIR yang menentukan (urut `created_at`, lalu `id`). `APPROVE`
+        memakai JSON kanonik `isi` (kunci terurut, `ensure_ascii=False`, tanpa spasi pemisah);
+        `REVISE` memakai `teks_koreksi` reviewer apa adanya. Hasilnya tetap melewati gerbang
+        jenis dan PII gateway seperti sumber lain; helper ini tidak melonggarkannya.
+
+        Args:
+            usulan_id: Id usulan yang dirangkai.
+
+        Returns:
+            Sumber berjenis `USULAN_AI` dengan `source_id` `usulan:<id>` dan `source_hash`
+            SHA-256 teksnya.
+
+        Raises:
+            NotFoundError: usulan tidak ada (404).
+            UsulanBelumDiterimaError: tanpa putusan, putusan terakhir `REJECT`, atau `APPROVE`
+                atas usulan tanpa `isi` (409 `USULAN_BELUM_DITERIMA`).
+        """
+        rec = self._s.get(AiUsulanModel, usulan_id)
+        if rec is None:
+            raise NotFoundError(f"Usulan AI '{usulan_id}' tidak ditemukan.")
+        P = AiUsulanPutusanModel
+        terakhir = self._s.scalars(
+            select(P).where(P.usulan_id == usulan_id).order_by(P.created_at.desc(), P.id.desc())
+        ).first()
+        teks: str | None = None
+        if terakhir is not None and terakhir.putusan == PutusanUsulan.APPROVE.value:
+            if rec.isi is not None:
+                teks = json.dumps(
+                    rec.isi, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+                )
+        elif terakhir is not None and terakhir.putusan == PutusanUsulan.REVISE.value:
+            teks = terakhir.teks_koreksi
+        if not teks:
+            raise UsulanBelumDiterimaError("Usulan AI ini belum diterima reviewer.")
+        return SumberAi(
+            source_id=f"{AWALAN_SUMBER_USULAN}{rec.id}",
+            source_hash=hashlib.sha256(teks.encode("utf-8")).hexdigest(),
+            jenis=JENIS_SUMBER_USULAN_AI,
+            teks=teks,
+        )
 
     def _putusan_terakhir(self, usulan_ids: Sequence[str]) -> dict[str, AiUsulanPutusanRingkas]:
         """Putusan terbaru per usulan dalam SATU kueri (`DISTINCT ON`), untuk daftar dan pencarian.

@@ -11,6 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from anjab_abk_backend.ai.fungsi_p01 import aturan_p01
+from anjab_abk_backend.ai.fungsi_p02 import aturan_p02
 from anjab_abk_backend.ai.fungsi_p04 import (
     FUNGSI_P04,
     SKEMA_ISI_P04,
@@ -207,7 +208,7 @@ def test_aturan_material_true_tanpa_tanda_tanya_tidak_ditambah_aturan():
 
 
 def test_aturan_terdaftar_hanya_untuk_p04():
-    assert ATURAN_ISI == {"P01": aturan_p01, "P04": aturan_p04}
+    assert ATURAN_ISI == {"P01": aturan_p01, "P02": aturan_p02, "P04": aturan_p04}
 
 
 # --- parameter dan id sumber ---

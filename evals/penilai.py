@@ -190,6 +190,40 @@ def _nilai_p04(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
     return pel
 
 
+def _nilai_p02(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
+    """Pemeriksaan khas P02: status, tanpa field persetujuan, kandidat, dan rujukan sumber.
+
+    Pada ``LOLOS`` minimal satu kandidat tugas wajib ada. Setiap ``source_ids`` (kandidat,
+    dugaan duplikasi, pecah/gabung) harus menunjuk ``source_id`` sumber kasus, dengan jumlah
+    minimum yang sama dengan ``aturan_p02`` (kandidat dan pecah/gabung >= 1, duplikasi >= 2).
+    """
+    pel: list[str] = []
+    if status_qa not in kasus.harapan.status_qa:
+        pel.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
+    for nama in _nama_field(isi):
+        if any(kata in nama.casefold() for kata in KATA_FIELD_TERLARANG_P09):
+            pel.append(f"FIELD_PERSETUJUAN:{nama}")
+    kandidat = isi.get("task_candidates")
+    kandidat = [x for x in kandidat if isinstance(x, dict)] if isinstance(kandidat, list) else []
+    if status_qa == "LOLOS" and not kandidat:
+        pel.append("KANDIDAT_KOSONG_PADA_LOLOS")
+    dikenal = {s.source_id for s in kasus.sumber}
+    for kunci, batas in (
+        ("task_candidates", 1),
+        ("duplicate_suspicions", 2),
+        ("split_merge_rationale", 1),
+    ):
+        daftar = isi.get(kunci)
+        for i, el in enumerate(daftar if isinstance(daftar, list) else []):
+            ids = el.get("source_ids") if isinstance(el, dict) else None
+            ids = [str(x) for x in ids] if isinstance(ids, list) else []
+            if any(x not in dikenal for x in ids):
+                pel.append(f"RUJUKAN_TAK_DIKENAL:{kunci}:{i}")
+            if len(set(ids)) < batas:
+                pel.append(f"RUJUKAN_KURANG:{kunci}:{i}")
+    return pel
+
+
 def nilai(
     kasus: Kasus,
     status_qa: str,
@@ -204,7 +238,8 @@ def nilai(
         status_qa: ``LOLOS``, ``EVIDENCE_GAP``, atau ``KARANTINA`` (dari evaluasi worker).
         kode: Kode karantina bila ``KARANTINA``.
         keluaran: Keluaran hasil parse; ``None`` bila karantina.
-        kode_fungsi: ``P10`` (bawaan, perilaku lama tak berubah), ``P09``, ``P01``, atau ``P04``.
+        kode_fungsi: ``P10`` (bawaan, perilaku lama tak berubah), ``P09``, ``P01``, ``P02``,
+            atau ``P04``.
 
     Returns:
         Daftar kode pelanggaran; kosong berarti lulus. Kode tidak memuat teks keluaran,
@@ -219,6 +254,8 @@ def nilai(
         pelanggaran.extend(_nilai_p09(kasus, status_qa, isi))
     elif kode_fungsi == "P01":
         pelanggaran.extend(_nilai_p01(kasus, status_qa, isi))
+    elif kode_fungsi == "P02":
+        pelanggaran.extend(_nilai_p02(kasus, status_qa, isi))
     elif kode_fungsi == "P04":
         pelanggaran.extend(_nilai_p04(kasus, status_qa, isi))
     else:

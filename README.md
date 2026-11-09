@@ -70,6 +70,15 @@ menyalakan AI:
    `PENYEDIA_MATI`. `AI_KREDENSIAL_KUNCI_INDUK` (env) wajib untuk menyimpan kunci API.
 5. Keputusan tertulis K-8 untuk membuka jenis sumber di luar `SINTETIS`.
 
+Label jenis sumber yang dipakai fungsi berbasis katalog dan rangkaian usulan **tidak** diizinkan
+bawaan; mencantumkannya di `AI_JENIS_SUMBER_DIIZINKAN` adalah keputusan aktivasi tersendiri:
+
+- `KATALOG_TI` — baris katalog Task Inventory (`ti_uraian_tugas_jabatan`) yang dikirim P02 sebagai
+  `uraian:<id>`; teksnya hanya field tugas (kode, unit, tugas pokok, detil tugas, uraian) dan
+  nilai standar.
+- `USULAN_AI` — usulan AI yang sudah diterima reviewer (putusan terakhir `APPROVE` atau
+  `REVISE`) dan dirangkai menjadi sumber fungsi lain sebagai `usulan:<id>`.
+
 Env `ANTHROPIC_API_KEY`, `AI_MODEL`, dan `AI_EFFORT` tidak lagi dibaca; model, effort, dan
 kunci hanya berasal dari pengaturan penyedia. Tiap `ai_run` mencatat `penyedia`.
 
@@ -146,7 +155,8 @@ make eval-ai FUNGSI=P10 PENYEDIA=LANGGANAN_CLAUDE CLAUDE_VOLUME=eval-claude
 `evals/p09/kasus.json`, dinilai atas kategori temuan, draf bersih, dan span, bukan atas
 `draft_text`). `P01` (ekstraksi fakta dari dokumen sumber; 10 kasus di `evals/p01/kasus.json`, dinilai atas
 sifat fakta, angka baru, pola klaim terlaksana, dan span fakta, bukan atas `draft_text`). `P04` (pengusul satu pertanyaan bukti netral tanpa pengiriman; 8 kasus di `evals/p04/kasus.json`, dinilai atas
-`material`, pertanyaan tunggal, dan pola pertanyaan mengarahkan, bukan atas `draft_text`). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
+`material`, pertanyaan tunggal, dan pola pertanyaan mengarahkan, bukan atas `draft_text`). `P02` (normalisasi tugas katalog; 3 kasus sintetis minimal di `evals/p02/kasus.json`, dinilai atas
+kandidat tugas dan rujukan `source_ids`, bukan atas `draft_text`). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
 `AI_FUNGSI_AKTIF`. Contoh: `make eval-ai FUNGSI=P04 PENYEDIA=<jalur>`.
 
 `PENYEDIA` wajib dan tanpa nilai bawaan; kosong atau tak dikenal ditolak sebelum build dan

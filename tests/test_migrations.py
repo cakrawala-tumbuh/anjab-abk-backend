@@ -1142,3 +1142,82 @@ def test_sekolah_cabang_database_kosong_tanpa_error(fresh_db_url: str) -> None:
     upgrade(fresh_db_url, _SEKOLAH_CABANG_DDL_REVISION)
     upgrade(fresh_db_url, "head")
     downgrade(fresh_db_url, _SEKOLAH_CABANG_DDL_REVISION)
+
+
+# --- revisi `12a4ee50e4f3`: SasaranUsulan batch P02 + lebar `ai_usulan.sasaran_id` (#118) ---
+
+_SASARAN_P02_REVISION = "12a4ee50e4f3"
+_SASARAN_P02_DOWN = "cc4cbfe34e90"
+
+
+def _insert_ai_usulan_mig(conn, *, sasaran_jenis: str, sasaran_id: str) -> None:
+    run_id = str(uuid.uuid4())
+    conn.execute(
+        text(
+            "INSERT INTO ai_run (id, fungsi, prompt_version, prompt_hash, model_diminta, "
+            "protocol_id, input_snapshot_id, sumber, masukan, status_qa, kode_qa, created_at) "
+            "VALUES (:id, 'P02', 'v1', :h, 'm', 'uji', :h, '[]', '{}', 'LOLOS', '[]', now())"
+        ),
+        {"id": run_id, "h": "a" * 64},
+    )
+    conn.execute(
+        text(
+            "INSERT INTO ai_usulan (id, fungsi, sasaran_jenis, sasaran_id, job_id, ai_run_id, "
+            "sumber_ids, diminta_oleh, created_at) VALUES (:id, 'P02', :sj, :si, :job, :run, "
+            "'[]', 'uji', now())"
+        ),
+        {
+            "id": str(uuid.uuid4()),
+            "sj": sasaran_jenis,
+            "si": sasaran_id,
+            "job": str(uuid.uuid4()),
+            "run": run_id,
+        },
+    )
+
+
+def test_sasaran_usulan_p02_check_menerima_nilai_baru_dan_menolak_asing(fresh_db_url: str) -> None:
+    """Revisi `12a4ee50e4f3`: tiga nilai baru sah, `sasaran_id` 40 karakter utuh, asing ditolak."""
+    upgrade(fresh_db_url, "head")
+    engine = create_engine(fresh_db_url)
+    try:
+        id40 = "j" * 40
+        with engine.begin() as conn:
+            for jenis in ("JABATAN", "REDESAIN_MASALAH", "PROTOKOL_RISET", "NARASI_KASUS"):
+                _insert_ai_usulan_mig(conn, sasaran_jenis=jenis, sasaran_id=id40)
+        with engine.connect() as conn:
+            assert (
+                conn.execute(
+                    text("SELECT count(*) FROM ai_usulan WHERE sasaran_id = :i"), {"i": id40}
+                ).scalar()
+                == 4
+            )
+        with pytest.raises(Exception, match="ck_ai_usulan_sasaran_jenis"):
+            with engine.begin() as conn:
+                _insert_ai_usulan_mig(conn, sasaran_jenis="ASING", sasaran_id="x")
+    finally:
+        engine.dispose()
+
+
+def test_sasaran_usulan_p02_roundtrip_downgrade_mengembalikan_check_dan_lebar(
+    fresh_db_url: str,
+) -> None:
+    """Downgrade ke `cc4cbfe34e90` memulihkan CHECK dua nilai dan `String(36)`; naik ulang."""
+    upgrade(fresh_db_url, _SASARAN_P02_REVISION)
+    downgrade(fresh_db_url, _SASARAN_P02_DOWN)
+    engine = create_engine(fresh_db_url)
+    try:
+        kolom = {c["name"]: c for c in inspect(engine).get_columns("ai_usulan")}
+        assert kolom["sasaran_id"]["type"].length == 36
+        with pytest.raises(Exception, match="ck_ai_usulan_sasaran_jenis"):
+            with engine.begin() as conn:
+                _insert_ai_usulan_mig(conn, sasaran_jenis="JABATAN", sasaran_id="x")
+        with engine.begin() as conn:
+            _insert_ai_usulan_mig(conn, sasaran_jenis="NARASI_SUMBER", sasaran_id="x")
+        upgrade(fresh_db_url, "head")
+        kolom = {c["name"]: c for c in inspect(engine).get_columns("ai_usulan")}
+        assert kolom["sasaran_id"]["type"].length == 40
+        with engine.begin() as conn:
+            _insert_ai_usulan_mig(conn, sasaran_jenis="JABATAN", sasaran_id="y" * 40)
+    finally:
+        engine.dispose()

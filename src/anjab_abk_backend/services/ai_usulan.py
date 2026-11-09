@@ -22,6 +22,7 @@ __all__ = [
     "FungsiAiBelumAktifError",
     "PiiModeAiBelumDidukungError",
     "UsulanBelumBisaDiputusError",
+    "UsulanBelumDiterimaError",
     "UsulanBerjalanError",
 ]
 
@@ -49,6 +50,16 @@ class UsulanBelumBisaDiputusError(ConflictError):
     error_code = "usulan_belum_bisa_diputus"
 
 
+class UsulanBelumDiterimaError(ConflictError):
+    """409: usulan belum diterima reviewer, jadi tidak boleh menjadi sumber fungsi lain.
+
+    Diterima berarti putusan terakhirnya `APPROVE` (dengan `isi` terisi) atau `REVISE`.
+    Kode galat huruf besar karena dipakai sebagai kontrak klien (rangkaian usulan P03, P07).
+    """
+
+    error_code = "USULAN_BELUM_DITERIMA"
+
+
 class FungsiAiBelumAktifError(ConflictError):
     """409: fungsi belum terdaftar (`AI_FUNGSI_AKTIF`)."""
 
@@ -68,6 +79,15 @@ class AiUsulanService(Protocol):
         principal: Principal,
     ) -> AiUsulanRingkas:
         """Periksa gerbang, ajukan job lewat gateway, dan catat satu usulan."""
+        ...
+
+    def sumber_dari_usulan(self, usulan_id: str) -> SumberAi:
+        """Bungkus usulan yang sudah diterima sebagai sumber `USULAN_AI` (`usulan:<id>`).
+
+        Raises:
+            NotFoundError: usulan tidak ada (404).
+            UsulanBelumDiterimaError: putusan terakhir bukan `APPROVE`/`REVISE` (409).
+        """
         ...
 
     def get(self, usulan_id: str) -> AiUsulanRead:

@@ -23,10 +23,18 @@ __all__ = [
 
 
 class SasaranUsulan(StrEnum):
-    """Jenis objek sasaran sebuah usulan AI (`ai_usulan.sasaran_jenis`)."""
+    """Jenis objek sasaran sebuah usulan AI (`ai_usulan.sasaran_jenis`).
+
+    Dikunci CHECK `ck_ai_usulan_sasaran_jenis`. `JABATAN` dipakai P02 (sasaran `jabatan.id`);
+    `REDESAIN_MASALAH` dan `PROTOKOL_RISET` disiapkan untuk fungsi berikutnya di batch yang sama
+    agar tidak ada migrasi enum per fungsi.
+    """
 
     NARASI_KASUS = "NARASI_KASUS"
     NARASI_SUMBER = "NARASI_SUMBER"
+    JABATAN = "JABATAN"
+    REDESAIN_MASALAH = "REDESAIN_MASALAH"
+    PROTOKOL_RISET = "PROTOKOL_RISET"
 
 
 class HasilSerapUsulan(StrEnum):

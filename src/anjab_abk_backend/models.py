@@ -1668,7 +1668,8 @@ class NarasiAiPermintaanModel(Base):
 class AiUsulanModel(Base):
     """Usulan hasil fungsi AI non-narasi atas satu sasaran; tidak pernah menjadi versi narasi.
 
-    `ai_run_id` UNIQUE (satu run, satu usulan). `sasaran_id` polimorfik, sengaja tanpa FK.
+    `ai_run_id` UNIQUE (satu run, satu usulan). `sasaran_id` polimorfik, sengaja tanpa FK, selebar
+    40 karakter agar muat id `jabatan` (`String(40)`) selain UUID.
     `diserap_at`, `hasil_serap`, `kode_serap`, `isi`, `amplop`, `output_hash` null sampai
     penyerap menulisnya; `isi` dan `amplop` adalah keluaran model dan tidak boleh dicatat ke log.
     """
@@ -1687,7 +1688,7 @@ class AiUsulanModel(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     fungsi: Mapped[str] = mapped_column(String(10), nullable=False)
     sasaran_jenis: Mapped[str] = mapped_column(String(30), nullable=False)
-    sasaran_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    sasaran_id: Mapped[str] = mapped_column(String(40), nullable=False)
     job_id: Mapped[str] = mapped_column(String(36), nullable=False)
     ai_run_id: Mapped[str] = mapped_column(
         ForeignKey("ai_run.id", name="fk_ai_usulan_ai_run_id_ai_run"),

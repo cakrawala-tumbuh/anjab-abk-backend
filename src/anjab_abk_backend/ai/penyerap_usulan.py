@@ -23,6 +23,7 @@ from ..schemas.ai_usulan import HasilSerapUsulan
 from ..services.ai_run import hash_masukan
 from ..services.ai_run_sql import SqlAiRunService
 from .fungsi_p01 import aturan_p01
+from .fungsi_p02 import aturan_p02
 from .fungsi_p04 import aturan_p04
 
 __all__ = ["ATURAN_ISI", "serap_usulan", "serap_usulan_tertunda"]
@@ -44,12 +45,13 @@ KUNCI_AMPLOP = ("source_refs", "cited_spans", "confidence_reason", "unknowns", "
 
 ATURAN_ISI: dict[str, Callable[[dict[str, Any], dict[str, Any]], list[str]]] = {
     "P01": aturan_p01,
+    "P02": aturan_p02,
     "P04": aturan_p04,
 }
 """Pemeriksaan pasca-validasi `isi` per kode fungsi; mengembalikan daftar kode pelanggaran.
 
-Signature aturan `(isi, amplop)`; `amplop` hasil `_amplop(keluaran)`. P01 dan P04 punya aturan
-(`FungsiAi` tidak punya kolom validator); fungsi lain tanpa entri berarti tanpa pemeriksaan
+Signature aturan `(isi, amplop)`; `amplop` hasil `_amplop(keluaran)`. P01, P02, dan P04 punya
+aturan (`FungsiAi` tidak punya kolom validator); fungsi lain tanpa entri berarti tanpa pemeriksaan
 tambahan. Daftar tak kosong membuat usulan `MANUAL` tanpa `isi`.
 """
 

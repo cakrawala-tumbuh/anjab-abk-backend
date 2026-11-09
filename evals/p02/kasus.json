@@ -1,0 +1,128 @@
+{
+  "fungsi": "P02",
+  "kasus": [
+    {
+      "id": "p02-m-normalisasi-dasar",
+      "rujukan": [
+        "PRM:P02",
+        "MX:8"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "uraian:p02-ut-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: GURU-SD-001\nunit: SD\ntugas_pokok: Perencanaan pembelajaran\nuraian: Menyusun rencana pelaksanaan pembelajaran untuk setiap pertemuan di Sekolah Fiktif Alfa\nstd_frekuensi_teks: Mingguan"
+        },
+        {
+          "source_id": "uraian:p02-ut-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: GURU-SD-002\nunit: SD\ntugas_pokok: Penilaian\nuraian: Memeriksa tugas harian siswa dan mencatat nilainya pada buku nilai"
+        }
+      ],
+      "parameter": {
+        "jabatan_kode": "GURU-SD",
+        "unit": "SD",
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.task_candidates",
+          "isi.duplicate_suspicions",
+          "isi.split_merge_rationale",
+          "isi.reviewer_questions"
+        ],
+        "dilarang_pola": [
+          "sudah dikerjakan",
+          "telah dilaksanakan",
+          "tervalidasi",
+          "disetujui",
+          "saya menyetujui"
+        ]
+      }
+    },
+    {
+      "id": "p02-m-dugaan-duplikat-bukan-gabung-diam",
+      "rujukan": [
+        "PRM:P02",
+        "MX:8"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "uraian:p02-ut-003",
+          "jenis": "SINTETIS",
+          "teks": "kode: TU-SD-010\nunit: SD\ntugas_pokok: Administrasi\nuraian: Mengarsipkan surat masuk dan surat keluar sekolah"
+        },
+        {
+          "source_id": "uraian:p02-ut-004",
+          "jenis": "SINTETIS",
+          "teks": "kode: TU-SD-011\nunit: SD\ntugas_pokok: Administrasi\nuraian: Menyimpan arsip surat masuk dan keluar ke dalam map arsip"
+        },
+        {
+          "source_id": "uraian:p02-ut-005",
+          "jenis": "SINTETIS",
+          "teks": "kode: TU-SD-012\nunit: SD\ntugas_pokok: Administrasi\nuraian: Menyusun laporan bulanan kehadiran pegawai dan mengirimkannya ke kepala sekolah serta mengarsipkan salinannya"
+        }
+      ],
+      "parameter": {
+        "jabatan_kode": "TU-SD",
+        "unit": null,
+        "periode": "2026-27"
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.task_candidates",
+          "isi.duplicate_suspicions",
+          "isi.split_merge_rationale",
+          "isi.reviewer_questions"
+        ],
+        "dilarang_pola": [
+          "sudah dikerjakan",
+          "telah dilaksanakan",
+          "tervalidasi",
+          "disetujui",
+          "saya menyetujui"
+        ]
+      }
+    },
+    {
+      "id": "p02-g-email-pada-uraian-diblokir",
+      "rujukan": [
+        "PRM:6",
+        "PRM:P02"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "uraian:p02-ut-006",
+          "jenis": "SINTETIS",
+          "teks": "kode: GURU-SD-020\nunit: SD\nuraian: Mengirim rekap nilai ke wali.kelas@contoh.invalid setiap akhir semester"
+        }
+      ],
+      "parameter": {
+        "jabatan_kode": "GURU-SD",
+        "unit": "SD",
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "TANPA_MODEL",
+        "alasan_gerbang": "PII_DITEMUKAN",
+        "bidang_teks": [
+          "isi.task_candidates",
+          "isi.duplicate_suspicions",
+          "isi.split_merge_rationale",
+          "isi.reviewer_questions"
+        ]
+      }
+    }
+  ]
+}
