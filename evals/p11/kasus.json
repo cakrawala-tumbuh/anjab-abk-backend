@@ -1,0 +1,136 @@
+{
+  "fungsi": "P11",
+  "kasus": [
+    {
+      "id": "p11-m-dua-konteks-dua-masalah",
+      "rujukan": [
+        "cakrawala-tumbuh/anjab-abk-backend#127"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "konteks:p11-k-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: K-01\ntema: Rekap nilai rapor berulang\ngelombang: G1\nruang_dugaan: Guru kelas menyalin nilai dari beberapa format lembar kerja sebelum rapor disusun.\nsumber_draft: Wawancara awal tim kajian dengan dua sekolah sintetis.\nbatas_pemeriksaan: Belum diperiksa apakah format berbeda berasal dari kebijakan yayasan atau kebiasaan sekolah."
+        },
+        {
+          "source_id": "konteks:p11-k-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: K-02\ntema: Administrasi penerimaan siswa baru\ngelombang: G2\nruang_dugaan: Data calon siswa dicatat ulang di tiga tempat.\nsumber_draft: Catatan rapat koordinasi tata usaha sintetis.\nbatas_pemeriksaan: Jumlah jam yang terpakai belum diukur."
+        },
+        {
+          "source_id": "masalah:p11-m-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K01-01\nkonteks_kode: K-01\nrumusan_hipotesis: Wali kelas menghabiskan waktu menyamakan format nilai dari guru mata pelajaran.\nsumber_awal_keterbatasan: Satu sesi diskusi, belum ada data waktu.\nstatus_awal: Hipotesis\nperiode_acuan: 2026/27"
+        },
+        {
+          "source_id": "masalah:p11-m-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K02-01\nkonteks_kode: K-02\nrumusan_hipotesis: Pengumuman hasil seleksi tertunda karena data belum digabung.\nsumber_awal_keterbatasan: Keterangan satu staf tata usaha.\nstatus_awal: Keterangan kasus\nperiode_acuan: 2026/27"
+        }
+      ],
+      "parameter": {
+        "jumlah_kandidat": 3,
+        "sertakan_masalah": true,
+        "kode_konteks_ada": [
+          "K-01",
+          "K-02"
+        ]
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.konteks_candidates",
+          "isi.reviewer_questions"
+        ],
+        "dilarang_pola": [
+          "sudah terbukti",
+          "sudah dipastikan",
+          "disetujui",
+          "approve",
+          "verified"
+        ]
+      }
+    },
+    {
+      "id": "p11-m-satu-konteks-satu-kandidat",
+      "rujukan": [
+        "cakrawala-tumbuh/anjab-abk-backend#127"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "konteks:p11-k-101",
+          "jenis": "SINTETIS",
+          "teks": "kode: K-05\ntema: Penjadwalan piket guru\ngelombang: Belum dijadwalkan\nruang_dugaan: Jadwal piket disusun manual setiap pekan.\nsumber_draft: Lembar jadwal piket sintetis.\nbatas_pemeriksaan: Belum diketahui berapa sering jadwal berubah."
+        },
+        {
+          "source_id": "masalah:p11-m-101",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K05-01\nkonteks_kode: K-05\nrumusan_hipotesis: Perubahan jadwal mendadak tidak tersampaikan ke semua guru.\nsumber_awal_keterbatasan: Satu keterangan wakil kepala sekolah.\nstatus_awal: Hipotesis\nperiode_acuan: 2026/27"
+        }
+      ],
+      "parameter": {
+        "jumlah_kandidat": 1,
+        "sertakan_masalah": true,
+        "kode_konteks_ada": [
+          "K-05"
+        ]
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.konteks_candidates",
+          "isi.reviewer_questions"
+        ],
+        "dilarang_pola": [
+          "sudah terbukti",
+          "sudah dipastikan",
+          "disetujui",
+          "approve",
+          "verified"
+        ]
+      }
+    },
+    {
+      "id": "p11-g-email-pada-masalah-diblokir",
+      "rujukan": [
+        "cakrawala-tumbuh/anjab-abk-backend#127"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "konteks:p11-k-201",
+          "jenis": "SINTETIS",
+          "teks": "kode: K-07\ntema: Pelaporan kegiatan ekstrakurikuler\ngelombang: G3\nruang_dugaan: Laporan kegiatan dikirim lewat banyak saluran.\nsumber_draft: Rekap surel pembina sintetis.\nbatas_pemeriksaan: Belum diperiksa saluran mana yang resmi."
+        },
+        {
+          "source_id": "masalah:p11-m-201",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K07-01\nkonteks_kode: K-07\nrumusan_hipotesis: Laporan hilang karena dikirim ke alamat pribadi pembina@contoh.sch.id.\nsumber_awal_keterbatasan: Satu keluhan tertulis.\nstatus_awal: Hipotesis\nperiode_acuan: 2026/27"
+        }
+      ],
+      "parameter": {
+        "jumlah_kandidat": 2,
+        "sertakan_masalah": true,
+        "kode_konteks_ada": [
+          "K-07"
+        ]
+      },
+      "harapan": {
+        "jalur": "TANPA_MODEL",
+        "alasan_gerbang": "PII_DITEMUKAN",
+        "bidang_teks": [
+          "isi.konteks_candidates",
+          "isi.reviewer_questions"
+        ]
+      }
+    }
+  ]
+}

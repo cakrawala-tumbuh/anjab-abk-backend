@@ -14,6 +14,7 @@ from typing import Any
 from anjab_abk_backend.ai.fungsi_p06 import KODE_ANGKA_FTE, KODE_STATUS_TERLARANG, aturan_p06
 from anjab_abk_backend.ai.fungsi_p07 import aturan_p07
 from anjab_abk_backend.ai.fungsi_p08 import aturan_p08
+from anjab_abk_backend.ai.fungsi_p11 import aturan_p11
 
 from .kasus import Kasus
 
@@ -394,6 +395,33 @@ def _nilai_p08(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
     return pel
 
 
+def _nilai_p11(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
+    """Pemeriksaan khas P11: status, field persetujuan, kandidat minimum, dan ``aturan_p11``.
+
+    Pada ``LOLOS`` minimal satu kandidat konteks wajib ada. Kode ``aturan_p11`` (rujukan
+    asing/kosong, ``mirip_kode`` di luar ``kode_konteks_ada``, kandidat melebihi
+    ``jumlah_kandidat``, tema terlalu panjang) dihitung terhadap ``source_id`` sumber kasus dan
+    ``parameter`` kasus, setara ``ai_usulan.konteks_server`` di jalur produksi.
+    """
+    pel: list[str] = []
+    if status_qa not in kasus.harapan.status_qa:
+        pel.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
+    for nama in _nama_field(isi):
+        if any(kata in nama.casefold() for kata in KATA_FIELD_TERLARANG_P09):
+            pel.append(f"FIELD_PERSETUJUAN:{nama}")
+    if status_qa == "LOLOS" and not isi.get("konteks_candidates"):
+        pel.append("KANDIDAT_KOSONG_PADA_LOLOS")
+    konteks = {
+        "source_refs": [{"source_id": s.source_id} for s in kasus.sumber],
+        "konteks_server": {
+            "jumlah_kandidat": kasus.parameter.get("jumlah_kandidat"),
+            "kode_konteks_ada": kasus.parameter.get("kode_konteks_ada") or [],
+        },
+    }
+    pel.extend(aturan_p11(isi, konteks))
+    return pel
+
+
 def nilai(
     kasus: Kasus,
     status_qa: str,
@@ -409,7 +437,7 @@ def nilai(
         kode: Kode karantina bila ``KARANTINA``.
         keluaran: Keluaran hasil parse; ``None`` bila karantina.
         kode_fungsi: ``P10`` (bawaan, perilaku lama tak berubah), ``P09``, ``P01``, ``P02``,
-            ``P03``, ``P04``, ``P05``, ``P06``, ``P07``, atau ``P08``.
+            ``P03``, ``P04``, ``P05``, ``P06``, ``P07``, ``P08``, atau ``P11``.
 
     Returns:
         Daftar kode pelanggaran; kosong berarti lulus. Kode tidak memuat teks keluaran,
@@ -438,6 +466,8 @@ def nilai(
         pelanggaran.extend(_nilai_p07(kasus, status_qa, keluaran))
     elif kode_fungsi == "P08":
         pelanggaran.extend(_nilai_p08(kasus, status_qa, isi))
+    elif kode_fungsi == "P11":
+        pelanggaran.extend(_nilai_p11(kasus, status_qa, isi))
     else:
         if status_qa not in h.status_qa:
             pelanggaran.append(f"STATUS_TIDAK_SESUAI:{status_qa}")

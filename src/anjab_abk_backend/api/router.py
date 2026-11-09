@@ -35,6 +35,7 @@ from .v1 import (
     redesain_kode_orang,
     redesain_konfirmasi,
     redesain_konteks,
+    redesain_konteks_usulan_ai,
     redesain_masalah,
     redesain_opsi_ai,
     redesain_penilaian,
@@ -276,6 +277,11 @@ api_router.include_router(
     redesain_kode_orang.router,
     prefix="/redesain/kode-orang",
     tags=["redesain"],
+)
+api_router.include_router(
+    redesain_konteks_usulan_ai.router,
+    prefix="/redesain/konteks",
+    tags=["redesain.konteks-usulan-ai"],
 )
 api_router.include_router(
     redesain_konteks.router,

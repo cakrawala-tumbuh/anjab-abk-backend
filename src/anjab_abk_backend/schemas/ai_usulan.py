@@ -181,7 +181,8 @@ class AiUsulanRead(AiUsulanRingkas):
     `isi` dan `amplop` adalah keluaran model (null sampai diserap) dan hanya keluar dari
     rute detail; `masukan` run tidak pernah dibuka dan `keluaran` run tidak lewat sini.
     `konteks_server` (#125) diisi server saat pengajuan, bukan keluaran model; P07 menyimpan
-    `authorization_state` di sana, fungsi lain null.
+    `authorization_state` di sana, P11 `jumlah_kandidat` dan `kode_konteks_ada` (batas aturan
+    isinya), fungsi lain null.
 
     `putusan_terakhir` WAJIB dideklarasikan ulang sebagai `AiUsulanPutusanTerakhir`: Pydantic
     menyerialkan menurut tipe deklarasi dan `model_copy(update=...)` tidak memvalidasi, jadi
@@ -208,7 +209,8 @@ class AiUsulanRead(AiUsulanRingkas):
         default=None,
         description=(
             "Cuplikan yang diisi server saat pengajuan, bukan oleh model. P07 memuat "
-            "`authorization_state`; fungsi lain null."
+            "`authorization_state`; P11 memuat `jumlah_kandidat` dan `kode_konteks_ada`; "
+            "fungsi lain null."
         ),
     )
     putusan: list[AiUsulanPutusanRead] = Field(

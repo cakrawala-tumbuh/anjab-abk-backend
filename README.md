@@ -90,6 +90,11 @@ bawaan; mencantumkannya di `AI_JENIS_SUMBER_DIIZINKAN` adalah keputusan aktivasi
   `TERVERIFIKASI`; nama analisis, `kode_sumber_ref`, keluaran), `kasus-negatif:`, dan
   `versi-metode:` (seluruh `redesain_versi_metode` sebagai log versi) diikuti id baris. Statistik
   `DRAF` dan identitas pembuat, pengunci, pemverifikasi, maupun pemeriksa tidak dikirim.
+- `REDESAIN` juga dipakai P11 (`rakit_sumber_konteks`, `ai/sumber_konteks.py`) untuk katalog
+  konteks: `konteks:<id>` (kode, tema, gelombang, ruang dugaan, sumber draf, batas pemeriksaan;
+  hanya konteks aktif) dan, bila diminta, `masalah:<id>` (kode, kode konteks, rumusan hipotesis,
+  sumber awal/keterbatasan, status awal, periode acuan, penjelasan alternatif) untuk masalah yang
+  konteksnya aktif, **tanpa** sekolah, keterangan sekolah, maupun kode orang PIC.
 
 P02 dan P03 mengirim `KATALOG_TI`; P03 juga mengirim `USULAN_AI`. Baris mandat P03 berbentuk
 `uraian:<uraian_id>@<jabatan_id>` dan teksnya hanya kode/nama jabatan serta field tugas.
@@ -163,6 +168,26 @@ sumber `statistik:` (`KLAIM_TERLARANG`).
 menahan AI F5 (KTK:192) dan OD-09 belum terkunci. Karena itu P08 tidak ada di `AI_FUNGSI_AKTIF`
 bawaan dan `RISET` tidak ada di `AI_JENIS_SUMBER_DIIZINKAN` bawaan; menyalakan keduanya adalah
 putusan terpisah yang harus menimbang penahanan KTK:192 dan status OD-09.
+
+### Pengusul konteks P11
+
+`POST /api/v1/redesain/konteks/usulan-ai` (P11 Pengusul Konteks) meminta 1-5 kandidat isian
+Konteks redesain (tema, ruang dugaan, sumber draf, batas pemeriksaan, saran gelombang, kode
+konteks mirip) dari katalog konteks aktif dan, bila `sertakan_masalah` (bawaan `true`), daftar
+masalahnya. Badan `PengajuanP11` = `sertakan_masalah`, `jumlah_kandidat` (1-5, bawaan 3), dan
+`sumber_dokumen_ids` (maks. 5 `narasi_sumber`, dikirim dengan jenisnya sendiri, mis.
+`DOKUMEN_RESMI`). Usulan bersasaran `REDESAIN_KONTEKS` dengan `sasaran_id` tetap `KATALOG`.
+Tanpa konteks aktif ditolak `422 TANPA_KONTEKS`; lebih dari 60 sumber redesain `422
+SUMBER_TERLALU_BANYAK`; dokumen tak ada `404`, tanpa izin AI `409 izin_sumber_tidak_ada`.
+`jumlah_kandidat` dan `kode_konteks_ada` disimpan di `ai_usulan.konteks_server` sebagai batas
+aturan isi: usulan `MANUAL` bila rujukan asing atau kosong (`RUJUKAN_TAK_DIKENAL`), `mirip_kode`
+bukan kode konteks aktif (`KODE_KONTEKS_TAK_DIKENAL`), kandidat melebihi `jumlah_kandidat`
+(`KANDIDAT_BERLEBIH`), atau `tema` lebih dari 200 karakter (`TEMA_TERLALU_PANJANG`). Rute ini
+tidak menulis `redesain_konteks`; kandidat diputus Tim Kajian.
+
+**Keputusan aktivasi:** P11 tidak ada di `AI_FUNGSI_AKTIF` bawaan. Ia mengirim `REDESAIN` (dan
+`DOKUMEN_RESMI` bila dokumen pendukung disertakan); keduanya tidak ada di
+`AI_JENIS_SUMBER_DIIZINKAN` bawaan, jadi mencantumkannya adalah keputusan operator.
 
 ### Batas P03 versi terbatas (tag peran)
 
@@ -264,7 +289,8 @@ dasar mandat, status aktual, rujukan `source_ids`, dan `unknowns`). `P05` (hipot
 status `HIPOTESIS`, penyangkal tiap hipotesis, dan rujukan `source_ids`). `P06` (draf opsi; 3 kasus sintetis minimal di `evals/p06/kasus.json`, dinilai atas
 opsi, `unknown_parameters`, rujukan `source_ids`, kata status terlarang, dan angka FTE). `P07` (kartu keputusan; 3 kasus sintetis minimal di `evals/p07/kasus.json`, dinilai atas
 isi kartu, `limitation`, larangan field `authorization_state`, dan seluruh aturan isi P07). `P08` (sintesis bukti riset; 3 kasus sintetis minimal di `evals/p08/kasus.json`, dinilai atas
-bagian naskah, `limitations`, dan seluruh aturan isi P08). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
+bagian naskah, `limitations`, dan seluruh aturan isi P08). `P11` (pengusul konteks; 3 kasus sintetis minimal di `evals/p11/kasus.json`, dinilai atas
+kandidat konteks dan seluruh aturan isi P11). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
 `AI_FUNGSI_AKTIF`. Contoh: `make eval-ai FUNGSI=P04 PENYEDIA=<jalur>`.
 
 `PENYEDIA` wajib dan tanpa nilai bawaan; kosong atau tak dikenal ditolak sebelum build dan

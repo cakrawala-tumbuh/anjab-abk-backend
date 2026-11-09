@@ -18,6 +18,7 @@ from .fungsi_p07 import FUNGSI_P07
 from .fungsi_p08 import FUNGSI_P08
 from .fungsi_p09 import FUNGSI_P09
 from .fungsi_p10 import FUNGSI_P10
+from .fungsi_p11 import FUNGSI_P11
 from .gateway import FUNGSI_TERDAFTAR, FungsiAi
 
 __all__ = ["KATALOG_FUNGSI", "daftarkan_fungsi"]
@@ -33,6 +34,7 @@ KATALOG_FUNGSI: dict[str, FungsiAi] = {
     "P08": FUNGSI_P08,
     "P09": FUNGSI_P09,
     "P10": FUNGSI_P10,
+    "P11": FUNGSI_P11,
 }
 """Semua fungsi AI yang tersedia di kode, menurut kode."""
 

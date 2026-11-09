@@ -30,6 +30,7 @@ from .fungsi_p05 import aturan_p05
 from .fungsi_p06 import aturan_p06
 from .fungsi_p07 import aturan_p07
 from .fungsi_p08 import aturan_p08
+from .fungsi_p11 import aturan_p11
 
 __all__ = ["ATURAN_ISI", "serap_usulan", "serap_usulan_tertunda"]
 
@@ -57,12 +58,16 @@ ATURAN_ISI: dict[str, Callable[[dict[str, Any], dict[str, Any]], list[str]]] = {
     "P06": aturan_p06,
     "P07": aturan_p07,
     "P08": aturan_p08,
+    "P11": aturan_p11,
 }
 """Pemeriksaan pasca-validasi `isi` per kode fungsi; mengembalikan daftar kode pelanggaran.
 
-Signature aturan `(isi, amplop)`; `amplop` hasil `_amplop(keluaran)`. P01, P02, P03, P04, P05,
-P06, P07, dan P08 punya aturan (`FungsiAi` tidak punya kolom validator); fungsi lain tanpa entri
-berarti tanpa pemeriksaan tambahan. Daftar tak kosong membuat usulan `MANUAL` tanpa `isi`.
+Signature aturan `(isi, amplop)`; `amplop` hasil `_amplop(keluaran)` ditambah kunci
+`konteks_server` (salinan `ai_usulan.konteks_server`, diisi server saat pengajuan; `{}` bila
+null) yang dipakai P11 untuk batas pengajuannya. Kunci itu tidak ikut tersimpan di
+`ai_usulan.amplop`. P01-P08 dan P11 punya aturan (`FungsiAi` tidak punya kolom validator); fungsi
+lain tanpa entri berarti tanpa pemeriksaan tambahan. Daftar tak kosong membuat usulan `MANUAL`
+tanpa `isi`.
 """
 
 
@@ -101,7 +106,8 @@ def _terapkan(session: Session, rec: AiUsulanModel, run: AiRunModel) -> HasilSer
         return _manual(rec, [KODE_KELUARAN_TIDAK_SAH])
     aturan = ATURAN_ISI.get(rec.fungsi)
     amplop = _amplop(keluaran)
-    pelanggaran = aturan(isi, amplop) if aturan is not None else []
+    konteks = {**amplop, "konteks_server": rec.konteks_server or {}}
+    pelanggaran = aturan(isi, konteks) if aturan is not None else []
     if pelanggaran:
         return _manual(rec, list(pelanggaran))
     rec.isi = isi

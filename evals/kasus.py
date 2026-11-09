@@ -26,6 +26,7 @@ from anjab_abk_backend.ai.fungsi_p07 import FUNGSI_P07, ParameterP07
 from anjab_abk_backend.ai.fungsi_p08 import FUNGSI_P08, ParameterP08
 from anjab_abk_backend.ai.fungsi_p09 import FUNGSI_P09, ParameterP09
 from anjab_abk_backend.ai.fungsi_p10 import FUNGSI_P10, ParameterP10
+from anjab_abk_backend.ai.fungsi_p11 import FUNGSI_P11, ParameterP11
 from anjab_abk_backend.ai.gateway import FungsiAi
 
 __all__ = [
@@ -113,6 +114,11 @@ DEFINISI_FUNGSI: dict[str, DefinisiFungsi] = {
         fungsi=FUNGSI_P10,
         parameter=ParameterP10,
         berkas=Path(__file__).parent / "p10" / "kasus.json",
+    ),
+    "P11": DefinisiFungsi(
+        fungsi=FUNGSI_P11,
+        parameter=ParameterP11,
+        berkas=Path(__file__).parent / "p11" / "kasus.json",
     ),
 }
 """Fungsi yang bisa dievaluasi, menurut kode; item berikutnya menambah entri di sini."""
@@ -259,7 +265,7 @@ _KHAS_FUNGSI = {
 }
 """Isian ``HarapanKasus`` yang hanya sah untuk satu fungsi."""
 
-_TANPA_DRAFT_TEXT = ("P01", "P02", "P03", "P04", "P05", "P06", "P07", "P08", "P09")
+_TANPA_DRAFT_TEXT = ("P01", "P02", "P03", "P04", "P05", "P06", "P07", "P08", "P09", "P11")
 """Fungsi yang keluarannya tidak punya ``isi.draft_text``."""
 
 
@@ -274,8 +280,8 @@ def _periksa_khas_fungsi(kasus: Kasus, kode_fungsi: str) -> None:
 
     Raises:
         KasusRusak: isian khas fungsi lain dipakai (mis. isian P09 pada P01 atau P10), atau
-            kasus P01/P02/P03/P04/P05/P06/P07/P08/P09 berjalur ``MODEL`` masih memakai bidang teks
-            bawaan P10 (``isi.draft_text``).
+            kasus P01/P02/P03/P04/P05/P06/P07/P08/P09/P11 berjalur ``MODEL`` masih memakai bidang
+            teks bawaan P10 (``isi.draft_text``).
     """
     h = kasus.harapan
     for pemilik, isian in _KHAS_FUNGSI.items():

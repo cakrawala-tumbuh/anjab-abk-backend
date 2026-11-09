@@ -1675,7 +1675,9 @@ class AiUsulanModel(Base):
     `diserap_at`, `hasil_serap`, `kode_serap`, `isi`, `amplop`, `output_hash` null sampai
     penyerap menulisnya; `isi` dan `amplop` adalah keluaran model dan tidak boleh dicatat ke log.
     `konteks_server` diisi server saat pengajuan (bukan oleh model) dan tidak pernah dikirim ke
-    model; P07 menyimpan `{"authorization_state": ...}`, fungsi lain membiarkannya null.
+    model; P07 menyimpan `{"authorization_state": ...}`, P11 menyimpan
+    `{"jumlah_kandidat": ..., "kode_konteks_ada": [...]}` (dibaca penyerap untuk aturan isi),
+    fungsi lain membiarkannya null.
     """
 
     __tablename__ = "ai_usulan"

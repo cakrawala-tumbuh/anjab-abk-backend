@@ -5,10 +5,12 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..ai.fungsi_p02 import POLA_KODE_P02
+from ..ai.fungsi_p11 import MAKS_KANDIDAT_P11
 from ..ai.masukan import POLA_PERIODE_AI
 
 __all__ = [
     "MAKS_DOKUMEN_P02",
+    "MAKS_DOKUMEN_P11",
     "POLA_UUID",
     "PengajuanP02",
     "PengajuanP03",
@@ -16,10 +18,14 @@ __all__ = [
     "PengajuanP06",
     "PengajuanP07",
     "PengajuanP08",
+    "PengajuanP11",
 ]
 
 MAKS_DOKUMEN_P02 = 5
 """Jumlah maksimum `narasi_sumber` pendukung per pengajuan P02."""
+
+MAKS_DOKUMEN_P11 = 5
+"""Jumlah maksimum `narasi_sumber` pendukung per pengajuan P11."""
 
 POLA_UUID = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 """Pola id usulan AI (UUID berbentuk kanonik 8-4-4-4-12)."""
@@ -173,4 +179,36 @@ class PengajuanP08(BaseModel):
         max_length=100,
         description="Kode periode konteks.",
         examples=["2026/27"],
+    )
+
+
+class PengajuanP11(BaseModel):
+    """Badan `POST /redesain/konteks/usulan-ai` (P11 Pengusul Konteks).
+
+    Tanpa teks bebas: sumber dirakit server dari katalog konteks aktif (dan masalahnya), dokumen
+    pendukung dirujuk lewat id.
+
+    Attributes:
+        sertakan_masalah: Sertakan daftar masalah redesain (konteks aktif) sebagai sumber.
+        jumlah_kandidat: Jumlah kandidat konteks maksimum yang diminta (1-5).
+        sumber_dokumen_ids: Id `narasi_sumber` pendukung (maks. 5), dikirim dengan jenisnya
+            sendiri; duplikat diabaikan.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    sertakan_masalah: bool = Field(
+        default=True, description="Sertakan masalah redesain sebagai sumber.", examples=[True]
+    )
+    jumlah_kandidat: int = Field(
+        default=3,
+        ge=1,
+        le=MAKS_KANDIDAT_P11,
+        description="Jumlah kandidat konteks maksimum (1-5).",
+        examples=[3],
+    )
+    sumber_dokumen_ids: list[str] = Field(
+        default_factory=list,
+        max_length=MAKS_DOKUMEN_P11,
+        description="Id `narasi_sumber` pendukung (maks. 5).",
     )
