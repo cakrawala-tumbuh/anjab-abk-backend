@@ -108,6 +108,8 @@ from .services.idempotency_sql import SqlIdempotencyStore
 from .services.ratelimit import AllowAllRateLimiter, RateLimiter
 from .services.readiness import ReadinessCheck
 from .services.readiness_db import DatabaseReadinessCheck
+from .services.riset_kasus_negatif import RisetKasusNegatifService
+from .services.riset_kasus_negatif_sql import SqlRisetKasusNegatifService
 from .services.riset_protokol import RisetProtokolService
 from .services.riset_protokol_sql import SqlRisetProtokolService
 from .services.riset_statistik import RisetStatistikService
@@ -431,6 +433,11 @@ def get_riset_protokol_service(session: SessionDep) -> RisetProtokolService:
 def get_riset_statistik_service(session: SessionDep) -> RisetStatistikService:
     """SEAM: `RisetStatistikService` PostgreSQL (statistik riset dengan verifikasi independen)."""
     return SqlRisetStatistikService(session)
+
+
+def get_riset_kasus_negatif_service(session: SessionDep) -> RisetKasusNegatifService:
+    """SEAM: `RisetKasusNegatifService` PostgreSQL (kasus negatif riset, append-only)."""
+    return SqlRisetKasusNegatifService(session)
 
 
 def get_narasi_service(session: SessionDep) -> NarasiService:

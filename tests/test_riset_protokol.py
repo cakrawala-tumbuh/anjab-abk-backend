@@ -66,6 +66,7 @@ def test_tanpa_patch_put_delete(client_as, client):
         f"{URL}/{{protokol_id}}",
         f"{URL}/{{protokol_id}}/kunci",
         f"{URL}/{{protokol_id}}/statistik",  # statistik riset (#122), juga tanpa sunting
+        f"{URL}/{{protokol_id}}/kasus-negatif",  # kasus negatif (#123), append-only
     }
     for p, ops in rute.items():
         assert not ({"patch", "put", "delete"} & set(ops)), p

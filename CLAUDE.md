@@ -82,6 +82,20 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-09] Kasus negatif riset, append-only (rute `/riset/protokol/{id}/kasus-negatif`)
+
+Backlog `#123` (bagian ketiga pecahan P08; protokol `#119`, statistik `#122`, fungsi `#126`).
+
+- **Tabel `riset_kasus_negatif`** (migrasi `ca3b9bb3b458`): FK `protokol_id` ke `riset_protokol.id`
+  `ON DELETE RESTRICT`, hanya `created_at`; tanpa kolom status.
+- **Hanya protokol `TERKUNCI`**: create membaca protokol `FOR SHARE`; `DRAF` -> 409
+  `PROTOKOL_BELUM_TERKUNCI` (kelas galat dipakai ulang dari `services/riset_statistik.py`).
+  GET urut `created_at` naik lalu `id`.
+- **Append-only di lapisan API**: tidak ada sunting/hapus. `dibuat_oleh` = subjek token; `dibuat_oleh` di
+  body dibuang diam-diam (skenario uji issue), field asing lain tetap 422 (`extra="forbid"`). Tidak ada penyaringan PII baru.
+- Router `api/v1/riset_kasus_negatif.py` di-mount prefix `/riset`; seam
+  `services/riset_kasus_negatif.py` (+ `_sql.py`), skema `schemas/riset_kasus_negatif.py`.
+
 ### [2026-11-09] Statistik riset dengan verifikasi independen (rute `/riset/.../statistik`)
 
 Backlog `#122` (bagian kedua pecahan P08; protokol `#119`, kasus negatif `#123`, fungsi `#126`).

@@ -1871,3 +1871,28 @@ class RisetStatistikModel(Base):
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = _ts()
+
+
+class RisetKasusNegatifModel(Base):
+    """Kasus negatif per protokol riset `TERKUNCI` (`riset_kasus_negatif`), append-only.
+
+    Kasus yang tidak mendukung hipotesis dicatat agar sintesis P08 tidak hanya memuat bukti
+    yang menguntungkan. Tidak ada sunting atau hapus: imutabilitas ditegakkan lapisan API
+    (tanpa PATCH/PUT/DELETE). FK ke `riset_protokol` memakai `ON DELETE RESTRICT` agar
+    protokol yang sudah punya kasus negatif tidak bisa hilang diam-diam.
+    """
+
+    __tablename__ = "riset_kasus_negatif"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    protokol_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("riset_protokol.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    ringkasan: Mapped[str] = mapped_column(Text, nullable=False)
+    alasan_negatif: Mapped[str] = mapped_column(Text, nullable=False)
+    sumber_ref: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    dibuat_oleh: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = _ts()

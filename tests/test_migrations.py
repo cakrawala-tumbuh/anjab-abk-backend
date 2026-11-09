@@ -37,6 +37,8 @@ Yang dijamin:
     `#119`): CHECK status `DRAF`/`TERKUNCI`, UNIQUE (`kode`, `versi`), dan round-trip.
 12. ``test_riset_statistik_*`` — revisi DDL `aa0aebd31d4a` (tabel `riset_statistik`, backlog
     `#122`): CHECK status `DRAF`/`TERVERIFIKASI`, FK `ON DELETE RESTRICT`, dan round-trip.
+13. ``test_riset_kasus_negatif_*`` — revisi DDL `ca3b9bb3b458` (tabel `riset_kasus_negatif`,
+    backlog `#123`): FK `ON DELETE RESTRICT`, indeks `protokol_id`, dan round-trip.
 
 Test berbasis-DB membangun **database sekali-pakai** terpisah dari DB test utama agar
 tidak mengganggu fixtur ``engine`` (yang sudah di-seed). Database itu dibuat & dihapus
@@ -1326,5 +1328,55 @@ def test_riset_statistik_check_fk_restrict_dan_roundtrip(fresh_db_url: str) -> N
         assert "riset_statistik" not in set(inspect(engine).get_table_names())
         upgrade(fresh_db_url, "head")
         assert "riset_statistik" in set(inspect(engine).get_table_names())
+    finally:
+        engine.dispose()
+
+
+# --- Revisi `ca3b9bb3b458`: tabel `riset_kasus_negatif` (backlog `#123`) ------------
+
+_RISET_KASUS_NEGATIF_REVISION = "ca3b9bb3b458"
+
+
+def _insert_riset_kasus_negatif_mig(conn, *, protokol_id: str) -> None:
+    """Sisipkan satu baris `riset_kasus_negatif` minimal lewat SQL mentah (tanpa ORM)."""
+    conn.execute(
+        text(
+            "INSERT INTO riset_kasus_negatif "
+            "(id, protokol_id, ringkasan, alasan_negatif, dibuat_oleh, created_at) "
+            "VALUES (:id, :pid, 'Kasus', 'Tidak sesuai hipotesis', 'tester', now())"
+        ),
+        {"id": str(uuid.uuid4()), "pid": protokol_id},
+    )
+
+
+def test_riset_kasus_negatif_fk_restrict_dan_roundtrip(fresh_db_url: str) -> None:
+    """Protokol asing ditolak FK; protokol ber-kasus tak bisa dihapus (`ON DELETE RESTRICT`).
+
+    `sumber_ref` boleh NULL. Downgrade ke `aa0aebd31d4a` membuang tabel; upgrade ulang
+    memulihkannya.
+    """
+    upgrade(fresh_db_url, _RISET_KASUS_NEGATIF_REVISION)
+    engine = create_engine(fresh_db_url)
+    fk = "fk_riset_kasus_negatif_protokol_id_riset_protokol"
+    try:
+        with engine.begin() as conn:
+            _insert_riset_protokol_mig(conn, kode="KN-MIG", versi=1, status="TERKUNCI")
+            pid = conn.scalar(text("SELECT id FROM riset_protokol WHERE kode = 'KN-MIG'"))
+            _insert_riset_kasus_negatif_mig(conn, protokol_id=pid)
+            ref = conn.scalar(text("SELECT sumber_ref FROM riset_kasus_negatif"))
+        assert ref is None
+        with pytest.raises(Exception, match=fk):
+            with engine.begin() as conn:
+                _insert_riset_kasus_negatif_mig(conn, protokol_id="tidak-ada")
+        with pytest.raises(Exception, match=fk):
+            with engine.begin() as conn:
+                conn.execute(text("DELETE FROM riset_protokol WHERE id = :id"), {"id": pid})
+        indeks = {i["name"] for i in inspect(engine).get_indexes("riset_kasus_negatif")}
+        assert "ix_riset_kasus_negatif_protokol_id" in indeks
+
+        downgrade(fresh_db_url, _RISET_STATISTIK_REVISION)
+        assert "riset_kasus_negatif" not in set(inspect(engine).get_table_names())
+        upgrade(fresh_db_url, "head")
+        assert "riset_kasus_negatif" in set(inspect(engine).get_table_names())
     finally:
         engine.dispose()

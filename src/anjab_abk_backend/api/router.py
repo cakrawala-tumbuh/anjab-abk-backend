@@ -41,6 +41,7 @@ from .v1 import (
     redesain_sesi,
     redesain_versi_metode,
     redesain_yayasan,
+    riset_kasus_negatif,
     riset_protokol,
     riset_statistik,
     sekolah,
@@ -320,6 +321,11 @@ api_router.include_router(
 )
 api_router.include_router(
     riset_statistik.router,
+    prefix="/riset",
+    tags=["riset"],
+)
+api_router.include_router(
+    riset_kasus_negatif.router,
     prefix="/riset",
     tags=["riset"],
 )
