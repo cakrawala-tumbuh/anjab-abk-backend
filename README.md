@@ -78,9 +78,21 @@ bawaan; mencantumkannya di `AI_JENIS_SUMBER_DIIZINKAN` adalah keputusan aktivasi
   nilai standar.
 - `USULAN_AI` — usulan AI yang sudah diterima reviewer (putusan terakhir `APPROVE` atau
   `REVISE`) dan dirangkai menjadi sumber fungsi lain sebagai `usulan:<id>`.
+- `REDESAIN` — data redesain satu masalah yang dirakit `rakit_sumber_redesain`
+  (`ai/sumber_redesain.py`, dipakai P05 dan disiapkan untuk P06/P07): `masalah:`, `proses:`,
+  `langkah:`, `bukti:`, `koreksi:`, `konfirmasi:` diikuti id baris. Teksnya field isi dan status;
+  orang hanya lewat kode samaran. Konfirmasi hanya yang sudah terkirim, tanpa `cerita_sebelum`
+  dan `catatan_akses`; `catatan_privasi_gap` bukti tidak dikirim.
 
 P02 dan P03 mengirim `KATALOG_TI`; P03 juga mengirim `USULAN_AI`. Baris mandat P03 berbentuk
 `uraian:<uraian_id>@<jabatan_id>` dan teksnya hanya kode/nama jabatan serta field tugas.
+
+`POST /api/v1/redesain/masalah/{masalah_id}/hipotesis-proses-ai` (P05) mengirim `REDESAIN` dan
+baru sah sesudah sumber proses terhubung (MX:10): masalah punya minimal satu proses dengan
+minimal satu langkah (`409 SUMBER_PROSES_BELUM_TERHUBUNG`); lebih dari 60 sumber terakit ditolak
+`422 SUMBER_TERLALU_BANYAK`. Hasilnya draf alur, hipotesis berstatus `HIPOTESIS`, pemeriksaan
+penyangkal, dan celah bukti di `ai_usulan` — bukan akar penyebab terbukti; tidak ada kolom
+hipotesis di tabel redesain, jadi Tim memindahkannya secara manual.
 
 ### Batas P03 versi terbatas (tag peran)
 
@@ -178,7 +190,8 @@ make eval-ai FUNGSI=P10 PENYEDIA=LANGGANAN_CLAUDE CLAUDE_VOLUME=eval-claude
 sifat fakta, angka baru, pola klaim terlaksana, dan span fakta, bukan atas `draft_text`). `P04` (pengusul satu pertanyaan bukti netral tanpa pengiriman; 8 kasus di `evals/p04/kasus.json`, dinilai atas
 `material`, pertanyaan tunggal, dan pola pertanyaan mengarahkan, bukan atas `draft_text`). `P02` (normalisasi tugas katalog; 3 kasus sintetis minimal di `evals/p02/kasus.json`, dinilai atas
 kandidat tugas dan rujukan `source_ids`, bukan atas `draft_text`). `P03` (tag peran versi terbatas; 3 kasus sintetis minimal di `evals/p03/kasus.json`, dinilai atas
-dasar mandat, status aktual, rujukan `source_ids`, dan `unknowns`). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
+dasar mandat, status aktual, rujukan `source_ids`, dan `unknowns`). `P05` (hipotesis proses; 3 kasus sintetis minimal di `evals/p05/kasus.json`, dinilai atas
+status `HIPOTESIS`, penyangkal tiap hipotesis, dan rujukan `source_ids`). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
 `AI_FUNGSI_AKTIF`. Contoh: `make eval-ai FUNGSI=P04 PENYEDIA=<jalur>`.
 
 `PENYEDIA` wajib dan tanpa nilai bawaan; kosong atau tak dikenal ditolak sebelum build dan

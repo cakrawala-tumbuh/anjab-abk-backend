@@ -262,6 +262,45 @@ def _nilai_p03(kasus: Kasus, status_qa: str, keluaran: dict[str, Any]) -> list[s
     return pel
 
 
+def _nilai_p05(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
+    """Pemeriksaan khas P05: status, tanpa field persetujuan, hipotesis, rujukan, dan penyangkal.
+
+    Pada ``LOLOS`` minimal satu hipotesis wajib ada. Tiap hipotesis harus berstatus
+    ``HIPOTESIS`` dan ditunjuk minimal satu ``disconfirming_checks`` lewat ``hipotesis_ke``.
+    Setiap ``source_ids`` langkah draf dan hipotesis harus menunjuk ``source_id`` sumber kasus,
+    minimal satu per elemen (sama dengan ``aturan_p05``).
+    """
+    pel: list[str] = []
+    if status_qa not in kasus.harapan.status_qa:
+        pel.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
+    for nama in _nama_field(isi):
+        if any(kata in nama.casefold() for kata in KATA_FIELD_TERLARANG_P09):
+            pel.append(f"FIELD_PERSETUJUAN:{nama}")
+    hip = isi.get("issue_hypotheses")
+    hip = [x for x in hip if isinstance(x, dict)] if isinstance(hip, list) else []
+    if status_qa == "LOLOS" and not hip:
+        pel.append("HIPOTESIS_KOSONG_PADA_LOLOS")
+    draf = isi.get("process_draft")
+    langkah = draf.get("langkah") if isinstance(draf, dict) else None
+    langkah = [x for x in langkah if isinstance(x, dict)] if isinstance(langkah, list) else []
+    dikenal = {s.source_id for s in kasus.sumber}
+    for kunci, daftar in (("langkah", langkah), ("issue_hypotheses", hip)):
+        for i, el in enumerate(daftar):
+            ids = el.get("source_ids")
+            ids = [str(x) for x in ids] if isinstance(ids, list) else []
+            if not ids or any(x not in dikenal for x in ids):
+                pel.append(f"RUJUKAN_TAK_DIKENAL:{kunci}:{i}")
+    cek = isi.get("disconfirming_checks")
+    cek = [x for x in cek if isinstance(x, dict)] if isinstance(cek, list) else []
+    ditunjuk = {c.get("hipotesis_ke") for c in cek}
+    for i, h in enumerate(hip):
+        if h.get("status") != "HIPOTESIS":
+            pel.append(f"STATUS_BUKAN_HIPOTESIS:{i}")
+        if i not in ditunjuk:
+            pel.append(f"HIPOTESIS_TANPA_PENYANGKAL:{i}")
+    return pel
+
+
 def nilai(
     kasus: Kasus,
     status_qa: str,
@@ -277,7 +316,7 @@ def nilai(
         kode: Kode karantina bila ``KARANTINA``.
         keluaran: Keluaran hasil parse; ``None`` bila karantina.
         kode_fungsi: ``P10`` (bawaan, perilaku lama tak berubah), ``P09``, ``P01``, ``P02``,
-            ``P03``, atau ``P04``.
+            ``P03``, ``P04``, atau ``P05``.
 
     Returns:
         Daftar kode pelanggaran; kosong berarti lulus. Kode tidak memuat teks keluaran,
@@ -298,6 +337,8 @@ def nilai(
         pelanggaran.extend(_nilai_p03(kasus, status_qa, keluaran))
     elif kode_fungsi == "P04":
         pelanggaran.extend(_nilai_p04(kasus, status_qa, isi))
+    elif kode_fungsi == "P05":
+        pelanggaran.extend(_nilai_p05(kasus, status_qa, isi))
     else:
         if status_qa not in h.status_qa:
             pelanggaran.append(f"STATUS_TIDAK_SESUAI:{status_qa}")

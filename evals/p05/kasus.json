@@ -1,0 +1,162 @@
+{
+  "fungsi": "P05",
+  "kasus": [
+    {
+      "id": "p05-m-alur-terlambat-rekap",
+      "rujukan": [
+        "PRM:36-40",
+        "MX:10"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "masalah:p05-m-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K01-01\nperiode_acuan: 2026/27\nrumusan_hipotesis: Rekap nilai semester terlambat diserahkan ke wali kelas\nsumber_awal_keterbatasan: Catatan rapat guru\nstatus_awal: Dugaan\ngelombang: Gelombang 1\ntask_links: ut-p05-001 (Menyusun rekap nilai semester)"
+        },
+        {
+          "source_id": "proses:p05-p-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: P-001\nmasalah_kode: M-K01-01\nsekolah: SD Sintetis Satu\nperiode: 2026/27\nnama_proses: Penyusunan rekap nilai semester"
+        },
+        {
+          "source_id": "langkah:p05-l-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: L-001\nproses_kode: P-001\nurutan: 1\ntahap: Pengumpulan nilai\npemicu_input: Akhir semester\npelaksana: Guru mata pelajaran\npekerjaan_sistem: Mengisi nilai di lembar kerja\nkeluaran_penerima: Lembar nilai ke wali kelas\nhambatan: Format lembar berbeda antar guru\nstatus_langkah: Dicatat"
+        },
+        {
+          "source_id": "langkah:p05-l-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: L-002\nproses_kode: P-001\nurutan: 2\ntahap: Penggabungan nilai\npemicu_input: Lembar nilai dari guru\npelaksana: Wali kelas\npekerjaan_sistem: Menyalin nilai ke rekap kelas\nkeluaran_penerima: Rekap kelas ke kepala sekolah\nstatus_langkah: Dicatat"
+        },
+        {
+          "source_id": "bukti:p05-b-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: B-0001\nlangkah_kode: L-001\nunit_periode: SD Sintetis Satu 2026/27\njenis: Dokumen\nindependen: Tidak\nklaim_didukung: Ada tiga format lembar nilai yang berbeda\ntanggal_versi_lokasi: Folder kurikulum semester ganjil\nstatus_pemeriksaan: Belum diperiksa"
+        }
+      ],
+      "parameter": {
+        "masalah_id": "p05-m-001",
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.process_draft",
+          "isi.issue_hypotheses",
+          "isi.disconfirming_checks",
+          "isi.evidence_gaps"
+        ],
+        "dilarang_pola": [
+          "akar penyebab terbukti",
+          "sudah terbukti",
+          "terbukti menyebabkan",
+          "penyebab pasti",
+          "disetujui",
+          "status bukti diubah"
+        ]
+      }
+    },
+    {
+      "id": "p05-m-konfirmasi-terkirim",
+      "rujukan": [
+        "PRM:36-40",
+        "KAI:15"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "masalah:p05-m-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K02-01\nperiode_acuan: 2026/27\nrumusan_hipotesis: Permintaan surat keterangan siswa menumpuk di tata usaha\nsumber_awal_keterbatasan: Keluhan orang tua yang dicatat Tim\nstatus_awal: Dugaan\ngelombang: Gelombang 1"
+        },
+        {
+          "source_id": "proses:p05-p-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: P-002\nmasalah_kode: M-K02-01\nsekolah: SMP Sintetis Dua\nperiode: 2026/27\nnama_proses: Penerbitan surat keterangan"
+        },
+        {
+          "source_id": "langkah:p05-l-003",
+          "jenis": "SINTETIS",
+          "teks": "kode: L-003\nproses_kode: P-002\nurutan: 1\ntahap: Penerimaan permintaan\npemicu_input: Formulir permintaan\npelaksana: Staf tata usaha\npekerjaan_sistem: Mencatat permintaan di buku agenda\nkeluaran_penerima: Daftar permintaan ke kepala tata usaha\nstatus_langkah: Dicatat"
+        },
+        {
+          "source_id": "koreksi:p05-k-001",
+          "jenis": "SINTETIS",
+          "teks": "langkah_kode: L-003\nkode_orang: O-0102\nisi: Permintaan juga masuk lewat pesan singkat, tidak hanya formulir\nwaktu: 2026-10-01 08:00:00+00:00"
+        },
+        {
+          "source_id": "konfirmasi:p05-f-001",
+          "jenis": "SINTETIS",
+          "teks": "kode_orang: O-0102\nperan: Staf tata usaha\nsumber: daring\ntanggal: 2026-10-01\nkesesuaian: Sebagian sesuai\nkoreksi: Penumpukan terjadi di tahap tanda tangan, bukan pencatatan\nhal_belum_jelas: Berapa lama rata-rata menunggu tanda tangan\nstatus: terkirim"
+        }
+      ],
+      "parameter": {
+        "masalah_id": "p05-m-002",
+        "periode": "2026-27"
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.process_draft",
+          "isi.issue_hypotheses",
+          "isi.disconfirming_checks",
+          "isi.evidence_gaps"
+        ],
+        "dilarang_pola": [
+          "akar penyebab terbukti",
+          "sudah terbukti",
+          "terbukti menyebabkan",
+          "penyebab pasti",
+          "disetujui",
+          "status bukti diubah"
+        ]
+      }
+    },
+    {
+      "id": "p05-g-email-pada-langkah-diblokir",
+      "rujukan": [
+        "PRM:6",
+        "PRM:36-40"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "masalah:p05-m-003",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K03-01\nperiode_acuan: 2026/27\nrumusan_hipotesis: Jadwal piket tidak tersampaikan\nsumber_awal_keterbatasan: Catatan Tim\nstatus_awal: Dugaan\ngelombang: Gelombang 1"
+        },
+        {
+          "source_id": "proses:p05-p-003",
+          "jenis": "SINTETIS",
+          "teks": "kode: P-003\nmasalah_kode: M-K03-01\nsekolah: SD Sintetis Tiga\nperiode: 2026/27\nnama_proses: Penyebaran jadwal piket"
+        },
+        {
+          "source_id": "langkah:p05-l-004",
+          "jenis": "SINTETIS",
+          "teks": "kode: L-004\nproses_kode: P-003\nurutan: 1\ntahap: Pengiriman jadwal\npemicu_input: Awal bulan\npelaksana: Wakil kepala sekolah\npekerjaan_sistem: Mengirim jadwal ke piket.sekolah@contoh.invalid\nkeluaran_penerima: Jadwal ke guru piket\nstatus_langkah: Dicatat"
+        }
+      ],
+      "parameter": {
+        "masalah_id": "p05-m-003",
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "TANPA_MODEL",
+        "alasan_gerbang": "PII_DITEMUKAN",
+        "bidang_teks": [
+          "isi.process_draft",
+          "isi.issue_hypotheses",
+          "isi.disconfirming_checks",
+          "isi.evidence_gaps"
+        ]
+      }
+    }
+  ]
+}

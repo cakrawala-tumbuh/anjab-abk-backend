@@ -26,6 +26,7 @@ from .fungsi_p01 import aturan_p01
 from .fungsi_p02 import aturan_p02
 from .fungsi_p03 import aturan_p03
 from .fungsi_p04 import aturan_p04
+from .fungsi_p05 import aturan_p05
 
 __all__ = ["ATURAN_ISI", "serap_usulan", "serap_usulan_tertunda"]
 
@@ -49,12 +50,13 @@ ATURAN_ISI: dict[str, Callable[[dict[str, Any], dict[str, Any]], list[str]]] = {
     "P02": aturan_p02,
     "P03": aturan_p03,
     "P04": aturan_p04,
+    "P05": aturan_p05,
 }
 """Pemeriksaan pasca-validasi `isi` per kode fungsi; mengembalikan daftar kode pelanggaran.
 
-Signature aturan `(isi, amplop)`; `amplop` hasil `_amplop(keluaran)`. P01, P02, P03, dan P04 punya
-aturan (`FungsiAi` tidak punya kolom validator); fungsi lain tanpa entri berarti tanpa pemeriksaan
-tambahan. Daftar tak kosong membuat usulan `MANUAL` tanpa `isi`.
+Signature aturan `(isi, amplop)`; `amplop` hasil `_amplop(keluaran)`. P01, P02, P03, P04, dan
+P05 punya aturan (`FungsiAi` tidak punya kolom validator); fungsi lain tanpa entri berarti tanpa
+pemeriksaan tambahan. Daftar tak kosong membuat usulan `MANUAL` tanpa `isi`.
 """
 
 
