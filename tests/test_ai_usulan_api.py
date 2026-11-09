@@ -36,7 +36,7 @@ KUNCI_RINGKAS = {
     "kode_serap",
     "putusan_terakhir",
 }
-# Lima belas field detail + `putusan_terakhir` + `putusan` (#103).
+# Lima belas field detail + `putusan_terakhir` + `putusan` (#103) + `konteks_server` (#125).
 KUNCI_DETAIL = KUNCI_RINGKAS | {
     "ai_run_id",
     "sumber_ids",
@@ -45,6 +45,7 @@ KUNCI_DETAIL = KUNCI_RINGKAS | {
     "amplop",
     "output_hash",
     "putusan",
+    "konteks_server",
 }
 
 

@@ -23,6 +23,7 @@ from anjab_abk_backend.ai.fungsi_p04 import (
 )
 from anjab_abk_backend.ai.fungsi_p05 import aturan_p05
 from anjab_abk_backend.ai.fungsi_p06 import aturan_p06
+from anjab_abk_backend.ai.fungsi_p07 import aturan_p07
 from anjab_abk_backend.ai.fungsi_p08 import aturan_p08
 from anjab_abk_backend.ai.gateway import FUNGSI_TERDAFTAR
 from anjab_abk_backend.ai.guardrail import susun_instruksi
@@ -219,6 +220,7 @@ def test_aturan_terdaftar_hanya_untuk_p04():
         "P04": aturan_p04,
         "P05": aturan_p05,
         "P06": aturan_p06,
+        "P07": aturan_p07,
         "P08": aturan_p08,
     }
 

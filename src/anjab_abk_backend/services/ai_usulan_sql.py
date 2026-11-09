@@ -76,11 +76,12 @@ def _sekarang() -> datetime:
 
 
 def _tanpa_isi() -> tuple[Any, ...]:
-    """Opsi muat: kolom keluaran model tidak ikut dibaca pada daftar/pencarian."""
+    """Opsi muat: keluaran model dan `konteks_server` tidak dibaca pada daftar/pencarian."""
     return (
         defer(AiUsulanModel.isi),
         defer(AiUsulanModel.amplop),
         defer(AiUsulanModel.output_hash),
+        defer(AiUsulanModel.konteks_server),
     )
 
 
@@ -111,6 +112,7 @@ class SqlAiUsulanService:
         sumber: list[SumberAi],
         parameter: dict[str, Any],
         principal: Principal,
+        konteks_server: dict[str, Any] | None = None,
     ) -> AiUsulanRingkas:
         """Ajukan fungsi AI atas satu sasaran lalu catat usulannya.
 
@@ -124,6 +126,9 @@ class SqlAiUsulanService:
             sumber: Sumber data calon masukan model.
             parameter: Parameter fungsi (tanpa PII).
             principal: Pemohon; `subject` dicatat sebagai `diminta_oleh`.
+            konteks_server: Cuplikan milik server yang disimpan apa adanya di
+                `ai_usulan.konteks_server` (P07: `{"authorization_state": ...}`); tidak
+                dikirim ke model. `None` (bawaan) untuk fungsi lain.
 
         Returns:
             Proyeksi usulan yang baru dicatat (belum diserap).
@@ -164,6 +169,7 @@ class SqlAiUsulanService:
             ai_run_id=job.ref_id,
             sumber_ids=[s.source_id for s in sumber],
             diminta_oleh=principal.subject,
+            konteks_server=konteks_server,
         )
         self._s.add(rec)
         self._s.flush()

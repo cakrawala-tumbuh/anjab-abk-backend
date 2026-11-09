@@ -1,0 +1,164 @@
+{
+  "fungsi": "P07",
+  "kasus": [
+    {
+      "id": "p07-m-rekap-nilai-dua-alternatif",
+      "rujukan": [
+        "PRM:48-52",
+        "I07:68",
+        "KTK:139"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "masalah:p07-m-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K01-01\nperiode_acuan: 2026/27\nrumusan_hipotesis: Rekap nilai semester terlambat diserahkan ke wali kelas\nsumber_awal_keterbatasan: Catatan rapat guru\nstatus_awal: Diperkuat untuk klaim\ngelombang: Gelombang 1"
+        },
+        {
+          "source_id": "langkah:p07-l-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: L-001\nproses_kode: P-001\nurutan: 1\ntahap: Penggabungan nilai\npemicu_input: Lembar nilai dari guru\npelaksana: Wali kelas\npekerjaan_sistem: Menyalin nilai dari tiga format lembar ke rekap kelas\nkeluaran_penerima: Rekap kelas ke kepala sekolah\nhambatan: Format lembar berbeda antar guru\nstatus_langkah: Dicatat"
+        },
+        {
+          "source_id": "bukti:p07-b-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: B-0001\nlangkah_kode: L-001\nunit_periode: SD Sintetis Satu 2026/27\njenis: Keluaran/dokumen\nindependen: Ya\nklaim_didukung: Ada tiga format lembar nilai yang berbeda\ntanggal_versi_lokasi: Folder kurikulum semester ganjil\nstatus_pemeriksaan: Diperiksa sesuai klaim"
+        },
+        {
+          "source_id": "alternatif:p07-a-001",
+          "jenis": "SINTETIS",
+          "teks": "opsi: Sederhanakan\nkomitmen_penerima: Belum dibahas\ngap_penerima: Belum tahu\nrisiko_layanan: Guru perlu menyesuaikan lembar lama"
+        },
+        {
+          "source_id": "alternatif:p07-a-002",
+          "jenis": "SINTETIS",
+          "teks": "opsi: Uji terbatas\nkomitmen_penerima: Wali kelas kelas 4 bersedia\ngap_penerima: Belum tahu\nrisiko_layanan: Hasil uji belum mewakili semua kelas"
+        },
+        {
+          "source_id": "otorisasi:p07-m-001",
+          "jenis": "SINTETIS",
+          "teks": "{\"alternatif\":[{\"alternatif_id\":\"p07-a-001\",\"keputusan\":null,\"pemutus_kode_orang\":null,\"prasyarat_monitoring\":null,\"status_telaah\":\"Belum ditelaah\"},{\"alternatif_id\":\"p07-a-002\",\"keputusan\":\"Uji pada satu kelas\",\"pemutus_kode_orang\":\"O-9301\",\"prasyarat_monitoring\":\"Pantau dua minggu\",\"status_telaah\":\"Siap telaah\"}],\"change_ditandatangani\":false,\"prioritas_final\":\"P1 - Utama\",\"sumber\":\"server\"}"
+        }
+      ],
+      "parameter": {
+        "masalah_id": "p07-m-001",
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.decision_card",
+          "isi.limitation",
+          "isi.required_signoffs"
+        ],
+        "dilarang_pola": [
+          "verified",
+          "ready",
+          "approve",
+          "disetujui yayasan",
+          "sudah ditandatangani",
+          "boleh dijalankan",
+          "formasi ditetapkan",
+          "authorization_state"
+        ]
+      }
+    },
+    {
+      "id": "p07-m-surat-keterangan-belum-diprioritaskan",
+      "rujukan": [
+        "PRM:48-52",
+        "KAI:16"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "masalah:p07-m-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K02-01\nperiode_acuan: 2026/27\nrumusan_hipotesis: Surat keterangan siswa menumpuk di tata usaha\nsumber_awal_keterbatasan: Keluhan orang tua yang dicatat Tim\nstatus_awal: Diperkuat untuk klaim\ngelombang: Gelombang 1"
+        },
+        {
+          "source_id": "bukti:p07-b-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: B-0002\nlangkah_kode: L-002\nunit_periode: SMP Sintetis Dua 2026/27\njenis: Log/riwayat\nindependen: Ya\nklaim_didukung: Antrean permintaan surat tercatat lebih dari satu minggu\ntanggal_versi_lokasi: Buku agenda tata usaha\nstatus_pemeriksaan: Diperiksa sesuai klaim"
+        },
+        {
+          "source_id": "alternatif:p07-a-003",
+          "jenis": "SINTETIS",
+          "teks": "opsi: Alihkan tugas bersyarat\npihak_penerima_jabatan_id: jbt_sintetis_02\nkomitmen_penerima: Belum dibahas\ngap_penerima: Ada gap\nrisiko_layanan: Penerima belum terlatih"
+        },
+        {
+          "source_id": "otorisasi:p07-m-002",
+          "jenis": "SINTETIS",
+          "teks": "{\"alternatif\":[{\"alternatif_id\":\"p07-a-003\",\"keputusan\":null,\"pemutus_kode_orang\":null,\"prasyarat_monitoring\":null,\"status_telaah\":\"Tunda gap material\"}],\"change_ditandatangani\":false,\"prioritas_final\":null,\"sumber\":\"server\"}"
+        }
+      ],
+      "parameter": {
+        "masalah_id": "p07-m-002",
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.decision_card",
+          "isi.limitation",
+          "isi.required_signoffs"
+        ],
+        "dilarang_pola": [
+          "verified",
+          "ready",
+          "approve",
+          "disetujui yayasan",
+          "sudah ditandatangani",
+          "boleh dijalankan",
+          "formasi ditetapkan",
+          "authorization_state"
+        ]
+      }
+    },
+    {
+      "id": "p07-g-email-pada-alternatif-diblokir",
+      "rujukan": [
+        "PRM:6",
+        "PRM:48-52"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "masalah:p07-m-003",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K03-01\nperiode_acuan: 2026/27\nrumusan_hipotesis: Jadwal piket tidak tersampaikan\nsumber_awal_keterbatasan: Catatan Tim\nstatus_awal: Diperkuat untuk klaim\ngelombang: Gelombang 1"
+        },
+        {
+          "source_id": "alternatif:p07-a-004",
+          "jenis": "SINTETIS",
+          "teks": "opsi: Perbaiki alat/dukungan\nketerampilan_akses: Jadwal dikirim otomatis ke piket.sekolah@contoh.invalid\ngap_penerima: Belum tahu"
+        },
+        {
+          "source_id": "otorisasi:p07-m-003",
+          "jenis": "SINTETIS",
+          "teks": "{\"alternatif\":[{\"alternatif_id\":\"p07-a-004\",\"keputusan\":null,\"pemutus_kode_orang\":null,\"prasyarat_monitoring\":null,\"status_telaah\":\"Belum ditelaah\"}],\"change_ditandatangani\":false,\"prioritas_final\":null,\"sumber\":\"server\"}"
+        }
+      ],
+      "parameter": {
+        "masalah_id": "p07-m-003",
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "TANPA_MODEL",
+        "alasan_gerbang": "PII_DITEMUKAN",
+        "bidang_teks": [
+          "isi.decision_card",
+          "isi.limitation",
+          "isi.required_signoffs"
+        ]
+      }
+    }
+  ]
+}

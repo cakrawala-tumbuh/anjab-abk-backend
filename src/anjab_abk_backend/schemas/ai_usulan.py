@@ -178,6 +178,8 @@ class AiUsulanRead(AiUsulanRingkas):
     pencarian) dan wajib terisi.
     `isi` dan `amplop` adalah keluaran model (null sampai diserap) dan hanya keluar dari
     rute detail; `masukan` run tidak pernah dibuka dan `keluaran` run tidak lewat sini.
+    `konteks_server` (#125) diisi server saat pengajuan, bukan keluaran model; P07 menyimpan
+    `authorization_state` di sana, fungsi lain null.
 
     `putusan_terakhir` WAJIB dideklarasikan ulang sebagai `AiUsulanPutusanTerakhir`: Pydantic
     menyerialkan menurut tipe deklarasi dan `model_copy(update=...)` tidak memvalidasi, jadi
@@ -200,6 +202,13 @@ class AiUsulanRead(AiUsulanRingkas):
         default=None, description="Amplop keluaran model; null sampai diserap."
     )
     output_hash: str | None = Field(default=None, description="SHA-256 keluaran; null bila tanpa.")
+    konteks_server: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Cuplikan yang diisi server saat pengajuan, bukan oleh model. P07 memuat "
+            "`authorization_state`; fungsi lain null."
+        ),
+    )
     putusan: list[AiUsulanPutusanRead] = Field(
         default_factory=list, description="Seluruh putusan, urut waktu naik."
     )

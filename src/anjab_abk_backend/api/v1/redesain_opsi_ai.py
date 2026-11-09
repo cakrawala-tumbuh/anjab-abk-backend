@@ -56,10 +56,11 @@ class SyaratF4BelumTerpenuhiError(ConflictError):
     error_code = "SYARAT_F4_BELUM_TERPENUHI"
 
 
-def _galat_syarat_f4(alasan: list[str]) -> SyaratF4BelumTerpenuhiError:
+def galat_syarat_f4(alasan: list[str]) -> SyaratF4BelumTerpenuhiError:
     """Bangun galat 409 dengan satu `ErrorDetail` per kode syarat F4 yang gagal.
 
-    Envelope galat repo hanya mengenal `details` berupa daftar, jadi `alasan` gerbang dipetakan
+    Dipakai juga rute P07 (`redesain_kartu_keputusan_ai`). Envelope galat repo hanya mengenal
+    `details` berupa daftar, jadi `alasan` gerbang dipetakan
     ke `details[i].loc == ["alasan"]` dengan `details[i].code` = kode syaratnya.
 
     Args:
@@ -134,7 +135,7 @@ def ajukan_opsi_ai(
             raise NotFoundError(f"Masalah '{masalah_id}' tidak ditemukan.")
         alasan = periksa_syarat_f4(session, masalah_id)
         if alasan:
-            raise _galat_syarat_f4(alasan)
+            raise galat_syarat_f4(alasan)
         sumber = [
             *rakit_sumber_redesain(session, masalah_id, sertakan_konfirmasi=True),
             *rakit_sumber_alternatif(session, masalah_id),

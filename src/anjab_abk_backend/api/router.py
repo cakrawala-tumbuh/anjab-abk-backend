@@ -31,6 +31,7 @@ from .v1 import (
     redesain_cakupan_jabatan,
     redesain_ekspor,
     redesain_hipotesis_proses_ai,
+    redesain_kartu_keputusan_ai,
     redesain_kode_orang,
     redesain_konfirmasi,
     redesain_konteks,
@@ -295,6 +296,11 @@ api_router.include_router(
     redesain_opsi_ai.router,
     prefix="/redesain/masalah",
     tags=["redesain.opsi-ai"],
+)
+api_router.include_router(
+    redesain_kartu_keputusan_ai.router,
+    prefix="/redesain/masalah",
+    tags=["redesain.kartu-keputusan-ai"],
 )
 api_router.include_router(
     redesain_alternatif.router,

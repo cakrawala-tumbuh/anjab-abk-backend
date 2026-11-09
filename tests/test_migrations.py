@@ -39,6 +39,8 @@ Yang dijamin:
     `#122`): CHECK status `DRAF`/`TERVERIFIKASI`, FK `ON DELETE RESTRICT`, dan round-trip.
 13. ``test_riset_kasus_negatif_*`` — revisi DDL `ca3b9bb3b458` (tabel `riset_kasus_negatif`,
     backlog `#123`): FK `ON DELETE RESTRICT`, indeks `protokol_id`, dan round-trip.
+14. ``test_ai_usulan_konteks_server_*`` — revisi DDL `e4a7c19b2d63` (kolom JSONB nullable
+    `ai_usulan.konteks_server`, backlog `#125`): baris lama tetap `NULL` dan round-trip.
 
 Test berbasis-DB membangun **database sekali-pakai** terpisah dari DB test utama agar
 tidak mengganggu fixtur ``engine`` (yang sudah di-seed). Database itu dibuat & dihapus
@@ -1378,5 +1380,32 @@ def test_riset_kasus_negatif_fk_restrict_dan_roundtrip(fresh_db_url: str) -> Non
         assert "riset_kasus_negatif" not in set(inspect(engine).get_table_names())
         upgrade(fresh_db_url, "head")
         assert "riset_kasus_negatif" in set(inspect(engine).get_table_names())
+    finally:
+        engine.dispose()
+
+
+# --- Revisi `e4a7c19b2d63`: kolom `ai_usulan.konteks_server` (backlog `#125`) ------------
+
+_KONTEKS_SERVER_REVISION = "e4a7c19b2d63"
+
+
+def _kolom_ai_usulan(engine) -> set[str]:
+    return {c["name"] for c in inspect(engine).get_columns("ai_usulan")}
+
+
+def test_ai_usulan_konteks_server_nullable_dan_roundtrip(fresh_db_url: str) -> None:
+    """Kolom ditambah nullable (JSONB); downgrade ke `ca3b9bb3b458` membuangnya, upgrade ulang
+    memulihkannya."""
+    upgrade(fresh_db_url, _KONTEKS_SERVER_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        kolom = {c["name"]: c for c in inspect(engine).get_columns("ai_usulan")}
+        assert kolom["konteks_server"]["nullable"] is True
+        assert kolom["konteks_server"]["type"].__class__.__name__ == "JSONB"
+
+        downgrade(fresh_db_url, _RISET_KASUS_NEGATIF_REVISION)
+        assert "konteks_server" not in _kolom_ai_usulan(engine)
+        upgrade(fresh_db_url, "head")
+        assert "konteks_server" in _kolom_ai_usulan(engine)
     finally:
         engine.dispose()

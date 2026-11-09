@@ -1,5 +1,8 @@
 """Gerbang F4 (Kebijakan AI-First, KAI:16) bersama untuk fungsi AI P06 dan P07.
 
+P07 memakai ``periksa_syarat_p07``: gerbang yang sama ditambah syarat MX:12 (minimal satu
+alternatif tercatat, ``ALTERNATIF_BELUM_ADA``).
+
 Pada jalur F4, AI baru boleh menulis sesudah klaim dan analisis tervalidasi, data kuantitatif
 sah, dan audit bukti minimal. Isi "audit bukti minimal" belum dipastikan Tim Kajian, jadi
 modul ini memegang **definisi sementara yang bisa diuji** (versi ``VERSI_SYARAT_F4``) dan dapat
@@ -22,9 +25,10 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..models import RedesainBuktiModel, RedesainPenilaianModel
+from ..models import RedesainAlternatifModel, RedesainBuktiModel, RedesainPenilaianModel
 
 __all__ = [
+    "KODE_ALTERNATIF_BELUM_ADA",
     "KODE_AUDIT_BUKTI_BELUM_MINIMAL",
     "KODE_BUKTI_DIPERSELISIHKAN",
     "KODE_KLAIM_BELUM_TERVALIDASI",
@@ -33,6 +37,7 @@ __all__ = [
     "STATUS_PEMERIKSAAN_SESUAI",
     "VERSI_SYARAT_F4",
     "periksa_syarat_f4",
+    "periksa_syarat_p07",
 ]
 
 VERSI_SYARAT_F4 = "sementara-2026-11"
@@ -56,6 +61,9 @@ KODE_AUDIT_BUKTI_BELUM_MINIMAL = "AUDIT_BUKTI_BELUM_MINIMAL"
 
 KODE_BUKTI_DIPERSELISIHKAN = "BUKTI_DIPERSELISIHKAN"
 """Ada bukti masalah itu yang berstatus ``STATUS_PEMERIKSAAN_DIPERSELISIHKAN``."""
+
+KODE_ALTERNATIF_BELUM_ADA = "ALTERNATIF_BELUM_ADA"
+"""Khusus P07 (MX:12): masalah belum punya satu pun ``redesain_alternatif``."""
 
 
 def periksa_syarat_f4(session: Session, masalah_id: str) -> list[str]:
@@ -95,4 +103,34 @@ def periksa_syarat_f4(session: Session, masalah_id: str) -> list[str]:
         gagal.append(KODE_AUDIT_BUKTI_BELUM_MINIMAL)
     if hitung.get(STATUS_PEMERIKSAAN_DIPERSELISIHKAN):
         gagal.append(KODE_BUKTI_DIPERSELISIHKAN)
+    return gagal
+
+
+def periksa_syarat_p07(session: Session, masalah_id: str) -> list[str]:
+    """Periksa syarat pengajuan P07: gerbang F4 ditambah minimal satu alternatif (MX:12).
+
+    Kartu keputusan membandingkan alternatif yang sudah dicatat Tim, jadi selain
+    ``periksa_syarat_f4`` masalah wajib punya minimal satu ``redesain_alternatif``.
+    ``periksa_syarat_f4`` sendiri tidak berubah (P06 tetap memakai definisi tanpa syarat ini).
+
+    Args:
+        session: Sesi basis data.
+        masalah_id: Id ``redesain_masalah`` (keberadaannya diperiksa pemanggil).
+
+    Returns:
+        Kode syarat F4 yang gagal (urutan ``periksa_syarat_f4``), diikuti
+        ``ALTERNATIF_BELUM_ADA`` bila tanpa alternatif; kosong berarti lolos.
+
+    Example:
+        >>> periksa_syarat_p07(session, masalah_id)  # doctest: +SKIP
+        ['ALTERNATIF_BELUM_ADA']
+    """
+    gagal = periksa_syarat_f4(session, masalah_id)
+    ada = session.scalar(
+        select(RedesainAlternatifModel.id)
+        .where(RedesainAlternatifModel.masalah_id == masalah_id)
+        .limit(1)
+    )
+    if ada is None:
+        gagal.append(KODE_ALTERNATIF_BELUM_ADA)
     return gagal

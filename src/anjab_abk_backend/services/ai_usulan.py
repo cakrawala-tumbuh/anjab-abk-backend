@@ -77,8 +77,13 @@ class AiUsulanService(Protocol):
         sumber: list[SumberAi],
         parameter: dict[str, Any],
         principal: Principal,
+        konteks_server: dict[str, Any] | None = None,
     ) -> AiUsulanRingkas:
-        """Periksa gerbang, ajukan job lewat gateway, dan catat satu usulan."""
+        """Periksa gerbang, ajukan job lewat gateway, dan catat satu usulan.
+
+        `konteks_server` adalah cuplikan yang diisi server (P07: `authorization_state`),
+        disimpan apa adanya di `ai_usulan.konteks_server` dan tidak dikirim ke model.
+        """
         ...
 
     def sumber_dari_usulan(self, usulan_id: str) -> SumberAi:

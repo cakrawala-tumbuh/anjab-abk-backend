@@ -14,6 +14,7 @@ __all__ = [
     "PengajuanP03",
     "PengajuanP05",
     "PengajuanP06",
+    "PengajuanP07",
     "PengajuanP08",
 ]
 
@@ -122,6 +123,36 @@ class PengajuanP06(BaseModel):
         max_length=100,
         description="Kode periode konteks.",
         examples=["2026/27"],
+    )
+
+
+class PengajuanP07(BaseModel):
+    """Badan `POST /redesain/masalah/{masalah_id}/kartu-keputusan-ai` (P07).
+
+    Tanpa teks bebas maupun status otorisasi: sumber dan `authorization_state` dirakit server
+    dari data redesain masalah itu. Badan hanya membawa kode periode dan, opsional, id usulan
+    P06 yang ikut dirangkai sebagai sumber.
+
+    Attributes:
+        periode: Kode periode konteks; pola `POLA_PERIODE_AI`.
+        usulan_p06_id: Id `ai_usulan` P06 bersasaran masalah yang sama dan sudah diterima
+            reviewer (putusan terakhir `APPROVE` atau `REVISE`), atau `None`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    periode: str = Field(
+        pattern=POLA_PERIODE_AI,
+        max_length=100,
+        description="Kode periode konteks.",
+        examples=["2026/27"],
+    )
+    usulan_p06_id: str | None = Field(
+        default=None,
+        pattern=POLA_UUID,
+        max_length=36,
+        description="Id usulan P06 (UUID) yang sudah diterima reviewer; opsional.",
+        examples=["3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b"],
     )
 
 

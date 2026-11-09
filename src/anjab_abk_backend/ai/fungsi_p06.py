@@ -37,6 +37,7 @@ __all__ = [
     "SKEMA_ISI_P06",
     "ParameterP06",
     "aturan_p06",
+    "memuat_status_terlarang",
 ]
 
 JENIS_OPSI_P06 = ("STATUS_QUO", "SIMPLIFY", "AUTOMATE", "TRANSFER")
@@ -220,6 +221,26 @@ def _string_isi(nilai: Any) -> Iterator[str]:
             yield from _string_isi(v)
 
 
+def memuat_status_terlarang(isi: Any) -> bool:
+    """Apakah ada nilai string ``isi`` yang memuat kata utuh VERIFIED, READY, atau APPROVE.
+
+    Pemeriksaan bersama aturan ``STATUS_TERLARANG`` P06 dan P07: tak peka huruf, rekursif atas
+    nilai (kunci tidak ikut diperiksa), kata utuh sehingga ``READYMADE`` atau ``APPROVED_X``
+    tidak terkena.
+
+    Args:
+        isi: Field ``isi`` keluaran (atau bagian mana pun darinya).
+
+    Returns:
+        ``True`` bila ada kata status terlarang.
+
+    Example:
+        >>> memuat_status_terlarang({"a": ["Opsi ini Approve"]})
+        True
+    """
+    return any(_RE_STATUS_TERLARANG.search(t) for t in _string_isi(isi))
+
+
 def aturan_p06(isi: dict[str, Any], amplop: dict[str, Any]) -> list[str]:
     """Periksa keluaran P06 yang sudah lolos skema (terdaftar di ``ATURAN_ISI``).
 
@@ -259,9 +280,8 @@ def aturan_p06(isi: dict[str, Any], amplop: dict[str, Any]) -> list[str]:
         if not ids or any(sid not in dikenal for sid in ids):
             pelanggaran.append(KODE_RUJUKAN_TAK_DIKENAL)
             break
-    teks = list(_string_isi(isi))
-    if any(_RE_STATUS_TERLARANG.search(t) for t in teks):
+    if memuat_status_terlarang(isi):
         pelanggaran.append(KODE_STATUS_TERLARANG)
-    if any(_RE_ANGKA_FTE.search(t) for t in teks):
+    if any(_RE_ANGKA_FTE.search(t) for t in _string_isi(isi)):
         pelanggaran.append(KODE_ANGKA_FTE)
     return pelanggaran

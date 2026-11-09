@@ -1674,6 +1674,8 @@ class AiUsulanModel(Base):
     40 karakter agar muat id `jabatan` (`String(40)`) selain UUID.
     `diserap_at`, `hasil_serap`, `kode_serap`, `isi`, `amplop`, `output_hash` null sampai
     penyerap menulisnya; `isi` dan `amplop` adalah keluaran model dan tidak boleh dicatat ke log.
+    `konteks_server` diisi server saat pengajuan (bukan oleh model) dan tidak pernah dikirim ke
+    model; P07 menyimpan `{"authorization_state": ...}`, fungsi lain membiarkannya null.
     """
 
     __tablename__ = "ai_usulan"
@@ -1706,6 +1708,7 @@ class AiUsulanModel(Base):
     isi: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     amplop: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     output_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    konteks_server: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
 
 class AiUsulanPutusanModel(Base):

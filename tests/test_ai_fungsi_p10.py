@@ -73,7 +73,7 @@ def test_daftar_p10_idempoten_dan_dikosongkan():
     assert FUNGSI_TERDAFTAR == {"P10": FUNGSI_P10}
     assert KATALOG_FUNGSI["P10"] is FUNGSI_P10
     assert set(KATALOG_FUNGSI) == {
-        "P01", "P02", "P03", "P04", "P05", "P06", "P08", "P09", "P10"
+        "P01", "P02", "P03", "P04", "P05", "P06", "P07", "P08", "P09", "P10"
     }  # fmt: skip
     daftarkan_fungsi(_settings([]))
     assert FUNGSI_TERDAFTAR == {}

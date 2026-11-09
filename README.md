@@ -79,11 +79,12 @@ bawaan; mencantumkannya di `AI_JENIS_SUMBER_DIIZINKAN` adalah keputusan aktivasi
 - `USULAN_AI` — usulan AI yang sudah diterima reviewer (putusan terakhir `APPROVE` atau
   `REVISE`) dan dirangkai menjadi sumber fungsi lain sebagai `usulan:<id>`.
 - `REDESAIN` — data redesain satu masalah yang dirakit `rakit_sumber_redesain`
-  (`ai/sumber_redesain.py`, dipakai P05 dan P06, disiapkan untuk P07): `masalah:`, `proses:`,
+  (`ai/sumber_redesain.py`, dipakai P05, P06, dan P07): `masalah:`, `proses:`,
   `langkah:`, `bukti:`, `koreksi:`, `konfirmasi:` diikuti id baris; P06 menambah `alternatif:`
   (`rakit_sumber_alternatif`, tanpa status telaah, keputusan, dan pemutus). Teksnya field isi dan status;
   orang hanya lewat kode samaran. Konfirmasi hanya yang sudah terkirim, tanpa `cerita_sebelum`
-  dan `catatan_akses`; `catatan_privasi_gap` bukti tidak dikirim.
+  dan `catatan_akses`; `catatan_privasi_gap` bukti tidak dikirim. P07 menambah
+  `otorisasi:<masalah_id>` (`ai/otorisasi_redesain.py`): salinan baca `authorization_state`.
 - `RISET` — data riset satu protokol yang dirakit `rakit_sumber_riset` (`ai/sumber_riset.py`,
   dipakai P08): `protokol:` (kode, versi, `isi_hash`, isi), `statistik:` (hanya yang
   `TERVERIFIKASI`; nama analisis, `kode_sumber_ref`, keluaran), `kasus-negatif:`, dan
@@ -122,6 +123,29 @@ Masalah yang gagal dibalas `409 SYARAT_F4_BELUM_TERPENUHI` sebelum run dibuat, d
 FTE, formasi, maupun status persetujuan: aturan isi menandai usulan `MANUAL` bila ada kata utuh
 `VERIFIED`/`READY`/`APPROVE` (`STATUS_TERLARANG`), angka diikuti `FTE` (`ANGKA_FTE`), atau
 `source_ids` fakta yang asing/kosong (`RUJUKAN_TAK_DIKENAL`). Tab Alternatif tidak diisi otomatis.
+
+### Kartu keputusan P07 (status otorisasi milik server)
+
+`POST /api/v1/redesain/masalah/{masalah_id}/kartu-keputusan-ai` (P07, Executive Decision Pack
+Writer) menyusun kartu keputusan satu halaman untuk Tim: masalah, bukti, alternatif, batas angka,
+risiko, persyaratan, `limitation` (minimal satu), dan `required_signoffs` PRIORITY/CHANGE
+terpisah yang statusnya selalu `BELUM_DITANDATANGANI`. Badan `PengajuanP07` = `periode` dan
+opsional `usulan_p06_id` (usulan P06 masalah yang sama yang sudah diterima reviewer, dirangkai
+sebagai `USULAN_AI`). Syaratnya gerbang F4 di atas ditambah minimal satu `redesain_alternatif`
+(MX:12, `ALTERNATIF_BELUM_ADA`), dibalas `409 SYARAT_F4_BELUM_TERPENUHI` dengan bentuk yang sama.
+Usulan bukan P06 atau milik masalah lain `422 USULAN_BUKAN_P06`; usulan P06 belum diterima
+`409 USULAN_BELUM_DITERIMA`.
+
+**`authorization_state` tidak pernah berasal dari model.** Server membacanya saat pengajuan dari
+`redesain_alternatif` (`status_telaah`, `pemutus_kode_orang`, `keputusan`,
+`prasyarat_monitoring`) dan `redesain_penilaian.prioritas_final`, lalu menyimpannya di kolom
+`ai_usulan.konteks_server` (`{"authorization_state": {alternatif, prioritas_final,
+change_ditandatangani: false, sumber: "server", diambil_pada}}`; fungsi lain `null`), terbaca di
+`GET /api/v1/ai/usulan/{id}`. `change_ditandatangani` selalu `false` karena belum ada model tanda
+tangan. Skema keluaran P07 tidak punya kunci `authorization_state`; aturan isi menandai usulan
+`MANUAL` untuk `RUJUKAN_TAK_DIKENAL`, `STATUS_TERLARANG` (aturan P06), `CHANGE_TIDAK_DISEBUT`,
+dan `UNKNOWNS_KOSONG`. Kartu hanya untuk Tim: `/redesain/yayasan` dan `/redesain/ekspor` tidak
+membaca `ai_usulan`, dan P07 tidak mengubah `status_telaah` maupun `keputusan`.
 
 ### Sintesis bukti riset P08 (ditahan)
 
@@ -238,7 +262,8 @@ sifat fakta, angka baru, pola klaim terlaksana, dan span fakta, bukan atas `draf
 kandidat tugas dan rujukan `source_ids`, bukan atas `draft_text`). `P03` (tag peran versi terbatas; 3 kasus sintetis minimal di `evals/p03/kasus.json`, dinilai atas
 dasar mandat, status aktual, rujukan `source_ids`, dan `unknowns`). `P05` (hipotesis proses; 3 kasus sintetis minimal di `evals/p05/kasus.json`, dinilai atas
 status `HIPOTESIS`, penyangkal tiap hipotesis, dan rujukan `source_ids`). `P06` (draf opsi; 3 kasus sintetis minimal di `evals/p06/kasus.json`, dinilai atas
-opsi, `unknown_parameters`, rujukan `source_ids`, kata status terlarang, dan angka FTE). `P08` (sintesis bukti riset; 3 kasus sintetis minimal di `evals/p08/kasus.json`, dinilai atas
+opsi, `unknown_parameters`, rujukan `source_ids`, kata status terlarang, dan angka FTE). `P07` (kartu keputusan; 3 kasus sintetis minimal di `evals/p07/kasus.json`, dinilai atas
+isi kartu, `limitation`, larangan field `authorization_state`, dan seluruh aturan isi P07). `P08` (sintesis bukti riset; 3 kasus sintetis minimal di `evals/p08/kasus.json`, dinilai atas
 bagian naskah, `limitations`, dan seluruh aturan isi P08). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
 `AI_FUNGSI_AKTIF`. Contoh: `make eval-ai FUNGSI=P04 PENYEDIA=<jalur>`.
 

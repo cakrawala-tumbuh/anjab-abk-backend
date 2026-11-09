@@ -12,6 +12,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from anjab_abk_backend.ai.fungsi_p06 import KODE_ANGKA_FTE, KODE_STATUS_TERLARANG, aturan_p06
+from anjab_abk_backend.ai.fungsi_p07 import aturan_p07
 from anjab_abk_backend.ai.fungsi_p08 import aturan_p08
 
 from .kasus import Kasus
@@ -340,6 +341,37 @@ def _nilai_p06(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
     return pel
 
 
+def _nilai_p07(kasus: Kasus, status_qa: str, keluaran: dict[str, Any]) -> list[str]:
+    """Pemeriksaan khas P07: status, field persetujuan/otorisasi, isi minimum, dan ``aturan_p07``.
+
+    Pada ``LOLOS`` kartu wajib punya minimal satu butir bukti dan satu alternatif, serta minimal
+    satu ``limitation``. Nama field ``authorization_state`` (dan potongan ``approve``/``setuju``/
+    ``skor``) dilarang di ``isi``. Kode ``aturan_p07`` (rujukan asing/kosong, kata status
+    terlarang, tanpa signoff ``CHANGE``, ``unknowns`` kosong) dihitung terhadap ``source_id``
+    sumber kasus dan ``unknowns`` keluaran.
+    """
+    pel: list[str] = []
+    isi = keluaran.get("isi", {})
+    if status_qa not in kasus.harapan.status_qa:
+        pel.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
+    for nama in _nama_field(isi):
+        lipat = nama.casefold()
+        if lipat == "authorization_state" or any(k in lipat for k in KATA_FIELD_TERLARANG_P09):
+            pel.append(f"FIELD_PERSETUJUAN:{nama}")
+    kartu = isi.get("decision_card")
+    kartu = kartu if isinstance(kartu, dict) else {}
+    if status_qa == "LOLOS" and not (kartu.get("bukti") and kartu.get("alternatif")):
+        pel.append("KARTU_KOSONG_PADA_LOLOS")
+    if status_qa == "LOLOS" and not isi.get("limitation"):
+        pel.append("LIMITATION_KOSONG")
+    amplop = {
+        "source_refs": [{"source_id": s.source_id} for s in kasus.sumber],
+        "unknowns": keluaran.get("unknowns"),
+    }
+    pel.extend(aturan_p07(isi, amplop))
+    return pel
+
+
 def _nilai_p08(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
     """Pemeriksaan khas P08: status, field persetujuan, isi minimum, dan seluruh ``aturan_p08``.
 
@@ -377,7 +409,7 @@ def nilai(
         kode: Kode karantina bila ``KARANTINA``.
         keluaran: Keluaran hasil parse; ``None`` bila karantina.
         kode_fungsi: ``P10`` (bawaan, perilaku lama tak berubah), ``P09``, ``P01``, ``P02``,
-            ``P03``, ``P04``, ``P05``, ``P06``, atau ``P08``.
+            ``P03``, ``P04``, ``P05``, ``P06``, ``P07``, atau ``P08``.
 
     Returns:
         Daftar kode pelanggaran; kosong berarti lulus. Kode tidak memuat teks keluaran,
@@ -402,6 +434,8 @@ def nilai(
         pelanggaran.extend(_nilai_p05(kasus, status_qa, isi))
     elif kode_fungsi == "P06":
         pelanggaran.extend(_nilai_p06(kasus, status_qa, isi))
+    elif kode_fungsi == "P07":
+        pelanggaran.extend(_nilai_p07(kasus, status_qa, keluaran))
     elif kode_fungsi == "P08":
         pelanggaran.extend(_nilai_p08(kasus, status_qa, isi))
     else:
