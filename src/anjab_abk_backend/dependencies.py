@@ -108,6 +108,8 @@ from .services.idempotency_sql import SqlIdempotencyStore
 from .services.ratelimit import AllowAllRateLimiter, RateLimiter
 from .services.readiness import ReadinessCheck
 from .services.readiness_db import DatabaseReadinessCheck
+from .services.riset_protokol import RisetProtokolService
+from .services.riset_protokol_sql import SqlRisetProtokolService
 from .services.skema_db import SkemaDbService
 from .services.skema_db_sql import SqlSkemaDbService
 from .taskinv.schemas.sesi import TiSesiRead
@@ -417,6 +419,11 @@ def get_bukti_service(session: SessionDep) -> BuktiService:
 def get_narasi_sumber_service(session: SessionDep) -> NarasiSumberService:
     """SEAM: `NarasiSumberService` PostgreSQL (teks sumber narasi yang tak dapat diubah)."""
     return SqlNarasiSumberService(session)
+
+
+def get_riset_protokol_service(session: SessionDep) -> RisetProtokolService:
+    """SEAM: `RisetProtokolService` PostgreSQL (protokol riset berversi yang dapat dikunci)."""
+    return SqlRisetProtokolService(session)
 
 
 def get_narasi_service(session: SessionDep) -> NarasiService:

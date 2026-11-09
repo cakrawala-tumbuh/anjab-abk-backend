@@ -49,6 +49,7 @@ from anjab_abk_backend.narasi.schemas.kasus import (
     StatusNarasi,
 )
 from anjab_abk_backend.schemas.ai_usulan import PutusanUsulan, SasaranUsulan, TingkatKoreksi
+from anjab_abk_backend.schemas.riset_protokol import StatusProtokol
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -1794,3 +1795,42 @@ class NarasiEventModel(Base):
     ke_status: Mapped[str] = mapped_column(String(30), nullable=False)
     event_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     event_at: Mapped[datetime] = _ts()
+
+
+# ======================================================================================
+# Riset — protokol berversi yang dapat dikunci
+# ======================================================================================
+
+
+class RisetProtokolModel(Base):
+    """Protokol riset berversi (`riset_protokol`); sesudah `TERKUNCI` tak ada jalur API pengubah.
+
+    `versi` dihitung per `kode` (versi terbesar + 1, mulai 1) dan dijaga UNIQUE (`kode`, `versi`).
+    Perbaikan draf maupun revisi = baris `DRAF` baru dengan `kode` sama; tidak ada sunting atau
+    hapus. `isi_hash` (SHA-256 heksadesimal atas UTF-8 `isi`), `dikunci_oleh`, dan
+    `dikunci_pada` null sampai protokol dikunci.
+    """
+
+    __tablename__ = "riset_protokol"
+    __table_args__ = (
+        CheckConstraint(_in_check("status", StatusProtokol), name="status"),
+        UniqueConstraint("kode", "versi", name="uq_riset_protokol_kode_versi"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kode: Mapped[str] = mapped_column(String(40), nullable=False)
+    versi: Mapped[int] = mapped_column(Integer, nullable=False)
+    judul: Mapped[str] = mapped_column(String(200), nullable=False)
+    isi: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default=StatusProtokol.DRAF.value,
+        server_default=text("'DRAF'"),
+    )
+    isi_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    dibuat_oleh: Mapped[str] = mapped_column(String(200), nullable=False)
+    dikunci_oleh: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    dikunci_pada: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = _ts()
+    updated_at: Mapped[datetime] = _ts()

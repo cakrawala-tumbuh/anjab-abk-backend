@@ -82,6 +82,20 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-09] Protokol riset berversi yang dapat dikunci (rute `/riset/protokol`)
+
+Backlog `#119` (bagian pertama pecahan P08; statistik `#122`, kasus negatif `#123`, fungsi `#126`).
+
+- **Tabel `riset_protokol`** (migrasi `26b72008801d`): CHECK `ck_riset_protokol_status`
+  (`DRAF`/`TERKUNCI`), UNIQUE `uq_riset_protokol_kode_versi` (nama eksplisit karena konvensi `uq`
+  repo hanya memakai kolom pertama). `versi` = versi terbesar `kode` + 1; bentrok bersamaan dibalas
+  409 (hanya `UniqueViolation` yang dipetakan).
+- **Imutabilitas di lapisan API**, bukan trigger: tidak ada PATCH/PUT/DELETE/buka-kunci; satu-satunya
+  perubahan baris adalah `POST /{id}/kunci` (baris dikunci `FOR UPDATE`), kunci ulang 409
+  `PROTOKOL_TERKUNCI` (huruf besar, seperti `MODEL_DITOLAK`). Revisi = protokol `DRAF` baru.
+- Guard `require_tim_kajian` (admin tidak otomatis lolos); tidak ada role/izin baru.
+- Seam di `services/riset_protokol.py` (+ `_sql.py`), skema `schemas/riset_protokol.py`.
+
 ### [2026-11-05] API admin pengaturan penyedia AI (rute `/system/ai/penyedia`)
 
 Backlog `#110`, permukaan HTTP untuk `SqlAiPenyediaService` (`#109`). Pemakaian oleh worker milik

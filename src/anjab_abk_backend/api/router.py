@@ -40,6 +40,7 @@ from .v1 import (
     redesain_sesi,
     redesain_versi_metode,
     redesain_yayasan,
+    riset_protokol,
     sekolah,
     sme_panel,
     system,
@@ -298,6 +299,11 @@ api_router.include_router(
     ai_usulan.router,
     prefix="/ai/usulan",
     tags=["ai"],
+)
+api_router.include_router(
+    riset_protokol.router,
+    prefix="/riset/protokol",
+    tags=["riset"],
 )
 api_router.include_router(
     narasi_sumber.router,

@@ -33,6 +33,8 @@ Yang dijamin:
     + revisi data `dd4050714517` (backfill `cabang` dari `sekolah.provinsi`:
     Jawa Barat->Bandung, Jawa Tengah->Semarang, provinsi lain dibiarkan `NULL`,
     backlog `#40`) idempoten dan tidak menimpa `cabang` yang sudah terisi.
+11. ``test_riset_protokol_*`` — revisi DDL `26b72008801d` (tabel `riset_protokol`, backlog
+    `#119`): CHECK status `DRAF`/`TERKUNCI`, UNIQUE (`kode`, `versi`), dan round-trip.
 
 Test berbasis-DB membangun **database sekali-pakai** terpisah dari DB test utama agar
 tidak mengganggu fixtur ``engine`` (yang sudah di-seed). Database itu dibuat & dihapus
@@ -1219,5 +1221,53 @@ def test_sasaran_usulan_p02_roundtrip_downgrade_mengembalikan_check_dan_lebar(
         assert kolom["sasaran_id"]["type"].length == 40
         with engine.begin() as conn:
             _insert_ai_usulan_mig(conn, sasaran_jenis="JABATAN", sasaran_id="y" * 40)
+    finally:
+        engine.dispose()
+
+
+# --- Revisi `26b72008801d`: tabel `riset_protokol` (backlog `#119`) ----------------
+
+_RISET_PROTOKOL_REVISION = "26b72008801d"
+_RISET_PROTOKOL_DOWN = "12a4ee50e4f3"
+
+
+def _insert_riset_protokol_mig(conn, *, kode: str, versi: int, status: str | None = None) -> None:
+    """Sisipkan satu baris `riset_protokol` minimal lewat SQL mentah (tanpa ORM)."""
+    kolom = "id, kode, versi, judul, isi, dibuat_oleh, created_at, updated_at"
+    nilai = ":id, :kode, :versi, 'Judul', 'Isi', 'tester', now(), now()"
+    if status is not None:
+        kolom += ", status"
+        nilai += ", :status"
+    conn.execute(
+        text(f"INSERT INTO riset_protokol ({kolom}) VALUES ({nilai})"),
+        {"id": str(uuid.uuid4()), "kode": kode, "versi": versi, "status": status},
+    )
+
+
+def test_riset_protokol_check_unique_dan_roundtrip(fresh_db_url: str) -> None:
+    """Status default `DRAF`; `BATAL` ditolak CHECK; (`kode`, `versi`) ganda ditolak UNIQUE.
+
+    Downgrade ke `12a4ee50e4f3` membuang tabel; upgrade ulang memulihkannya.
+    """
+    upgrade(fresh_db_url, _RISET_PROTOKOL_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            _insert_riset_protokol_mig(conn, kode="PRT-1", versi=1)
+            status = conn.scalar(text("SELECT status FROM riset_protokol WHERE kode = 'PRT-1'"))
+        assert status == "DRAF"
+        with pytest.raises(Exception, match="ck_riset_protokol_status"):
+            with engine.begin() as conn:
+                _insert_riset_protokol_mig(conn, kode="PRT-2", versi=1, status="BATAL")
+        with pytest.raises(Exception, match="uq_riset_protokol_kode_versi"):
+            with engine.begin() as conn:
+                _insert_riset_protokol_mig(conn, kode="PRT-1", versi=1)
+        with engine.begin() as conn:
+            _insert_riset_protokol_mig(conn, kode="PRT-1", versi=2, status="TERKUNCI")
+
+        downgrade(fresh_db_url, _RISET_PROTOKOL_DOWN)
+        assert "riset_protokol" not in set(inspect(engine).get_table_names())
+        upgrade(fresh_db_url, "head")
+        assert "riset_protokol" in set(inspect(engine).get_table_names())
     finally:
         engine.dispose()
