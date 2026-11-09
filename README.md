@@ -84,6 +84,11 @@ bawaan; mencantumkannya di `AI_JENIS_SUMBER_DIIZINKAN` adalah keputusan aktivasi
   (`rakit_sumber_alternatif`, tanpa status telaah, keputusan, dan pemutus). Teksnya field isi dan status;
   orang hanya lewat kode samaran. Konfirmasi hanya yang sudah terkirim, tanpa `cerita_sebelum`
   dan `catatan_akses`; `catatan_privasi_gap` bukti tidak dikirim.
+- `RISET` — data riset satu protokol yang dirakit `rakit_sumber_riset` (`ai/sumber_riset.py`,
+  dipakai P08): `protokol:` (kode, versi, `isi_hash`, isi), `statistik:` (hanya yang
+  `TERVERIFIKASI`; nama analisis, `kode_sumber_ref`, keluaran), `kasus-negatif:`, dan
+  `versi-metode:` (seluruh `redesain_versi_metode` sebagai log versi) diikuti id baris. Statistik
+  `DRAF` dan identitas pembuat, pengunci, pemverifikasi, maupun pemeriksa tidak dikirim.
 
 P02 dan P03 mengirim `KATALOG_TI`; P03 juga mengirim `USULAN_AI`. Baris mandat P03 berbentuk
 `uraian:<uraian_id>@<jabatan_id>` dan teksnya hanya kode/nama jabatan serta field tugas.
@@ -117,6 +122,23 @@ Masalah yang gagal dibalas `409 SYARAT_F4_BELUM_TERPENUHI` sebelum run dibuat, d
 FTE, formasi, maupun status persetujuan: aturan isi menandai usulan `MANUAL` bila ada kata utuh
 `VERIFIED`/`READY`/`APPROVE` (`STATUS_TERLARANG`), angka diikuti `FTE` (`ANGKA_FTE`), atau
 `source_ids` fakta yang asing/kosong (`RUJUKAN_TAK_DIKENAL`). Tab Alternatif tidak diisi otomatis.
+
+### Sintesis bukti riset P08 (ditahan)
+
+`POST /api/v1/riset/protokol/{protokol_id}/sintesis-ai` (P08, Scientific Evidence Synthesizer)
+mengirim `RISET` dan hanya sah untuk protokol `TERKUNCI` (`409 PROTOKOL_BELUM_TERKUNCI`) yang
+punya minimal satu statistik `TERVERIFIKASI` (`409 STATISTIK_TERVERIFIKASI_KOSONG`); lebih dari
+60 sumber terakit ditolak `422 SUMBER_TERLALU_BANYAK`. Keluarannya draf bagian METODE/HASIL,
+tabel bukti, keterbatasan, dan klaim yang tidak didukung. Aturan isi menandai usulan `MANUAL`
+bila rujukan asing atau kosong (`RUJUKAN_TAK_DIKENAL`), klaim tabel bukti tidak menunjuk
+`statistik:` (`KLAIM_TANPA_STATISTIK`), bagian HASIL tanpa sumber `statistik:`
+(`HASIL_TANPA_STATISTIK`), atau naskah menyebut `Q1` maupun `signifikan`/`non-inferior` tanpa
+sumber `statistik:` (`KLAIM_TERLARANG`).
+
+**Pertimbangan aktivasi:** P08 dibangun atas putusan user meski Keputusan Tim Kajian 4 November
+menahan AI F5 (KTK:192) dan OD-09 belum terkunci. Karena itu P08 tidak ada di `AI_FUNGSI_AKTIF`
+bawaan dan `RISET` tidak ada di `AI_JENIS_SUMBER_DIIZINKAN` bawaan; menyalakan keduanya adalah
+putusan terpisah yang harus menimbang penahanan KTK:192 dan status OD-09.
 
 ### Batas P03 versi terbatas (tag peran)
 
@@ -216,7 +238,8 @@ sifat fakta, angka baru, pola klaim terlaksana, dan span fakta, bukan atas `draf
 kandidat tugas dan rujukan `source_ids`, bukan atas `draft_text`). `P03` (tag peran versi terbatas; 3 kasus sintetis minimal di `evals/p03/kasus.json`, dinilai atas
 dasar mandat, status aktual, rujukan `source_ids`, dan `unknowns`). `P05` (hipotesis proses; 3 kasus sintetis minimal di `evals/p05/kasus.json`, dinilai atas
 status `HIPOTESIS`, penyangkal tiap hipotesis, dan rujukan `source_ids`). `P06` (draf opsi; 3 kasus sintetis minimal di `evals/p06/kasus.json`, dinilai atas
-opsi, `unknown_parameters`, rujukan `source_ids`, kata status terlarang, dan angka FTE). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
+opsi, `unknown_parameters`, rujukan `source_ids`, kata status terlarang, dan angka FTE). `P08` (sintesis bukti riset; 3 kasus sintetis minimal di `evals/p08/kasus.json`, dinilai atas
+bagian naskah, `limitations`, dan seluruh aturan isi P08). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
 `AI_FUNGSI_AKTIF`. Contoh: `make eval-ai FUNGSI=P04 PENYEDIA=<jalur>`.
 
 `PENYEDIA` wajib dan tanpa nilai bawaan; kosong atau tak dikenal ditolak sebelum build dan

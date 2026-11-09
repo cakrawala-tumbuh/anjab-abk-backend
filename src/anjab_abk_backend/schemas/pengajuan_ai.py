@@ -14,6 +14,7 @@ __all__ = [
     "PengajuanP03",
     "PengajuanP05",
     "PengajuanP06",
+    "PengajuanP08",
 ]
 
 MAKS_DOKUMEN_P02 = 5
@@ -109,6 +110,26 @@ class PengajuanP06(BaseModel):
 
     Tanpa teks bebas maupun angka: sumber dirakit server dari data redesain dan alternatif masalah
     itu, badan hanya membawa kode periode.
+
+    Attributes:
+        periode: Kode periode konteks; pola `POLA_PERIODE_AI`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    periode: str = Field(
+        pattern=POLA_PERIODE_AI,
+        max_length=100,
+        description="Kode periode konteks.",
+        examples=["2026/27"],
+    )
+
+
+class PengajuanP08(BaseModel):
+    """Badan `POST /riset/protokol/{protokol_id}/sintesis-ai` (P08).
+
+    Tanpa teks bebas maupun angka: sumber dirakit server dari protokol terkunci, statistik
+    terverifikasi, kasus negatif, dan log versi metode; badan hanya membawa kode periode.
 
     Attributes:
         periode: Kode periode konteks; pola `POLA_PERIODE_AI`.

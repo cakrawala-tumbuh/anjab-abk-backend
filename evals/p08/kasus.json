@@ -1,0 +1,152 @@
+{
+  "fungsi": "P08",
+  "kasus": [
+    {
+      "id": "p08-m-reliabilitas-dcs-dengan-kasus-negatif",
+      "rujukan": [
+        "PRM:54-58",
+        "KAI:17"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "protokol:p08-pr-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: P08-DCS\nversi: 1\nisi_hash: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nisi:\nTujuan: mengukur reliabilitas instrumen DCS pada guru SD sintetis.\nMetode: Cronbach alpha per sub-skala, n minimum 30 responden."
+        },
+        {
+          "source_id": "statistik:p08-st-001",
+          "jenis": "SINTETIS",
+          "teks": "nama_analisis: Reliabilitas Cronbach alpha DCS\nkode_sumber_ref: analisis/dcs_alpha.py@3f2a9c1\nkeluaran:\nsub_skala  n   alpha\nTuntutan   34  0.81\nKendali    34  0.74"
+        },
+        {
+          "source_id": "kasus-negatif:p08-kn-001",
+          "jenis": "SINTETIS",
+          "teks": "ringkasan: Satu sekolah sintetis memberi alpha sub-skala Dukungan di bawah 0.6\nalasan_negatif: Berlawanan dengan dugaan reliabilitas memadai di semua unit"
+        },
+        {
+          "source_id": "versi-metode:p08-vm-001",
+          "jenis": "SINTETIS",
+          "teks": "versi: v1.3\ntanggal: 2026-11-01\nbagian: Skoring sub-skala\napa_diperbarui: Butir terbalik dihitung ulang\nalasan_risiko: Skor terbalik sempat salah arah\nstatus_hasil_uji: Lulus uji ulang"
+        }
+      ],
+      "parameter": {
+        "protokol_kode": "P08-DCS",
+        "protokol_versi": 1,
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.manuscript_sections",
+          "isi.evidence_table",
+          "isi.limitations",
+          "isi.unsupported_claims"
+        ],
+        "dilarang_pola": [
+          "q1",
+          "jurnal bereputasi",
+          "non-inferior",
+          "terbukti efektif",
+          "disetujui",
+          "approve",
+          "verified"
+        ]
+      }
+    },
+    {
+      "id": "p08-m-hasil-tanpa-uji-signifikansi",
+      "rujukan": [
+        "PRM:54-58",
+        "PRM:9"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "protokol:p08-pr-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: P08-TS\nversi: 2\nisi_hash: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nisi:\nTujuan: membandingkan rerata jam kerja tercatat sebelum dan sesudah redesain rekap nilai.\nMetode: statistik deskriptif; tidak ada uji hipotesis yang direncanakan."
+        },
+        {
+          "source_id": "statistik:p08-st-002",
+          "jenis": "SINTETIS",
+          "teks": "nama_analisis: Deskriptif jam rekap nilai\nkode_sumber_ref: analisis/ts_deskriptif.py@9b1e2d0\nkeluaran:\nkelompok  n   rerata_jam  sd\nsebelum   12  6.4         1.1\nsesudah   12  4.9         0.9"
+        },
+        {
+          "source_id": "kasus-negatif:p08-kn-002",
+          "jenis": "SINTETIS",
+          "teks": "ringkasan: Dua wali kelas sintetis mencatat jam rekap naik sesudah redesain\nalasan_negatif: Format baru belum dikuasai pada bulan pertama"
+        }
+      ],
+      "parameter": {
+        "protokol_kode": "P08-TS",
+        "protokol_versi": 2,
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.manuscript_sections",
+          "isi.evidence_table",
+          "isi.limitations",
+          "isi.unsupported_claims"
+        ],
+        "dilarang_pola": [
+          "q1",
+          "jurnal bereputasi",
+          "non-inferior",
+          "terbukti efektif",
+          "disetujui",
+          "approve",
+          "verified"
+        ]
+      }
+    },
+    {
+      "id": "p08-g-email-pada-kasus-negatif-diblokir",
+      "rujukan": [
+        "PRM:6",
+        "PRM:54-58"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "protokol:p08-pr-003",
+          "jenis": "SINTETIS",
+          "teks": "kode: P08-OPM\nversi: 1\nisi_hash: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\nisi:\nTujuan: menilai konsistensi rating OPM antar panel."
+        },
+        {
+          "source_id": "statistik:p08-st-003",
+          "jenis": "SINTETIS",
+          "teks": "nama_analisis: ICC rating OPM\nkode_sumber_ref: analisis/opm_icc.py@1c2d3e4\nkeluaran:\nICC(2,k) = 0.77"
+        },
+        {
+          "source_id": "kasus-negatif:p08-kn-003",
+          "jenis": "SINTETIS",
+          "teks": "ringkasan: Rating panel B menyimpang, dilaporkan oleh panel.b@contoh.invalid\nalasan_negatif: Tidak sejalan dengan panel lain"
+        }
+      ],
+      "parameter": {
+        "protokol_kode": "P08-OPM",
+        "protokol_versi": 1,
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "TANPA_MODEL",
+        "alasan_gerbang": "PII_DITEMUKAN",
+        "bidang_teks": [
+          "isi.manuscript_sections",
+          "isi.evidence_table",
+          "isi.limitations",
+          "isi.unsupported_claims"
+        ]
+      }
+    }
+  ]
+}
