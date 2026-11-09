@@ -35,6 +35,8 @@ Yang dijamin:
     backlog `#40`) idempoten dan tidak menimpa `cabang` yang sudah terisi.
 11. ``test_riset_protokol_*`` — revisi DDL `26b72008801d` (tabel `riset_protokol`, backlog
     `#119`): CHECK status `DRAF`/`TERKUNCI`, UNIQUE (`kode`, `versi`), dan round-trip.
+12. ``test_riset_statistik_*`` — revisi DDL `aa0aebd31d4a` (tabel `riset_statistik`, backlog
+    `#122`): CHECK status `DRAF`/`TERVERIFIKASI`, FK `ON DELETE RESTRICT`, dan round-trip.
 
 Test berbasis-DB membangun **database sekali-pakai** terpisah dari DB test utama agar
 tidak mengganggu fixtur ``engine`` (yang sudah di-seed). Database itu dibuat & dihapus
@@ -1269,5 +1271,60 @@ def test_riset_protokol_check_unique_dan_roundtrip(fresh_db_url: str) -> None:
         assert "riset_protokol" not in set(inspect(engine).get_table_names())
         upgrade(fresh_db_url, "head")
         assert "riset_protokol" in set(inspect(engine).get_table_names())
+    finally:
+        engine.dispose()
+
+
+# --- Revisi `aa0aebd31d4a`: tabel `riset_statistik` (backlog `#122`) ----------------
+
+_RISET_STATISTIK_REVISION = "aa0aebd31d4a"
+
+
+def _insert_riset_statistik_mig(conn, *, protokol_id: str, status: str | None = None) -> None:
+    """Sisipkan satu baris `riset_statistik` minimal lewat SQL mentah (tanpa ORM)."""
+    kolom = "id, protokol_id, nama_analisis, keluaran, kode_sumber_ref, dibuat_oleh, created_at"
+    nilai = ":id, :pid, 'Analisis', 'alpha = 0.8', 'skrip.py@abc', 'tester', now()"
+    if status is not None:
+        kolom += ", status"
+        nilai += ", :status"
+    conn.execute(
+        text(f"INSERT INTO riset_statistik ({kolom}) VALUES ({nilai})"),
+        {"id": str(uuid.uuid4()), "pid": protokol_id, "status": status},
+    )
+
+
+def test_riset_statistik_check_fk_restrict_dan_roundtrip(fresh_db_url: str) -> None:
+    """Status default `DRAF`; status asing ditolak CHECK; protokol asing ditolak FK.
+
+    Protokol yang sudah menjadi dasar statistik tidak bisa dihapus (`ON DELETE RESTRICT`).
+    Downgrade ke `26b72008801d` membuang tabel; upgrade ulang memulihkannya.
+    """
+    upgrade(fresh_db_url, _RISET_STATISTIK_REVISION)
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            _insert_riset_protokol_mig(conn, kode="STAT-MIG", versi=1, status="TERKUNCI")
+            pid = conn.scalar(text("SELECT id FROM riset_protokol WHERE kode = 'STAT-MIG'"))
+            _insert_riset_statistik_mig(conn, protokol_id=pid)
+            status = conn.scalar(text("SELECT status FROM riset_statistik"))
+        assert status == "DRAF"
+        with pytest.raises(Exception, match="ck_riset_statistik_status"):
+            with engine.begin() as conn:
+                _insert_riset_statistik_mig(conn, protokol_id=pid, status="BATAL")
+        with pytest.raises(Exception, match="fk_riset_statistik_protokol_id_riset_protokol"):
+            with engine.begin() as conn:
+                _insert_riset_statistik_mig(conn, protokol_id="tidak-ada")
+        with pytest.raises(Exception, match="fk_riset_statistik_protokol_id_riset_protokol"):
+            with engine.begin() as conn:
+                conn.execute(text("DELETE FROM riset_protokol WHERE id = :id"), {"id": pid})
+        with engine.begin() as conn:
+            _insert_riset_statistik_mig(conn, protokol_id=pid, status="TERVERIFIKASI")
+        indeks = {i["name"] for i in inspect(engine).get_indexes("riset_statistik")}
+        assert "ix_riset_statistik_protokol_id" in indeks
+
+        downgrade(fresh_db_url, _RISET_PROTOKOL_REVISION)
+        assert "riset_statistik" not in set(inspect(engine).get_table_names())
+        upgrade(fresh_db_url, "head")
+        assert "riset_statistik" in set(inspect(engine).get_table_names())
     finally:
         engine.dispose()

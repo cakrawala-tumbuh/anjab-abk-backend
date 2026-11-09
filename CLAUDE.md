@@ -82,6 +82,21 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-09] Statistik riset dengan verifikasi independen (rute `/riset/.../statistik`)
+
+Backlog `#122` (bagian kedua pecahan P08; protokol `#119`, kasus negatif `#123`, fungsi `#126`).
+
+- **Tabel `riset_statistik`** (migrasi `aa0aebd31d4a`): FK `protokol_id` ke `riset_protokol.id`
+  `ON DELETE RESTRICT` (protokol yang sudah menjadi dasar statistik tak bisa dihapus), CHECK
+  `ck_riset_statistik_status` (`DRAF`/`TERVERIFIKASI`), hanya `created_at` (tanpa `updated_at`).
+- **Hanya protokol `TERKUNCI`**: create membaca protokol `FOR SHARE`; `DRAF` -> 409
+  `PROTOKOL_BELUM_TERKUNCI`. Verifikasi mengunci baris `FOR UPDATE`; urutan cek 404 -> 409
+  `STATISTIK_SUDAH_TERVERIFIKASI` -> 409 `PEMVERIFIKASI_TIDAK_INDEPENDEN` (subjek token =
+  `dibuat_oleh`). Independensi adalah aturan subjek, bukan role baru; guard tetap `require_tim_kajian`.
+- **Imutabilitas di lapisan API**: tidak ada sunting/hapus/pembatalan verifikasi; koreksi = baris baru.
+- Router `api/v1/riset_statistik.py` di-mount prefix `/riset`; seam `services/riset_statistik.py`
+  (+ `_sql.py`), skema `schemas/riset_statistik.py`. Kode galat huruf besar seperti `PROTOKOL_TERKUNCI`.
+
 ### [2026-11-09] Protokol riset berversi yang dapat dikunci (rute `/riset/protokol`)
 
 Backlog `#119` (bagian pertama pecahan P08; statistik `#122`, kasus negatif `#123`, fungsi `#126`).

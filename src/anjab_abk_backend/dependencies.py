@@ -110,6 +110,8 @@ from .services.readiness import ReadinessCheck
 from .services.readiness_db import DatabaseReadinessCheck
 from .services.riset_protokol import RisetProtokolService
 from .services.riset_protokol_sql import SqlRisetProtokolService
+from .services.riset_statistik import RisetStatistikService
+from .services.riset_statistik_sql import SqlRisetStatistikService
 from .services.skema_db import SkemaDbService
 from .services.skema_db_sql import SqlSkemaDbService
 from .taskinv.schemas.sesi import TiSesiRead
@@ -424,6 +426,11 @@ def get_narasi_sumber_service(session: SessionDep) -> NarasiSumberService:
 def get_riset_protokol_service(session: SessionDep) -> RisetProtokolService:
     """SEAM: `RisetProtokolService` PostgreSQL (protokol riset berversi yang dapat dikunci)."""
     return SqlRisetProtokolService(session)
+
+
+def get_riset_statistik_service(session: SessionDep) -> RisetStatistikService:
+    """SEAM: `RisetStatistikService` PostgreSQL (statistik riset dengan verifikasi independen)."""
+    return SqlRisetStatistikService(session)
 
 
 def get_narasi_service(session: SessionDep) -> NarasiService:

@@ -61,7 +61,12 @@ def test_tanpa_patch_put_delete(client_as, client):
     assert c.delete(f"{URL}/{pid}").status_code == 405
     paths = client.get("/openapi.json").json()["paths"]
     rute = {p: ops for p, ops in paths.items() if p.startswith(URL)}
-    assert set(rute) == {URL, f"{URL}/{{protokol_id}}", f"{URL}/{{protokol_id}}/kunci"}
+    assert set(rute) == {
+        URL,
+        f"{URL}/{{protokol_id}}",
+        f"{URL}/{{protokol_id}}/kunci",
+        f"{URL}/{{protokol_id}}/statistik",  # statistik riset (#122), juga tanpa sunting
+    }
     for p, ops in rute.items():
         assert not ({"patch", "put", "delete"} & set(ops)), p
         for op in ops.values():

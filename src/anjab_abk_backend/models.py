@@ -50,6 +50,7 @@ from anjab_abk_backend.narasi.schemas.kasus import (
 )
 from anjab_abk_backend.schemas.ai_usulan import PutusanUsulan, SasaranUsulan, TingkatKoreksi
 from anjab_abk_backend.schemas.riset_protokol import StatusProtokol
+from anjab_abk_backend.schemas.riset_statistik import StatusStatistik
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -1834,3 +1835,39 @@ class RisetProtokolModel(Base):
     dikunci_pada: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = _ts()
     updated_at: Mapped[datetime] = _ts()
+
+
+class RisetStatistikModel(Base):
+    """Keluaran analisis statistik per protokol riset `TERKUNCI` (`riset_statistik`).
+
+    Tidak ada sunting atau hapus; koreksi = baris baru. Satu-satunya perubahan baris adalah
+    verifikasi sekali jalan (`DRAF` -> `TERVERIFIKASI`) oleh subjek yang bukan `dibuat_oleh`.
+    FK ke `riset_protokol` memakai `ON DELETE RESTRICT` agar protokol yang sudah menjadi dasar
+    statistik tidak bisa hilang diam-diam.
+    """
+
+    __tablename__ = "riset_statistik"
+    __table_args__ = (CheckConstraint(_in_check("status", StatusStatistik), name="status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    protokol_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("riset_protokol.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    nama_analisis: Mapped[str] = mapped_column(String(200), nullable=False)
+    keluaran: Mapped[str] = mapped_column(Text, nullable=False)
+    kode_sumber_ref: Mapped[str] = mapped_column(String(500), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default=StatusStatistik.DRAF.value,
+        server_default=text("'DRAF'"),
+    )
+    dibuat_oleh: Mapped[str] = mapped_column(String(200), nullable=False)
+    diverifikasi_oleh: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    diverifikasi_pada: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = _ts()
