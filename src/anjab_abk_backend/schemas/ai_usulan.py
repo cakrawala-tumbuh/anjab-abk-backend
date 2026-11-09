@@ -27,7 +27,8 @@ class SasaranUsulan(StrEnum):
 
     Dikunci CHECK `ck_ai_usulan_sasaran_jenis`. `JABATAN` dipakai P02 (sasaran `jabatan.id`);
     `REDESAIN_MASALAH` dan `PROTOKOL_RISET` disiapkan untuk fungsi berikutnya di batch yang sama
-    agar tidak ada migrasi enum per fungsi.
+    agar tidak ada migrasi enum per fungsi. `REDESAIN_KONTEKS` (P11 Pengusul Konteks) menyasar
+    katalog konteks redesain; ditambah lewat revisi `b7d3e5a91c48`.
     """
 
     NARASI_KASUS = "NARASI_KASUS"
@@ -35,6 +36,7 @@ class SasaranUsulan(StrEnum):
     JABATAN = "JABATAN"
     REDESAIN_MASALAH = "REDESAIN_MASALAH"
     PROTOKOL_RISET = "PROTOKOL_RISET"
+    REDESAIN_KONTEKS = "REDESAIN_KONTEKS"
 
 
 class HasilSerapUsulan(StrEnum):

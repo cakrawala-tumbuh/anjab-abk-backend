@@ -1409,3 +1409,45 @@ def test_ai_usulan_konteks_server_nullable_dan_roundtrip(fresh_db_url: str) -> N
         assert "konteks_server" in _kolom_ai_usulan(engine)
     finally:
         engine.dispose()
+
+
+# --- Revisi `b7d3e5a91c48`: SasaranUsulan.REDESAIN_KONTEKS (backlog `#129`) ---
+
+_SASARAN_KONTEKS_REVISION = "b7d3e5a91c48"
+_SASARAN_KONTEKS_DOWN = "e4a7c19b2d63"
+
+
+def test_sasaran_usulan_redesain_konteks_check_menerima_dan_menolak_asing(
+    fresh_db_url: str,
+) -> None:
+    """Revisi `b7d3e5a91c48`: `REDESAIN_KONTEKS` sah, nilai asing tetap ditolak CHECK."""
+    upgrade(fresh_db_url, "head")
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            _insert_ai_usulan_mig(conn, sasaran_jenis="REDESAIN_KONTEKS", sasaran_id="k1")
+        with pytest.raises(Exception, match="ck_ai_usulan_sasaran_jenis"):
+            with engine.begin() as conn:
+                _insert_ai_usulan_mig(conn, sasaran_jenis="ASING", sasaran_id="x")
+    finally:
+        engine.dispose()
+
+
+def test_sasaran_usulan_redesain_konteks_roundtrip(fresh_db_url: str) -> None:
+    """Downgrade menolak `REDESAIN_KONTEKS` lagi; gagal bila baris ada; naik ulang bersih."""
+    upgrade(fresh_db_url, _SASARAN_KONTEKS_REVISION)
+    downgrade(fresh_db_url, _SASARAN_KONTEKS_DOWN)
+    engine = create_engine(fresh_db_url)
+    try:
+        with pytest.raises(Exception, match="ck_ai_usulan_sasaran_jenis"):
+            with engine.begin() as conn:
+                _insert_ai_usulan_mig(conn, sasaran_jenis="REDESAIN_KONTEKS", sasaran_id="x")
+        with engine.begin() as conn:
+            _insert_ai_usulan_mig(conn, sasaran_jenis="JABATAN", sasaran_id="x")
+        upgrade(fresh_db_url, "head")
+        with engine.begin() as conn:
+            _insert_ai_usulan_mig(conn, sasaran_jenis="REDESAIN_KONTEKS", sasaran_id="y")
+        with pytest.raises(Exception, match="ck_ai_usulan_sasaran_jenis"):
+            downgrade(fresh_db_url, _SASARAN_KONTEKS_DOWN)
+    finally:
+        engine.dispose()
