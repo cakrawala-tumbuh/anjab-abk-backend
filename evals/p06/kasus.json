@@ -1,0 +1,167 @@
+{
+  "fungsi": "P06",
+  "kasus": [
+    {
+      "id": "p06-m-rekap-nilai-dengan-alternatif",
+      "rujukan": [
+        "PRM:42-46",
+        "KAI:16"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "masalah:p06-m-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K01-01\nperiode_acuan: 2026/27\nrumusan_hipotesis: Rekap nilai semester terlambat diserahkan ke wali kelas\nsumber_awal_keterbatasan: Catatan rapat guru\nstatus_awal: Diperkuat untuk klaim\ngelombang: Gelombang 1"
+        },
+        {
+          "source_id": "proses:p06-p-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: P-001\nmasalah_kode: M-K01-01\nsekolah: SD Sintetis Satu\nperiode: 2026/27\nnama_proses: Penyusunan rekap nilai semester"
+        },
+        {
+          "source_id": "langkah:p06-l-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: L-001\nproses_kode: P-001\nurutan: 1\ntahap: Penggabungan nilai\npemicu_input: Lembar nilai dari guru\npelaksana: Wali kelas\npekerjaan_sistem: Menyalin nilai dari tiga format lembar ke rekap kelas\nkeluaran_penerima: Rekap kelas ke kepala sekolah\nhambatan: Format lembar berbeda antar guru\nstatus_langkah: Dicatat"
+        },
+        {
+          "source_id": "bukti:p06-b-001",
+          "jenis": "SINTETIS",
+          "teks": "kode: B-0001\nlangkah_kode: L-001\nunit_periode: SD Sintetis Satu 2026/27\njenis: Keluaran/dokumen\nindependen: Ya\nklaim_didukung: Ada tiga format lembar nilai yang berbeda\ntanggal_versi_lokasi: Folder kurikulum semester ganjil\nstatus_pemeriksaan: Diperiksa sesuai klaim"
+        },
+        {
+          "source_id": "alternatif:p06-a-001",
+          "jenis": "SINTETIS",
+          "teks": "opsi: Sederhanakan\nkomitmen_penerima: Belum dibahas\ngap_penerima: Belum tahu\nrisiko_layanan: Guru perlu menyesuaikan lembar lama"
+        }
+      ],
+      "parameter": {
+        "masalah_id": "p06-m-001",
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.options",
+          "isi.scenario_assumptions",
+          "isi.unknown_parameters",
+          "isi.risks",
+          "isi.checks"
+        ],
+        "dilarang_pola": [
+          "verified",
+          "ready",
+          "approve",
+          "disetujui",
+          "siap dijalankan",
+          "formasi ditetapkan",
+          "slot kosong sehingga"
+        ]
+      }
+    },
+    {
+      "id": "p06-m-alih-tugas-penerima-tunggal",
+      "rujukan": [
+        "PRM:42-46",
+        "PRM:91"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "masalah:p06-m-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K02-01\nperiode_acuan: 2026/27\nrumusan_hipotesis: Surat keterangan siswa menumpuk di tata usaha\nsumber_awal_keterbatasan: Keluhan orang tua yang dicatat Tim\nstatus_awal: Diperkuat untuk klaim\ngelombang: Gelombang 1"
+        },
+        {
+          "source_id": "proses:p06-p-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: P-002\nmasalah_kode: M-K02-01\nsekolah: SMP Sintetis Dua\nperiode: 2026/27\nnama_proses: Penerbitan surat keterangan"
+        },
+        {
+          "source_id": "langkah:p06-l-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: L-002\nproses_kode: P-002\nurutan: 1\ntahap: Penyusunan surat\npemicu_input: Permintaan orang tua\npelaksana: Staf tata usaha\npekerjaan_sistem: Mengetik ulang data siswa dari buku induk\nkeluaran_penerima: Draf surat ke kepala sekolah\nhambatan: Data siswa belum digital\nstatus_langkah: Dicatat"
+        },
+        {
+          "source_id": "bukti:p06-b-002",
+          "jenis": "SINTETIS",
+          "teks": "kode: B-0002\nlangkah_kode: L-002\nunit_periode: SMP Sintetis Dua 2026/27\njenis: Jejak sistem\nindependen: Ya\nklaim_didukung: Antrean permintaan surat tercatat di buku agenda\ntanggal_versi_lokasi: Buku agenda TU Oktober\nstatus_pemeriksaan: Diperiksa sesuai klaim"
+        },
+        {
+          "source_id": "alternatif:p06-a-002",
+          "jenis": "SINTETIS",
+          "teks": "opsi: Alihkan tugas bersyarat\npihak_penerima_jabatan_id: jbt_sintetis_operator\nkomitmen_penerima: Belum ada pernyataan kesanggupan\njadwal_puncak: Awal tahun ajaran\nketerampilan_akses: Akses aplikasi data siswa belum dipastikan\ngap_penerima: Belum tahu\nrisiko_layanan: Surat tertunda bila penerima sedang puncak kerja"
+        }
+      ],
+      "parameter": {
+        "masalah_id": "p06-m-002",
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.options",
+          "isi.scenario_assumptions",
+          "isi.unknown_parameters",
+          "isi.risks",
+          "isi.checks"
+        ],
+        "dilarang_pola": [
+          "verified",
+          "ready",
+          "approve",
+          "disetujui",
+          "siap dijalankan",
+          "formasi ditetapkan",
+          "slot kosong sehingga"
+        ]
+      }
+    },
+    {
+      "id": "p06-g-email-pada-alternatif-diblokir",
+      "rujukan": [
+        "PRM:6",
+        "PRM:42-46"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "masalah:p06-m-003",
+          "jenis": "SINTETIS",
+          "teks": "kode: M-K03-01\nperiode_acuan: 2026/27\nrumusan_hipotesis: Jadwal piket tidak tersampaikan\nsumber_awal_keterbatasan: Catatan Tim\nstatus_awal: Diperkuat untuk klaim\ngelombang: Gelombang 1"
+        },
+        {
+          "source_id": "langkah:p06-l-003",
+          "jenis": "SINTETIS",
+          "teks": "kode: L-003\nproses_kode: P-003\nurutan: 1\ntahap: Pengiriman jadwal\npemicu_input: Awal bulan\npelaksana: Wakil kepala sekolah\npekerjaan_sistem: Mengirim jadwal manual\nkeluaran_penerima: Jadwal ke guru piket\nstatus_langkah: Dicatat"
+        },
+        {
+          "source_id": "alternatif:p06-a-003",
+          "jenis": "SINTETIS",
+          "teks": "opsi: Perbaiki alat/dukungan\nketerampilan_akses: Jadwal dikirim otomatis ke piket.sekolah@contoh.invalid\ngap_penerima: Belum tahu"
+        }
+      ],
+      "parameter": {
+        "masalah_id": "p06-m-003",
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "TANPA_MODEL",
+        "alasan_gerbang": "PII_DITEMUKAN",
+        "bidang_teks": [
+          "isi.options",
+          "isi.scenario_assumptions",
+          "isi.unknown_parameters",
+          "isi.risks",
+          "isi.checks"
+        ]
+      }
+    }
+  ]
+}

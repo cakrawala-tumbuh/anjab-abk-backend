@@ -7,7 +7,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..ai.fungsi_p02 import POLA_KODE_P02
 from ..ai.masukan import POLA_PERIODE_AI
 
-__all__ = ["MAKS_DOKUMEN_P02", "POLA_UUID", "PengajuanP02", "PengajuanP03", "PengajuanP05"]
+__all__ = [
+    "MAKS_DOKUMEN_P02",
+    "POLA_UUID",
+    "PengajuanP02",
+    "PengajuanP03",
+    "PengajuanP05",
+    "PengajuanP06",
+]
 
 MAKS_DOKUMEN_P02 = 5
 """Jumlah maksimum `narasi_sumber` pendukung per pengajuan P02."""
@@ -82,6 +89,26 @@ class PengajuanP05(BaseModel):
 
     Tanpa teks bebas: sumber dirakit server dari data redesain masalah itu, badan hanya membawa
     kode periode.
+
+    Attributes:
+        periode: Kode periode konteks; pola `POLA_PERIODE_AI`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    periode: str = Field(
+        pattern=POLA_PERIODE_AI,
+        max_length=100,
+        description="Kode periode konteks.",
+        examples=["2026/27"],
+    )
+
+
+class PengajuanP06(BaseModel):
+    """Badan `POST /redesain/masalah/{masalah_id}/opsi-ai` (P06).
+
+    Tanpa teks bebas maupun angka: sumber dirakit server dari data redesain dan alternatif masalah
+    itu, badan hanya membawa kode periode.
 
     Attributes:
         periode: Kode periode konteks; pola `POLA_PERIODE_AI`.

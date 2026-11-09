@@ -3,7 +3,8 @@
 Satu masalah redesain dirangkai menjadi daftar ``SumberAi`` berjenis ``REDESAIN``: masalah itu
 sendiri, proses dan langkah ALUR-nya, bukti, koreksi langkah, dan (opsional) konfirmasi sekolah.
 Tiap sumber satu baris tabel, ``source_id`` berawalan nama tabelnya (``masalah:``, ``proses:``,
-``langkah:``, ``bukti:``, ``koreksi:``, ``konfirmasi:``) diikuti id baris.
+``langkah:``, ``bukti:``, ``koreksi:``, ``konfirmasi:``) diikuti id baris. Alternatif redesain
+(``alternatif:``, dipakai P06) dirakit terpisah lewat ``rakit_sumber_alternatif``.
 
 Batas isi:
 
@@ -28,6 +29,7 @@ from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.orm import Session
 
 from ..models import (
+    RedesainAlternatifModel,
     RedesainBuktiModel,
     RedesainKonfirmasiModel,
     RedesainKoreksiLangkahModel,
@@ -45,6 +47,7 @@ __all__ = [
     "FIELD_SUMBER_REDESAIN",
     "JENIS_SUMBER_REDESAIN",
     "proses_terhubung",
+    "rakit_sumber_alternatif",
     "rakit_sumber_redesain",
     "sumber_redesain",
     "teks_sumber_redesain",
@@ -54,8 +57,16 @@ JENIS_SUMBER_REDESAIN = "REDESAIN"
 """Jenis sumber data redesain. Baru boleh dikirim ke model bila operator mencantumkannya di
 ``AI_JENIS_SUMBER_DIIZINKAN`` (keputusan aktivasi, bukan bawaan)."""
 
-AWALAN_SUMBER_REDESAIN = ("masalah:", "proses:", "langkah:", "bukti:", "koreksi:", "konfirmasi:")
-"""Awalan ``source_id`` yang dihasilkan perakit, satu per tabel sumber."""
+AWALAN_SUMBER_REDESAIN = (
+    "masalah:",
+    "proses:",
+    "langkah:",
+    "bukti:",
+    "koreksi:",
+    "konfirmasi:",
+    "alternatif:",
+)
+"""Awalan ``source_id`` yang dihasilkan modul ini, satu per tabel sumber."""
 
 FIELD_SUMBER_REDESAIN: dict[str, tuple[str, ...]] = {
     "masalah": (
@@ -119,6 +130,16 @@ FIELD_SUMBER_REDESAIN: dict[str, tuple[str, ...]] = {
         "indikasi_risiko",
         "status",
     ),
+    "alternatif": (
+        "opsi",
+        "pihak_penerima_jabatan_id",
+        "komitmen_penerima",
+        "jadwal_puncak",
+        "keterampilan_akses",
+        "tambahan_bersih",
+        "gap_penerima",
+        "risiko_layanan",
+    ),
 }
 """Satu-satunya kunci yang boleh muncul pada teks sumber per tabel. ``cerita_sebelum``,
 ``catatan_akses``, dan ``catatan_privasi_gap`` sengaja tidak ada."""
@@ -155,7 +176,7 @@ def sumber_redesain(tabel: str, baris_id: str, nilai: dict[str, Any]) -> SumberA
 
     Args:
         tabel: Nama tabel sumber (``masalah``, ``proses``, ``langkah``, ``bukti``, ``koreksi``,
-            atau ``konfirmasi``); menjadi awalan ``source_id``.
+            ``konfirmasi``, atau ``alternatif``); menjadi awalan ``source_id``.
         baris_id: Id baris di tabelnya.
         nilai: Field baris (lihat ``teks_sumber_redesain``).
 
@@ -292,3 +313,28 @@ def rakit_sumber_redesain(
             nilai = _kolom(konfirmasi, FIELD_SUMBER_REDESAIN["konfirmasi"])
             hasil.append(sumber_redesain("konfirmasi", konfirmasi.id, nilai))
     return hasil
+
+
+def rakit_sumber_alternatif(session: Session, masalah_id: str) -> list[SumberAi]:
+    """Rangkai tiap ``redesain_alternatif`` satu masalah menjadi sumber AI ``REDESAIN``.
+
+    Satu sumber per alternatif, ``source_id`` ``alternatif:<id>``, urut ``kode``. Teks hanya
+    memuat field ``FIELD_SUMBER_REDESAIN["alternatif"]`` (opsi, penerima berupa id jabatan,
+    komitmen, jadwal puncak, keterampilan/akses, tambahan bersih, gap, risiko layanan); status
+    telaah, keputusan, dan pemutus tidak pernah ikut, sehingga model tidak membaca putusan Tim.
+
+    Args:
+        session: Sesi basis data.
+        masalah_id: Id ``redesain_masalah``.
+
+    Returns:
+        Daftar sumber; kosong bila masalah tidak punya alternatif.
+    """
+    return [
+        sumber_redesain("alternatif", alt.id, _kolom(alt, FIELD_SUMBER_REDESAIN["alternatif"]))
+        for alt in session.scalars(
+            select(RedesainAlternatifModel)
+            .where(RedesainAlternatifModel.masalah_id == masalah_id)
+            .order_by(RedesainAlternatifModel.kode)
+        ).all()
+    ]

@@ -13,6 +13,7 @@ from .fungsi_p02 import FUNGSI_P02
 from .fungsi_p03 import FUNGSI_P03
 from .fungsi_p04 import FUNGSI_P04
 from .fungsi_p05 import FUNGSI_P05
+from .fungsi_p06 import FUNGSI_P06
 from .fungsi_p09 import FUNGSI_P09
 from .fungsi_p10 import FUNGSI_P10
 from .gateway import FUNGSI_TERDAFTAR, FungsiAi
@@ -25,6 +26,7 @@ KATALOG_FUNGSI: dict[str, FungsiAi] = {
     "P03": FUNGSI_P03,
     "P04": FUNGSI_P04,
     "P05": FUNGSI_P05,
+    "P06": FUNGSI_P06,
     "P09": FUNGSI_P09,
     "P10": FUNGSI_P10,
 }

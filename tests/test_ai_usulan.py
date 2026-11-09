@@ -24,6 +24,7 @@ from anjab_abk_backend.ai.fungsi_p02 import aturan_p02
 from anjab_abk_backend.ai.fungsi_p03 import aturan_p03
 from anjab_abk_backend.ai.fungsi_p04 import aturan_p04
 from anjab_abk_backend.ai.fungsi_p05 import aturan_p05
+from anjab_abk_backend.ai.fungsi_p06 import aturan_p06
 from anjab_abk_backend.ai.gateway import FUNGSI_TERDAFTAR, AiGateway, FungsiAi
 from anjab_abk_backend.ai.penyerap_usulan import ATURAN_ISI, serap_usulan, serap_usulan_tertunda
 from anjab_abk_backend.ai.redaksi import SumberAi
@@ -199,6 +200,7 @@ def test_registri_bawaan_kosong_dan_aturan_isi_hanya_p04():
         "P03": aturan_p03,
         "P04": aturan_p04,
         "P05": aturan_p05,
+        "P06": aturan_p06,
     }
 
 

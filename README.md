@@ -79,8 +79,9 @@ bawaan; mencantumkannya di `AI_JENIS_SUMBER_DIIZINKAN` adalah keputusan aktivasi
 - `USULAN_AI` — usulan AI yang sudah diterima reviewer (putusan terakhir `APPROVE` atau
   `REVISE`) dan dirangkai menjadi sumber fungsi lain sebagai `usulan:<id>`.
 - `REDESAIN` — data redesain satu masalah yang dirakit `rakit_sumber_redesain`
-  (`ai/sumber_redesain.py`, dipakai P05 dan disiapkan untuk P06/P07): `masalah:`, `proses:`,
-  `langkah:`, `bukti:`, `koreksi:`, `konfirmasi:` diikuti id baris. Teksnya field isi dan status;
+  (`ai/sumber_redesain.py`, dipakai P05 dan P06, disiapkan untuk P07): `masalah:`, `proses:`,
+  `langkah:`, `bukti:`, `koreksi:`, `konfirmasi:` diikuti id baris; P06 menambah `alternatif:`
+  (`rakit_sumber_alternatif`, tanpa status telaah, keputusan, dan pemutus). Teksnya field isi dan status;
   orang hanya lewat kode samaran. Konfirmasi hanya yang sudah terkirim, tanpa `cerita_sebelum`
   dan `catatan_akses`; `catatan_privasi_gap` bukti tidak dikirim.
 
@@ -93,6 +94,29 @@ minimal satu langkah (`409 SUMBER_PROSES_BELUM_TERHUBUNG`); lebih dari 60 sumber
 `422 SUMBER_TERLALU_BANYAK`. Hasilnya draf alur, hipotesis berstatus `HIPOTESIS`, pemeriksaan
 penyangkal, dan celah bukti di `ai_usulan` — bukan akar penyebab terbukti; tidak ada kolom
 hipotesis di tabel redesain, jadi Tim memindahkannya secara manual.
+
+### Gerbang F4 P06 (definisi sementara)
+
+`POST /api/v1/redesain/masalah/{masalah_id}/opsi-ai` (P06, draf opsi STATUS_QUO/SIMPLIFY/
+AUTOMATE/TRANSFER) mengirim `REDESAIN` dan hanya sah untuk masalah yang lolos gerbang F4
+(Kebijakan AI-First, KAI:16). **Definisi "audit bukti minimal" di bawah adalah keputusan
+sementara** (`VERSI_SYARAT_F4 = "sementara-2026-11"`, `ai/syarat_f4.py`) karena isinya belum
+dipastikan Tim Kajian; versinya ikut tercatat di `parameter` run dan bisa direvisi:
+
+1. `redesain_penilaian.status_bukti` masalah itu `Diperkuat untuk klaim`, bila tidak
+   `KLAIM_BELUM_TERVALIDASI` (tanpa penilaian juga gagal di sini).
+2. Audit bukti minimal: minimal satu `redesain_bukti` masalah itu `Diperiksa sesuai klaim`, bila
+   tidak `AUDIT_BUKTI_BELUM_MINIMAL`; dan tidak ada bukti `Diperselisihkan`, bila ada
+   `BUKTI_DIPERSELISIHKAN`.
+3. Data kuantitatif sah: tidak ada angka tak terverifikasi yang dikirim
+   (`source_verified_quantities` di `parameter` selalu kosong, `ti_detail.jam_per_minggu` tidak
+   dirakit) dan skema keluaran mewajibkan `unknown_parameters` terisi.
+
+Masalah yang gagal dibalas `409 SYARAT_F4_BELUM_TERPENUHI` sebelum run dibuat, dengan satu
+`details[]` ber-`loc: ["alasan"]` per kode syarat (`details[].code`). Keluaran P06 tidak memuat
+FTE, formasi, maupun status persetujuan: aturan isi menandai usulan `MANUAL` bila ada kata utuh
+`VERIFIED`/`READY`/`APPROVE` (`STATUS_TERLARANG`), angka diikuti `FTE` (`ANGKA_FTE`), atau
+`source_ids` fakta yang asing/kosong (`RUJUKAN_TAK_DIKENAL`). Tab Alternatif tidak diisi otomatis.
 
 ### Batas P03 versi terbatas (tag peran)
 
@@ -191,7 +215,8 @@ sifat fakta, angka baru, pola klaim terlaksana, dan span fakta, bukan atas `draf
 `material`, pertanyaan tunggal, dan pola pertanyaan mengarahkan, bukan atas `draft_text`). `P02` (normalisasi tugas katalog; 3 kasus sintetis minimal di `evals/p02/kasus.json`, dinilai atas
 kandidat tugas dan rujukan `source_ids`, bukan atas `draft_text`). `P03` (tag peran versi terbatas; 3 kasus sintetis minimal di `evals/p03/kasus.json`, dinilai atas
 dasar mandat, status aktual, rujukan `source_ids`, dan `unknowns`). `P05` (hipotesis proses; 3 kasus sintetis minimal di `evals/p05/kasus.json`, dinilai atas
-status `HIPOTESIS`, penyangkal tiap hipotesis, dan rujukan `source_ids`). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
+status `HIPOTESIS`, penyangkal tiap hipotesis, dan rujukan `source_ids`). `P06` (draf opsi; 3 kasus sintetis minimal di `evals/p06/kasus.json`, dinilai atas
+opsi, `unknown_parameters`, rujukan `source_ids`, kata status terlarang, dan angka FTE). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
 `AI_FUNGSI_AKTIF`. Contoh: `make eval-ai FUNGSI=P04 PENYEDIA=<jalur>`.
 
 `PENYEDIA` wajib dan tanpa nilai bawaan; kosong atau tak dikenal ditolak sebelum build dan

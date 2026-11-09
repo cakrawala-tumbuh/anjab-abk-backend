@@ -11,6 +11,8 @@ import re
 from collections.abc import Iterable
 from typing import Any
 
+from anjab_abk_backend.ai.fungsi_p06 import KODE_ANGKA_FTE, KODE_STATUS_TERLARANG, aturan_p06
+
 from .kasus import Kasus
 
 __all__ = ["KATA_BILANGAN", "bilangan_dalam", "nilai", "normalkan"]
@@ -301,6 +303,42 @@ def _nilai_p05(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
     return pel
 
 
+def _nilai_p06(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
+    """Pemeriksaan khas P06: status, field persetujuan, opsi, rujukan, kata status, dan FTE.
+
+    Pada ``LOLOS`` minimal satu opsi dan satu ``unknown_parameters`` wajib ada. Setiap
+    ``fakta_sumber[].source_ids`` harus menunjuk ``source_id`` sumber kasus, minimal satu per
+    fakta. String isi tidak boleh memuat kata utuh ``VERIFIED``/``READY``/``APPROVE`` maupun
+    angka diikuti ``FTE`` (sama dengan ``aturan_p06``).
+    """
+    pel: list[str] = []
+    if status_qa not in kasus.harapan.status_qa:
+        pel.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
+    for nama in _nama_field(isi):
+        if any(kata in nama.casefold() for kata in KATA_FIELD_TERLARANG_P09):
+            pel.append(f"FIELD_PERSETUJUAN:{nama}")
+    opsi = isi.get("options")
+    opsi = [x for x in opsi if isinstance(x, dict)] if isinstance(opsi, list) else []
+    if status_qa == "LOLOS" and not opsi:
+        pel.append("OPSI_KOSONG_PADA_LOLOS")
+    if status_qa == "LOLOS" and not isi.get("unknown_parameters"):
+        pel.append("UNKNOWN_PARAMETERS_KOSONG")
+    dikenal = {s.source_id for s in kasus.sumber}
+    for i, o in enumerate(opsi):
+        fakta = o.get("fakta_sumber")
+        fakta = [x for x in fakta if isinstance(x, dict)] if isinstance(fakta, list) else []
+        for j, f in enumerate(fakta):
+            ids = f.get("source_ids")
+            ids = [str(x) for x in ids] if isinstance(ids, list) else []
+            if not ids or any(x not in dikenal for x in ids):
+                pel.append(f"RUJUKAN_TAK_DIKENAL:options:{i}:{j}")
+    refs = {"source_refs": [{"source_id": s} for s in dikenal]}
+    for kode in aturan_p06(isi, refs):
+        if kode in (KODE_STATUS_TERLARANG, KODE_ANGKA_FTE):
+            pel.append(kode)
+    return pel
+
+
 def nilai(
     kasus: Kasus,
     status_qa: str,
@@ -316,7 +354,7 @@ def nilai(
         kode: Kode karantina bila ``KARANTINA``.
         keluaran: Keluaran hasil parse; ``None`` bila karantina.
         kode_fungsi: ``P10`` (bawaan, perilaku lama tak berubah), ``P09``, ``P01``, ``P02``,
-            ``P03``, ``P04``, atau ``P05``.
+            ``P03``, ``P04``, ``P05``, atau ``P06``.
 
     Returns:
         Daftar kode pelanggaran; kosong berarti lulus. Kode tidak memuat teks keluaran,
@@ -339,6 +377,8 @@ def nilai(
         pelanggaran.extend(_nilai_p04(kasus, status_qa, isi))
     elif kode_fungsi == "P05":
         pelanggaran.extend(_nilai_p05(kasus, status_qa, isi))
+    elif kode_fungsi == "P06":
+        pelanggaran.extend(_nilai_p06(kasus, status_qa, isi))
     else:
         if status_qa not in h.status_qa:
             pelanggaran.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
