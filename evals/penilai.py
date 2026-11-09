@@ -224,6 +224,44 @@ def _nilai_p02(kasus: Kasus, status_qa: str, isi: dict[str, Any]) -> list[str]:
     return pel
 
 
+def _nilai_p03(kasus: Kasus, status_qa: str, keluaran: dict[str, Any]) -> list[str]:
+    """Pemeriksaan khas P03 terbatas: status, tanpa field persetujuan, tag, dan dasar mandat.
+
+    Pada ``LOLOS`` minimal satu tag wajib ada. Tiap tag harus ``dasar`` ``MANDAT_FORMAL`` dan
+    ``status_aktual`` ``BELUM_DIKETAHUI``, setiap ``source_ids``-nya menunjuk ``source_id``
+    sumber kasus, dan minimal satu berawalan ``uraian:`` (sama dengan ``aturan_p03``).
+    ``unknowns`` amplop wajib terisi (ketiadaan sumber penugasan aktual).
+    """
+    isi = keluaran.get("isi", {})
+    isi = isi if isinstance(isi, dict) else {}
+    pel: list[str] = []
+    if status_qa not in kasus.harapan.status_qa:
+        pel.append(f"STATUS_TIDAK_SESUAI:{status_qa}")
+    for nama in _nama_field(isi):
+        if any(kata in nama.casefold() for kata in KATA_FIELD_TERLARANG_P09):
+            pel.append(f"FIELD_PERSETUJUAN:{nama}")
+    tags = isi.get("tag_candidates")
+    tags = [x for x in tags if isinstance(x, dict)] if isinstance(tags, list) else []
+    if status_qa == "LOLOS" and not tags:
+        pel.append("TAG_KOSONG_PADA_LOLOS")
+    dikenal = {s.source_id for s in kasus.sumber}
+    for i, tag in enumerate(tags):
+        if tag.get("dasar") != "MANDAT_FORMAL":
+            pel.append(f"DASAR_BUKAN_MANDAT:{i}")
+        if tag.get("status_aktual") != "BELUM_DIKETAHUI":
+            pel.append(f"STATUS_AKTUAL_DINYATAKAN:{i}")
+        ids = tag.get("source_ids")
+        ids = [str(x) for x in ids] if isinstance(ids, list) else []
+        if any(x not in dikenal for x in ids):
+            pel.append(f"RUJUKAN_TAK_DIKENAL:tag_candidates:{i}")
+        if not any(x.startswith("uraian:") for x in ids):
+            pel.append(f"TANPA_DASAR_MANDAT:{i}")
+    unknowns = keluaran.get("unknowns")
+    if not (isinstance(unknowns, list) and any(str(u).strip() for u in unknowns)):
+        pel.append("UNKNOWNS_KOSONG")
+    return pel
+
+
 def nilai(
     kasus: Kasus,
     status_qa: str,
@@ -239,7 +277,7 @@ def nilai(
         kode: Kode karantina bila ``KARANTINA``.
         keluaran: Keluaran hasil parse; ``None`` bila karantina.
         kode_fungsi: ``P10`` (bawaan, perilaku lama tak berubah), ``P09``, ``P01``, ``P02``,
-            atau ``P04``.
+            ``P03``, atau ``P04``.
 
     Returns:
         Daftar kode pelanggaran; kosong berarti lulus. Kode tidak memuat teks keluaran,
@@ -256,6 +294,8 @@ def nilai(
         pelanggaran.extend(_nilai_p01(kasus, status_qa, isi))
     elif kode_fungsi == "P02":
         pelanggaran.extend(_nilai_p02(kasus, status_qa, isi))
+    elif kode_fungsi == "P03":
+        pelanggaran.extend(_nilai_p03(kasus, status_qa, keluaran))
     elif kode_fungsi == "P04":
         pelanggaran.extend(_nilai_p04(kasus, status_qa, isi))
     else:

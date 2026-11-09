@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from anjab_abk_backend.ai import penyerap_usulan
 from anjab_abk_backend.ai.fungsi_p01 import aturan_p01
 from anjab_abk_backend.ai.fungsi_p02 import aturan_p02
+from anjab_abk_backend.ai.fungsi_p03 import aturan_p03
 from anjab_abk_backend.ai.fungsi_p04 import aturan_p04
 from anjab_abk_backend.ai.gateway import FUNGSI_TERDAFTAR, AiGateway, FungsiAi
 from anjab_abk_backend.ai.penyerap_usulan import ATURAN_ISI, serap_usulan, serap_usulan_tertunda
@@ -191,7 +192,12 @@ def test_usulan_sama_belum_diserap_409_usulan_berjalan_lalu_lepas_setelah_serap(
 
 def test_registri_bawaan_kosong_dan_aturan_isi_hanya_p04():
     assert FUNGSI_TERDAFTAR == {}
-    assert ATURAN_ISI == {"P01": aturan_p01, "P02": aturan_p02, "P04": aturan_p04}
+    assert ATURAN_ISI == {
+        "P01": aturan_p01,
+        "P02": aturan_p02,
+        "P03": aturan_p03,
+        "P04": aturan_p04,
+    }
 
 
 # --- penyerapan ---------------------------------------------------------------------------

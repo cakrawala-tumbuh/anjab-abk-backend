@@ -54,6 +54,7 @@ from .v1 import (
     taskinv_responden,
     taskinv_seleksi,
     taskinv_sesi,
+    taskinv_tag_peran_ai,
     taskinv_tahap2,
     taskinv_tugas_pokok,
     taskinv_uraian_tugas,
@@ -224,6 +225,11 @@ api_router.include_router(
     taskinv_normalisasi_ai.router,
     prefix="/task-inventory",
     tags=["taskinv.normalisasi-ai"],
+)
+api_router.include_router(
+    taskinv_tag_peran_ai.router,
+    prefix="/task-inventory",
+    tags=["taskinv.tag-peran-ai"],
 )
 api_router.include_router(
     ts_kuesioner.router,

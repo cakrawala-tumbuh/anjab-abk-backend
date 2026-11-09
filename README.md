@@ -79,6 +79,27 @@ bawaan; mencantumkannya di `AI_JENIS_SUMBER_DIIZINKAN` adalah keputusan aktivasi
 - `USULAN_AI` — usulan AI yang sudah diterima reviewer (putusan terakhir `APPROVE` atau
   `REVISE`) dan dirangkai menjadi sumber fungsi lain sebagai `usulan:<id>`.
 
+P02 dan P03 mengirim `KATALOG_TI`; P03 juga mengirim `USULAN_AI`. Baris mandat P03 berbentuk
+`uraian:<uraian_id>@<jabatan_id>` dan teksnya hanya kode/nama jabatan serta field tugas.
+
+### Batas P03 versi terbatas (tag peran)
+
+`POST /api/v1/task-inventory/jabatan/{jabatan_id}/tag-peran-ai` (P03) sengaja dibangun terbatas
+karena sumber penugasan berperiode belum ada di aplikasi:
+
+- Masukan hanya usulan P02 jabatan itu yang sudah diterima reviewer, ditambah baris mandat formal
+  (`ti_uraian_tugas_jabatan`) dari semua jabatan untuk uraian yang dirujuk usulan tersebut.
+  `assignment_sources` tidak pernah dikirim, dan tabel petunjuk aktual (jabatan tambahan
+  partisipan, seleksi/detail Task Inventory, pelaksana langkah redesain) tidak dibaca.
+- Tiap tag berdasar `MANDAT_FORMAL` dengan `status_aktual` selalu `BELUM_DIKETAHUI` (dikunci
+  skema). Mandat formal bukan bukti tugas dikerjakan.
+- `unknowns` wajib terisi; kosong membuat usulan `MANUAL` (`UNKNOWNS_KOSONG`). Tag tanpa sumber
+  `uraian:` menjadi `TANPA_DASAR_MANDAT`, rujukan asing `RUJUKAN_TAK_DIKENAL`.
+
+Syarat membuka versi penuh: model penugasan berperiode dan roster unit (butir 16-17) tersedia di
+aplikasi, terisi data lapangan, lalu dicatat sebagai item backlog baru yang mengubah skema `isi`
+dan menambah sumber penugasan. Sampai saat itu jangan melonggarkan `const` di skema.
+
 Env `ANTHROPIC_API_KEY`, `AI_MODEL`, dan `AI_EFFORT` tidak lagi dibaca; model, effort, dan
 kunci hanya berasal dari pengaturan penyedia. Tiap `ai_run` mencatat `penyedia`.
 
@@ -156,7 +177,8 @@ make eval-ai FUNGSI=P10 PENYEDIA=LANGGANAN_CLAUDE CLAUDE_VOLUME=eval-claude
 `draft_text`). `P01` (ekstraksi fakta dari dokumen sumber; 10 kasus di `evals/p01/kasus.json`, dinilai atas
 sifat fakta, angka baru, pola klaim terlaksana, dan span fakta, bukan atas `draft_text`). `P04` (pengusul satu pertanyaan bukti netral tanpa pengiriman; 8 kasus di `evals/p04/kasus.json`, dinilai atas
 `material`, pertanyaan tunggal, dan pola pertanyaan mengarahkan, bukan atas `draft_text`). `P02` (normalisasi tugas katalog; 3 kasus sintetis minimal di `evals/p02/kasus.json`, dinilai atas
-kandidat tugas dan rujukan `source_ids`, bukan atas `draft_text`). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
+kandidat tugas dan rujukan `source_ids`, bukan atas `draft_text`). `P03` (tag peran versi terbatas; 3 kasus sintetis minimal di `evals/p03/kasus.json`, dinilai atas
+dasar mandat, status aktual, rujukan `source_ids`, dan `unknowns`). Fungsi baru wajib lulus evaluasi ini sebelum operator memasukkannya ke
 `AI_FUNGSI_AKTIF`. Contoh: `make eval-ai FUNGSI=P04 PENYEDIA=<jalur>`.
 
 `PENYEDIA` wajib dan tanpa nilai bawaan; kosong atau tak dikenal ditolak sebelum build dan

@@ -1,0 +1,126 @@
+{
+  "fungsi": "P03",
+  "kasus": [
+    {
+      "id": "p03-m-mandat-tunggal",
+      "rujukan": [
+        "PRM:24-28",
+        "KAI:13"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "usulan:p03-us-001",
+          "jenis": "SINTETIS",
+          "teks": "{\"duplicate_suspicions\":[],\"reviewer_questions\":[],\"split_merge_rationale\":[],\"task_candidates\":[{\"cara\":\"mengikuti format sekolah\",\"objek\":\"rencana pelaksanaan pembelajaran\",\"output\":\"rencana pelaksanaan pembelajaran tersusun\",\"source_ids\":[\"uraian:p03-ut-001\"],\"tindakan\":\"Menyusun\",\"tingkat\":\"TASK\",\"tujuan\":\"tertib administrasi\"}]}"
+        },
+        {
+          "source_id": "uraian:p03-ut-001@jbt_p03_guru",
+          "jenis": "SINTETIS",
+          "teks": "jabatan_kode: GURU-SD\njabatan_nama: Guru Kelas\nkode: GURU-SD-001\nunit: SD\ntugas_pokok: Perencanaan pembelajaran\nuraian: Menyusun rencana pelaksanaan pembelajaran untuk setiap pertemuan"
+        }
+      ],
+      "parameter": {
+        "jabatan_kode": "GURU-SD",
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.tag_candidates",
+          "isi.owner_ambiguities"
+        ],
+        "dilarang_pola": [
+          "sedang dikerjakan",
+          "sudah dikerjakan",
+          "telah dilaksanakan",
+          "ditugaskan secara tetap",
+          "penugasan aktual terverifikasi",
+          "disetujui"
+        ]
+      }
+    },
+    {
+      "id": "p03-m-mandat-ganda-jadi-ambiguitas",
+      "rujukan": [
+        "PRM:24-28",
+        "KAI:13"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "usulan:p03-us-002",
+          "jenis": "SINTETIS",
+          "teks": "{\"duplicate_suspicions\":[],\"reviewer_questions\":[],\"split_merge_rationale\":[],\"task_candidates\":[{\"cara\":\"mengikuti format sekolah\",\"objek\":\"surat masuk dan keluar\",\"output\":\"surat masuk dan keluar tersusun\",\"source_ids\":[\"uraian:p03-ut-002\"],\"tindakan\":\"Mengarsipkan\",\"tingkat\":\"TASK\",\"tujuan\":\"tertib administrasi\"}]}"
+        },
+        {
+          "source_id": "uraian:p03-ut-002@jbt_p03_tu",
+          "jenis": "SINTETIS",
+          "teks": "jabatan_kode: TU-SD\njabatan_nama: Staf Tata Usaha\nkode: TU-SD-010\nunit: SD\ntugas_pokok: Administrasi\nuraian: Mengarsipkan surat masuk dan surat keluar sekolah"
+        },
+        {
+          "source_id": "uraian:p03-ut-002@jbt_p03_ks",
+          "jenis": "SINTETIS",
+          "teks": "jabatan_kode: KS-SD\njabatan_nama: Kepala Sekolah\nkode: KS-SD-031\nunit: SD\ntugas_pokok: Administrasi\nuraian: Mengarsipkan surat masuk dan surat keluar sekolah"
+        }
+      ],
+      "parameter": {
+        "jabatan_kode": "TU-SD",
+        "periode": "2026-27"
+      },
+      "harapan": {
+        "jalur": "MODEL",
+        "status_qa": [
+          "LOLOS"
+        ],
+        "bidang_teks": [
+          "isi.tag_candidates",
+          "isi.owner_ambiguities"
+        ],
+        "dilarang_pola": [
+          "sedang dikerjakan",
+          "sudah dikerjakan",
+          "telah dilaksanakan",
+          "ditugaskan secara tetap",
+          "penugasan aktual terverifikasi",
+          "disetujui"
+        ]
+      }
+    },
+    {
+      "id": "p03-g-email-pada-mandat-diblokir",
+      "rujukan": [
+        "PRM:6",
+        "PRM:24-28"
+      ],
+      "kamus_nama": [],
+      "sumber": [
+        {
+          "source_id": "usulan:p03-us-003",
+          "jenis": "SINTETIS",
+          "teks": "{\"duplicate_suspicions\":[],\"reviewer_questions\":[],\"split_merge_rationale\":[],\"task_candidates\":[{\"cara\":\"mengikuti format sekolah\",\"objek\":\"rekap nilai\",\"output\":\"rekap nilai tersusun\",\"source_ids\":[\"uraian:p03-ut-003\"],\"tindakan\":\"Mengirim\",\"tingkat\":\"TASK\",\"tujuan\":\"tertib administrasi\"}]}"
+        },
+        {
+          "source_id": "uraian:p03-ut-003@jbt_p03_wk",
+          "jenis": "SINTETIS",
+          "teks": "jabatan_kode: WK-SD\njabatan_nama: Wali Kelas\nkode: WK-SD-020\nunit: SD\ntugas_pokok: Penilaian\nuraian: Mengirim rekap nilai ke wali.kelas@contoh.invalid setiap akhir semester"
+        }
+      ],
+      "parameter": {
+        "jabatan_kode": "WK-SD",
+        "periode": "2026/27"
+      },
+      "harapan": {
+        "jalur": "TANPA_MODEL",
+        "alasan_gerbang": "PII_DITEMUKAN",
+        "bidang_teks": [
+          "isi.tag_candidates",
+          "isi.owner_ambiguities"
+        ]
+      }
+    }
+  ]
+}

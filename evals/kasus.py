@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from anjab_abk_backend.ai.fungsi_p01 import FUNGSI_P01, SIFAT_FAKTA_P01, ParameterP01
 from anjab_abk_backend.ai.fungsi_p02 import FUNGSI_P02, ParameterP02
+from anjab_abk_backend.ai.fungsi_p03 import FUNGSI_P03, ParameterP03
 from anjab_abk_backend.ai.fungsi_p04 import FUNGSI_P04, ParameterP04
 from anjab_abk_backend.ai.fungsi_p09 import FUNGSI_P09, ParameterP09
 from anjab_abk_backend.ai.fungsi_p10 import FUNGSI_P10, ParameterP10
@@ -68,6 +69,11 @@ DEFINISI_FUNGSI: dict[str, DefinisiFungsi] = {
         fungsi=FUNGSI_P02,
         parameter=ParameterP02,
         berkas=Path(__file__).parent / "p02" / "kasus.json",
+    ),
+    "P03": DefinisiFungsi(
+        fungsi=FUNGSI_P03,
+        parameter=ParameterP03,
+        berkas=Path(__file__).parent / "p03" / "kasus.json",
     ),
     "P04": DefinisiFungsi(
         fungsi=FUNGSI_P04,
@@ -229,7 +235,7 @@ _KHAS_FUNGSI = {
 }
 """Isian ``HarapanKasus`` yang hanya sah untuk satu fungsi."""
 
-_TANPA_DRAFT_TEXT = ("P01", "P02", "P04", "P09")
+_TANPA_DRAFT_TEXT = ("P01", "P02", "P03", "P04", "P09")
 """Fungsi yang keluarannya tidak punya ``isi.draft_text``."""
 
 
@@ -244,7 +250,7 @@ def _periksa_khas_fungsi(kasus: Kasus, kode_fungsi: str) -> None:
 
     Raises:
         KasusRusak: isian khas fungsi lain dipakai (mis. isian P09 pada P01 atau P10), atau
-            kasus P01/P02/P04/P09 berjalur ``MODEL`` masih memakai bidang teks bawaan P10
+            kasus P01/P02/P03/P04/P09 berjalur ``MODEL`` masih memakai bidang teks bawaan P10
             (``isi.draft_text``).
     """
     h = kasus.harapan
