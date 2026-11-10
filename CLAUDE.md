@@ -82,6 +82,22 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-10] Terapkan kandidat P11 menjadi konteks (rute `/ai/usulan/{id}/terapkan-konteks`)
+
+Backlog `#128` (lanjutan P11 `#127`). Putusan tetap append-only tanpa efek ke tabel domain;
+penerapan adalah aksi terpisah yang eksplisit.
+
+- **Kolom asal** (migrasi `8e8950b14821`): `redesain_konteks.ai_usulan_id` (FK `ai_usulan.id`
+  `ON DELETE RESTRICT`) + `ai_kandidat_indeks`; CHECK `ck_redesain_konteks_asal_usulan_ai`
+  (keduanya null/terisi), UNIQUE eksplisit `uq_redesain_konteks_ai_usulan_kandidat` (tepat sekali).
+- **`SqlKonteksService.terapkan_usulan`** membaca `ai_usulan` langsung (`FOR SHARE`) dan putusan
+  terakhir (urut `created_at`, `id`); fungsi dibandingkan literal `"P11"` agar `redesain` tak
+  mengimpor paket `ai`. Urutan cek: 404 -> 422 `USULAN_BUKAN_P11` -> 409 `USULAN_BELUM_DITERIMA`
+  -> 422 `KANDIDAT_TAK_ADA` -> 422 `ISIAN_REVISI_WAJIB` -> 409 `KANDIDAT_SUDAH_DITERAPKAN`
+  (`details[0].msg` = id konteks) -> 409 `conflict` (kode). Isian gabungan divalidasi ulang lewat
+  `KonteksCreate` (422 `validation_error`). `UniqueViolation` dibedakan per nama constraint.
+- `gelombang` selalu dari body (kandidat hanya `gelombang_saran`). `REVISE` mewajibkan keempat isian.
+
 ### [2026-11-09] Kasus negatif riset, append-only (rute `/riset/protokol/{id}/kasus-negatif`)
 
 Backlog `#123` (bagian ketiga pecahan P08; protokol `#119`, statistik `#122`, fungsi `#126`).

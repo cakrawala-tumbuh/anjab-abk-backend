@@ -278,6 +278,7 @@ def test_openapi_rute_usulan_tanpa_ubah_hapus_dan_skema_tertutup(client):
         ("GET", f"{URL}/{{usulan_id}}"),
         ("POST", f"{URL}/search"),
         ("POST", f"{URL}/{{usulan_id}}/putusan"),
+        ("POST", f"{URL}/{{usulan_id}}/terapkan-konteks"),
     }
     for p, v in paths.items():
         if p.startswith(URL):

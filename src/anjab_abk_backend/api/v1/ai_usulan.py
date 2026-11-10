@@ -1,4 +1,8 @@
-"""Endpoint baca usulan AI non-narasi: khusus `tim-kajian`, tanpa PATCH/DELETE."""
+"""Endpoint usulan AI non-narasi: khusus `tim-kajian`, tanpa PATCH/DELETE.
+
+Selain baca dan putusan, ada aksi eksplisit `terapkan-konteks` yang membuat konteks redesain
+baru dari kandidat usulan P11; putusan sendiri tetap tidak menyentuh tabel domain.
+"""
 
 from __future__ import annotations
 
@@ -11,11 +15,15 @@ from ...dependencies import (
     Idempotency,
     Pagination,
     get_ai_usulan_service,
+    get_kode_orang_pemanggil,
+    get_konteks_service,
     idempotency,
     pagination_params,
     rate_limit,
     require_tim_kajian,
 )
+from ...redesain.schemas.konteks import KonteksRead, TerapkanKonteks
+from ...redesain.services.konteks import KonteksService
 from ...schemas.ai_usulan import (
     AiUsulanPutusanCreate,
     AiUsulanPutusanRead,
@@ -157,3 +165,60 @@ def create_putusan(
         return service.putuskan(usulan_id, data, principal.subject)
 
     return run_idempotent(idem, response, AiUsulanPutusanRead, _aksi)
+
+
+@router.post(
+    "/{usulan_id}/terapkan-konteks",
+    response_model=KonteksRead,
+    status_code=201,
+    summary="Terapkan kandidat usulan P11 menjadi konteks redesain baru (tim-kajian)",
+    operation_id="ai_usulan_terapkan_konteks",
+    dependencies=_WRITE,
+    responses={
+        **IDEMPOTENCY_RESPONSES,
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOTFOUND,
+        409: {
+            "model": ErrorResponse,
+            "description": (
+                "USULAN_BELUM_DITERIMA (putusan terakhir bukan APPROVE/REVISE); "
+                "KANDIDAT_SUDAH_DITERAPKAN (`details[0].msg` = id konteks yang ada); "
+                "`conflict` (kode konteks sudah dipakai) atau Idempotency-Key sedang diproses."
+            ),
+        },
+        422: {
+            "model": ErrorResponse,
+            "description": (
+                "Badan tidak sah; USULAN_BUKAN_P11 (fungsi bukan P11 atau sasaran bukan "
+                "REDESAIN_KONTEKS); KANDIDAT_TAK_ADA (indeks di luar rentang atau isi kosong); "
+                "ISIAN_REVISI_WAJIB (putusan REVISE tanpa keempat isian); isian gabungan tidak "
+                "sah untuk konteks."
+            ),
+        },
+    },
+)
+def terapkan_konteks(
+    usulan_id: str,
+    data: TerapkanKonteks,
+    service: Annotated[KonteksService, Depends(get_konteks_service)],
+    pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> KonteksRead:
+    """Buat SATU konteks baru dari satu kandidat usulan P11 yang sudah diterima.
+
+    Aksi terpisah dari putusan: isian kandidat disalin (field body yang terisi menimpa),
+    `kode` dan `gelombang` dari body, `aktif=true`, penanda asal `ai_usulan_id`/
+    `ai_kandidat_indeks`, dan riwayat `create` dicatat. Tiap kandidat hanya bisa diterapkan
+    sekali (UNIQUE). Pemeriksaan berada di dalam aksi idempoten, jadi ulangan dengan key yang
+    sama membalas respons tersimpan (200). Urutan: usulan 404, bukan P11 422, belum diterima
+    409, kandidat tak ada 422, isian REVISE kurang 422, kandidat sudah diterapkan 409, kode
+    duplikat 409.
+    """
+
+    def _aksi() -> KonteksRead:
+        return service.terapkan_usulan(usulan_id, data, pelaku_kode_orang=pelaku)
+
+    return run_idempotent(idem, response, KonteksRead, _aksi)

@@ -33,6 +33,7 @@ from sqlalchemy import (
     Integer,
     MetaData,
     Sequence,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -980,9 +981,22 @@ class RedesainKonteksModel(Base):
 
     Tidak pernah dihapus; konteks dinonaktifkan lewat `aktif=False`. `gelombang`
     bertipe `String(40)` tanpa CHECK (divalidasi skema `Gelombang`).
+
+    `ai_usulan_id` + `ai_kandidat_indeks` menandai konteks yang dibuat dari kandidat usulan P11
+    (`POST /ai/usulan/{id}/terapkan-konteks`): keduanya null (konteks manual/seed) atau keduanya
+    terisi (CHECK `asal_usulan_ai`); UNIQUE pasangan itu menjamin satu kandidat diterapkan tepat
+    sekali. FK `ON DELETE RESTRICT` (usulan yang sudah diterapkan tidak bisa dihapus).
     """
 
     __tablename__ = "redesain_konteks"
+    __table_args__ = (
+        CheckConstraint(
+            "(ai_usulan_id IS NULL) = (ai_kandidat_indeks IS NULL)", name="asal_usulan_ai"
+        ),
+        UniqueConstraint(
+            "ai_usulan_id", "ai_kandidat_indeks", name="uq_redesain_konteks_ai_usulan_kandidat"
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     kode: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
@@ -994,6 +1008,12 @@ class RedesainKonteksModel(Base):
     aktif: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=text("true")
     )
+    ai_usulan_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("ai_usulan.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    ai_kandidat_indeks: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )
