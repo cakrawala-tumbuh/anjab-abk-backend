@@ -12,10 +12,17 @@ BATAS_TEKS = 200_000
 
 
 class JenisSumberNarasi(StrEnum):
-    """Jenis sumber yang sah pada tahap T0 dan T1 (K-3); nilai lain ditolak 422."""
+    """Jenis sumber narasi yang sah pada tahap T0, T1, dan T2 (K-3); nilai lain ditolak 422.
+
+    ``SINTETIS`` (T0) dan ``DOKUMEN_RESMI`` (T1) adalah jenis awal; ``KETERANGAN_ORANG``
+    (T2) memuat cerita, wawancara, dan keterangan orang yang dikumpulkan dalam kajian.
+    Jenis apa pun tetap harus diizinkan lewat ``AI_JENIS_SUMBER_DIIZINKAN`` sebelum
+    dikirim ke model; mendaftarkan sumber tidak menyalakan AI.
+    """
 
     SINTETIS = "SINTETIS"
     DOKUMEN_RESMI = "DOKUMEN_RESMI"
+    KETERANGAN_ORANG = "KETERANGAN_ORANG"
 
 
 class NarasiSumberCreate(BaseModel):
@@ -24,7 +31,9 @@ class NarasiSumberCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     judul: str = Field(min_length=1, max_length=200, examples=["Pedoman akademik 2026"])
-    jenis: JenisSumberNarasi = Field(description="Jenis sumber (SINTETIS atau DOKUMEN_RESMI).")
+    jenis: JenisSumberNarasi = Field(
+        description="Jenis sumber (SINTETIS, DOKUMEN_RESMI, atau KETERANGAN_ORANG)."
+    )
     versi: str = Field(min_length=1, max_length=50, examples=["v1.0"])
     periode: str = Field(min_length=1, max_length=20, examples=["2026/27"])
     teks: str = Field(min_length=1, max_length=BATAS_TEKS, description="Teks sumber (tempelan).")

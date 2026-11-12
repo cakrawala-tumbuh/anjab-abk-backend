@@ -91,6 +91,8 @@ class Settings(BaseSettings):
     # Gerbang redaksi PII (lihat ai/redaksi.py); bawaan paling ketat (fail-closed).
     ai_jenis_sumber_diizinkan: list[str] = ["SINTETIS"]
     """Jenis sumber yang boleh dikirim ke model; env ``AI_JENIS_SUMBER_DIIZINKAN`` (JSON).
+    Nilai yang dapat didaftarkan operator: jenis narasi ``SINTETIS``, ``DOKUMEN_RESMI``,
+    ``KETERANGAN_ORANG`` dan jenis domain ``KATALOG_TI``, ``REDESAIN``, ``RISET``.
     Jenis berawalan WCP/DCS/KONSELING/MURID selalu ditolak."""
     ai_pii_mode: Literal["BLOKIR", "SAMARKAN"] = "BLOKIR"
     """``BLOKIR`` menolak masukan bila ada PII; ``SAMARKAN`` mengganti dengan penanda

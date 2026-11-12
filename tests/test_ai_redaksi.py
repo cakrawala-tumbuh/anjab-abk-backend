@@ -157,3 +157,30 @@ def test_muat_kamus_nama_aktif_dan_nonaktif(db_session: Session) -> None:
     db_session.flush()
     kamus = muat_kamus_nama(db_session)
     assert "Kamus Aktifa" in kamus and "Kamus Nonaktif" in kamus
+
+
+_KETERANGAN = Settings(_env_file=None, ai_jenis_sumber_diizinkan=["KETERANGAN_ORANG"])
+
+
+def test_gerbang_keterangan_orang_diizinkan_env_bersih_lolos() -> None:
+    hasil = gerbang_masukan(
+        _sumber("Cerita guru tentang rapat.", jenis="KETERANGAN_ORANG"), [], _KETERANGAN
+    )
+    assert hasil.lolos and hasil.alasan is None
+
+
+def test_gerbang_keterangan_orang_ber_pii_tetap_ditolak() -> None:
+    teks = "Hubungi 081234567890 atau NIK 3201234567890123."
+    hasil = gerbang_masukan(_sumber(teks, jenis="KETERANGAN_ORANG"), [], _KETERANGAN)
+    assert (hasil.lolos, hasil.alasan) == (False, "PII_DITEMUKAN")
+
+
+def test_gerbang_keterangan_orang_bawaan_ditolak() -> None:
+    hasil = gerbang_masukan(_sumber("teks aman", jenis="KETERANGAN_ORANG"), [], _BAWAAN)
+    assert hasil.alasan == "JENIS_DITOLAK"
+
+
+def test_gerbang_murid_diizinkan_env_tetap_ditolak() -> None:
+    s = Settings(_env_file=None, ai_jenis_sumber_diizinkan=["MURID_X"])
+    hasil = gerbang_masukan(_sumber("teks aman", jenis="MURID_X"), [], s)
+    assert hasil.alasan == "JENIS_DITOLAK"

@@ -1,8 +1,9 @@
 """Gerbang redaksi PII dan daftar izin sumber sebelum data menyentuh model AI.
 
-Kebijakan bawaan sengaja paling ketat (``FAIL CLOSED``): hanya sumber berjenis
-``SINTETIS`` yang boleh lewat, dan temuan PII apa pun menolak seluruh masukan.
-Jenis sumber riil yang boleh dikirim adalah keputusan OD-11 yang belum diambil.
+Kebijakan bawaan sengaja paling ketat (``FAIL CLOSED``): izin jenis sumber ditentukan
+env ``AI_JENIS_SUMBER_DIIZINKAN`` (bawaan hanya ``SINTETIS``; operator menambah jenis
+lain, mis. ``KETERANGAN_ORANG``), dan temuan PII apa pun menolak seluruh masukan.
+Jenis berawalan WCP/DCS/KONSELING/MURID selalu ditolak.
 
 Batas deteksi: nama orang di luar kamus partisipan hanya tertangkap bila muncul
 tepat setelah kata konteks (``murid``, ``siswa``, ``siswi``, ``ananda``,

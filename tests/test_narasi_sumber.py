@@ -124,3 +124,13 @@ def test_teks_tidak_masuk_log(client_as, caplog):
         c.post(URL, json=_body(teks=rahasia, jenis="WCP_JAWABAN"))
         c.post(URL, json=_body(teks=rahasia, menggantikan_id="tidak-ada"))
     assert rahasia not in caplog.text
+
+
+def test_keterangan_orang_201_dan_terfilter(client_as):
+    c = _tim(client_as)
+    r = c.post(URL, json=_body(jenis="KETERANGAN_ORANG", periode="2033/34", judul="Cerita uniq"))
+    assert r.status_code == 201, r.text
+    lst = c.get(URL, params={"jenis": "KETERANGAN_ORANG", "periode": "2033/34"})
+    assert lst.status_code == 200
+    assert r.json()["id"] in [x["id"] for x in lst.json()["items"]]
+    assert c.post(URL, json=_body(jenis="ASLI_LAIN")).status_code == 422
