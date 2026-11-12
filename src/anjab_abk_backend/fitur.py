@@ -35,6 +35,9 @@ KETERANGAN: dict[FiturKode, str] = {
     FiturKode.CHANGE_AUTHORIZATION: (
         "Otorisasi keputusan perubahan. Belum ada fungsi yang digerbang."
     ),
+    FiturKode.PREBANK_FREEZE: (
+        "Cerita pra-bank Task Inventory dibekukan dan paparan bank tugas dicatat."
+    ),
 }
 """Keterangan tiap flag, dipakai respons status."""
 
@@ -64,7 +67,7 @@ def fitur_aktif(kode: FiturKode, settings: Settings | None = None) -> bool:
 
 
 def daftar_fitur(settings: Settings | None = None) -> list[FiturRead]:
-    """Kembalikan status kelima flag, berurutan sesuai enum `FiturKode`."""
+    """Kembalikan status keenam flag, berurutan sesuai enum `FiturKode`."""
     return [
         FiturRead(kode=k, aktif=fitur_aktif(k, settings), keterangan=KETERANGAN[k])
         for k in FiturKode

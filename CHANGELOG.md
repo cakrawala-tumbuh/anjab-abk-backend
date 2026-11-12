@@ -7,6 +7,10 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Ditambahkan
+
+- **Cerita pra-bank Task Inventory dan log paparan bank tugas** (backlog #131, revisi `a1c5e7b93d20`): saklar baru `FEATURE_PREBANK_FREEZE` (anggota `FiturKode.PREBANK_FREEZE`, bawaan mati; `GET /api/v1/system/fitur` kini memuat enam kode). Tabel `ti_cerita_prabank` (satu cerita per responden, `frozen_at`) dan `ti_paparan_event` (append-only; trigger menolak `UPDATE`, memakai ulang `narasi_tolak_ubah()`). Empat rute di `/api/v1/task-inventory/sesi/responden/{responden_id}` (admin atau pemilik responden; saklar mati 409 `feature_disabled`): `PUT /cerita-prabank` (409 `CERITA_SUDAH_DIKUNCI` bila sudah beku), `POST /cerita-prabank/bekukan` (idempoten; 422 `CERITA_KOSONG`), `POST /paparan` (201; `status_saat_paparan` `LOCKED_PRE_EXPOSURE` bila cerita sudah beku, selain itu `EXPOSED`; waktu dari server, field asing 422), `GET /prabank` (`cerita`, `frozen_at`, `first_exposed_at`, `exposure_state`). Saat saklar hidup, `PUT .../seleksi` sebelum ada paparan 409 `PAPARAN_BELUM_TERCATAT`; saklar mati tidak mengubah perilaku seleksi. Seam `TiPrabankService.status_paparan(responden_id)` disiapkan untuk antrean narasi.
+
 ## [0.50.0] - 2026-11-10
 
 ### Ditambahkan

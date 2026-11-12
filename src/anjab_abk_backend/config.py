@@ -80,6 +80,7 @@ class Settings(BaseSettings):
     feature_wcp_dcs_scoring: bool = False
     feature_research_export: bool = False
     feature_change_authorization: bool = False
+    feature_prebank_freeze: bool = False
 
     # Register run AI (lihat services/ai_run.py)
     ai_protocol_arm: str = "TANPA_ARM"

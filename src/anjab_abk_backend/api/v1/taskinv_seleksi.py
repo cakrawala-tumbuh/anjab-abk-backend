@@ -15,18 +15,21 @@ from ...dependencies import (
     get_current_principal,
     get_partisipan_service,
     get_ti_catalog_service,
+    get_ti_prabank_service,
     get_ti_responden_service,
     get_ti_seleksi_service,
     get_ti_sesi_service,
     idempotency,
     rate_limit,
 )
-from ...errors import NotFoundError, ValidationAppError
+from ...errors import ConflictError, NotFoundError, ValidationAppError
 from ...etag import check_if_match, compute_etag
+from ...fitur import FiturKode, fitur_aktif
 from ...schemas.common import ErrorResponse
 from ...security import Principal
 from ...taskinv.schemas.seleksi import TiSeleksiDraftSave, TiSeleksiRead
 from ...taskinv.services.catalog import TiCatalogService
+from ...taskinv.services.prabank import TiPrabankService
 from ...taskinv.services.responden import TiRespondenService
 from ...taskinv.services.seleksi import TiSeleksiService
 from ...taskinv.services.sesi import TiSesiService
@@ -43,6 +46,14 @@ _WRITE_GUARDS = [Depends(get_current_principal), Depends(rate_limit)]
 _NOT_FOUND_RSP = {404: {"model": ErrorResponse, "description": "Responden tidak ditemukan."}}
 _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."}}
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
+
+
+class PaparanBelumTercatatError(ConflictError):
+    """409 `PAPARAN_BELUM_TERCATAT`: saklar PREBANK_FREEZE hidup tetapi paparan belum dicatat."""
+
+    error_code = "PAPARAN_BELUM_TERCATAT"
+
+
 _FORBIDDEN = {
     403: {"model": ErrorResponse, "description": "Bukan admin atau bukan pemilik responden."}
 }
@@ -60,6 +71,12 @@ _FORBIDDEN = {
         **_FORBIDDEN,
         **_NOT_FOUND_RSP,
         **PRECONDITION_RESPONSES,
+        409: {
+            "model": ErrorResponse,
+            "description": (
+                "`PAPARAN_BELUM_TERCATAT`: saklar PREBANK_FREEZE hidup, paparan belum ada."
+            ),
+        },
         422: {
             "model": ErrorResponse,
             "description": "Kode task tidak valid, sesi bukan TAHAP1, atau responden sudah submit.",
@@ -75,12 +92,18 @@ def save_draft_seleksi(
     seleksi_service: Annotated[TiSeleksiService, Depends(get_ti_seleksi_service)],
     catalog: Annotated[TiCatalogService, Depends(get_ti_catalog_service)],
     par_service: Annotated[PartisipanService, Depends(get_partisipan_service)],
+    prabank: Annotated[TiPrabankService, Depends(get_ti_prabank_service)],
     settings: Annotated[Settings, Depends(get_settings)],
     response: Response,
     if_match: IfMatchHeader = None,
 ) -> TiSeleksiRead:
     responden = rsp_service.get(responden_id)
     authorize_responden_access(principal, responden.partisipan_id, par_service)
+    if fitur_aktif(FiturKode.PREBANK_FREEZE, settings) and not prabank.ada_paparan(responden_id):
+        raise PaparanBelumTercatatError(
+            "Paparan bank tugas belum tercatat untuk responden ini; catat lewat"
+            " POST .../paparan sebelum menyimpan seleksi."
+        )
     # Belum ada seleksi tersimpan -> GET-nya 404 (tak ada ETag untuk dipegang klien), jadi
     # state kosong dibandingkan sebagai `{}`.
     saat_ini = seleksi_service.get_by_responden(responden_id)

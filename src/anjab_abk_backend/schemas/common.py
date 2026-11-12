@@ -85,7 +85,7 @@ class ErrorResponse(BaseModel):
 
 
 class FiturKode(StrEnum):
-    """Kode lima fungsi yang dapat dimatikan secara independen (feature flag).
+    """Kode enam fungsi yang dapat dimatikan secara independen (feature flag).
 
     Nilai literal mengikuti paket kajian; urutan anggota = urutan di respons
     `GET /api/v1/system/fitur`.
@@ -96,6 +96,7 @@ class FiturKode(StrEnum):
     WCP_DCS_SCORING = "WCP_DCS_SCORING"
     RESEARCH_EXPORT = "RESEARCH_EXPORT"
     CHANGE_AUTHORIZATION = "CHANGE_AUTHORIZATION"
+    PREBANK_FREEZE = "PREBANK_FREEZE"
 
 
 class FiturRead(BaseModel):

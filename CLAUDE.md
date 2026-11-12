@@ -82,6 +82,29 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-12] Cerita pra-bank TI dan log paparan bank tugas (saklar `PREBANK_FREEZE`)
+
+Backlog `#131` (UX-01; asal `ypii-support#463`; pasangan web `anjab-abk-web-app#121`, antrean narasi `#132`).
+
+- **Saklar** `FiturKode.PREBANK_FREEZE` / `feature_prebank_freeze` (env `FEATURE_PREBANK_FREEZE`, bawaan
+  mati) — anggota baru, bukan memakai ulang flag lain; `GET /system/fitur` kini enam kode. Mati -> empat
+  rute baru 409 `feature_disabled`, `PUT .../seleksi` tanpa gerbang.
+- **Tabel** (migrasi `a1c5e7b93d20`): `ti_cerita_prabank` (UNIQUE `responden_id`, `teks_hash` SHA-256,
+  `frozen_at`) dan `ti_paparan_event` (CHECK `jenis` / `status_saat_paparan`; trigger `BEFORE UPDATE`
+  memakai ulang `narasi_tolak_ubah()`; DELETE sengaja tidak ditolak agar cascade hapus-paksa sesi jalan).
+  Downgrade tidak membuang fungsi trigger (milik revisi `74125eebc244`).
+- **Waktu dari server di Python** (`datetime.now(UTC)`), bukan `now()` basis data: `now()` PostgreSQL
+  konstan sepanjang transaksi sehingga urutan `frozen_at` < paparan tak terjamin (dan tak teruji) dalam
+  satu transaksi. `server_default now()` tetap ada sebagai cadangan. Status paparan: `frozen_at <= sekarang`
+  -> `LOCKED_PRE_EXPOSURE`, selain itu `EXPOSED`; cerita belum beku tidak memblokir paparan.
+- **Rute** `/task-inventory/sesi/responden/{id}/{cerita-prabank,cerita-prabank/bekukan,paparan,prabank}`
+  (router `taskinv_prabank.py`, `authorize_responden_access`). Kode galat huruf besar: `CERITA_SUDAH_DIKUNCI`,
+  `CERITA_KOSONG`, `PAPARAN_BELUM_TERCATAT`.
+- **Gerbang seleksi** ada di router `taskinv_seleksi.py` (bukan seam seleksi): saklar hidup dan belum ada
+  paparan -> 409 `PAPARAN_BELUM_TERCATAT`; hanya `PUT .../seleksi`, submit tidak digerbang.
+- Seam `services/prabank.py` (+ `_sql.py`): `status_paparan(responden_id) -> ExposureState | None` (None =
+  responden tak ada) dipakai item antrean narasi `#132`.
+
 ### [2026-11-10] Terapkan kandidat P11 menjadi konteks (rute `/ai/usulan/{id}/terapkan-konteks`)
 
 Backlog `#128` (lanjutan P11 `#127`). Putusan tetap append-only tanpa efek ke tabel domain;

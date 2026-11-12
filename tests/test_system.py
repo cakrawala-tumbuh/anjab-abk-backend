@@ -106,7 +106,7 @@ from anjab_abk_backend.fitur import FiturKode, fitur_aktif, require_fitur  # noq
 
 def test_fitur_default_semua_mati() -> None:
     s = Settings(_env_file=None)
-    assert [fitur_aktif(k, s) for k in FiturKode] == [False] * 5
+    assert [fitur_aktif(k, s) for k in FiturKode] == [False] * 6
 
 
 def test_fitur_env_menghidupkan_satu_flag(monkeypatch: pytest.MonkeyPatch) -> None:

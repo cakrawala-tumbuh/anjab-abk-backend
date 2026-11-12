@@ -122,6 +122,8 @@ from .taskinv.services.detail import TiDetailService
 from .taskinv.services.detail_sql import SqlTiDetailService
 from .taskinv.services.detil_tugas import DetilTugasService
 from .taskinv.services.detil_tugas_sql import SqlDetilTugasService
+from .taskinv.services.prabank import TiPrabankService
+from .taskinv.services.prabank_sql import SqlTiPrabankService
 from .taskinv.services.responden import TiRespondenService
 from .taskinv.services.responden_sql import SqlTiRespondenService
 from .taskinv.services.seleksi import TiSeleksiService
@@ -317,6 +319,11 @@ def get_ti_responden_service(
 def get_ti_seleksi_service(session: SessionDep) -> TiSeleksiService:
     """SEAM: implementasi `TiSeleksiService` berbasis PostgreSQL."""
     return SqlTiSeleksiService(session)
+
+
+def get_ti_prabank_service(session: SessionDep) -> TiPrabankService:
+    """SEAM: implementasi `TiPrabankService` (cerita pra-bank + log paparan) di PostgreSQL."""
+    return SqlTiPrabankService(session)
 
 
 def get_ti_detail_service(session: SessionDep) -> TiDetailService:

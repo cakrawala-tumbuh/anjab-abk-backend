@@ -58,6 +58,7 @@ from .v1 import (
     taskinv_hasil,
     taskinv_kuesioner,
     taskinv_normalisasi_ai,
+    taskinv_prabank,
     taskinv_responden,
     taskinv_seleksi,
     taskinv_sesi,
@@ -202,6 +203,11 @@ api_router.include_router(
     taskinv_responden.router,
     prefix="/task-inventory/sesi",
     tags=["taskinv.responden"],
+)
+api_router.include_router(
+    taskinv_prabank.router,
+    prefix="/task-inventory/sesi",
+    tags=["taskinv.prabank"],
 )
 api_router.include_router(
     taskinv_seleksi.router,

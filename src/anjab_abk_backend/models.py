@@ -52,6 +52,7 @@ from anjab_abk_backend.narasi.schemas.kasus import (
 from anjab_abk_backend.schemas.ai_usulan import PutusanUsulan, SasaranUsulan, TingkatKoreksi
 from anjab_abk_backend.schemas.riset_protokol import StatusProtokol
 from anjab_abk_backend.schemas.riset_statistik import StatusStatistik
+from anjab_abk_backend.taskinv.schemas.prabank import JenisPaparan, StatusPaparan
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -1921,3 +1922,59 @@ class RisetKasusNegatifModel(Base):
     sumber_ref: Mapped[str | None] = mapped_column(String(500), nullable=True)
     dibuat_oleh: Mapped[str] = mapped_column(String(200), nullable=False)
     created_at: Mapped[datetime] = _ts()
+
+
+class TiCeritaPrabankModel(Base):
+    """Cerita bebas pra-bank satu responden TI (satu baris per responden, UNIQUE).
+
+    Setelah `frozen_at` terisi, baris tidak boleh berubah; penegakan ada di
+    `SqlTiPrabankService` (409 `CERITA_SUDAH_DIKUNCI`), meniru pola
+    `cerita_dikunci_pada` pada `RedesainKonfirmasiModel`. `teks_hash` = SHA-256 hex.
+    """
+
+    __tablename__ = "ti_cerita_prabank"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    responden_id: Mapped[str] = mapped_column(
+        String(40),
+        ForeignKey("ti_responden.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    teks: Mapped[str] = mapped_column(Text, nullable=False)
+    teks_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    frozen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = _ts()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+
+class TiPaparanEventModel(Base):
+    """Log paparan bank tugas ke responden TI; append-only.
+
+    Trigger `BEFORE UPDATE` (fungsi `narasi_tolak_ubah()`) menolak perubahan. DELETE sengaja
+    tidak ditolak agar hapus-paksa sesi/responden (`ON DELETE CASCADE`) tetap berjalan.
+    `terjadi_pada` diisi `now()` oleh basis data, tidak pernah dari klien.
+    """
+
+    __tablename__ = "ti_paparan_event"
+    __table_args__ = (
+        CheckConstraint(_in_check("jenis", JenisPaparan), name="jenis"),
+        CheckConstraint(
+            _in_check("status_saat_paparan", StatusPaparan), name="status_saat_paparan"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    responden_id: Mapped[str] = mapped_column(
+        String(40),
+        ForeignKey("ti_responden.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    jenis: Mapped[str] = mapped_column(String(20), nullable=False)
+    terjadi_pada: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    status_saat_paparan: Mapped[str] = mapped_column(String(25), nullable=False)
