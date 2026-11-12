@@ -16,7 +16,11 @@ from fastapi import APIRouter, Depends, Response
 from pydantic import ValidationError
 
 from ...ai.fungsi_p06 import ParameterP06
-from ...ai.sumber_redesain import rakit_sumber_alternatif, rakit_sumber_redesain
+from ...ai.sumber_redesain import (
+    rakit_sumber_alternatif,
+    rakit_sumber_kesiapan,
+    rakit_sumber_redesain,
+)
 from ...ai.syarat_f4 import periksa_syarat_f4
 from ...config import Settings, get_settings
 from ...dependencies import (
@@ -139,6 +143,7 @@ def ajukan_opsi_ai(
         sumber = [
             *rakit_sumber_redesain(session, masalah_id, sertakan_konfirmasi=True),
             *rakit_sumber_alternatif(session, masalah_id),
+            *rakit_sumber_kesiapan(session, masalah_id, data.periode),
         ]
         try:
             parameter = ParameterP06(masalah_id=masalah_id, periode=data.periode).model_dump(

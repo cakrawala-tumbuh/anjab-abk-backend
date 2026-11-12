@@ -30,8 +30,11 @@ from anjab_abk_backend.models import (
     AiRunModel,
     AiUsulanModel,
     AiUsulanPutusanModel,
+    JabatanModel,
     RedesainAlternatifModel,
+    RedesainAlternatifPenerimaModel,
     RedesainBuktiModel,
+    RedesainKesiapanModel,
     RedesainKonteksModel,
     RedesainLangkahModel,
     RedesainMasalahModel,
@@ -393,3 +396,46 @@ def test_bukan_tim_kajian_403_dan_badan_tidak_sah_422(app, client_as, db_session
     ):
         r = c.post(f"{URL}/{mid}/kartu-keputusan-ai", json=badan)
         assert r.status_code == 422, badan
+
+
+def _tambah_penerima(db: Session, alternatif_id: str, *, nilai: str | None) -> str:
+    """Tambah satu penerima (jabatan baru) dan, bila `nilai`, satu penilaian kesiapan 2026/27."""
+    jid = f"jbt_{_hex()}"
+    db.add(JabatanModel(id=jid, kode=jid.upper(), nama=f"Jabatan {jid}", jenis="struktural"))
+    db.flush()
+    pid = str(uuid.uuid4())
+    db.add(
+        RedesainAlternatifPenerimaModel(
+            id=pid, alternatif_id=alternatif_id, penerima_jabatan_id=jid, material=True
+        )
+    )
+    db.flush()
+    if nilai:
+        db.add(
+            RedesainKesiapanModel(
+                id=str(uuid.uuid4()), penerima_id=pid, periode="2026/27", status=nilai,
+                delta_asal_estimasi="NOT_ESTIMABLE", delta_penerima_estimasi="NOT_ESTIMABLE",
+                delta_organisasi_estimasi="NOT_ESTIMABLE", dinilai_oleh="O-9301",
+            )
+        )  # fmt: skip
+        db.flush()
+    return pid
+
+
+def test_sumber_kesiapan_dan_keputusan_perubahan_belum_diputus_ikut_ke_p07(
+    app, client_as, db_session, p07
+):
+    mid, (a1, a2) = _siap(db_session)
+    p1 = _tambah_penerima(db_session, a1, nilai="HOLD")
+    _atur(app)
+    r = _ajukan(_tim(client_as), mid)
+    assert r.status_code == 202, r.text
+    rec = db_session.get(AiUsulanModel, r.json()["id"])
+    db_session.refresh(rec)
+    sumber = db_session.get(AiRunModel, rec.ai_run_id).masukan["sumber"]
+    per = {s["source_id"]: s["teks"] for s in sumber}
+    assert "status: HOLD" in per[f"kesiapan:{a1}:{p1}"]
+    assert not any(k.startswith(f"kesiapan:{a2}") for k in per)
+    assert per[f"otorisasi:{mid}"].count("BELUM_DIPUTUS") == 2
+    ke = rec.konteks_server["authorization_state"]["keputusan_perubahan"]
+    assert [k["keputusan"] for k in ke] == ["BELUM_DIPUTUS", "BELUM_DIPUTUS"]

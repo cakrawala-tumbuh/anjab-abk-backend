@@ -4,7 +4,9 @@ Satu masalah redesain dirangkai menjadi daftar ``SumberAi`` berjenis ``REDESAIN`
 sendiri, proses dan langkah ALUR-nya, bukti, koreksi langkah, dan (opsional) konfirmasi sekolah.
 Tiap sumber satu baris tabel, ``source_id`` berawalan nama tabelnya (``masalah:``, ``proses:``,
 ``langkah:``, ``bukti:``, ``koreksi:``, ``konfirmasi:``) diikuti id baris. Alternatif redesain
-(``alternatif:``, dipakai P06) dirakit terpisah lewat ``rakit_sumber_alternatif``.
+(``alternatif:``, dipakai P06 dan P07) dirakit terpisah lewat ``rakit_sumber_alternatif``, dan
+kesiapan tiap penerima alternatif pada satu periode (``kesiapan:``) lewat
+``rakit_sumber_kesiapan``.
 
 Batas isi:
 
@@ -30,7 +32,9 @@ from sqlalchemy.orm import Session
 
 from ..models import (
     RedesainAlternatifModel,
+    RedesainAlternatifPenerimaModel,
     RedesainBuktiModel,
+    RedesainKesiapanModel,
     RedesainKonfirmasiModel,
     RedesainKoreksiLangkahModel,
     RedesainLangkahModel,
@@ -40,14 +44,18 @@ from ..models import (
     SekolahModel,
     TiUraianTugasModel,
 )
+from ..redesain.schemas.alternatif import EstimasiDelta, StatusKesiapan
+from ..redesain.services.alternatif import hitung_status_opsi
 from .redaksi import SumberAi
 
 __all__ = [
     "AWALAN_SUMBER_REDESAIN",
     "FIELD_SUMBER_REDESAIN",
     "JENIS_SUMBER_REDESAIN",
+    "STATUS_BELUM_DINILAI",
     "proses_terhubung",
     "rakit_sumber_alternatif",
+    "rakit_sumber_kesiapan",
     "rakit_sumber_redesain",
     "sumber_redesain",
     "teks_sumber_redesain",
@@ -65,6 +73,7 @@ AWALAN_SUMBER_REDESAIN = (
     "koreksi:",
     "konfirmasi:",
     "alternatif:",
+    "kesiapan:",
 )
 """Awalan ``source_id`` yang dihasilkan modul ini, satu per tabel sumber."""
 
@@ -140,9 +149,26 @@ FIELD_SUMBER_REDESAIN: dict[str, tuple[str, ...]] = {
         "gap_penerima",
         "risiko_layanan",
     ),
+    "kesiapan": (
+        "kode_alternatif",
+        "penerima_jabatan_id",
+        "material",
+        "periode",
+        "status",
+        "delta_asal",
+        "delta_penerima",
+        "delta_organisasi",
+        "syarat",
+        "alasan_hold",
+        "status_opsi",
+    ),
 }
 """Satu-satunya kunci yang boleh muncul pada teks sumber per tabel. ``cerita_sebelum``,
 ``catatan_akses``, dan ``catatan_privasi_gap`` sengaja tidak ada."""
+
+
+STATUS_BELUM_DINILAI = "BELUM_DINILAI"
+"""Nilai ``status`` sumber ``kesiapan:`` bila penerima belum punya penilaian pada periode itu."""
 
 
 def teks_sumber_redesain(tabel: str, nilai: dict[str, Any]) -> str:
@@ -338,3 +364,86 @@ def rakit_sumber_alternatif(session: Session, masalah_id: str) -> list[SumberAi]
             .order_by(RedesainAlternatifModel.kode)
         ).all()
     ]
+
+
+def _teks_delta(jam: Any, estimasi: str) -> str:
+    """Tulis satu delta kesiapan: ``NOT_ESTIMABLE`` apa adanya, atau jam beserta penandanya."""
+    if estimasi == EstimasiDelta.NOT_ESTIMABLE or jam is None:
+        return EstimasiDelta.NOT_ESTIMABLE.value
+    return f"{jam} jam kerja efektif per periode ({estimasi})"
+
+
+def rakit_sumber_kesiapan(session: Session, masalah_id: str, periode: str) -> list[SumberAi]:
+    """Rangkai kesiapan tiap penerima alternatif satu masalah pada satu periode menjadi sumber AI.
+
+    Satu sumber per pasangan alternatif x penerima, ``source_id``
+    ``kesiapan:<alternatif_id>:<penerima_id>``, urut ``kode`` alternatif lalu ``created_at`` dan
+    ``id`` penerima. Teks memuat ``kode`` alternatif, ``penerima_jabatan_id``, ``material``,
+    ``periode``, status penilaian terakhir (``created_at``, ``id``) pada periode itu atau
+    ``BELUM_DINILAI``, ketiga delta (``NOT_ESTIMABLE`` ditulis apa adanya, tidak pernah sebagai
+    nol), ``syarat``/``alasan_hold``, dan ``status_opsi`` alternatif (``hitung_status_opsi``).
+    Hanya kode dan id yang muncul, tidak ada nama orang. Penilaian periode lain tidak ikut.
+
+    Args:
+        session: Sesi basis data.
+        masalah_id: Id ``redesain_masalah``.
+        periode: Periode kesiapan yang diminta (mis. ``2026/27``).
+
+    Returns:
+        Daftar sumber; kosong bila masalah tidak punya alternatif ber-penerima.
+    """
+    hasil: list[SumberAi] = []
+    alternatif = session.scalars(
+        select(RedesainAlternatifModel)
+        .where(RedesainAlternatifModel.masalah_id == masalah_id)
+        .order_by(RedesainAlternatifModel.kode)
+    ).all()
+    for alt in alternatif:
+        penerima = session.scalars(
+            select(RedesainAlternatifPenerimaModel)
+            .where(RedesainAlternatifPenerimaModel.alternatif_id == alt.id)
+            .order_by(
+                RedesainAlternatifPenerimaModel.created_at, RedesainAlternatifPenerimaModel.id
+            )
+        ).all()
+        if not penerima:
+            continue
+        terakhir: dict[str, RedesainKesiapanModel] = {}
+        for nilai in session.scalars(
+            select(RedesainKesiapanModel)
+            .where(
+                RedesainKesiapanModel.penerima_id.in_([p.id for p in penerima]),
+                RedesainKesiapanModel.periode == periode,
+            )
+            .order_by(RedesainKesiapanModel.created_at, RedesainKesiapanModel.id)
+        ).all():
+            terakhir[nilai.penerima_id] = nilai
+        status_opsi = hitung_status_opsi(
+            (
+                p.material,
+                StatusKesiapan(terakhir[p.id].status) if p.id in terakhir else None,
+            )
+            for p in penerima
+        )
+        for p in penerima:
+            n = terakhir.get(p.id)
+            isi: dict[str, Any] = {
+                "kode_alternatif": alt.kode,
+                "penerima_jabatan_id": p.penerima_jabatan_id,
+                "material": "ya" if p.material else "tidak",
+                "periode": periode,
+                "status": n.status if n else STATUS_BELUM_DINILAI,
+                "status_opsi": status_opsi.value,
+            }
+            if n:
+                isi.update(
+                    delta_asal=_teks_delta(n.delta_asal_jam, n.delta_asal_estimasi),
+                    delta_penerima=_teks_delta(n.delta_penerima_jam, n.delta_penerima_estimasi),
+                    delta_organisasi=_teks_delta(
+                        n.delta_organisasi_jam, n.delta_organisasi_estimasi
+                    ),
+                    syarat=n.syarat,
+                    alasan_hold=n.alasan_hold,
+                )
+            hasil.append(sumber_redesain("kesiapan", f"{alt.id}:{p.id}", isi))
+    return hasil

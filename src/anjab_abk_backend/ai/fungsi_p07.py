@@ -63,8 +63,11 @@ INSTRUKSI_P07 = """\
 Fungsi: menyusun kartu keputusan satu halaman untuk Tim Kajian atas satu masalah redesain \
 sekolah. Sumber berpenanda "masalah:", "proses:", "langkah:", "bukti:", "koreksi:", dan \
 "konfirmasi:" memuat data masalah yang klaimnya sudah diperkuat Tim; "alternatif:" memuat \
-alternatif yang sudah dicatat Tim; "otorisasi:" memuat cuplikan status telaah, pemutus, \
-keputusan, dan prioritas final yang dibaca server; "usulan:" (bila ada) memuat draf opsi P06 \
+alternatif yang sudah dicatat Tim; "kesiapan:" memuat, per penerima tiap alternatif pada \
+periode yang diminta, status kesiapan (READY, CONDITIONAL, HOLD, atau BELUM_DINILAI), delta \
+beban, syarat, dan status opsi; "otorisasi:" memuat cuplikan status telaah, pemutus, \
+keputusan, prioritas final, dan keputusan perubahan terakhir per alternatif pada periode itu \
+(atau BELUM_DIPUTUS) yang dibaca server; "usulan:" (bila ada) memuat draf opsi P06 \
 yang sudah diterima reviewer. Orang hanya disebut lewat kode samaran. Kartu ini hanya bahan \
 untuk Tim; bukan keputusan dan bukan izin perubahan.
 
@@ -78,8 +81,12 @@ FTE, jam kerja, atau formasi), risiko, dan persyaratan.
 boleh dijalankan, dan jangan memberi status VERIFIED, READY, atau APPROVE.
 3. required_signoffs wajib menyebut tanda tangan PRIORITY dan CHANGE secara terpisah, \
 masing-masing dengan pihak yang menandatangani (mis. Yayasan) dan status BELUM_DITANDATANGANI.
-4. limitation wajib berisi minimal satu batasan kartu. Penerima tugas selain yang tercatat pada \
-sumber alternatif belum diketahui; tulis pada unknowns, jangan ditebak.
+4. limitation wajib berisi minimal satu batasan kartu. Kesiapan dibaca dari sumber \
+"kesiapan:" untuk setiap penerima, bukan diasumsikan. Penerima berstatus HOLD, CONDITIONAL, atau \
+BELUM_DINILAI masuk ke persyaratan beserta syaratnya; delta NOT_ESTIMABLE ditulis sebagai belum \
+dapat diperkirakan pada batas_angka, bukan nol. Penerima yang tidak tercatat pada sumber belum \
+diketahui; tulis pada unknowns, jangan ditebak. Keputusan perubahan pada "otorisasi:" hanya untuk \
+dibaca dan terpisah dari prioritas final.
 5. Gunakan hanya source_id yang ada pada sumber; jangan memakai pengetahuan lain. Parameter \
 masalah_id, periode, versi_syarat_f4, dan usulan_p06_id hanya kode konteks, bukan sumber \
 fakta. Tulis seluruh keluaran dalam bahasa Indonesia.\
@@ -151,7 +158,7 @@ ditagih ``aturan_p07``, ``CHANGE`` pada ``required_signoffs`` juga."""
 
 FUNGSI_P07 = FungsiAi(
     kode="P07",
-    prompt_version="p07-1",
+    prompt_version="p07-2",
     instruksi=INSTRUKSI_P07,
     skema_isi=SKEMA_ISI_P07,
 )

@@ -249,3 +249,16 @@ def test_sumber_alternatif_hanya_field_yang_diizinkan():
     assert s.teks == "opsi: Sederhanakan\ngap_penerima: Belum tahu"
     assert "alternatif:" in AWALAN_SUMBER_REDESAIN
     assert "keputusan" not in FIELD_SUMBER_REDESAIN["alternatif"]
+
+
+# --- instruksi: tanpa asumsi satu penerima, membaca kesiapan ---
+
+
+def test_instruksi_p06_tanpa_asumsi_satu_penerima_dan_membaca_kesiapan():
+    teks = " ".join(FUNGSI_P06.instruksi.split())
+    assert "satu jabatan penerima" not in teks and "Penerima selain satu jabatan" not in teks
+    assert "kesiapan:" in teks and "BELUM_DINILAI" in teks and "HOLD" in teks
+    assert "NOT_ESTIMABLE" in teks and "nol" in teks
+    assert "kesiapan:" in FUNGSI_P06.instruksi and FUNGSI_P06.prompt_version == "p06-2"
+    assert "kesiapan:" in AWALAN_SUMBER_REDESAIN
+    assert "keputusan_perubahan" not in FIELD_SUMBER_REDESAIN["kesiapan"]

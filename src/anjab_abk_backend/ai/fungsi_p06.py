@@ -8,7 +8,8 @@ READY/APPROVE (KAI:16).
 
 Pengajuan hanya sah untuk masalah yang lolos gerbang F4 (``ai/syarat_f4.py``, definisi
 sementara ``VERSI_SYARAT_F4``). Sumbernya ``rakit_sumber_redesain`` (dengan konfirmasi
-terkirim) ditambah ``rakit_sumber_alternatif``; tidak ada kuantitas terverifikasi yang dikirim
+terkirim) ditambah ``rakit_sumber_alternatif`` dan ``rakit_sumber_kesiapan`` (periode dari
+parameter); tidak ada kuantitas terverifikasi yang dikirim
 (``source_verified_quantities`` selalu kosong). Hasilnya hanya usulan di ``ai_usulan``; tab
 Alternatif tidak diisi otomatis.
 """
@@ -66,9 +67,10 @@ INSTRUKSI_P06 = """\
 Fungsi: menyusun draf opsi redesain untuk satu masalah redesain sekolah beserta asumsi \
 skenarionya. Sumber berpenanda "masalah:", "proses:", "langkah:", "bukti:", "koreksi:", dan \
 "konfirmasi:" memuat data masalah yang klaimnya sudah diperkuat Tim; "alternatif:" memuat \
-alternatif yang sudah dicatat Tim, termasuk satu jabatan penerima (pihak_penerima_jabatan_id) \
-bila ada. Orang hanya disebut lewat kode samaran. Hasilnya hanya usulan untuk Tim Kajian; \
-bukan keputusan.
+alternatif yang sudah dicatat Tim; "kesiapan:" memuat, per penerima tiap alternatif pada \
+periode yang diminta, status kesiapan (READY, CONDITIONAL, HOLD, atau BELUM_DINILAI), delta \
+beban, syarat, dan status opsi. Orang hanya disebut lewat kode samaran. Hasilnya hanya usulan \
+untuk Tim Kajian; bukan keputusan.
 
 Aturan fungsi:
 1. Susun opsi dengan jenis STATUS_QUO, SIMPLIFY, AUTOMATE, atau TRANSFER. Petakan ke \
@@ -84,8 +86,11 @@ yang diperlukan ditulis pada unknown_parameters beserta alasannya.
 atau siap dijalankan. Penetapan opsi tetap keputusan manusia.
 4. Jangan menyetujui atau menganjurkan pengalihan tugas hanya karena slot jabatan penerima \
 tampak kosong atau longgar; kesanggupan penerima harus didukung sumber.
-5. Penerima selain satu jabatan yang tercatat pada sumber alternatif tidak diketahui: tulis \
-sebagai unknown_parameters, jangan ditebak.
+5. Satu alternatif boleh punya beberapa penerima. Baca kesiapan tiap penerima dari sumber \
+"kesiapan:". Setiap penerima berstatus HOLD atau BELUM_DINILAI wajib disebut sebagai risiko \
+atau prasyarat opsi terkait (pada risks atau asumsi), dan penerima yang tidak tercatat pada \
+sumber ditulis sebagai unknown_parameters, jangan ditebak. Delta NOT_ESTIMABLE berarti belum \
+dapat diperkirakan: jangan menulisnya sebagai nol, dan jangan menggantinya dengan angka.
 6. Tiap fakta_sumber menunjuk minimal satu source_id pendukung; hal yang tidak didukung \
 sumber ditulis sebagai asumsi (pada opsi atau scenario_assumptions), bukan sebagai fakta.
 7. unknown_parameters wajib berisi minimal satu parameter. risks dan checks menunjuk opsi \
@@ -179,7 +184,7 @@ menuntut skema yang menolak daftar kosong; minimal satu ``source_ids`` per fakta
 
 FUNGSI_P06 = FungsiAi(
     kode="P06",
-    prompt_version="p06-1",
+    prompt_version="p06-2",
     instruksi=INSTRUKSI_P06,
     skema_isi=SKEMA_ISI_P06,
 )

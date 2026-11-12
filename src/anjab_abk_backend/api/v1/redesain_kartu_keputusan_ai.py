@@ -20,7 +20,11 @@ from pydantic import ValidationError
 
 from ...ai.fungsi_p07 import ParameterP07
 from ...ai.otorisasi_redesain import bangun_authorization_state, sumber_otorisasi
-from ...ai.sumber_redesain import rakit_sumber_alternatif, rakit_sumber_redesain
+from ...ai.sumber_redesain import (
+    rakit_sumber_alternatif,
+    rakit_sumber_kesiapan,
+    rakit_sumber_redesain,
+)
 from ...ai.syarat_f4 import periksa_syarat_p07
 from ...config import Settings, get_settings
 from ...dependencies import (
@@ -136,10 +140,11 @@ def ajukan_kartu_keputusan_ai(
         sumber_usulan = (
             [usulan.sumber_dari_usulan(data.usulan_p06_id)] if data.usulan_p06_id else []
         )
-        state = bangun_authorization_state(session, masalah_id)
+        state = bangun_authorization_state(session, masalah_id, data.periode)
         sumber = [
             *rakit_sumber_redesain(session, masalah_id, sertakan_konfirmasi=True),
             *rakit_sumber_alternatif(session, masalah_id),
+            *rakit_sumber_kesiapan(session, masalah_id, data.periode),
             sumber_otorisasi(masalah_id, state),
             *sumber_usulan,
         ]

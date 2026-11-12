@@ -227,3 +227,13 @@ def test_sumber_otorisasi_tanpa_diambil_pada_dan_hash_stabil():
     assert s1.source_id == _O and s1.jenis == "REDESAIN"
     assert "diambil_pada" not in s1.teks and "P1 - Utama" in s1.teks
     assert s1.source_hash == s2.source_hash
+
+
+def test_instruksi_p07_tanpa_asumsi_penerima_tunggal_dan_membaca_kesiapan():
+    teks = " ".join(FUNGSI_P07.instruksi.split())
+    assert "Penerima tugas selain yang tercatat" not in teks
+    assert "kesiapan:" in teks and "BELUM_DINILAI" in teks and "NOT_ESTIMABLE" in teks
+    assert "persyaratan" in teks and "BELUM_DIPUTUS" in teks
+    assert "PRIORITY dan CHANGE secara terpisah" in teks  # aturan 2 & 3 tak berubah
+    assert "jangan memberi status VERIFIED, READY, atau APPROVE" in teks
+    assert FUNGSI_P07.prompt_version == "p07-2"

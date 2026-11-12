@@ -27,8 +27,11 @@ from anjab_abk_backend.config import Settings, get_settings
 from anjab_abk_backend.models import (
     AiRunModel,
     AiUsulanModel,
+    JabatanModel,
     RedesainAlternatifModel,
+    RedesainAlternatifPenerimaModel,
     RedesainBuktiModel,
+    RedesainKesiapanModel,
     RedesainKonteksModel,
     RedesainLangkahModel,
     RedesainMasalahModel,
@@ -289,3 +292,48 @@ def test_badan_tidak_sah_422(app, client_as, db_session, p06):
     for badan in ({}, {"periode": "2026/27", "jam_per_minggu": 5}, {"periode": "x y"}):
         r = c.post(f"{URL}/{mid}/opsi-ai", json=badan)
         assert r.status_code == 422, badan
+
+
+def _tambah_penerima(db: Session, alternatif_id: str, *, nilai: str | None) -> str:
+    """Tambah satu penerima (jabatan baru) dan, bila `nilai`, satu penilaian kesiapan 2026/27."""
+    jid = f"jbt_{_hex()}"
+    db.add(JabatanModel(id=jid, kode=jid.upper(), nama=f"Jabatan {jid}", jenis="struktural"))
+    db.flush()
+    pid = str(uuid.uuid4())
+    db.add(
+        RedesainAlternatifPenerimaModel(
+            id=pid, alternatif_id=alternatif_id, penerima_jabatan_id=jid, material=True
+        )
+    )
+    db.flush()
+    if nilai:
+        db.add(
+            RedesainKesiapanModel(
+                id=str(uuid.uuid4()), penerima_id=pid, periode="2026/27", status=nilai,
+                delta_asal_estimasi="NOT_ESTIMABLE", delta_penerima_estimasi="NOT_ESTIMABLE",
+                delta_organisasi_estimasi="NOT_ESTIMABLE", dinilai_oleh="O-9301",
+            )
+        )  # fmt: skip
+        db.flush()
+    return pid
+
+
+def test_sumber_kesiapan_dua_penerima_ikut_terkirim_ke_p06(app, client_as, db_session, p06):
+    mid = _lolos_f4(db_session)
+    aid = _alternatif(db_session, mid)
+    p1 = _tambah_penerima(db_session, aid, nilai="READY")
+    p2 = _tambah_penerima(db_session, aid, nilai=None)
+    _atur(app)
+    r = _ajukan(_tim(client_as), mid)
+    assert r.status_code == 202, r.text
+    rec = db_session.get(AiUsulanModel, r.json()["id"])
+    db_session.refresh(rec)
+    sumber = db_session.get(AiRunModel, rec.ai_run_id).masukan["sumber"]
+    per = {s["source_id"]: s["teks"] for s in sumber}
+    assert "status: READY" in per[f"kesiapan:{aid}:{p1}"]
+    assert "delta_asal: NOT_ESTIMABLE" in per[f"kesiapan:{aid}:{p1}"]
+    assert "status: BELUM_DINILAI" in per[f"kesiapan:{aid}:{p2}"]
+    assert [s["jenis"] for s in sumber if s["source_id"].startswith("kesiapan:")] == [
+        "REDESAIN",
+        "REDESAIN",
+    ]

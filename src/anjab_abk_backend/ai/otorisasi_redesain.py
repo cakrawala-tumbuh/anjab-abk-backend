@@ -19,12 +19,17 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import RedesainAlternatifModel, RedesainPenilaianModel
+from ..models import (
+    RedesainAlternatifModel,
+    RedesainKeputusanPerubahanModel,
+    RedesainPenilaianModel,
+)
 from .redaksi import SumberAi
 from .sumber_redesain import JENIS_SUMBER_REDESAIN
 
 __all__ = [
     "AWALAN_SUMBER_OTORISASI",
+    "KEPUTUSAN_BELUM_DIPUTUS",
     "SUMBER_STATE_SERVER",
     "bangun_authorization_state",
     "sumber_otorisasi",
@@ -32,6 +37,10 @@ __all__ = [
 
 AWALAN_SUMBER_OTORISASI = "otorisasi:"
 """Awalan ``source_id`` cuplikan otorisasi: ``otorisasi:<masalah_id>``."""
+
+KEPUTUSAN_BELUM_DIPUTUS = "BELUM_DIPUTUS"
+"""Nilai ``keputusan`` pada ``keputusan_perubahan`` bila alternatif belum punya keputusan
+perubahan pada periode yang diminta."""
 
 SUMBER_STATE_SERVER = "server"
 """Nilai tetap ``authorization_state.sumber``: penanda bahwa cuplikan diisi server."""
@@ -42,16 +51,23 @@ def _sekarang() -> datetime:
     return datetime.now(UTC)
 
 
-def bangun_authorization_state(session: Session, masalah_id: str) -> dict[str, Any]:
+def bangun_authorization_state(
+    session: Session, masalah_id: str, periode: str | None = None
+) -> dict[str, Any]:
     """Susun cuplikan status otorisasi satu masalah dari basis data saat ini.
 
     Satu entri per ``redesain_alternatif`` masalah itu, urut ``kode`` (sama dengan
     ``rakit_sumber_alternatif``). ``change_ditandatangani`` selalu ``False`` karena aplikasi
     belum punya model tanda tangan CHANGE (butir 14/16/17 di luar lingkup).
 
+    Bila ``periode`` diberikan, ditambah ``keputusan_perubahan`` (sejajar ``alternatif``): keputusan
+    perubahan (ChangeDecision) **terakhir** (``created_at``, ``id``) tiap alternatif pada periode
+    itu, atau ``keputusan`` ``BELUM_DIPUTUS`` bila belum ada. Ia terpisah dari ``prioritas_final``.
+
     Args:
         session: Sesi basis data.
         masalah_id: Id ``redesain_masalah``.
+        periode: Periode keputusan perubahan; ``None`` melewatkan ``keputusan_perubahan``.
 
     Returns:
         ``{"alternatif": [{alternatif_id, status_telaah, pemutus_kode_orang, keputusan,
@@ -63,6 +79,11 @@ def bangun_authorization_state(session: Session, masalah_id: str) -> dict[str, A
         >>> bangun_authorization_state(session, masalah_id)["sumber"]  # doctest: +SKIP
         'server'
     """
+    daftar_alt = session.scalars(
+        select(RedesainAlternatifModel)
+        .where(RedesainAlternatifModel.masalah_id == masalah_id)
+        .order_by(RedesainAlternatifModel.kode)
+    ).all()
     alternatif = [
         {
             "alternatif_id": alt.id,
@@ -71,24 +92,51 @@ def bangun_authorization_state(session: Session, masalah_id: str) -> dict[str, A
             "keputusan": alt.keputusan,
             "prasyarat_monitoring": alt.prasyarat_monitoring,
         }
-        for alt in session.scalars(
-            select(RedesainAlternatifModel)
-            .where(RedesainAlternatifModel.masalah_id == masalah_id)
-            .order_by(RedesainAlternatifModel.kode)
-        ).all()
+        for alt in daftar_alt
     ]
     prioritas_final = session.scalar(
         select(RedesainPenilaianModel.prioritas_final).where(
             RedesainPenilaianModel.masalah_id == masalah_id
         )
     )
-    return {
+    state: dict[str, Any] = {
         "alternatif": alternatif,
         "prioritas_final": prioritas_final,
         "change_ditandatangani": False,
         "sumber": SUMBER_STATE_SERVER,
         "diambil_pada": _sekarang().isoformat(),
     }
+    if periode is not None:
+        state["keputusan_perubahan"] = _keputusan_perubahan(session, daftar_alt, periode)
+    return state
+
+
+def _keputusan_perubahan(
+    session: Session, daftar_alt: list[RedesainAlternatifModel], periode: str
+) -> list[dict[str, Any]]:
+    """Keputusan perubahan terakhir tiap alternatif pada ``periode``, atau ``BELUM_DIPUTUS``."""
+    terakhir: dict[str, RedesainKeputusanPerubahanModel] = {}
+    if daftar_alt:
+        K = RedesainKeputusanPerubahanModel
+        for k in session.scalars(
+            select(K)
+            .where(K.alternatif_id.in_([a.id for a in daftar_alt]), K.periode == periode)
+            .order_by(K.created_at, K.id)
+        ).all():
+            terakhir[k.alternatif_id] = k
+    return [
+        {
+            "alternatif_id": alt.id,
+            "periode": periode,
+            "keputusan": terakhir[alt.id].keputusan
+            if alt.id in terakhir
+            else KEPUTUSAN_BELUM_DIPUTUS,
+            "status_opsi_saat_putus": terakhir[alt.id].status_opsi_saat_putus
+            if alt.id in terakhir
+            else None,
+        }
+        for alt in daftar_alt
+    ]
 
 
 def sumber_otorisasi(masalah_id: str, state: dict[str, Any]) -> SumberAi:
