@@ -82,6 +82,15 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-12] Menit aktif tinjauan dan metrik alur narasi (UX-13)
+
+Backlog `#138` (asal `ypii-support#463`; pasangan web `anjab-abk-web-app#124`). False negative di luar lingkup (menunggu OD-13); dilaporkan konstan di `metrik_ditahan`.
+
+- **Tabel `narasi_menit_aktif`** (migrasi `b7e41d09c5a2`): `narasi_id` FK `ON DELETE RESTRICT`, `actor_key`, `menit` timestamptz; UNIQUE bernama `uq_narasi_menit_aktif_narasi_actor_menit`. Append-only lewat trigger `BEFORE UPDATE OR DELETE` memakai ulang `narasi_tolak_ubah()`.
+- **Detak** `POST /api/v1/narasi/kasus/{narasi_id}/menit-aktif` -> 204, tanpa body (`tim-kajian` + rate limit). Waktu dari jam server dipotong ke menit (`potong_ke_menit`, UTC); klien tidak mengirim timestamp. `INSERT ... ON CONFLICT DO NOTHING` pada UNIQUE di atas, jadi idempoten per menit tanpa `Idempotency-Key`. Parameter `sekarang` di `catat_menit_aktif` hanya untuk uji. Waktu = menit aktif (PRD:63), bukan selisih timestamp.
+- **Metrik** `GET /api/v1/narasi/metrik` (`READ_GUARDS` + `tim-kajian`; `dari`/`sampai` wajib, rentang inklusif hari UTC <= 366 hari, `dari` > `sampai` 422 `rentang_metrik_tidak_valid`). `jumlah_keputusan` = event TEAM_APPROVE/REVISE/REJECT + NEED_SOURCE pada `event_at`; `correction_rate`/`rejection_rate` = REVISE/REJECT dibagi `jumlah_keputusan`; `source_coverage` = proporsi `narasi_versi` (menurut `created_at`) yang punya >= 1 `narasi_versi_sumber`; menit total dan median per kasus (`percentile_cont(0.5)` atas kasus ber-menit > 0). Semua `null` bila penyebut/himpunan kosong; rasio dibulatkan 4 angka; agregasi di SQL (empat kueri). `narrative_kind` menyaring lewat join `narasi_kasus`.
+- Berkas: skema `narasi/schemas/metrik.py`, seam `narasi/services/metrik{,_sql}.py`, router `api/v1/narasi_metrik.py` (dua `APIRouter`: `router` di prefix `/narasi/kasus`, `router_metrik` di `/narasi/metrik`).
+
 ### [2026-11-12] Terapkan usulan P04 menjadi baris register klarifikasi; TOLAK menutup baris
 
 Backlog `#137` (lanjutan `#136`; pasangan web `anjab-abk-web-app#123`). `ai/fungsi_p04.py` tidak berubah.

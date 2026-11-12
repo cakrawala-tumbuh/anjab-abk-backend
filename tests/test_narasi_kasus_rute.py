@@ -178,8 +178,9 @@ def test_openapi_tanpa_patch_delete(client):
     paths = client.get("/openapi.json").json()["paths"]
     narasi = {p: v for p, v in paths.items() if p.startswith("/api/v1/narasi/kasus")}
     # 6 path kasus bawaan + 2 path rute pengaju draf AI (#98: draf-ai, permintaan-ai)
-    # + 1 path kritik AI (#104: kritik-ai) + 1 path usulan pertanyaan bukti (#106).
-    assert len(narasi) == 10
+    # + 1 path kritik AI (#104: kritik-ai) + 1 path usulan pertanyaan bukti (#106)
+    # + 1 path detak menit aktif tinjauan (#138: menit-aktif).
+    assert len(narasi) == 11
     ai = ("/draf-ai", "/permintaan-ai", "/kritik-ai", "/tanya-bukti-ai")
     assert {p.rsplit("/", 1)[1] for p in narasi if p.endswith(ai)} == {
         "draf-ai",

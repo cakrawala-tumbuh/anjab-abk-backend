@@ -48,6 +48,8 @@ from .errors import ForbiddenError, RateLimitedError, UnauthorizedError
 from .logging import AUDIT_LOGGER_NAME
 from .narasi.services.klarifikasi import KlarifikasiService
 from .narasi.services.klarifikasi_sql import SqlKlarifikasiService
+from .narasi.services.metrik import NarasiMetrikService
+from .narasi.services.metrik_sql import SqlNarasiMetrikService
 from .narasi.services.narasi import NarasiService
 from .narasi.services.narasi_sql import SqlNarasiService
 from .narasi.services.permintaan_ai import PermintaanAiService
@@ -452,6 +454,11 @@ def get_riset_kasus_negatif_service(session: SessionDep) -> RisetKasusNegatifSer
 def get_klarifikasi_service(session: SessionDep) -> KlarifikasiService:
     """SEAM: `KlarifikasiService` PostgreSQL (register klarifikasi narasi, riwayat append-only)."""
     return SqlKlarifikasiService(session)
+
+
+def get_narasi_metrik_service(session: SessionDep) -> NarasiMetrikService:
+    """SEAM: `NarasiMetrikService` PostgreSQL (menit aktif tinjauan dan metrik alur narasi)."""
+    return SqlNarasiMetrikService(session)
 
 
 def get_narasi_service(session: SessionDep) -> NarasiService:

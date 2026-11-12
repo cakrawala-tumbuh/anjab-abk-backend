@@ -20,6 +20,7 @@ from .v1 import (
     narasi_kasus,
     narasi_klarifikasi,
     narasi_kritik_ai,
+    narasi_metrik,
     narasi_sumber,
     narasi_tanya_bukti_ai,
     opm_hasil,
@@ -378,6 +379,16 @@ api_router.include_router(
 api_router.include_router(
     narasi_klarifikasi.router,
     prefix="/narasi/klarifikasi",
+    tags=["narasi"],
+)
+api_router.include_router(
+    narasi_metrik.router,
+    prefix="/narasi/kasus",
+    tags=["narasi"],
+)
+api_router.include_router(
+    narasi_metrik.router_metrik,
+    prefix="/narasi/metrik",
     tags=["narasi"],
 )
 api_router.include_router(

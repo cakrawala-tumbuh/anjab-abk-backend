@@ -1958,6 +1958,33 @@ class NarasiEventModel(Base):
     event_at: Mapped[datetime] = _ts()
 
 
+class NarasiMenitAktifModel(Base):
+    """Satu menit aktif tinjauan seorang reviewer atas sebuah kasus narasi; append-only.
+
+    Baris = satu detak yang diterima server; `menit` dipotong ke menit oleh server (klien tak
+    pernah mengirim waktu). UNIQUE (`narasi_id`, `actor_key`, `menit`) membuat detak berulang
+    dalam menit yang sama idempoten. Trigger `BEFORE UPDATE OR DELETE` (fungsi
+    `narasi_tolak_ubah()`) menolak perubahan.
+    """
+
+    __tablename__ = "narasi_menit_aktif"
+    __table_args__ = (
+        UniqueConstraint(
+            "narasi_id", "actor_key", "menit", name="uq_narasi_menit_aktif_narasi_actor_menit"
+        ),
+        Index("ix_narasi_menit_aktif_menit", "menit"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    narasi_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("narasi_kasus.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    actor_key: Mapped[str] = mapped_column(String(254), nullable=False)
+    menit: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 # ======================================================================================
 # Riset — protokol berversi yang dapat dikunci
 # ======================================================================================
