@@ -82,6 +82,16 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-12] Penerima jamak dan kesiapan per periode pada alternatif redesain
+
+Backlog `#133` (OD-10 / UX-14; asal `ypii-support#463`; lanjutan `#134` ChangeDecision, `#135` P06/P07; pasangan web `anjab-abk-web-app#122`).
+
+- **Tabel `redesain_alternatif_penerima`** (RecipientAssignment; migrasi `91d5ea3c7153`): `alternatif_id` FK `ON DELETE RESTRICT`, `penerima_jabatan_id` FK `jabatan.id`, `material` (bawaan true), `catatan`; UNIQUE (`alternatif_id`, `penerima_jabatan_id`) bernama eksplisit. Revisi yang sama mem-backfill satu baris (material) per alternatif ber-`pihak_penerima_jabatan_id`. Kolom lama **dipertahankan** dan tidak disinkronkan lagi; aturan "opsi pengalihan mewajibkan penerima" tetap membaca kolom lama.
+- **Tabel `redesain_kesiapan`** (append-only di lapisan API; koreksi = baris baru): `periode` pola `^\d{4}/\d{2}$`, `status` READY/CONDITIONAL/HOLD, tiga pasang `delta_{asal,penerima,organisasi}_{jam,estimasi}` (jam `Numeric(10,2)`, jam kerja efektif per periode, positif = beban bertambah) dengan CHECK `NOT_ESTIMABLE` <=> jam `NULL`; `syarat` wajib bila CONDITIONAL, `alasan_hold` wajib bila HOLD (divalidasi skema -> 422); `dinilai_oleh` = kode orang pemanggil. `delta_*_estimasi` bawaan `ESTIMATED` di payload.
+- **Rute** (router `redesain_alternatif.py`, `require_tim_kajian`): `GET/POST /redesain/alternatif/{id}/penerima` (409 `PENERIMA_GANDA`), `POST .../kesiapan` (422 `PENERIMA_BUKAN_MILIK_ALTERNATIF`), `GET .../kesiapan?periode=` (wajib, salah pola 422) -> `KesiapanMatriksRead` dari penilaian terakhir (`created_at`, `id`) per penerima.
+- **`hitung_status_opsi`** (fungsi murni di `redesain/services/alternatif.py`, dipakai ulang `#134`/`#135`): HOLD bila tanpa penerima atau ada penerima `material` HOLD/belum dinilai; selain itu CONDITIONAL bila ada CONDITIONAL; selain itu READY. Penerima non-material HOLD/belum dinilai tidak berpengaruh.
+- Enum `StatusKesiapan`/`EstimasiDelta` dan `POLA_PERIODE` ada di `redesain/schemas/alternatif.py` (diimpor `models.py`). Model baru ditaruh setelah `_in_check` di `models.py`.
+
 ### [2026-11-12] Cerita pra-bank TI dan log paparan bank tugas (saklar `PREBANK_FREEZE`)
 
 Backlog `#131` (UX-01; asal `ypii-support#463`; pasangan web `anjab-abk-web-app#121`, antrean narasi `#132`).

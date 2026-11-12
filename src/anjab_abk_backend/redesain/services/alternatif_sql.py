@@ -11,12 +11,34 @@ from sqlalchemy.orm import Session
 
 from ...anjab.services.jabatan import JabatanService
 from ...errors import ConflictError, NotFoundError, ValidationAppError
-from ...models import RedesainAlternatifModel, RedesainKodeOrangModel, RedesainMasalahModel
+from ...models import (
+    RedesainAlternatifModel,
+    RedesainAlternatifPenerimaModel,
+    RedesainKesiapanModel,
+    RedesainKodeOrangModel,
+    RedesainMasalahModel,
+)
 from ...schemas.search import Domain, Order
 from ...services.domain import validate_searchable_fields
 from ...services.domain_sql import FieldMap, FieldSpec, compile_domain, order_by_columns
-from ..schemas.alternatif import AlternatifCreate, AlternatifRead, AlternatifUpdate
-from .alternatif import SEARCHABLE_FIELDS
+from ..schemas.alternatif import (
+    AlternatifCreate,
+    AlternatifRead,
+    AlternatifUpdate,
+    KesiapanBaris,
+    KesiapanCreate,
+    KesiapanMatriksRead,
+    KesiapanRead,
+    PenerimaCreate,
+    PenerimaRead,
+    StatusKesiapan,
+)
+from .alternatif import (
+    SEARCHABLE_FIELDS,
+    PenerimaBukanMilikAlternatifError,
+    PenerimaGandaError,
+    hitung_status_opsi,
+)
 from .riwayat import RiwayatService
 
 ENTITAS = "alternatif"
@@ -80,6 +102,43 @@ def snapshot(r: AlternatifRead) -> dict[str, object]:
         Dict kode + kolom bisnis (tanpa id dan cap waktu).
     """
     return {"kode": r.kode, **{k: getattr(r, k) for k in _KOLOM_EDIT}}
+
+
+def _penerima_read(rec: RedesainAlternatifPenerimaModel) -> PenerimaRead:
+    """Petakan baris penerima ke skema respons."""
+    return PenerimaRead(
+        id=rec.id,
+        alternatif_id=rec.alternatif_id,
+        penerima_jabatan_id=rec.penerima_jabatan_id,
+        material=rec.material,
+        catatan=rec.catatan,
+        created_at=_aware(rec.created_at),
+    )
+
+
+_KOLOM_DELTA = (
+    "delta_asal_jam",
+    "delta_asal_estimasi",
+    "delta_penerima_jam",
+    "delta_penerima_estimasi",
+    "delta_organisasi_jam",
+    "delta_organisasi_estimasi",
+)
+
+
+def _kesiapan_read(rec: RedesainKesiapanModel) -> KesiapanRead:
+    """Petakan baris kesiapan ke skema respons."""
+    return KesiapanRead(
+        id=rec.id,
+        penerima_id=rec.penerima_id,
+        periode=rec.periode,
+        status=rec.status,  # type: ignore[arg-type]
+        syarat=rec.syarat,
+        alasan_hold=rec.alasan_hold,
+        dinilai_oleh=rec.dinilai_oleh,
+        created_at=_aware(rec.created_at),
+        **{k: getattr(rec, k) for k in _KOLOM_DELTA},
+    )
 
 
 def _nomor_berikutnya(kode_ada: list[str]) -> int:
@@ -254,3 +313,122 @@ class SqlAlternatifService:
         read = _to_read(rec)
         self._riwayat.catat(ENTITAS, read.id, "update", sebelum, snapshot(read), pelaku_kode_orang)
         return read
+
+    def tambah_penerima(self, alternatif_id: str, data: PenerimaCreate) -> PenerimaRead:
+        """Tambah penerima (jabatan) pada alternatif.
+
+        Raises:
+            NotFoundError: alternatif tak ada.
+            ValidationAppError: jabatan tak ditemukan.
+            PenerimaGandaError: jabatan sudah menjadi penerima alternatif ini (409
+                `PENERIMA_GANDA`), termasuk balapan dua permintaan (UNIQUE).
+        """
+        self._get_model(alternatif_id)
+        self._validasi_jabatan(data.penerima_jabatan_id, "penerima")
+        m = RedesainAlternatifPenerimaModel
+        ada = self._s.scalar(
+            select(func.count())
+            .select_from(m)
+            .where(
+                m.alternatif_id == alternatif_id, m.penerima_jabatan_id == data.penerima_jabatan_id
+            )
+        )
+        if ada:
+            raise PenerimaGandaError("Jabatan itu sudah menjadi penerima alternatif ini.")
+        rec = m(
+            id=str(uuid.uuid4()),
+            alternatif_id=alternatif_id,
+            penerima_jabatan_id=data.penerima_jabatan_id,
+            material=data.material,
+            catatan=data.catatan,
+            created_at=datetime.now(UTC),
+        )
+        self._s.add(rec)
+        try:
+            self._s.flush()
+        except IntegrityError as exc:
+            raise PenerimaGandaError("Jabatan itu sudah menjadi penerima alternatif ini.") from exc
+        self._s.refresh(rec)
+        return _penerima_read(rec)
+
+    def daftar_penerima(self, alternatif_id: str) -> list[PenerimaRead]:
+        """Daftar penerima alternatif, urut `created_at` naik lalu `id`; 404 bila tak ada."""
+        self._get_model(alternatif_id)
+        m = RedesainAlternatifPenerimaModel
+        rows = self._s.scalars(
+            select(m).where(m.alternatif_id == alternatif_id).order_by(m.created_at, m.id)
+        ).all()
+        return [_penerima_read(r) for r in rows]
+
+    def nilai_kesiapan(
+        self, alternatif_id: str, data: KesiapanCreate, *, dinilai_oleh: str
+    ) -> KesiapanRead:
+        """Simpan penilaian kesiapan baru; tidak pernah menimpa penilaian lama.
+
+        Raises:
+            NotFoundError: alternatif tak ada.
+            PenerimaBukanMilikAlternatifError: `penerima_id` bukan penerima alternatif ini.
+        """
+        self._get_model(alternatif_id)
+        pm = RedesainAlternatifPenerimaModel
+        penerima = self._s.get(pm, data.penerima_id)
+        if penerima is None or penerima.alternatif_id != alternatif_id:
+            raise PenerimaBukanMilikAlternatifError(
+                f"Penerima '{data.penerima_id}' bukan milik alternatif '{alternatif_id}'."
+            )
+        rec = RedesainKesiapanModel(
+            id=str(uuid.uuid4()),
+            dinilai_oleh=dinilai_oleh,
+            created_at=datetime.now(UTC),
+            **{k: (v.value if hasattr(v, "value") else v) for k, v in data.model_dump().items()},
+        )
+        self._s.add(rec)
+        self._s.flush()
+        self._s.refresh(rec)
+        return _kesiapan_read(rec)
+
+    def matriks_kesiapan(self, alternatif_id: str, periode: str) -> KesiapanMatriksRead:
+        """Susun matriks kesiapan dari penilaian TERAKHIR tiap penerima pada `periode`.
+
+        Penilaian terakhir = `created_at` terbesar, `id` sebagai pemutus seri. Penerima tanpa
+        penilaian tampil dengan `status=None`.
+
+        Raises:
+            NotFoundError: alternatif tak ada.
+        """
+        self._get_model(alternatif_id)
+        pm = RedesainAlternatifPenerimaModel
+        km = RedesainKesiapanModel
+        penerima = self._s.scalars(
+            select(pm).where(pm.alternatif_id == alternatif_id).order_by(pm.created_at, pm.id)
+        ).all()
+        terakhir: dict[str, RedesainKesiapanModel] = {}
+        if penerima:
+            nilai = self._s.scalars(
+                select(km)
+                .where(km.penerima_id.in_([p.id for p in penerima]), km.periode == periode)
+                .order_by(km.created_at, km.id)
+            ).all()
+            for n in nilai:  # urutan naik: yang terakhir menimpa
+                terakhir[n.penerima_id] = n
+        baris: list[KesiapanBaris] = []
+        for p in penerima:
+            n = terakhir.get(p.id)
+            baris.append(
+                KesiapanBaris(
+                    penerima_id=p.id,
+                    penerima_jabatan_id=p.penerima_jabatan_id,
+                    material=p.material,
+                    status=n.status if n else None,  # type: ignore[arg-type]
+                    syarat=n.syarat if n else None,
+                    alasan_hold=n.alasan_hold if n else None,
+                    dinilai_pada=_aware(n.created_at) if n else None,
+                    **{k: (getattr(n, k) if n else None) for k in _KOLOM_DELTA},
+                )
+            )
+        status_opsi = hitung_status_opsi(
+            (b.material, StatusKesiapan(b.status) if b.status else None) for b in baris
+        )
+        return KesiapanMatriksRead(
+            alternatif_id=alternatif_id, periode=periode, status_opsi=status_opsi, baris=baris
+        )

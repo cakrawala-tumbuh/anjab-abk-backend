@@ -20,6 +20,7 @@ efisien; properti `*_values`/`*_ids` memetakannya kembali ke `list[str]`.
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
@@ -32,12 +33,14 @@ from sqlalchemy import (
     Index,
     Integer,
     MetaData,
+    Numeric,
     Sequence,
     SmallInteger,
     String,
     Text,
     UniqueConstraint,
     text,
+    true,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -49,6 +52,7 @@ from anjab_abk_backend.narasi.schemas.kasus import (
     RevisionOrigin,
     StatusNarasi,
 )
+from anjab_abk_backend.redesain.schemas.alternatif import EstimasiDelta, StatusKesiapan
 from anjab_abk_backend.schemas.ai_usulan import PutusanUsulan, SasaranUsulan, TingkatKoreksi
 from anjab_abk_backend.schemas.riset_protokol import StatusProtokol
 from anjab_abk_backend.schemas.riset_statistik import StatusStatistik
@@ -1561,6 +1565,94 @@ def _in_check(kolom: str, enum_cls: type) -> str:
     """Ekspresi SQL `kolom IN (...)` dari nilai sebuah StrEnum (untuk CHECK constraint)."""
     nilai = ", ".join(f"'{m.value}'" for m in enum_cls)  # type: ignore[attr-defined]
     return f"{kolom} IN ({nilai})"
+
+
+class RedesainAlternatifPenerimaModel(Base):
+    """Penerima satu alternatif redesain (`redesain_alternatif_penerima`; RecipientAssignment).
+
+    Satu alternatif boleh punya banyak penerima (jabatan), masing-masing `material` atau tidak.
+    UNIQUE (`alternatif_id`, `penerima_jabatan_id`). FK ke alternatif `ON DELETE RESTRICT`;
+    tidak ada sunting maupun hapus di lapisan API. Kolom lama
+    `redesain_alternatif.pihak_penerima_jabatan_id` dipertahankan demi kompatibilitas.
+    """
+
+    __tablename__ = "redesain_alternatif_penerima"
+    __table_args__ = (
+        UniqueConstraint(
+            "alternatif_id", "penerima_jabatan_id", name="uq_redesain_alternatif_penerima_jabatan"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    alternatif_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("redesain_alternatif.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    penerima_jabatan_id: Mapped[str] = mapped_column(
+        String(40), ForeignKey("jabatan.id"), nullable=False
+    )
+    material: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    catatan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = _ts()
+
+
+class RedesainKesiapanModel(Base):
+    """Penilaian kesiapan satu penerima pada satu periode (`redesain_kesiapan`), append-only.
+
+    Koreksi = baris baru; matriks memakai penilaian terakhir (`created_at`, `id`). Untuk tiap
+    sisi (`asal`, `penerima`, `organisasi`): `delta_*_jam` (jam kerja efektif per periode,
+    positif = beban bertambah) null bila dan hanya bila `delta_*_estimasi = NOT_ESTIMABLE`.
+    """
+
+    __tablename__ = "redesain_kesiapan"
+    __table_args__ = (
+        CheckConstraint(_in_check("status", StatusKesiapan), name="status"),
+        CheckConstraint(
+            _in_check("delta_asal_estimasi", EstimasiDelta), name="delta_asal_estimasi"
+        ),
+        CheckConstraint(
+            _in_check("delta_penerima_estimasi", EstimasiDelta), name="delta_penerima_estimasi"
+        ),
+        CheckConstraint(
+            _in_check("delta_organisasi_estimasi", EstimasiDelta), name="delta_organisasi_estimasi"
+        ),
+        CheckConstraint(
+            "(delta_asal_estimasi = 'NOT_ESTIMABLE') = (delta_asal_jam IS NULL)",
+            name="delta_asal_konsisten",
+        ),
+        CheckConstraint(
+            "(delta_penerima_estimasi = 'NOT_ESTIMABLE') = (delta_penerima_jam IS NULL)",
+            name="delta_penerima_konsisten",
+        ),
+        CheckConstraint(
+            "(delta_organisasi_estimasi = 'NOT_ESTIMABLE') = (delta_organisasi_jam IS NULL)",
+            name="delta_organisasi_konsisten",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    penerima_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("redesain_alternatif_penerima.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    periode: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    delta_asal_jam: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    delta_asal_estimasi: Mapped[str] = mapped_column(String(20), nullable=False)
+    delta_penerima_jam: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    delta_penerima_estimasi: Mapped[str] = mapped_column(String(20), nullable=False)
+    delta_organisasi_jam: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    delta_organisasi_estimasi: Mapped[str] = mapped_column(String(20), nullable=False)
+    syarat: Mapped[str | None] = mapped_column(Text, nullable=True)
+    alasan_hold: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dinilai_oleh: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = _ts()
 
 
 class NarasiKasusModel(Base):

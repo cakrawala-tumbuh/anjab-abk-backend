@@ -41,6 +41,9 @@ Yang dijamin:
     backlog `#123`): FK `ON DELETE RESTRICT`, indeks `protokol_id`, dan round-trip.
 14. ``test_ai_usulan_konteks_server_*`` — revisi DDL `e4a7c19b2d63` (kolom JSONB nullable
     `ai_usulan.konteks_server`, backlog `#125`): baris lama tetap `NULL` dan round-trip.
+15. ``test_redesain_penerima_*`` — revisi DDL `91d5ea3c7153` (tabel `redesain_alternatif_penerima`
+    dan `redesain_kesiapan`, backlog `#133`): backfill tepat satu baris penerima per alternatif
+    yang `pihak_penerima_jabatan_id`-nya terisi, CHECK konsistensi `NOT_ESTIMABLE`, round-trip.
 
 Test berbasis-DB membangun **database sekali-pakai** terpisah dari DB test utama agar
 tidak mengganggu fixtur ``engine`` (yang sudah di-seed). Database itu dibuat & dihapus
@@ -1449,5 +1452,48 @@ def test_sasaran_usulan_redesain_konteks_roundtrip(fresh_db_url: str) -> None:
             _insert_ai_usulan_mig(conn, sasaran_jenis="REDESAIN_KONTEKS", sasaran_id="y")
         with pytest.raises(Exception, match="ck_ai_usulan_sasaran_jenis"):
             downgrade(fresh_db_url, _SASARAN_KONTEKS_DOWN)
+    finally:
+        engine.dispose()
+
+
+def test_redesain_penerima_backfill_satu_baris_per_alternatif_berpenerima(
+    fresh_db_url: str,
+) -> None:
+    """Backfill `91d5ea3c7153`: alternatif berpenerima -> satu baris; tanpa penerima -> nol."""
+    upgrade(fresh_db_url, "a1c5e7b93d20")
+    engine = create_engine(fresh_db_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("SET LOCAL session_replication_role = replica"))  # lewati FK
+            conn.execute(
+                text(
+                    "INSERT INTO jabatan (id, kode, nama, jenis, aktif, created_at) "
+                    "VALUES ('jbt_x', 'JBT-X', 'Jabatan X', 'struktural', true, now())"
+                )
+            )
+            for aid, kode, penerima in (
+                ("alt-mig-1", "U-901", "jbt_x"),
+                ("alt-mig-2", "U-902", None),
+            ):
+                conn.execute(
+                    text(
+                        "INSERT INTO redesain_alternatif "
+                        "(id, kode, masalah_id, opsi, alur_kini_vs_usulan, "
+                        " pihak_penerima_jabatan_id, gap_penerima, status_telaah, "
+                        " created_at, updated_at) "
+                        "VALUES (:id, :kode, 'm-x', 'Sederhanakan', 'a', :p, 'Belum tahu', "
+                        " 'Belum ditelaah', now(), now())"
+                    ),
+                    {"id": aid, "kode": kode, "p": penerima},
+                )
+        upgrade(fresh_db_url, "head")
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT alternatif_id, penerima_jabatan_id, material "
+                    "FROM redesain_alternatif_penerima ORDER BY alternatif_id"
+                )
+            ).all()
+        assert [tuple(r) for r in rows] == [("alt-mig-1", "jbt_x", True)]
     finally:
         engine.dispose()

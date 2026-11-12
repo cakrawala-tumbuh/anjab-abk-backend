@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 
 from ...config import Settings, get_settings
 from ...dependencies import (
@@ -19,7 +19,17 @@ from ...dependencies import (
     require_tim_kajian,
 )
 from ...etag import check_if_match, compute_etag
-from ...redesain.schemas.alternatif import AlternatifCreate, AlternatifRead, AlternatifUpdate
+from ...redesain.schemas.alternatif import (
+    POLA_PERIODE,
+    AlternatifCreate,
+    AlternatifRead,
+    AlternatifUpdate,
+    KesiapanCreate,
+    KesiapanMatriksRead,
+    KesiapanRead,
+    PenerimaCreate,
+    PenerimaRead,
+)
 from ...redesain.services.alternatif import AlternatifService
 from ...schemas.common import ErrorResponse, Page
 from ...schemas.search import SearchRequest
@@ -153,3 +163,115 @@ def update_alternatif(
     item = service.update(alternatif_id, data, pelaku_kode_orang=pelaku)
     response.headers["ETag"] = compute_etag(item)
     return item
+
+
+@router.get(
+    "/{alternatif_id}/penerima",
+    response_model=list[PenerimaRead],
+    summary="Daftar penerima alternatif redesain (tim-kajian)",
+    operation_id="redesain_alternatif_penerima_list",
+    dependencies=_READ,
+    responses={**_AUTH, **_RATE, **_FORBIDDEN, **_NOTFOUND},
+)
+def list_penerima(
+    alternatif_id: str,
+    service: Annotated[AlternatifService, Depends(get_alternatif_service)],
+) -> list[PenerimaRead]:
+    """Daftar penerima (jabatan) alternatif, urut waktu penambahan."""
+    return service.daftar_penerima(alternatif_id)
+
+
+@router.post(
+    "/{alternatif_id}/penerima",
+    response_model=PenerimaRead,
+    status_code=201,
+    summary="Tambah penerima alternatif redesain (tim-kajian)",
+    operation_id="redesain_alternatif_penerima_create",
+    dependencies=_WRITE,
+    responses={
+        **IDEMPOTENCY_RESPONSES,
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOTFOUND,
+        409: {
+            "model": ErrorResponse,
+            "description": "Jabatan sudah menjadi penerima (`PENERIMA_GANDA`).",
+        },
+        422: {"model": ErrorResponse, "description": "Payload/jabatan tidak valid."},
+    },
+)
+def create_penerima(
+    alternatif_id: str,
+    data: PenerimaCreate,
+    service: Annotated[AlternatifService, Depends(get_alternatif_service)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> PenerimaRead:
+    """Tambah satu jabatan penerima; kolom lama `pihak_penerima_jabatan_id` tidak disentuh."""
+
+    def _aksi() -> PenerimaRead:
+        return service.tambah_penerima(alternatif_id, data)
+
+    return run_idempotent(idem, response, PenerimaRead, _aksi)
+
+
+@router.post(
+    "/{alternatif_id}/kesiapan",
+    response_model=KesiapanRead,
+    status_code=201,
+    summary="Catat penilaian kesiapan penerima per periode (tim-kajian)",
+    operation_id="redesain_alternatif_kesiapan_create",
+    dependencies=_WRITE,
+    responses={
+        **IDEMPOTENCY_RESPONSES,
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOTFOUND,
+        422: {
+            "model": ErrorResponse,
+            "description": "Aturan wajib-isi dilanggar atau `PENERIMA_BUKAN_MILIK_ALTERNATIF`.",
+        },
+    },
+)
+def create_kesiapan(
+    alternatif_id: str,
+    data: KesiapanCreate,
+    service: Annotated[AlternatifService, Depends(get_alternatif_service)],
+    pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> KesiapanRead:
+    """Catat penilaian kesiapan (append-only); koreksi = penilaian baru, matriks memakai terakhir.
+
+    `NOT_ESTIMABLE` menyimpan nilai null (bukan 0).
+    """
+
+    def _aksi() -> KesiapanRead:
+        return service.nilai_kesiapan(alternatif_id, data, dinilai_oleh=pelaku)
+
+    return run_idempotent(idem, response, KesiapanRead, _aksi)
+
+
+@router.get(
+    "/{alternatif_id}/kesiapan",
+    response_model=KesiapanMatriksRead,
+    summary="Matriks kesiapan alternatif per periode beserta status opsi (tim-kajian)",
+    operation_id="redesain_alternatif_kesiapan_matriks",
+    dependencies=_READ,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOTFOUND,
+        422: {"model": ErrorResponse, "description": "`periode` hilang atau salah pola."},
+    },
+)
+def get_matriks_kesiapan(
+    alternatif_id: str,
+    periode: Annotated[str, Query(pattern=POLA_PERIODE, description="Periode, mis. 2026/27.")],
+    service: Annotated[AlternatifService, Depends(get_alternatif_service)],
+) -> KesiapanMatriksRead:
+    """Matriks kesiapan pada periode: penilaian terakhir per penerima dan `status_opsi`."""
+    return service.matriks_kesiapan(alternatif_id, periode)
