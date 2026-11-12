@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     # besar dari batas umum karena berkas dump bisa berukuran ratusan MB. Middleware
     # `BodySizeLimitMiddleware` memakai nilai ini HANYA untuk path itu (lihat middleware.py).
     restore_max_body_bytes: int = 536_870_912  # 512 MiB
+    # Batas lampiran PDF sign-off PI/etik (`riset_signoff_max_bytes`) sekaligus batas body
+    # khusus rute `/riset/protokol/{id}/sign-off`; rute lain tetap `max_request_body_bytes`.
+    riset_signoff_max_bytes: int = 5_242_880  # 5 MiB
     request_timeout_seconds: float = 0
     enable_security_headers: bool = True
     enable_hsts: bool = False

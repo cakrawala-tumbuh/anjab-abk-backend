@@ -48,6 +48,7 @@ from .v1 import (
     redesain_yayasan,
     riset_kasus_negatif,
     riset_protokol,
+    riset_signoff,
     riset_sintesis_ai,
     riset_statistik,
     sekolah,
@@ -343,6 +344,11 @@ api_router.include_router(
 )
 api_router.include_router(
     riset_protokol.router,
+    prefix="/riset/protokol",
+    tags=["riset"],
+)
+api_router.include_router(
+    riset_signoff.router,
     prefix="/riset/protokol",
     tags=["riset"],
 )

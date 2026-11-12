@@ -32,6 +32,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     MetaData,
     Numeric,
     Sequence,
@@ -2082,6 +2083,32 @@ class RisetKasusNegatifModel(Base):
     alasan_negatif: Mapped[str] = mapped_column(Text, nullable=False)
     sumber_ref: Mapped[str | None] = mapped_column(String(500), nullable=True)
     dibuat_oleh: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = _ts()
+
+
+class RisetProtokolSignoffModel(Base):
+    """Bukti sign-off PI/etik per protokol riset (`riset_protokol_signoff`), satu per protokol.
+
+    Menyimpan PDF persetujuan etik sebagai `bytea` di PostgreSQL beserta metadata dan
+    SHA-256. Append-only di lapisan API (tanpa sunting/hapus/ganti). FK ke `riset_protokol`
+    memakai `ON DELETE RESTRICT` dan UNIQUE `protokol_id` menjamin paling banyak satu baris.
+    """
+
+    __tablename__ = "riset_protokol_signoff"
+    __table_args__ = (UniqueConstraint("protokol_id", name="uq_riset_protokol_signoff_protokol"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    protokol_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("riset_protokol.id", ondelete="RESTRICT"), nullable=False
+    )
+    pi_nama: Mapped[str] = mapped_column(String(200), nullable=False)
+    tanggal_persetujuan_etik: Mapped[date] = mapped_column(Date, nullable=False)
+    nomor_persetujuan_etik: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    lampiran_pdf: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, deferred=True)
+    lampiran_nama: Mapped[str] = mapped_column(String(255), nullable=False)
+    lampiran_ukuran: Mapped[int] = mapped_column(Integer, nullable=False)
+    lampiran_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    dicatat_oleh: Mapped[str] = mapped_column(String(200), nullable=False)
     created_at: Mapped[datetime] = _ts()
 
 

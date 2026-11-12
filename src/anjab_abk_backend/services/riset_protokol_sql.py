@@ -20,6 +20,7 @@ from ..schemas.riset_protokol import (
     StatusProtokol,
 )
 from .riset_protokol import ProtokolTerkunciError
+from .riset_signoff_sql import signoff_ada
 
 
 def hash_isi(isi: str) -> str:
@@ -58,9 +59,9 @@ def _ringkas(rec: RisetProtokolModel) -> RisetProtokolRingkas:
     )
 
 
-def _to_read(rec: RisetProtokolModel) -> RisetProtokolRead:
-    """Petakan baris ORM ke representasi lengkap (dengan `isi`)."""
-    return RisetProtokolRead(**_ringkas(rec).model_dump(), isi=rec.isi)
+def _to_read(rec: RisetProtokolModel, *, signoff_ada: bool = False) -> RisetProtokolRead:
+    """Petakan baris ORM ke representasi lengkap (dengan `isi` dan `signoff_ada`)."""
+    return RisetProtokolRead(**_ringkas(rec).model_dump(), isi=rec.isi, signoff_ada=signoff_ada)
 
 
 class SqlRisetProtokolService:
@@ -114,7 +115,7 @@ class SqlRisetProtokolService:
         rec = self._s.get(RisetProtokolModel, protokol_id)
         if rec is None:
             raise NotFoundError(f"Protokol riset '{protokol_id}' tidak ditemukan.")
-        return _to_read(rec)
+        return _to_read(rec, signoff_ada=signoff_ada(self._s, rec.id))
 
     def list(
         self, *, kode: str | None, status: str | None, limit: int, offset: int
@@ -154,4 +155,4 @@ class SqlRisetProtokolService:
         rec.updated_at = now
         self._s.flush()
         self._s.refresh(rec)
-        return _to_read(rec)
+        return _to_read(rec, signoff_ada=signoff_ada(self._s, rec.id))

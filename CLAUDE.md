@@ -91,6 +91,16 @@ Backlog `#138` (asal `ypii-support#463`; pasangan web `anjab-abk-web-app#124`). 
 - **Metrik** `GET /api/v1/narasi/metrik` (`READ_GUARDS` + `tim-kajian`; `dari`/`sampai` wajib, rentang inklusif hari UTC <= 366 hari, `dari` > `sampai` 422 `rentang_metrik_tidak_valid`). `jumlah_keputusan` = event TEAM_APPROVE/REVISE/REJECT + NEED_SOURCE pada `event_at`; `correction_rate`/`rejection_rate` = REVISE/REJECT dibagi `jumlah_keputusan`; `source_coverage` = proporsi `narasi_versi` (menurut `created_at`) yang punya >= 1 `narasi_versi_sumber`; menit total dan median per kasus (`percentile_cont(0.5)` atas kasus ber-menit > 0). Semua `null` bila penyebut/himpunan kosong; rasio dibulatkan 4 angka; agregasi di SQL (empat kueri). `narrative_kind` menyaring lewat join `narasi_kasus`.
 - Berkas: skema `narasi/schemas/metrik.py`, seam `narasi/services/metrik{,_sql}.py`, router `api/v1/narasi_metrik.py` (dua `APIRouter`: `router` di prefix `/narasi/kasus`, `router_metrik` di `/narasi/metrik`).
 
+### [2026-11-12] Bukti sign-off PI/etik protokol riset dan gerbang P08
+
+Backlog `#139` (OD-09; asal `ypii-support#463`; pasangan web `anjab-abk-web-app#125`).
+
+- **Tabel `riset_protokol_signoff`** (migrasi `d41f8a6e2b70`): satu per protokol (UNIQUE `uq_riset_protokol_signoff_protokol`), FK `ON DELETE RESTRICT`, `lampiran_pdf` `bytea` (kolom `deferred` agar metadata tidak menarik byte), plus nama/ukuran/sha256, `dicatat_oleh` (subjek token). Append-only di lapisan API: tanpa sunting/hapus/ganti.
+- **Siapa**: `require_tim_kajian` (tanpa grup baru, butir 18); pencatat menyatakan diri PI lewat `pi_nama`, server tidak memverifikasi jabatan "ketua".
+- **Rute** (router `riset_signoff.py`, prefix `/riset/protokol`): `POST /{id}/sign-off` multipart; urutan cek 404 -> 409 `PROTOKOL_BELUM_TERKUNCI` -> 409 `SIGNOFF_SUDAH_ADA` -> 422 `LAMPIRAN_BUKAN_PDF` (content-type `application/pdf` DAN byte awal `%PDF-`) -> 422 `LAMPIRAN_TERLALU_BESAR` -> 422 tanggal masa depan. `GET .../sign-off` (404 `SIGNOFF_TAK_ADA`) dan `GET .../sign-off/lampiran` (`attachment`, `ETag` = sha256). `RisetProtokolRead.signoff_ada` (hanya di detail, bukan di daftar ringkas).
+- **Batas body**: `Settings.riset_signoff_max_bytes` (5 MiB). `BodySizeLimitMiddleware` mendapat `pattern_overrides` (regex `fullmatch` pada path); rute sign-off diberi batas itu + 64 KiB untuk bidang form. Berkas > batas tetapi body masih dalam ruang tambahan -> 422 `LAMPIRAN_TERLALU_BESAR`; body lebih besar lagi -> 413.
+- **Gerbang P08**: setelah cek `TERKUNCI` dan sebelum cek statistik -> 409 `SIGNOFF_PI_ETIK_TAK_ADA`. Eval AI P08 perlu diulang di lingkungan yang punya protokol berisi sign-off.
+
 ### [2026-11-12] Terapkan usulan P04 menjadi baris register klarifikasi; TOLAK menutup baris
 
 Backlog `#137` (lanjutan `#136`; pasangan web `anjab-abk-web-app#123`). `ai/fungsi_p04.py` tidak berubah.

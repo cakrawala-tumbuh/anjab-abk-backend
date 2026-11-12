@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 import uuid
 
@@ -163,13 +164,30 @@ class BodySizeLimitMiddleware:
         app: ASGIApp,
         max_bytes: int,
         path_overrides: dict[str, int] | None = None,
+        pattern_overrides: list[tuple[re.Pattern[str], int]] | None = None,
     ) -> None:
+        """Simpan batas umum dan pengecualian per-path persis atau per-pola.
+
+        Args:
+            app: Aplikasi ASGI terbungkus.
+            max_bytes: Batas umum body (byte).
+            path_overrides: Path persis -> batas khusus.
+            pattern_overrides: Pola regex (`fullmatch` pada path) -> batas khusus, dipakai
+                rute ber-parameter seperti `/riset/protokol/{id}/sign-off`.
+        """
         self.app = app
         self.max_bytes = max_bytes
         self.path_overrides = path_overrides or {}
+        self.pattern_overrides = pattern_overrides or []
 
     def _limit_for(self, path: str) -> int:
-        return self.path_overrides.get(path, self.max_bytes)
+        """Batas body untuk `path`: path persis, lalu pola, lalu batas umum."""
+        if path in self.path_overrides:
+            return self.path_overrides[path]
+        for pola, batas in self.pattern_overrides:
+            if pola.fullmatch(path):
+                return batas
+        return self.max_bytes
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -224,6 +242,13 @@ def install_middleware(app: FastAPI, settings: Settings) -> None:
             BodySizeLimitMiddleware,
             max_bytes=settings.max_request_body_bytes,
             path_overrides={"/api/v1/system/restore": settings.restore_max_body_bytes},
+            pattern_overrides=[
+                (
+                    re.compile(r"/api/v1/riset/protokol/[^/]+/sign-off"),
+                    # Ruang tambahan untuk bidang form multipart di luar berkas PDF.
+                    settings.riset_signoff_max_bytes + 65_536,
+                )
+            ],
         )
     if settings.gzip_min_size:
         app.add_middleware(GZipMiddleware, minimum_size=settings.gzip_min_size)

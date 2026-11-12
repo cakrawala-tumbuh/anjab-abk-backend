@@ -61,6 +61,9 @@ class RisetProtokolRingkas(BaseModel):
 
 
 class RisetProtokolRead(RisetProtokolRingkas):
-    """Satu protokol riset lengkap, termasuk `isi`."""
+    """Satu protokol riset lengkap, termasuk `isi` dan penanda sign-off PI/etik."""
 
     isi: str
+    signoff_ada: bool = Field(
+        default=False, description="True bila bukti sign-off PI/etik sudah dicatat."
+    )

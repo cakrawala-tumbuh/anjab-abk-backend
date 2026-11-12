@@ -7,7 +7,9 @@ meninggalkan `ai_usulan` maupun `ai_run`.
 
 from __future__ import annotations
 
+import hashlib
 import uuid
+from datetime import date
 from typing import Any
 
 import pytest
@@ -24,6 +26,7 @@ from anjab_abk_backend.models import (
     AiUsulanModel,
     RisetKasusNegatifModel,
     RisetProtokolModel,
+    RisetProtokolSignoffModel,
     RisetStatistikModel,
 )
 
@@ -64,7 +67,8 @@ def _tim(client_as):
     return client_as("tim-p08", groups=["tim-kajian"])
 
 
-def _protokol(db: Session, *, terkunci: bool = True) -> RisetProtokolModel:
+def _protokol(db: Session, *, terkunci: bool = True, signoff: bool = True) -> RisetProtokolModel:
+    """Protokol uji; yang `TERKUNCI` otomatis diberi sign-off kecuali `signoff=False`."""
     rec = RisetProtokolModel(
         id=str(uuid.uuid4()), kode=f"P08-{uuid.uuid4().hex[:8]}", versi=1, judul="Protokol uji",
         isi="Metode: Cronbach alpha per sub-skala.",
@@ -74,6 +78,17 @@ def _protokol(db: Session, *, terkunci: bool = True) -> RisetProtokolModel:
     )  # fmt: skip
     db.add(rec)
     db.flush()  # FK telanjang tanpa relationship(): induk wajib di-flush lebih dulu
+    if terkunci and signoff:
+        pdf = b"%PDF-1.4 uji"
+        db.add(
+            RisetProtokolSignoffModel(
+                id=str(uuid.uuid4()), protokol_id=rec.id, pi_nama="Dr. PI Uji",
+                tanggal_persetujuan_etik=date(2026, 1, 5), lampiran_pdf=pdf,
+                lampiran_nama="etik.pdf", lampiran_ukuran=len(pdf),
+                lampiran_sha256=hashlib.sha256(pdf).hexdigest(), dicatat_oleh="tim-a",
+            )
+        )  # fmt: skip
+        db.flush()
     return rec
 
 
@@ -163,6 +178,20 @@ def test_protokol_draf_409_protokol_belum_terkunci(app, client_as, db_session, p
     prot = _protokol(db_session, terkunci=False)
     _atur(app)
     _assert_409(_ajukan(_tim(client_as), prot.id), db_session, "PROTOKOL_BELUM_TERKUNCI")
+
+
+def test_tanpa_signoff_409_dicek_sebelum_statistik(app, client_as, db_session, p08):
+    prot = _protokol(db_session, signoff=False)
+    _statistik(db_session, prot.id, "TERVERIFIKASI", "Alpha terverifikasi")
+    _atur(app)
+    r = _ajukan(_tim(client_as), prot.id)
+    _assert_409(r, db_session, "SIGNOFF_PI_ETIK_TAK_ADA")
+
+
+def test_tanpa_signoff_dan_tanpa_statistik_tetap_signoff_dulu(app, client_as, db_session, p08):
+    prot = _protokol(db_session, signoff=False)
+    _atur(app)
+    _assert_409(_ajukan(_tim(client_as), prot.id), db_session, "SIGNOFF_PI_ETIK_TAK_ADA")
 
 
 def test_tanpa_statistik_terverifikasi_409(app, client_as, db_session, p08):

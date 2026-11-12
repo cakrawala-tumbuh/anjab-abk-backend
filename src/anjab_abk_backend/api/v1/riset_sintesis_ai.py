@@ -36,6 +36,7 @@ from ...schemas.pengajuan_ai import PengajuanP08
 from ...schemas.riset_protokol import StatusProtokol
 from ...security import Principal
 from ...services.ai_usulan import AiUsulanService, FungsiAiBelumAktifError
+from ...services.riset_signoff_sql import signoff_ada
 from ...services.riset_statistik import ProtokolBelumTerkunciError
 from ..concurrency import IDEMPOTENCY_RESPONSES, run_idempotent
 
@@ -52,6 +53,12 @@ _AUTH = {401: {"model": ErrorResponse, "description": "Token tidak ada/invalid."
 _RATE = {429: {"model": ErrorResponse, "description": "Terlalu banyak permintaan."}}
 _FORBIDDEN = {403: {"model": ErrorResponse, "description": "Bukan anggota grup tim-kajian."}}
 _NOTFOUND = {404: {"model": ErrorResponse, "description": "Protokol riset tidak ditemukan."}}
+
+
+class SignoffPiEtikTakAdaError(ConflictError):
+    """409: protokol terkunci belum punya bukti sign-off PI/etik (`SIGNOFF_PI_ETIK_TAK_ADA`)."""
+
+    error_code = "SIGNOFF_PI_ETIK_TAK_ADA"
 
 
 class StatistikTerverifikasiKosongError(ConflictError):
@@ -83,6 +90,7 @@ class SumberTerlaluBanyakError(ValidationAppError):
             "model": ErrorResponse,
             "description": (
                 "feature_disabled; fungsi_belum_aktif; PROTOKOL_BELUM_TERKUNCI; "
+                "SIGNOFF_PI_ETIK_TAK_ADA; "
                 "STATISTIK_TERVERIFIKASI_KOSONG; pii_mode_belum_didukung; usulan_berjalan."
             ),
         },
@@ -110,7 +118,8 @@ def ajukan_sintesis_ai(
     Seluruh pemeriksaan berada di dalam aksi idempoten, jadi ulangan dengan `Idempotency-Key`
     yang sama membalas respons tersimpan (200). Urutan (semuanya sebelum run atau usulan dibuat):
     flag AI, protokol 404, fungsi belum terdaftar 409 `fungsi_belum_aktif`, protokol `DRAF` 409
-    `PROTOKOL_BELUM_TERKUNCI`, nol statistik terverifikasi 409 `STATISTIK_TERVERIFIKASI_KOSONG`,
+    `PROTOKOL_BELUM_TERKUNCI`, tanpa sign-off PI/etik 409
+    `SIGNOFF_PI_ETIK_TAK_ADA`, nol statistik terverifikasi 409 `STATISTIK_TERVERIFIKASI_KOSONG`,
     lebih dari 60 sumber 422 `SUMBER_TERLALU_BANYAK`, lalu `AiUsulanService.ajukan`. `parameter`
     hanya `protokol_kode`, `protokol_versi`, dan `periode`.
     """
@@ -126,6 +135,10 @@ def ajukan_sintesis_ai(
         if protokol.status != StatusProtokol.TERKUNCI.value:
             raise ProtokolBelumTerkunciError(
                 "Sintesis hanya untuk protokol berstatus TERKUNCI; kunci protokol lebih dulu."
+            )
+        if not signoff_ada(session, protokol_id):
+            raise SignoffPiEtikTakAdaError(
+                "Protokol belum punya bukti sign-off PI/etik; catat lewat .../sign-off."
             )
         if jumlah_statistik_terverifikasi(session, protokol_id) == 0:
             raise StatistikTerverifikasiKosongError(

@@ -116,6 +116,8 @@ from .services.riset_kasus_negatif import RisetKasusNegatifService
 from .services.riset_kasus_negatif_sql import SqlRisetKasusNegatifService
 from .services.riset_protokol import RisetProtokolService
 from .services.riset_protokol_sql import SqlRisetProtokolService
+from .services.riset_signoff import RisetSignoffService
+from .services.riset_signoff_sql import SqlRisetSignoffService
 from .services.riset_statistik import RisetStatistikService
 from .services.riset_statistik_sql import SqlRisetStatistikService
 from .services.skema_db import SkemaDbService
@@ -439,6 +441,11 @@ def get_narasi_sumber_service(session: SessionDep) -> NarasiSumberService:
 def get_riset_protokol_service(session: SessionDep) -> RisetProtokolService:
     """SEAM: `RisetProtokolService` PostgreSQL (protokol riset berversi yang dapat dikunci)."""
     return SqlRisetProtokolService(session)
+
+
+def get_riset_signoff_service(session: SessionDep) -> RisetSignoffService:
+    """SEAM: `RisetSignoffService` PostgreSQL (bukti sign-off PI/etik protokol riset)."""
+    return SqlRisetSignoffService(session)
 
 
 def get_riset_statistik_service(session: SessionDep) -> RisetStatistikService:
