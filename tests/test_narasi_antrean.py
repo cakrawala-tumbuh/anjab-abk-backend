@@ -308,3 +308,90 @@ def test_openapi_rute_baru(client):
     assert set(paths[ANTREAN]) == {"get"}
     assert set(paths[f"{ANTREAN}/{{narasi_id}}"]) == {"get"}
     assert set(paths[f"{KASUS}/{{narasi_id}}/tinjauan"]) == {"post"}
+
+
+# --- backlog #132: paparan dinamis untuk F2 ---------------------------------------------
+
+SESI_TI = "/api/v1/task-inventory/sesi"
+
+
+def _responden_ti(client, app, jabatan_id, jumlah):
+    """`jumlah` responden TI baru dalam satu sesi (admin), saklar pra-bank hidup."""
+    from anjab_abk_backend.config import Settings, get_settings
+
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None, feature_prebank_freeze=True
+    )
+    r = client.post(SESI_TI, json={"jabatan_id": jabatan_id, "cabang": "Bandung"})
+    assert r.status_code == 201, r.text
+    sid = r.json()["id"]
+    assert client.post(f"{SESI_TI}/{sid}/mulai-tahap1").status_code == 200
+    ids = []
+    for n in range(jumlah):
+        r = client.post(f"{SESI_TI}/{sid}/responden", json={"nama": f"Responden {n}"})
+        assert r.status_code == 201, r.text
+        ids.append(r.json()["id"])
+    return ids
+
+
+def _f2(svc, sumber, ref):
+    """Kasus F2_ACTUAL berstatus AI_DRAFT dengan `assignment_ref` = ref."""
+    return _draf(svc, sumber, narrative_kind="F2_ACTUAL", assignment_ref=ref)
+
+
+def _paparan_item(c, narasi_id):
+    items = c.get(ANTREAN, params={"limit": 200}).json()["items"]
+    return next(x for x in items if x["narasi_id"] == narasi_id)["paparan"]
+
+
+def test_paparan_f2_exposed_belum_terpapar_dan_locked(
+    client, app, client_as, svc, sumber, jabatan_id_tk
+):
+    r_exposed, r_belum, r_locked = _responden_ti(client, app, jabatan_id_tk, 3)
+    u = f"{SESI_TI}/responden"
+    assert client.post(f"{u}/{r_exposed}/paparan", json={"jenis": "BANK_TUGAS"}).status_code == 201
+    client.put(f"{u}/{r_locked}/cerita-prabank", json={"teks": "cerita saya"})
+    assert client.post(f"{u}/{r_locked}/cerita-prabank/bekukan").status_code == 200
+    assert client.post(f"{u}/{r_locked}/paparan", json={"jenis": "BANK_TUGAS"}).status_code == 201
+    kasus = {
+        "EXPOSED": _f2(svc, sumber, r_exposed)[0],
+        "BELUM_TERPAPAR": _f2(svc, sumber, r_belum)[0],
+        "LOCKED_PRE_EXPOSURE": _f2(svc, sumber, r_locked)[0],
+    }
+    c = _tim(client_as)
+    for nilai, k in kasus.items():
+        assert _paparan_item(c, k.id) == nilai
+        assert c.get(f"{ANTREAN}/{k.id}").json()["paparan"] == nilai
+
+
+def test_paparan_f2_tanpa_pasangan_dan_f1_tidak_berlaku(client_as, svc, sumber):
+    acak = _f2(svc, sumber, str(uuid.uuid4()))[0]
+    tanpa_ref = _draf(svc, sumber, narrative_kind="F2_ACTUAL")[0]
+    f1 = _draf(svc, sumber, assignment_ref=str(uuid.uuid4()))[0]
+    c = _tim(client_as)
+    assert _paparan_item(c, acak.id) == "TIDAK_DIKETAHUI"
+    assert _paparan_item(c, tanpa_ref.id) == "TIDAK_DIKETAHUI"
+    assert _paparan_item(c, f1.id) == "TIDAK_BERLAKU"
+    assert c.get(f"{ANTREAN}/{acak.id}").json()["paparan"] == "TIDAK_DIKETAHUI"
+    assert c.get(f"{ANTREAN}/{f1.id}").json()["paparan"] == "TIDAK_BERLAKU"
+
+
+def test_paparan_daftar_satu_kueri_batch(client_as, svc, sumber, db_session):
+    """Jumlah kueri ke `ti_responden` tetap 1 walau halaman memuat banyak kasus F2."""
+    from sqlalchemy import event
+
+    for _ in range(5):
+        _f2(svc, sumber, str(uuid.uuid4()))
+    c = _tim(client_as)
+    kueri: list[str] = []
+
+    def _catat(conn, cursor, statement, *a):
+        kueri.append(statement)
+
+    mesin = db_session.get_bind()
+    event.listen(mesin, "before_cursor_execute", _catat)
+    try:
+        assert c.get(ANTREAN, params={"limit": 200}).status_code == 200
+    finally:
+        event.remove(mesin, "before_cursor_execute", _catat)
+    assert sum("FROM ti_responden" in q for q in kueri) == 1

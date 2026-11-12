@@ -19,7 +19,17 @@ STATUS_ANTREAN: tuple[StatusNarasi, ...] = (
 """Status kasus yang tampil di antrean reviewer; selain ini bukan antrean."""
 
 PAPARAN_TIDAK_BERLAKU = "TIDAK_BERLAKU"
-"""Nilai tetap `paparan` pada F1; penanda paparan baru bermakna untuk F2."""
+"""Nilai `paparan` pada F1 dan jenis narasi selain F2: paparan bank tugas tak relevan."""
+
+PAPARAN_TIDAK_DIKETAHUI = "TIDAK_DIKETAHUI"
+"""Nilai `paparan` pada F2 yang `assignment_ref`-nya tidak cocok dengan responden TI mana pun."""
+
+DESKRIPSI_PAPARAN = (
+    "Status paparan bank tugas, dihitung saat baca. F1_FORMAL dan jenis lain: TIDAK_BERLAKU. "
+    "F2_ACTUAL berpasangan responden TI (assignment_ref = id responden): BELUM_TERPAPAR, "
+    "LOCKED_PRE_EXPOSURE (cerita beku sebelum paparan), atau EXPOSED. "
+    "F2_ACTUAL tanpa pasangan responden: TIDAK_DIKETAHUI."
+)
 
 CATATAN_MIN = 5
 """Panjang minimum `catatan` pada aksi `TOLAK` dan `BUTUH_SUMBER`."""
@@ -59,6 +69,10 @@ class AntreanItemRead(BaseModel):
     jumlah_sumber: int
     jumlah_kontradiksi: int
     updated_at: datetime
+    assignment_ref: str | None = Field(
+        default=None, description="Rujukan penugasan kasus; kunci pasangan responden F2."
+    )
+    paparan: str = Field(default=PAPARAN_TIDAK_BERLAKU, description=DESKRIPSI_PAPARAN)
 
 
 class AntreanSumberRead(BaseModel):
@@ -94,7 +108,7 @@ class AntreanDetailRead(BaseModel):
     missing_facts: list[Any]
     claim_to_source_map: Any | None
     recommended_review_scope: Any | None
-    paparan: str = Field(default=PAPARAN_TIDAK_BERLAKU)
+    paparan: str = Field(default=PAPARAN_TIDAK_BERLAKU, description=DESKRIPSI_PAPARAN)
 
 
 class TinjauanCreate(BaseModel):

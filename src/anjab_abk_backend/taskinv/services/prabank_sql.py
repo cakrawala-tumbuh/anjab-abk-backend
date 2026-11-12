@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from collections.abc import Iterable
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -152,6 +153,35 @@ class SqlTiPrabankService:
         if pertama is None:
             return ExposureState.BELUM_TERPAPAR
         return ExposureState(pertama.status_saat_paparan)
+
+    def status_paparan_banyak(self, responden_ids: Iterable[str]) -> dict[str, ExposureState]:
+        """Status paparan banyak responden dalam SATU kueri (bukan N kueri).
+
+        Args:
+            responden_ids: Id `ti_responden` yang ditanyakan; duplikat diabaikan.
+
+        Returns:
+            Peta id responden -> status. Id yang bukan responden TI tidak ada di peta;
+            responden tanpa log paparan bernilai `BELUM_TERPAPAR`.
+        """
+        ids = set(responden_ids)
+        if not ids:
+            return {}
+        pertama = (
+            select(TiPaparanEventModel.status_saat_paparan)
+            .where(TiPaparanEventModel.responden_id == TiRespondenModel.id)
+            .order_by(TiPaparanEventModel.terjadi_pada, TiPaparanEventModel.id)
+            .limit(1)
+            .correlate(TiRespondenModel)
+            .scalar_subquery()
+        )
+        rows = self._s.execute(
+            select(TiRespondenModel.id, pertama).where(TiRespondenModel.id.in_(ids))
+        ).all()
+        return {
+            rid: ExposureState(status) if status is not None else ExposureState.BELUM_TERPAPAR
+            for rid, status in rows
+        }
 
     def ada_paparan(self, responden_id: str) -> bool:
         """True bila responden punya >= 1 baris log paparan."""

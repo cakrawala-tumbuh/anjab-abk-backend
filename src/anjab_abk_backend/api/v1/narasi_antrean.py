@@ -17,6 +17,7 @@ from ...dependencies import (
     get_current_principal,
     get_narasi_service,
     get_narasi_sumber_service,
+    get_ti_prabank_service,
     idempotency,
     pagination_params,
     rate_limit,
@@ -26,6 +27,7 @@ from ...errors import NotFoundError, ValidationAppError
 from ...narasi.schemas.antrean import (
     CATATAN_MIN,
     PAPARAN_TIDAK_BERLAKU,
+    PAPARAN_TIDAK_DIKETAHUI,
     STATUS_ANTREAN,
     AksiTinjauan,
     AntreanDetailRead,
@@ -33,7 +35,7 @@ from ...narasi.schemas.antrean import (
     StatusAntrean,
     TinjauanCreate,
 )
-from ...narasi.schemas.kasus import EventKind, RevisionOrigin, StatusNarasi
+from ...narasi.schemas.kasus import EventKind, NarrativeKind, RevisionOrigin, StatusNarasi
 from ...narasi.schemas.mesin import AktorNarasi, KutipanSumber, NarasiEventRead
 from ...narasi.services.narasi import (
     NarasiService,
@@ -43,6 +45,8 @@ from ...narasi.services.narasi import (
 from ...narasi.services.sumber import NarasiSumberService
 from ...schemas.common import ErrorResponse, Page
 from ...security import Principal
+from ...taskinv.schemas.prabank import ExposureState
+from ...taskinv.services.prabank import TiPrabankService
 from ..concurrency import IDEMPOTENCY_RESPONSES, run_idempotent
 
 router = APIRouter()
@@ -78,6 +82,27 @@ def _daftar(meta: dict[str, Any], kunci: str) -> list[Any]:
     return nilai if isinstance(nilai, list) else []
 
 
+def _paparan(
+    kind: NarrativeKind, assignment_ref: str | None, peta: dict[str, ExposureState]
+) -> str:
+    """Turunkan `paparan` satu kasus dari jenis narasi dan peta status responden.
+
+    Args:
+        kind: Jenis narasi kasus.
+        assignment_ref: Rujukan penugasan kasus (id `ti_responden` bila F2 berpasangan).
+        peta: Status paparan responden yang ditemukan, kunci id responden.
+
+    Returns:
+        `TIDAK_BERLAKU` selain F2; untuk F2 status responden, atau `TIDAK_DIKETAHUI` bila
+        tidak ada pasangan responden.
+    """
+    if kind != NarrativeKind.F2_ACTUAL:
+        return PAPARAN_TIDAK_BERLAKU
+    if assignment_ref is None or assignment_ref not in peta:
+        return PAPARAN_TIDAK_DIKETAHUI
+    return peta[assignment_ref].value
+
+
 @router.get(
     "",
     response_model=Page[AntreanItemRead],
@@ -89,13 +114,17 @@ def _daftar(meta: dict[str, Any], kunci: str) -> list[Any]:
 def list_antrean(
     page: Annotated[Pagination, Depends(pagination_params)],
     service: Annotated[NarasiService, Depends(get_narasi_service)],
+    prabank: Annotated[TiPrabankService, Depends(get_ti_prabank_service)],
     status: Annotated[StatusAntrean | None, Query(description="Filter status antrean.")] = None,
     instrument_id: Annotated[
         str | None, Query(max_length=50, description="Filter instrumen.")
     ] = None,
     periode: Annotated[str | None, Query(max_length=20, description="Filter periode.")] = None,
 ) -> Page[AntreanItemRead]:
-    """Kasus `AI_DRAFT`, `TEAM_REVIEW`, `NEED_FACT`; urut `updated_at` naik."""
+    """Kasus `AI_DRAFT`, `TEAM_REVIEW`, `NEED_FACT`; urut `updated_at` naik.
+
+    `paparan` tiap baris dihitung dari satu kueri batch atas `assignment_ref` kasus F2 di halaman.
+    """
     items, total = service.list_antrean(
         status=status.value if status else None,
         instrument_id=instrument_id,
@@ -103,6 +132,13 @@ def list_antrean(
         limit=page.limit,
         offset=page.offset,
     )
+    peta = prabank.status_paparan_banyak(
+        i.assignment_ref
+        for i in items
+        if i.narrative_kind == NarrativeKind.F2_ACTUAL and i.assignment_ref
+    )
+    for i in items:
+        i.paparan = _paparan(i.narrative_kind, i.assignment_ref, peta)
     return Page[AntreanItemRead](items=items, total=total, limit=page.limit, offset=page.offset)
 
 
@@ -126,10 +162,12 @@ def list_antrean(
 def get_antrean(
     narasi_id: str,
     service: Annotated[NarasiService, Depends(get_narasi_service)],
+    prabank: Annotated[TiPrabankService, Depends(get_ti_prabank_service)],
 ) -> AntreanDetailRead:
     """Versi terbaru, sumber lengkap, dan metadata AI terpilih.
 
-    `paparan` bernilai tetap `TIDAK_BERLAKU` (F1); `AiRunRead` dan keluaran mentah tidak dibuka.
+    `paparan` dihitung saat baca (F1: `TIDAK_BERLAKU`; F2: status responden pasangan atau
+    `TIDAK_DIKETAHUI`); `AiRunRead` dan keluaran mentah tidak dibuka.
     """
     kasus = service.get_kasus(narasi_id)
     if kasus.status not in STATUS_ANTREAN:
@@ -138,6 +176,9 @@ def get_antrean(
     if versi is None:
         raise NarasiTidakDalamAntreanError("Kasus belum punya versi untuk ditinjau.")
     meta = versi.metadata_ai or {}
+    peta: dict[str, ExposureState] = {}
+    if kasus.narrative_kind == NarrativeKind.F2_ACTUAL and kasus.assignment_ref:
+        peta = prabank.status_paparan_banyak([kasus.assignment_ref])
     return AntreanDetailRead(
         narasi_id=kasus.id,
         instrument_id=kasus.instrument_id,
@@ -157,7 +198,7 @@ def get_antrean(
         missing_facts=_daftar(meta, "missing_facts"),
         claim_to_source_map=meta.get("claim_to_source_map"),
         recommended_review_scope=meta.get("recommended_review_scope"),
-        paparan=PAPARAN_TIDAK_BERLAKU,
+        paparan=_paparan(kasus.narrative_kind, kasus.assignment_ref, peta),
     )
 
 

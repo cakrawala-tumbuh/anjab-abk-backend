@@ -436,6 +436,7 @@ class SqlNarasiService:
                     jumlah_sumber=n or 0,
                     jumlah_kontradiksi=len(kontra) if isinstance(kontra, list) else 0,
                     updated_at=kasus.updated_at,
+                    assignment_ref=kasus.assignment_ref,
                 )
             )
         return items, total
