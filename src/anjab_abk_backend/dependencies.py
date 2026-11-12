@@ -46,6 +46,8 @@ from .dcs.services.subskala import DcsSubSkalaService
 from .dcs.services.subskala_sql import SqlDcsSubSkalaService
 from .errors import ForbiddenError, RateLimitedError, UnauthorizedError
 from .logging import AUDIT_LOGGER_NAME
+from .narasi.services.klarifikasi import KlarifikasiService
+from .narasi.services.klarifikasi_sql import SqlKlarifikasiService
 from .narasi.services.narasi import NarasiService
 from .narasi.services.narasi_sql import SqlNarasiService
 from .narasi.services.permintaan_ai import PermintaanAiService
@@ -445,6 +447,11 @@ def get_riset_statistik_service(session: SessionDep) -> RisetStatistikService:
 def get_riset_kasus_negatif_service(session: SessionDep) -> RisetKasusNegatifService:
     """SEAM: `RisetKasusNegatifService` PostgreSQL (kasus negatif riset, append-only)."""
     return SqlRisetKasusNegatifService(session)
+
+
+def get_klarifikasi_service(session: SessionDep) -> KlarifikasiService:
+    """SEAM: `KlarifikasiService` PostgreSQL (register klarifikasi narasi, riwayat append-only)."""
+    return SqlKlarifikasiService(session)
 
 
 def get_narasi_service(session: SessionDep) -> NarasiService:

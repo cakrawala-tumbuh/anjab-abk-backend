@@ -82,6 +82,15 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-12] Register klarifikasi narasi (rute `/narasi/klarifikasi`)
+
+Backlog `#136` (HO butir 6 / UX-11; asal `ypii-support#463`; lanjutan `#137` pemetaan P04; pasangan web `anjab-abk-web-app#123`).
+
+- **Tabel `narasi_klarifikasi`** (proyeksi; migrasi `1e85e065fc4a`): 13 metadata + `question_text`; `id` = Question_ID; CHECK `reviewer_approval` / `disposition` / `exposure` (himpunan `paparan` antrean); `ai_usulan_id` FK null (diisi `#137`). UNIQUE parsial `uq_narasi_klarifikasi_terbuka` (`narasi_id`, `claim_id`) `WHERE disposition = 'TERBUKA'` -> 409 `KLARIFIKASI_GANDA` (pra-cek + `UniqueViolation` dalam SAVEPOINT).
+- **Tabel `narasi_klarifikasi_event`** append-only (trigger `BEFORE UPDATE OR DELETE` memakai ulang `narasi_tolak_ubah()`): tiap aksi (`DIBUAT`/`DISETUJUI`/`DITOLAK`/`JAWABAN_DICATAT`/`DIBATALKAN`) = satu event dalam transaksi yang sama; `terjadi_pada` diisi Python (UTC) agar urut antar-transaksi.
+- **Alur**: pembuat != reviewer (409 `REVIEWER_TIDAK_INDEPENDEN`); persetujuan ganda 409 `PERSETUJUAN_SUDAH_ADA`; jawaban hanya setelah `DISETUJUI` (409 `KLARIFIKASI_BELUM_DISETUJUI`); aksi pada yang sudah `TERJAWAB`/`DIBATALKAN` 409 `KLARIFIKASI_TIDAK_TERBUKA`. `TOLAK` mewajibkan catatan >= 5 karakter dan membiarkan `disposition` `TERBUKA` (koreksi = batalkan lalu buat baru). `question_text` paling banyak satu tanda tanya (422).
+- Berkas: skema `narasi/schemas/klarifikasi.py`, seam `narasi/services/klarifikasi{,_sql}.py` (metode daftar bernama `daftar`), router `api/v1/narasi_klarifikasi.py`. Pengiriman pertanyaan lewat aplikasi di luar lingkup (OD-12).
+
 ### [2026-11-12] Keputusan perubahan (ChangeDecision) alternatif redesain
 
 Backlog `#134` (OD-10 / UX-14; asal `ypii-support#463`; bergantung `#133`; pasangan web `anjab-abk-web-app#122`).

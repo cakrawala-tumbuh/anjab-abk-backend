@@ -52,6 +52,12 @@ from anjab_abk_backend.narasi.schemas.kasus import (
     RevisionOrigin,
     StatusNarasi,
 )
+from anjab_abk_backend.narasi.schemas.klarifikasi import (
+    AksiKlarifikasi,
+    Disposition,
+    ExposureKlarifikasi,
+    ReviewerApproval,
+)
 from anjab_abk_backend.redesain.schemas.alternatif import (
     EstimasiDelta,
     KeputusanPerubahan,
@@ -2050,6 +2056,88 @@ class RisetKasusNegatifModel(Base):
     sumber_ref: Mapped[str | None] = mapped_column(String(500), nullable=True)
     dibuat_oleh: Mapped[str] = mapped_column(String(200), nullable=False)
     created_at: Mapped[datetime] = _ts()
+
+
+class NarasiKlarifikasiModel(Base):
+    """Register klarifikasi per kasus narasi (`narasi_klarifikasi`; 13 metadata + teks).
+
+    Proyeksi: `reviewer_approval`, `response_ref`, `jawaban_mentah`, `disposition` boleh
+    berubah; riwayat aksi ada di `narasi_klarifikasi_event` (append-only). UNIQUE parsial
+    (`narasi_id`, `claim_id`) `WHERE disposition = 'TERBUKA'` menolak pertanyaan ganda.
+    """
+
+    __tablename__ = "narasi_klarifikasi"
+    __table_args__ = (
+        CheckConstraint(_in_check("reviewer_approval", ReviewerApproval), name="reviewer_approval"),
+        CheckConstraint(_in_check("disposition", Disposition), name="disposition"),
+        CheckConstraint(_in_check("exposure", ExposureKlarifikasi), name="exposure"),
+        Index(
+            "uq_narasi_klarifikasi_terbuka",
+            "narasi_id",
+            "claim_id",
+            unique=True,
+            postgresql_where=text("disposition = 'TERBUKA'"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    narasi_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("narasi_kasus.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    claim_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    source_ids_checked: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    materiality_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    alternative_hypothesis: Mapped[str] = mapped_column(Text, nullable=False)
+    intended_decision: Mapped[str] = mapped_column(Text, nullable=False)
+    recipient_role: Mapped[str] = mapped_column(String(100), nullable=False)
+    periode: Mapped[str] = mapped_column(String(20), nullable=False)
+    exposure: Mapped[str] = mapped_column(String(30), nullable=False)
+    due_trigger: Mapped[str] = mapped_column(Text, nullable=False)
+    question_text: Mapped[str] = mapped_column(Text, nullable=False)
+    reviewer_approval: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'MENUNGGU'")
+    )
+    response_ref: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    jawaban_mentah: Mapped[str | None] = mapped_column(Text, nullable=True)
+    disposition: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'TERBUKA'")
+    )
+    ai_usulan_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("ai_usulan.id", ondelete="RESTRICT"), nullable=True
+    )
+    dibuat_oleh: Mapped[str] = mapped_column(String(254), nullable=False)
+    created_at: Mapped[datetime] = _ts()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+
+class NarasiKlarifikasiEventModel(Base):
+    """Riwayat aksi klarifikasi (`narasi_klarifikasi_event`), append-only.
+
+    Trigger `BEFORE UPDATE OR DELETE` (fungsi `narasi_tolak_ubah()`) menolak perubahan;
+    FK ke induk `ON DELETE RESTRICT`. Satu aksi = satu baris, transaksi yang sama.
+    """
+
+    __tablename__ = "narasi_klarifikasi_event"
+    __table_args__ = (CheckConstraint(_in_check("aksi", AksiKlarifikasi), name="aksi"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    klarifikasi_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("narasi_klarifikasi.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    aksi: Mapped[str] = mapped_column(String(20), nullable=False)
+    actor_key: Mapped[str] = mapped_column(String(254), nullable=False)
+    catatan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    terjadi_pada: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
 
 
 class TiCeritaPrabankModel(Base):
