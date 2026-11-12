@@ -33,7 +33,7 @@ KETERANGAN: dict[FiturKode, str] = {
     FiturKode.WCP_DCS_SCORING: "Skor dan interpretasi WCP/DCS.",
     FiturKode.RESEARCH_EXPORT: "Ekspor data riset. Belum ada fungsi yang digerbang.",
     FiturKode.CHANGE_AUTHORIZATION: (
-        "Otorisasi keputusan perubahan. Belum ada fungsi yang digerbang."
+        "Pencatatan keputusan perubahan (ChangeDecision) alternatif redesain."
     ),
     FiturKode.PREBANK_FREEZE: (
         "Cerita pra-bank Task Inventory dibekukan dan paparan bank tugas dicatat."

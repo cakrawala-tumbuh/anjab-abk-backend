@@ -221,3 +221,51 @@ class KesiapanMatriksRead(BaseModel):
         description="HOLD bila ada penerima material HOLD/belum dinilai atau tanpa penerima."
     )
     baris: list[KesiapanBaris]
+
+
+class KeputusanPerubahan(StrEnum):
+    """Keputusan perubahan (ChangeDecision), terpisah dari keputusan prioritas."""
+
+    APPROVE = "APPROVE"
+    CONDITIONAL = "CONDITIONAL"
+    HOLD = "HOLD"
+    REJECT = "REJECT"
+
+
+class KeputusanPerubahanCreate(BaseModel):
+    """Payload keputusan perubahan per alternatif per periode (append-only).
+
+    `stop_rule` wajib berisi bila `keputusan` CONDITIONAL; pilot bersyarat harus reversibel.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    periode: str = Field(pattern=POLA_PERIODE, max_length=20, examples=["2026/27"])
+    keputusan: KeputusanPerubahan
+    alasan: str = Field(min_length=5, description="Alasan keputusan, minimal 5 karakter.")
+    stop_rule: str | None = Field(default=None, description="Wajib bila CONDITIONAL.")
+
+    @model_validator(mode="after")
+    def _periksa_aturan(self) -> Self:
+        """Tegakkan alasan tidak kosong (setelah strip) dan `stop_rule` wajib bila CONDITIONAL."""
+        if len(self.alasan.strip()) < 5:
+            raise ValueError("alasan minimal 5 karakter (tanpa spasi tepi).")
+        if self.keputusan == KeputusanPerubahan.CONDITIONAL and not (self.stop_rule or "").strip():
+            raise ValueError("stop_rule wajib diisi bila keputusan CONDITIONAL.")
+        return self
+
+
+class KeputusanPerubahanRead(BaseModel):
+    """Satu keputusan perubahan tersimpan."""
+
+    id: str
+    alternatif_id: str
+    periode: str
+    keputusan: KeputusanPerubahan
+    alasan: str
+    stop_rule: str | None
+    status_opsi_saat_putus: StatusKesiapan = Field(
+        description="Salinan `status_opsi` matriks kesiapan saat keputusan dicatat."
+    )
+    pemutus_kode_orang: str = Field(description="Kode orang pemutus.")
+    created_at: datetime

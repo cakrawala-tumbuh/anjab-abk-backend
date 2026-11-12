@@ -82,6 +82,14 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-12] Keputusan perubahan (ChangeDecision) alternatif redesain
+
+Backlog `#134` (OD-10 / UX-14; asal `ypii-support#463`; bergantung `#133`; pasangan web `anjab-abk-web-app#122`).
+
+- **Tabel `redesain_keputusan_perubahan`** (append-only di lapisan API; migrasi `f02ed2fece58`): `alternatif_id` FK `ON DELETE RESTRICT`, `periode` pola `^\d{4}/\d{2}$`, `keputusan` CHECK APPROVE/CONDITIONAL/HOLD/REJECT, `alasan` (>= 5 karakter), `stop_rule` (wajib bila CONDITIONAL, divalidasi skema -> 422), `status_opsi_saat_putus` (salinan `hitung_status_opsi` dari matriks saat diputus, bukan dihitung ulang saat baca), `pemutus_kode_orang`.
+- **Rute** (router `redesain_alternatif.py`, `require_tim_kajian`): `POST .../{id}/keputusan-perubahan` digerbang `require_fitur(CHANGE_AUTHORIZATION)` (mati -> 409 `feature_disabled`); APPROVE hanya bila `status_opsi=READY` (409 `KESIAPAN_BELUM_READY`), CONDITIONAL hanya bila READY/CONDITIONAL (409 `KESIAPAN_HOLD`), HOLD/REJECT selalu boleh. `GET` riwayat urut `created_at` naik, tanpa gerbang saklar; keputusan berlaku = baris terakhir per periode.
+- **Pemisahan dari PriorityDecision**: `POST /redesain/penilaian/{id}/putuskan` tidak menyentuh tabel ini (dijaga test). Keterangan saklar `CHANGE_AUTHORIZATION` diperbarui. Tanda tangan CHANGE berjenjang (`ai/otorisasi_redesain.py`, `change_ditandatangani=False`) tidak diubah.
+
 ### [2026-11-12] Penerima jamak dan kesiapan per periode pada alternatif redesain
 
 Backlog `#133` (OD-10 / UX-14; asal `ypii-support#463`; lanjutan `#134` ChangeDecision, `#135` P06/P07; pasangan web `anjab-abk-web-app#122`).

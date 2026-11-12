@@ -19,11 +19,14 @@ from ...dependencies import (
     require_tim_kajian,
 )
 from ...etag import check_if_match, compute_etag
+from ...fitur import FiturKode, require_fitur
 from ...redesain.schemas.alternatif import (
     POLA_PERIODE,
     AlternatifCreate,
     AlternatifRead,
     AlternatifUpdate,
+    KeputusanPerubahanCreate,
+    KeputusanPerubahanRead,
     KesiapanCreate,
     KesiapanMatriksRead,
     KesiapanRead,
@@ -275,3 +278,77 @@ def get_matriks_kesiapan(
 ) -> KesiapanMatriksRead:
     """Matriks kesiapan pada periode: penilaian terakhir per penerima dan `status_opsi`."""
     return service.matriks_kesiapan(alternatif_id, periode)
+
+
+@router.post(
+    "/{alternatif_id}/keputusan-perubahan",
+    response_model=KeputusanPerubahanRead,
+    status_code=201,
+    summary="Catat keputusan perubahan alternatif per periode (tim-kajian)",
+    operation_id="redesain_alternatif_keputusan_perubahan_create",
+    dependencies=[*_WRITE, Depends(require_fitur(FiturKode.CHANGE_AUTHORIZATION))],
+    responses={
+        **IDEMPOTENCY_RESPONSES,
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOTFOUND,
+        409: {
+            "model": ErrorResponse,
+            "description": (
+                "Saklar `CHANGE_AUTHORIZATION` mati (`feature_disabled`), APPROVE saat opsi "
+                "belum READY (`KESIAPAN_BELUM_READY`), atau CONDITIONAL saat opsi HOLD "
+                "(`KESIAPAN_HOLD`)."
+            ),
+        },
+        422: {
+            "model": ErrorResponse,
+            "description": "Payload tidak valid (mis. `stop_rule` kosong pada CONDITIONAL).",
+        },
+    },
+)
+def create_keputusan_perubahan(
+    alternatif_id: str,
+    data: KeputusanPerubahanCreate,
+    service: Annotated[AlternatifService, Depends(get_alternatif_service)],
+    pelaku: Annotated[str, Depends(get_kode_orang_pemanggil)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> KeputusanPerubahanRead:
+    """Catat keputusan perubahan (append-only), ditegakkan terhadap status opsi periode itu.
+
+    Tidak pernah tercipta dari keputusan prioritas (`POST /redesain/penilaian/{id}/putuskan`).
+    """
+
+    def _aksi() -> KeputusanPerubahanRead:
+        return service.putuskan_perubahan(alternatif_id, data, pemutus=pelaku)
+
+    return run_idempotent(idem, response, KeputusanPerubahanRead, _aksi)
+
+
+@router.get(
+    "/{alternatif_id}/keputusan-perubahan",
+    response_model=list[KeputusanPerubahanRead],
+    summary="Riwayat keputusan perubahan alternatif (tim-kajian)",
+    operation_id="redesain_alternatif_keputusan_perubahan_list",
+    dependencies=_READ,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        **_NOTFOUND,
+        422: {"model": ErrorResponse, "description": "`periode` salah pola."},
+    },
+)
+def list_keputusan_perubahan(
+    alternatif_id: str,
+    service: Annotated[AlternatifService, Depends(get_alternatif_service)],
+    periode: Annotated[
+        str | None, Query(pattern=POLA_PERIODE, description="Saring per periode, mis. 2026/27.")
+    ] = None,
+) -> list[KeputusanPerubahanRead]:
+    """Riwayat urut `created_at` naik; keputusan berlaku = baris terakhir per periode.
+
+    Tidak digerbang saklar: riwayat tetap terbaca saat `CHANGE_AUTHORIZATION` mati.
+    """
+    return service.riwayat_keputusan_perubahan(alternatif_id, periode)

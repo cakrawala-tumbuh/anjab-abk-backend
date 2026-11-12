@@ -14,6 +14,7 @@ from ...errors import ConflictError, NotFoundError, ValidationAppError
 from ...models import (
     RedesainAlternatifModel,
     RedesainAlternatifPenerimaModel,
+    RedesainKeputusanPerubahanModel,
     RedesainKesiapanModel,
     RedesainKodeOrangModel,
     RedesainMasalahModel,
@@ -25,6 +26,9 @@ from ..schemas.alternatif import (
     AlternatifCreate,
     AlternatifRead,
     AlternatifUpdate,
+    KeputusanPerubahan,
+    KeputusanPerubahanCreate,
+    KeputusanPerubahanRead,
     KesiapanBaris,
     KesiapanCreate,
     KesiapanMatriksRead,
@@ -35,6 +39,8 @@ from ..schemas.alternatif import (
 )
 from .alternatif import (
     SEARCHABLE_FIELDS,
+    KesiapanBelumReadyError,
+    KesiapanHoldError,
     PenerimaBukanMilikAlternatifError,
     PenerimaGandaError,
     hitung_status_opsi,
@@ -138,6 +144,21 @@ def _kesiapan_read(rec: RedesainKesiapanModel) -> KesiapanRead:
         dinilai_oleh=rec.dinilai_oleh,
         created_at=_aware(rec.created_at),
         **{k: getattr(rec, k) for k in _KOLOM_DELTA},
+    )
+
+
+def _keputusan_read(rec: RedesainKeputusanPerubahanModel) -> KeputusanPerubahanRead:
+    """Petakan baris keputusan perubahan ke skema respons."""
+    return KeputusanPerubahanRead(
+        id=rec.id,
+        alternatif_id=rec.alternatif_id,
+        periode=rec.periode,
+        keputusan=rec.keputusan,  # type: ignore[arg-type]
+        alasan=rec.alasan,
+        stop_rule=rec.stop_rule,
+        status_opsi_saat_putus=rec.status_opsi_saat_putus,  # type: ignore[arg-type]
+        pemutus_kode_orang=rec.pemutus_kode_orang,
+        created_at=_aware(rec.created_at),
     )
 
 
@@ -432,3 +453,50 @@ class SqlAlternatifService:
         return KesiapanMatriksRead(
             alternatif_id=alternatif_id, periode=periode, status_opsi=status_opsi, baris=baris
         )
+
+    def putuskan_perubahan(
+        self, alternatif_id: str, data: KeputusanPerubahanCreate, *, pemutus: str
+    ) -> KeputusanPerubahanRead:
+        """Catat keputusan perubahan; status opsi dihitung ulang dari matriks saat itu.
+
+        Raises:
+            NotFoundError: alternatif tak ada.
+            KesiapanBelumReadyError: APPROVE saat status opsi bukan READY.
+            KesiapanHoldError: CONDITIONAL saat status opsi HOLD.
+        """
+        status_opsi = self.matriks_kesiapan(alternatif_id, data.periode).status_opsi
+        if data.keputusan == KeputusanPerubahan.APPROVE and status_opsi != StatusKesiapan.READY:
+            raise KesiapanBelumReadyError(
+                f"APPROVE ditolak: status opsi periode {data.periode} adalah {status_opsi.value}."
+            )
+        if data.keputusan == KeputusanPerubahan.CONDITIONAL and status_opsi == StatusKesiapan.HOLD:
+            raise KesiapanHoldError(
+                f"CONDITIONAL ditolak: status opsi periode {data.periode} adalah HOLD."
+            )
+        rec = RedesainKeputusanPerubahanModel(
+            id=str(uuid.uuid4()),
+            alternatif_id=alternatif_id,
+            periode=data.periode,
+            keputusan=data.keputusan.value,
+            alasan=data.alasan,
+            stop_rule=data.stop_rule,
+            status_opsi_saat_putus=status_opsi.value,
+            pemutus_kode_orang=pemutus,
+            created_at=datetime.now(UTC),
+        )
+        self._s.add(rec)
+        self._s.flush()
+        self._s.refresh(rec)
+        return _keputusan_read(rec)
+
+    def riwayat_keputusan_perubahan(
+        self, alternatif_id: str, periode: str | None
+    ) -> list[KeputusanPerubahanRead]:
+        """Riwayat keputusan perubahan urut `created_at` naik lalu `id`; 404 bila tak ada."""
+        self._get_model(alternatif_id)
+        m = RedesainKeputusanPerubahanModel
+        stmt = select(m).where(m.alternatif_id == alternatif_id)
+        if periode is not None:
+            stmt = stmt.where(m.periode == periode)
+        rows = self._s.scalars(stmt.order_by(m.created_at, m.id)).all()
+        return [_keputusan_read(r) for r in rows]

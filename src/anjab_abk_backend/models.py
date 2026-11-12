@@ -52,7 +52,11 @@ from anjab_abk_backend.narasi.schemas.kasus import (
     RevisionOrigin,
     StatusNarasi,
 )
-from anjab_abk_backend.redesain.schemas.alternatif import EstimasiDelta, StatusKesiapan
+from anjab_abk_backend.redesain.schemas.alternatif import (
+    EstimasiDelta,
+    KeputusanPerubahan,
+    StatusKesiapan,
+)
 from anjab_abk_backend.schemas.ai_usulan import PutusanUsulan, SasaranUsulan, TingkatKoreksi
 from anjab_abk_backend.schemas.riset_protokol import StatusProtokol
 from anjab_abk_backend.schemas.riset_statistik import StatusStatistik
@@ -1652,6 +1656,38 @@ class RedesainKesiapanModel(Base):
     syarat: Mapped[str | None] = mapped_column(Text, nullable=True)
     alasan_hold: Mapped[str | None] = mapped_column(Text, nullable=True)
     dinilai_oleh: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = _ts()
+
+
+class RedesainKeputusanPerubahanModel(Base):
+    """Keputusan perubahan (ChangeDecision) per alternatif per periode, append-only.
+
+    Terpisah dari keputusan prioritas penilaian; keputusan berlaku = baris terakhir per periode.
+    `status_opsi_saat_putus` menyalin hasil `hitung_status_opsi` saat keputusan dicatat.
+    """
+
+    __tablename__ = "redesain_keputusan_perubahan"
+    __table_args__ = (
+        CheckConstraint(_in_check("keputusan", KeputusanPerubahan), name="keputusan"),
+        CheckConstraint(
+            "status_opsi_saat_putus IN ('READY', 'CONDITIONAL', 'HOLD')",
+            name="status_opsi_saat_putus",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    alternatif_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("redesain_alternatif.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    periode: Mapped[str] = mapped_column(String(20), nullable=False)
+    keputusan: Mapped[str] = mapped_column(String(20), nullable=False)
+    alasan: Mapped[str] = mapped_column(Text, nullable=False)
+    stop_rule: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status_opsi_saat_putus: Mapped[str] = mapped_column(String(20), nullable=False)
+    pemutus_kode_orang: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at: Mapped[datetime] = _ts()
 
 

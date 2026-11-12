@@ -11,6 +11,8 @@ from ..schemas.alternatif import (
     AlternatifCreate,
     AlternatifRead,
     AlternatifUpdate,
+    KeputusanPerubahanCreate,
+    KeputusanPerubahanRead,
     KesiapanCreate,
     KesiapanMatriksRead,
     KesiapanRead,
@@ -27,6 +29,18 @@ class PenerimaGandaError(ConflictError):
     """409: jabatan itu sudah menjadi penerima alternatif yang sama."""
 
     error_code = "PENERIMA_GANDA"
+
+
+class KesiapanBelumReadyError(ConflictError):
+    """409: APPROVE ditolak karena status opsi pada periode itu bukan READY."""
+
+    error_code = "KESIAPAN_BELUM_READY"
+
+
+class KesiapanHoldError(ConflictError):
+    """409: CONDITIONAL ditolak karena status opsi pada periode itu HOLD."""
+
+    error_code = "KESIAPAN_HOLD"
 
 
 class PenerimaBukanMilikAlternatifError(ValidationAppError):
@@ -122,6 +136,33 @@ class AlternatifService(Protocol):
 
     def matriks_kesiapan(self, alternatif_id: str, periode: str) -> KesiapanMatriksRead:
         """Matriks kesiapan pada `periode` (penilaian terakhir per penerima) + status opsi.
+
+        Raises:
+            NotFoundError: alternatif tak ada (404).
+        """
+        ...
+
+    def putuskan_perubahan(
+        self, alternatif_id: str, data: KeputusanPerubahanCreate, *, pemutus: str
+    ) -> KeputusanPerubahanRead:
+        """Catat keputusan perubahan (append-only) setelah menegakkannya terhadap status opsi.
+
+        Aturan: `APPROVE` hanya bila status opsi READY; `CONDITIONAL` hanya bila READY atau
+        CONDITIONAL; `HOLD` dan `REJECT` selalu boleh.
+
+        Raises:
+            NotFoundError: alternatif tak ada (404).
+            KesiapanBelumReadyError: APPROVE saat status opsi bukan READY (409).
+            KesiapanHoldError: CONDITIONAL saat status opsi HOLD (409).
+        """
+        ...
+
+    def riwayat_keputusan_perubahan(
+        self, alternatif_id: str, periode: str | None
+    ) -> list[KeputusanPerubahanRead]:
+        """Riwayat keputusan perubahan urut `created_at` naik lalu `id`; filter `periode` opsional.
+
+        Keputusan berlaku = baris terakhir per periode.
 
         Raises:
             NotFoundError: alternatif tak ada (404).
