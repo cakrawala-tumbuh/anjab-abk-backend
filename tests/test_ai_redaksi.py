@@ -63,6 +63,40 @@ def test_pola_negatif(teks: str) -> None:
     assert hasil.teks == teks
 
 
+@pytest.mark.parametrize(
+    ("teks", "kategori"),
+    [
+        ("telp 0812-3456-7890 kantor", "TELEPON"),
+        ("telp:+6281234567890.", "TELEPON"),
+        ("(NIK 3201234567890123), lalu", "NIK"),
+        ("NIP:198501012010011001,", "NIP"),
+        ("NIP 198501012010011001.", "NIP"),
+    ],
+)
+def test_pola_positif_berbatas_token(teks: str, kategori: str) -> None:
+    assert periksa_pii(teks, []).temuan == {kategori: 1}
+
+
+@pytest.mark.parametrize(
+    "teks",
+    [
+        "usulan:3f2a9b10-6212-3456-7890-abcdef012345",
+        "id 3f2a9b10-0812-3456-7890-abcdef012345",
+        "ut_621234567890",
+        "P3a08123456789b",
+        "hex a1b2c3d4e5f60812345678901234567890",
+        "x3201234567890123y",
+        "k-198501012010011001",
+        "198501012010011001-abc",
+        "id_081234567890",
+    ],
+)
+def test_id_acak_bukan_pii(teks: str) -> None:
+    hasil = periksa_pii(teks, [])
+    assert hasil.temuan == {}
+    assert hasil.teks == teks
+
+
 def test_penanda_stabil_untuk_nilai_sama() -> None:
     hasil = periksa_pii("a@x.id lalu b@x.id lalu A@x.id", [])
     assert hasil.teks == "[EMAIL_1] lalu [EMAIL_2] lalu [EMAIL_1]"

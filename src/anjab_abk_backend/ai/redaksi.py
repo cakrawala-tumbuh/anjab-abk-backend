@@ -44,9 +44,15 @@ _PREFIKS_TERLARANG = ("WCP", "DCS", "KONSELING", "MURID")
 _MIN_PANJANG_KATA_NAMA = 4
 
 _RE_EMAIL = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+")
-_RE_NIP = re.compile(r"(?<!\d)\d{18}(?!\d)")
-_RE_NIK = re.compile(r"(?<!\d)\d{16}(?!\d)")
-_RE_TELEPON = re.compile(r"(?<![\d+])(?:\+62|62|08)(?:[ \-]?\d){8,12}(?!\d)")
+# Pola angka hanya cocok pada TOKEN UTUH: karakter sebelum awal bukan ``\w``/``+``/``-`` dan
+# karakter sesudah akhir bukan ``\w``/``-``. Tanda hubung/spasi DI DALAM nomor tetap sah
+# (``0812-3456-7890``). Tanpa batas ini deret digit di tengah id acak (UUID ber-tanda hubung,
+# hex, ``ut_...``) menjadi salah-positif.
+_AWAL_TOKEN = r"(?<![\w+\-])"
+_AKHIR_TOKEN = r"(?![\w\-])"
+_RE_NIP = re.compile(_AWAL_TOKEN + r"\d{18}" + _AKHIR_TOKEN)
+_RE_NIK = re.compile(_AWAL_TOKEN + r"\d{16}" + _AKHIR_TOKEN)
+_RE_TELEPON = re.compile(_AWAL_TOKEN + r"(?:\+62|62|08)(?:[ \-]?\d){8,12}" + _AKHIR_TOKEN)
 _RE_MURID = re.compile(r"\b(?i:murid|siswa|siswi|ananda|orang\s+tua|wali)\s+([A-Z]\w*)")
 
 
@@ -114,7 +120,9 @@ def periksa_pii(teks: str, kamus_nama: list[str]) -> HasilRedaksi:
 
     Kategori: ``EMAIL``, ``TELEPON``, ``NIK``, ``NIP``, ``NAMA_TERDAFTAR``,
     ``NAMA_MURID_KELUARGA``. Nilai yang sama dalam satu teks mendapat penanda
-    stabil (``[EMAIL_1]``). Nama di luar kamus hanya tertangkap lewat pola konteks
+    stabil (``[EMAIL_1]``). Pola angka (``TELEPON``/``NIK``/``NIP``) hanya cocok pada
+    token utuh, sehingga deret digit di dalam id acak (UUID, hex, ``ut_...``) tidak
+    dianggap PII. Nama di luar kamus hanya tertangkap lewat pola konteks
     ``NAMA_MURID_KELUARGA``.
 
     Args:
