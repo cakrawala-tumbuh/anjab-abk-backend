@@ -9,14 +9,24 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from psycopg.errors import UniqueViolation
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ...errors import NotFoundError
-from ...models import NarasiKasusModel, NarasiKlarifikasiEventModel, NarasiKlarifikasiModel
+from ...errors import NotFoundError, ValidationAppError
+from ...models import (
+    AiRunModel,
+    AiUsulanModel,
+    AiUsulanPutusanModel,
+    NarasiKasusModel,
+    NarasiKlarifikasiEventModel,
+    NarasiKlarifikasiModel,
+)
+from ...schemas.ai_usulan import PutusanUsulan, SasaranUsulan
 from ..schemas.klarifikasi import (
     AksiKlarifikasi,
     BatalkanKlarifikasi,
@@ -24,6 +34,7 @@ from ..schemas.klarifikasi import (
     JawabanKlarifikasi,
     KeputusanReviewer,
     KlarifikasiCreate,
+    KlarifikasiDariUsulan,
     KlarifikasiDetail,
     KlarifikasiEventRead,
     KlarifikasiRead,
@@ -31,12 +42,49 @@ from ..schemas.klarifikasi import (
     ReviewerApproval,
 )
 from .klarifikasi import (
+    IsianUsulanKurangError,
     KlarifikasiBelumDisetujuiError,
     KlarifikasiGandaError,
     KlarifikasiTidakTerbukaError,
+    PeriodeTakAdaError,
     PersetujuanSudahAdaError,
     ReviewerTidakIndependenError,
+    UsulanBelumDiterimaError,
+    UsulanBukanP04Error,
+    UsulanSudahDiterapkanError,
+    UsulanTidakMaterialError,
 )
+
+KODE_FUNGSI_P04 = "P04"
+"""Fungsi AI sumber penerapan; literal agar paket `narasi` tidak mengimpor paket `ai`."""
+
+_UQ_USULAN = "uq_narasi_klarifikasi_ai_usulan"
+"""Nama constraint UNIQUE `ai_usulan_id` (membedakannya dari indeks parsial klaim terbuka)."""
+
+ALTERNATIF_KOSONG = "Tidak ada alternatif yang diusulkan P04."
+"""Isi `alternative_hypothesis` bila `alternatives` usulan kosong (kolom wajib berisi)."""
+
+
+def _teks_alternatif(alternatives: Any) -> str:
+    """Gabungkan `alternatives` P04 menjadi satu butir per baris diawali `- `.
+
+    Args:
+        alternatives: Nilai `isi.alternatives` (daftar string; selain itu dianggap kosong).
+
+    Returns:
+        Teks bertingkat butir, atau `ALTERNATIF_KOSONG` bila tak ada butir berisi.
+    """
+    butir = (
+        [a.strip() for a in alternatives if isinstance(a, str) and a.strip()]
+        if isinstance(alternatives, list)
+        else []
+    )
+    return "\n".join(f"- {b}" for b in butir) if butir else ALTERNATIF_KOSONG
+
+
+def _teks_atau_none(nilai: Any) -> str | None:
+    """Kembalikan `nilai` bila string berisi (bukan spasi saja), selain itu `None`."""
+    return nilai if isinstance(nilai, str) and nilai.strip() else None
 
 
 def _aware(dt: datetime) -> datetime:
@@ -135,6 +183,29 @@ class SqlKlarifikasiService:
             NotFoundError: Kasus narasi tak ada (404).
             KlarifikasiGandaError: Sudah ada klarifikasi `TERBUKA` untuk (narasi, klaim) itu.
         """
+        return self._simpan(data, dibuat_oleh=dibuat_oleh, ai_usulan_id=None, catatan=None)
+
+    def _simpan(
+        self,
+        data: KlarifikasiCreate,
+        *,
+        dibuat_oleh: str,
+        ai_usulan_id: str | None,
+        catatan: str | None,
+    ) -> KlarifikasiDetail:
+        """Tulis baris register baru + event `DIBUAT` (dipakai `create` dan `dari_usulan`).
+
+        Args:
+            data: Isian tervalidasi.
+            dibuat_oleh: Subjek token pembuat.
+            ai_usulan_id: Usulan asal (None untuk pembuatan manual).
+            catatan: Catatan event `DIBUAT`.
+
+        Raises:
+            NotFoundError: Kasus narasi tak ada (404).
+            KlarifikasiGandaError: Sudah ada klarifikasi `TERBUKA` untuk (narasi, klaim) itu.
+            UsulanSudahDiterapkanError: Bentrok UNIQUE `ai_usulan_id` (permintaan bersamaan).
+        """
         if self._s.get(NarasiKasusModel, data.narasi_id) is None:
             raise NotFoundError(f"Kasus narasi '{data.narasi_id}' tidak ditemukan.")
         m = NarasiKlarifikasiModel
@@ -167,6 +238,7 @@ class SqlKlarifikasiService:
             question_text=data.question_text,
             reviewer_approval=ReviewerApproval.MENUNGGU.value,
             disposition=Disposition.TERBUKA.value,
+            ai_usulan_id=ai_usulan_id,
             dibuat_oleh=dibuat_oleh,
             created_at=sekarang,
             updated_at=sekarang,
@@ -177,12 +249,131 @@ class SqlKlarifikasiService:
                 self._s.flush()
         except IntegrityError as exc:
             if isinstance(exc.orig, UniqueViolation):
+                if getattr(exc.orig.diag, "constraint_name", None) == _UQ_USULAN:
+                    raise UsulanSudahDiterapkanError(None) from exc
                 raise KlarifikasiGandaError(
                     f"Sudah ada klarifikasi terbuka untuk klaim '{data.claim_id}' pada kasus ini."
                 ) from exc
             raise
-        self._event(rec, AksiKlarifikasi.DIBUAT, dibuat_oleh, None)
+        self._event(rec, AksiKlarifikasi.DIBUAT, dibuat_oleh, catatan)
         return self._detail(rec)
+
+    def dari_usulan(
+        self, ai_usulan_id: str, data: KlarifikasiDariUsulan, *, dibuat_oleh: str
+    ) -> KlarifikasiDetail:
+        """Terapkan usulan P04 yang diterima reviewer menjadi SATU baris register.
+
+        Satu transaksi: baris `ai_usulan` dibaca `FOR SHARE`, putusan terakhir (urut
+        `created_at` lalu `id`) menentukan penerimaan. Pemetaan tetap: `one_neutral_question`
+        -> `question_text`; `materiality_rationale` -> `materiality_reason`; `alternatives` ->
+        `alternative_hypothesis` (satu butir per baris diawali `- `); `preferred_role` ->
+        `recipient_role`; `why_ask` -> `intended_decision` bila body tak mengisinya;
+        `sumber_ids` -> `source_ids_checked`; `sasaran_id` -> `narasi_id`; `periode` dari
+        `parameter` run usulan (cadangan: periode kasus sasaran, yang memang nilai parameter
+        P04). Baris dibuat `MENUNGGU`/`TERBUKA` dengan event `DIBUAT` bercatatan
+        `dari usulan P04 <id>`; usulan dan putusannya tidak diubah.
+
+        Args:
+            ai_usulan_id: Id usulan P04.
+            data: Isian dari klien (claim, pemicu, paparan, keputusan opsional).
+            dibuat_oleh: Subjek token pembuat.
+
+        Returns:
+            Detail baris register baru.
+
+        Raises:
+            NotFoundError: Usulan tak ada, atau kasus sasaran tak ada (404).
+            UsulanBukanP04Error: Fungsi bukan P04 / sasaran bukan `NARASI_KASUS` (422).
+            UsulanBelumDiterimaError: Tanpa putusan atau putusan terakhir `REJECT` (409).
+            UsulanTidakMaterialError: `isi.material` false atau pertanyaan kosong (422).
+            UsulanSudahDiterapkanError: Usulan sudah menjadi klarifikasi (409).
+            PeriodeTakAdaError: Periode tak terbaca (422).
+            IsianUsulanKurangError: `preferred_role` kosong, atau `why_ask` kosong tanpa
+                `intended_decision` di body (422).
+            KlarifikasiGandaError: Sudah ada `TERBUKA` untuk klaim itu (409).
+            ValidationAppError: Hasil pemetaan tak lolos `KlarifikasiCreate` (422).
+        """
+        usulan = self._s.scalar(
+            select(AiUsulanModel).where(AiUsulanModel.id == ai_usulan_id).with_for_update(read=True)
+        )
+        if usulan is None:
+            raise NotFoundError(f"Usulan AI '{ai_usulan_id}' tidak ditemukan.")
+        if (
+            usulan.fungsi != KODE_FUNGSI_P04
+            or usulan.sasaran_jenis != SasaranUsulan.NARASI_KASUS.value
+        ):
+            raise UsulanBukanP04Error("Usulan bukan usulan P04 atas kasus narasi.")
+        P = AiUsulanPutusanModel
+        putusan = self._s.scalar(
+            select(P.putusan)
+            .where(P.usulan_id == ai_usulan_id)
+            .order_by(P.created_at.desc(), P.id.desc())
+            .limit(1)
+        )
+        if putusan not in (PutusanUsulan.APPROVE.value, PutusanUsulan.REVISE.value):
+            raise UsulanBelumDiterimaError("Usulan AI ini belum diterima reviewer.")
+        isi = usulan.isi or {}
+        pertanyaan = _teks_atau_none(isi.get("one_neutral_question"))
+        if isi.get("material") is not True or pertanyaan is None:
+            raise UsulanTidakMaterialError("Usulan P04 tidak material atau tanpa pertanyaan.")
+        ada = self._s.scalar(
+            select(NarasiKlarifikasiModel.id).where(
+                NarasiKlarifikasiModel.ai_usulan_id == ai_usulan_id
+            )
+        )
+        if ada is not None:
+            raise UsulanSudahDiterapkanError(ada)
+        periode = self._periode(usulan)
+        peran = _teks_atau_none(isi.get("preferred_role"))
+        keputusan = _teks_atau_none(data.intended_decision) or _teks_atau_none(isi.get("why_ask"))
+        if peran is None or keputusan is None:
+            raise IsianUsulanKurangError(
+                "Usulan P04 tanpa preferred_role, atau tanpa why_ask dan intended_decision."
+            )
+        try:
+            baru = KlarifikasiCreate(
+                narasi_id=usulan.sasaran_id,
+                claim_id=data.claim_id,
+                source_ids_checked=list(usulan.sumber_ids),
+                materiality_reason=str(isi.get("materiality_rationale") or ""),
+                alternative_hypothesis=_teks_alternatif(isi.get("alternatives")),
+                intended_decision=keputusan,
+                recipient_role=peran,
+                periode=periode,
+                exposure=data.exposure,
+                due_trigger=data.due_trigger,
+                question_text=pertanyaan,
+            )
+        except ValidationError as exc:
+            salah = sorted({str(e["loc"][0]) for e in exc.errors() if e["loc"]})
+            raise ValidationAppError(
+                "Isian usulan P04 tidak sah untuk register: " + ", ".join(salah) + "."
+            ) from exc
+        return self._simpan(
+            baru,
+            dibuat_oleh=dibuat_oleh,
+            ai_usulan_id=ai_usulan_id,
+            catatan=f"dari usulan P04 {ai_usulan_id}",
+        )
+
+    def _periode(self, usulan: AiUsulanModel) -> str:
+        """Baca periode dari `parameter` run usulan; cadangan periode kasus sasarannya.
+
+        `ai_run.masukan` dikosongkan saat run ditutup (kecuali `AI_SIMPAN_MASUKAN`), sedangkan
+        parameter P04 selalu `periode` kasus apa adanya, sehingga kasus adalah sumber setara.
+
+        Raises:
+            PeriodeTakAdaError: Keduanya tak menghasilkan teks berisi (422).
+        """
+        run = self._s.get(AiRunModel, usulan.ai_run_id)
+        parameter = (run.masukan or {}).get("parameter") if run is not None else None
+        periode = _teks_atau_none((parameter or {}).get("periode"))
+        if periode is None:
+            kasus = self._s.get(NarasiKasusModel, usulan.sasaran_id)
+            periode = _teks_atau_none(kasus.periode) if kasus is not None else None
+        if periode is None:
+            raise PeriodeTakAdaError("Periode usulan P04 tidak ditemukan.")
+        return periode
 
     def get(self, klarifikasi_id: str) -> KlarifikasiDetail:
         """Ambil satu pertanyaan beserta `riwayat`; `NotFoundError` bila tak ada."""
@@ -214,6 +405,9 @@ class SqlKlarifikasiService:
     ) -> KlarifikasiDetail:
         """Setujui/tolak pertanyaan `TERBUKA` yang `MENUNGGU`.
 
+        `TOLAK` menutup baris: `reviewer_approval` dan `disposition` menjadi `DITOLAK`, event
+        `DITOLAK` tercatat, dan klaim yang sama langsung boleh diberi klarifikasi baru.
+
         Raises:
             NotFoundError: Tak ada (404).
             KlarifikasiTidakTerbukaError: Bukan `TERBUKA` (409).
@@ -236,6 +430,8 @@ class SqlKlarifikasiService:
         rec.reviewer_approval = (
             ReviewerApproval.DISETUJUI if setuju else ReviewerApproval.DITOLAK
         ).value
+        if not setuju:
+            rec.disposition = Disposition.DITOLAK.value
         self._event(
             rec,
             AksiKlarifikasi.DISETUJUI if setuju else AksiKlarifikasi.DITOLAK,
@@ -251,7 +447,7 @@ class SqlKlarifikasiService:
 
         Raises:
             NotFoundError: Tak ada (404).
-            KlarifikasiTidakTerbukaError: Sudah `TERJAWAB`/`DIBATALKAN` (409).
+            KlarifikasiTidakTerbukaError: Sudah `TERJAWAB`/`DIBATALKAN`/`DITOLAK` (409).
             KlarifikasiBelumDisetujuiError: Belum `DISETUJUI` (409).
         """
         rec = self._muat(klarifikasi_id, kunci=True)

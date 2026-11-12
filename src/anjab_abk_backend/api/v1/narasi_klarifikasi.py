@@ -27,6 +27,7 @@ from ...narasi.schemas.klarifikasi import (
     Disposition,
     JawabanKlarifikasi,
     KlarifikasiCreate,
+    KlarifikasiDariUsulan,
     KlarifikasiDetail,
     KlarifikasiRead,
     PersetujuanKlarifikasi,
@@ -78,6 +79,52 @@ def create_klarifikasi(
 
     def _aksi() -> KlarifikasiDetail:
         return service.create(data, dibuat_oleh=principal.subject)
+
+    return run_idempotent(idem, response, KlarifikasiDetail, _aksi)
+
+
+@router.post(
+    "/dari-usulan/{ai_usulan_id}",
+    response_model=KlarifikasiDetail,
+    status_code=201,
+    summary="Terapkan usulan P04 yang diterima menjadi klarifikasi (tim-kajian)",
+    operation_id="narasi_klarifikasi_dari_usulan",
+    dependencies=_WRITE,
+    responses={
+        **_AUTH,
+        **_RATE,
+        **_FORBIDDEN,
+        404: {"model": ErrorResponse, "description": "Usulan atau kasus sasarannya tak ada."},
+        409: {
+            "model": ErrorResponse,
+            "description": "`USULAN_BELUM_DITERIMA`, `USULAN_SUDAH_DITERAPKAN` "
+            "(`details[0].msg` = id klarifikasi), `KLARIFIKASI_GANDA`, "
+            "atau Idempotency-Key sedang diproses.",
+        },
+        422: {
+            "model": ErrorResponse,
+            "description": "Badan tidak sah; `USULAN_BUKAN_P04`; `USULAN_TIDAK_MATERIAL`; "
+            "`PERIODE_TAK_ADA`; `ISIAN_USULAN_KURANG`.",
+        },
+    },
+)
+def terapkan_usulan_p04(
+    ai_usulan_id: str,
+    data: KlarifikasiDariUsulan,
+    service: Annotated[KlarifikasiService, Depends(get_klarifikasi_service)],
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    idem: Annotated[Idempotency, Depends(idempotency)],
+    response: Response,
+) -> KlarifikasiDetail:
+    """Buat SATU baris register dari usulan P04 yang sudah diterima reviewer.
+
+    Pemetaan field tetap; pembuat adalah subjek token. Urutan cek: usulan 404, bukan P04 422,
+    belum diterima 409, tidak material 422, sudah diterapkan 409, periode/isian kurang 422,
+    klaim sudah punya klarifikasi terbuka 409. Pemeriksaan berada di dalam aksi idempoten.
+    """
+
+    def _aksi() -> KlarifikasiDetail:
+        return service.dari_usulan(ai_usulan_id, data, dibuat_oleh=principal.subject)
 
     return run_idempotent(idem, response, KlarifikasiDetail, _aksi)
 
@@ -147,7 +194,11 @@ def putuskan_klarifikasi(
     idem: Annotated[Idempotency, Depends(idempotency)],
     response: Response,
 ) -> KlarifikasiDetail:
-    """Putuskan persetujuan; subjek token tidak boleh sama dengan pembuat pertanyaan."""
+    """Putuskan persetujuan; subjek token tidak boleh sama dengan pembuat pertanyaan.
+
+    `TOLAK` menutup baris (`disposition=DITOLAK`) sehingga klaim yang sama bebas diberi
+    klarifikasi baru; baris `DITOLAK` tak dapat disetujui, dijawab, atau dibatalkan lagi.
+    """
 
     def _aksi() -> KlarifikasiDetail:
         return service.putuskan(klarifikasi_id, data, reviewer=principal.subject)

@@ -25,11 +25,16 @@ class ReviewerApproval(StrEnum):
 
 
 class Disposition(StrEnum):
-    """Nasib sebuah pertanyaan klarifikasi."""
+    """Nasib sebuah pertanyaan klarifikasi.
+
+    `DITOLAK` menutup baris saat reviewer menolak (`TOLAK`); klaim yang sama lalu bebas
+    diberi klarifikasi baru, dan riwayat penolakan tetap ada di `narasi_klarifikasi_event`.
+    """
 
     TERBUKA = "TERBUKA"
     TERJAWAB = "TERJAWAB"
     DIBATALKAN = "DIBATALKAN"
+    DITOLAK = "DITOLAK"
 
 
 class AksiKlarifikasi(StrEnum):
@@ -129,8 +134,29 @@ class KlarifikasiCreate(BaseModel):
         return nilai
 
 
+class KlarifikasiDariUsulan(BaseModel):
+    """Body `POST /dari-usulan/{ai_usulan_id}`: isian yang tidak berasal dari usulan P04.
+
+    Field lain register diturunkan dari usulan dengan pemetaan tetap (lihat
+    `SqlKlarifikasiService.dari_usulan`).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    claim_id: str = Field(min_length=1, max_length=100, description="Claim_ID yang ditanyakan.")
+    due_trigger: str = Field(min_length=1, description="DueTrigger: kapan jawaban dibutuhkan.")
+    exposure: ExposureKlarifikasi = Field(description="Exposure (himpunan `paparan` antrean).")
+    intended_decision: str | None = Field(
+        default=None,
+        description="Keputusan yang hendak dibantu; bila kosong dipakai `why_ask` dari usulan.",
+    )
+
+
 class PersetujuanKlarifikasi(BaseModel):
-    """Payload keputusan reviewer atas pertanyaan klarifikasi."""
+    """Payload keputusan reviewer atas pertanyaan klarifikasi.
+
+    `TOLAK` sekaligus menutup baris (`disposition` menjadi `DITOLAK`).
+    """
 
     model_config = ConfigDict(extra="forbid")
 

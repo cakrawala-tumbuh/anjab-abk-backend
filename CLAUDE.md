@@ -82,13 +82,24 @@ run test ikut memverifikasi migrasi.
 
 ## Revisi Desain
 
+### [2026-11-12] Terapkan usulan P04 menjadi baris register klarifikasi; TOLAK menutup baris
+
+Backlog `#137` (lanjutan `#136`; pasangan web `anjab-abk-web-app#123`). `ai/fungsi_p04.py` tidak berubah.
+
+- **Rute** `POST /api/v1/narasi/klarifikasi/dari-usulan/{ai_usulan_id}` body `{claim_id, due_trigger, exposure, intended_decision?}` -> 201 `KlarifikasiDetail` (`MENUNGGU`/`TERBUKA`, event `DIBUAT` bercatatan `dari usulan P04 <id>`). `tim-kajian` + rate limit + idempoten. Logika di `SqlKlarifikasiService.dari_usulan`; `create` dan `dari_usulan` berbagi `_simpan`.
+- **Pemetaan tetap**: `one_neutral_question`->`question_text`; `materiality_rationale`->`materiality_reason`; `alternatives[]`->`alternative_hypothesis` (satu butir per baris `- `; kosong -> teks bawaan `ALTERNATIF_KOSONG`); `preferred_role`->`recipient_role`; `why_ask`->`intended_decision` bila body kosong; `sumber_ids`->`source_ids_checked`; `sasaran_id`->`narasi_id`; `ai_usulan_id` terisi.
+- **Urutan cek**: 404 usulan -> 422 `USULAN_BUKAN_P04` (fungsi bukan P04 / sasaran bukan `NARASI_KASUS`) -> 409 `USULAN_BELUM_DITERIMA` (putusan terakhir bukan APPROVE/REVISE) -> 422 `USULAN_TIDAK_MATERIAL` (`material` bukan true / pertanyaan kosong) -> 409 `USULAN_SUDAH_DITERAPKAN` (`details[0].msg` = id klarifikasi) -> 422 `PERIODE_TAK_ADA` -> 422 `ISIAN_USULAN_KURANG` (`preferred_role` kosong, atau `why_ask` kosong tanpa `intended_decision`) -> 404 kasus -> 409 `KLARIFIKASI_GANDA`.
+- **Periode**: dibaca dari `ai_run.masukan.parameter.periode`; karena `masukan` dikosongkan saat run ditutup (kecuali `AI_SIMPAN_MASUKAN`), cadangannya periode kasus sasaran (nilai yang sama dikirim sebagai parameter P04). Keduanya kosong -> 422.
+- **Tepat sekali**: migrasi `6c2d9a41b7e3` menambah UNIQUE `uq_narasi_klarifikasi_ai_usulan` pada `ai_usulan_id` (NULL boleh berulang); `UniqueViolation` dibedakan per nama constraint. Usulan yang barisnya ditolak tetap tak bisa diterapkan ulang.
+- **Perilaku `#136` berubah (putusan user 12 Nov, pilihan A)**: `POST .../persetujuan` `TOLAK` kini menutup baris: `disposition` -> `DITOLAK` (nilai baru; migrasi yang sama mengganti CHECK), event `DITOLAK` tetap tercatat. Indeks parsial `uq_narasi_klarifikasi_terbuka` tak lagi memblokir klaim itu sehingga klarifikasi baru (manual/`dari-usulan`) langsung boleh; baris `DITOLAK` tak bisa disetujui/dijawab/dibatalkan (409 `KLARIFIKASI_TIDAK_TERBUKA`). `downgrade` mengembalikan baris `DITOLAK` ke `TERBUKA` (best-effort; bisa bentrok indeks parsial bila klaimnya sudah punya yang terbuka).
+
 ### [2026-11-12] Register klarifikasi narasi (rute `/narasi/klarifikasi`)
 
 Backlog `#136` (HO butir 6 / UX-11; asal `ypii-support#463`; lanjutan `#137` pemetaan P04; pasangan web `anjab-abk-web-app#123`).
 
-- **Tabel `narasi_klarifikasi`** (proyeksi; migrasi `1e85e065fc4a`): 13 metadata + `question_text`; `id` = Question_ID; CHECK `reviewer_approval` / `disposition` / `exposure` (himpunan `paparan` antrean); `ai_usulan_id` FK null (diisi `#137`). UNIQUE parsial `uq_narasi_klarifikasi_terbuka` (`narasi_id`, `claim_id`) `WHERE disposition = 'TERBUKA'` -> 409 `KLARIFIKASI_GANDA` (pra-cek + `UniqueViolation` dalam SAVEPOINT).
+- **Tabel `narasi_klarifikasi`** (proyeksi; migrasi `1e85e065fc4a`): 13 metadata + `question_text`; `id` = Question_ID; CHECK `reviewer_approval` / `disposition` / `exposure` (himpunan `paparan` antrean); `ai_usulan_id` FK null (diisi `#137`); CHECK `disposition` kini memuat `DITOLAK`. UNIQUE parsial `uq_narasi_klarifikasi_terbuka` (`narasi_id`, `claim_id`) `WHERE disposition = 'TERBUKA'` -> 409 `KLARIFIKASI_GANDA` (pra-cek + `UniqueViolation` dalam SAVEPOINT).
 - **Tabel `narasi_klarifikasi_event`** append-only (trigger `BEFORE UPDATE OR DELETE` memakai ulang `narasi_tolak_ubah()`): tiap aksi (`DIBUAT`/`DISETUJUI`/`DITOLAK`/`JAWABAN_DICATAT`/`DIBATALKAN`) = satu event dalam transaksi yang sama; `terjadi_pada` diisi Python (UTC) agar urut antar-transaksi.
-- **Alur**: pembuat != reviewer (409 `REVIEWER_TIDAK_INDEPENDEN`); persetujuan ganda 409 `PERSETUJUAN_SUDAH_ADA`; jawaban hanya setelah `DISETUJUI` (409 `KLARIFIKASI_BELUM_DISETUJUI`); aksi pada yang sudah `TERJAWAB`/`DIBATALKAN` 409 `KLARIFIKASI_TIDAK_TERBUKA`. `TOLAK` mewajibkan catatan >= 5 karakter dan membiarkan `disposition` `TERBUKA` (koreksi = batalkan lalu buat baru). `question_text` paling banyak satu tanda tanya (422).
+- **Alur**: pembuat != reviewer (409 `REVIEWER_TIDAK_INDEPENDEN`); persetujuan ganda 409 `PERSETUJUAN_SUDAH_ADA`; jawaban hanya setelah `DISETUJUI` (409 `KLARIFIKASI_BELUM_DISETUJUI`); aksi pada yang sudah `TERJAWAB`/`DIBATALKAN` 409 `KLARIFIKASI_TIDAK_TERBUKA`. `TOLAK` mewajibkan catatan >= 5 karakter dan **menutup baris** (diubah `#137`: `disposition` -> `DITOLAK`, lihat entri 2026-11-12 di atas). `question_text` paling banyak satu tanda tanya (422).
 - Berkas: skema `narasi/schemas/klarifikasi.py`, seam `narasi/services/klarifikasi{,_sql}.py` (metode daftar bernama `daftar`), router `api/v1/narasi_klarifikasi.py`. Pengiriman pertanyaan lewat aplikasi di luar lingkup (OD-12).
 
 ### [2026-11-12] Keputusan perubahan (ChangeDecision) alternatif redesain

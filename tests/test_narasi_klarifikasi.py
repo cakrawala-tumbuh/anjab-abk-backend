@@ -127,7 +127,7 @@ def test_reviewer_pembuat_sendiri_409_dan_persetujuan_ganda(client_as):
     assert r.status_code == 409 and r.json()["error"] == "PERSETUJUAN_SUDAH_ADA"
 
 
-def test_tolak_butuh_catatan_dan_jawaban_setelah_ditolak_409(client_as):
+def test_tolak_butuh_catatan_dan_menutup_baris_sehingga_aksi_lanjutan_409(client_as):
     d = _buat(client_as, _kasus(client_as))
     rv = _tim(client_as, "reviewer")
     assert rv.post(f"{URL}/{d['id']}/persetujuan", json={"keputusan": "TOLAK"}).status_code == 422
@@ -135,8 +135,27 @@ def test_tolak_butuh_catatan_dan_jawaban_setelah_ditolak_409(client_as):
         f"{URL}/{d['id']}/persetujuan", json={"keputusan": "TOLAK", "catatan": "kurang jelas"}
     )
     assert r.status_code == 200 and r.json()["reviewer_approval"] == "DITOLAK"
+    assert r.json()["disposition"] == "DITOLAK"
+    assert [e["aksi"] for e in r.json()["riwayat"]] == ["DIBUAT", "DITOLAK"]
     r = rv.post(f"{URL}/{d['id']}/jawaban", json={"response_ref": "x", "jawaban_mentah": "y"})
-    assert r.status_code == 409 and r.json()["error"] == "KLARIFIKASI_BELUM_DISETUJUI"
+    assert r.status_code == 409 and r.json()["error"] == "KLARIFIKASI_TIDAK_TERBUKA"
+    r = rv.post(f"{URL}/{d['id']}/persetujuan", json={"keputusan": "SETUJU"})
+    assert r.status_code == 409 and r.json()["error"] == "KLARIFIKASI_TIDAK_TERBUKA"
+    r = _tim(client_as, "pembuat").post(f"{URL}/{d['id']}/batalkan", json={"catatan": "halo ya"})
+    assert r.status_code == 409 and r.json()["error"] == "KLARIFIKASI_TIDAK_TERBUKA"
+
+
+def test_tolak_lalu_buat_baru_untuk_klaim_yang_sama(client_as):
+    nid = _kasus(client_as)
+    d = _buat(client_as, nid)
+    _tim(client_as, "reviewer").post(
+        f"{URL}/{d['id']}/persetujuan", json={"keputusan": "TOLAK", "catatan": "kurang netral"}
+    )
+    baru = _tim(client_as, "pembuat").post(URL, json=_body(nid))
+    assert baru.status_code == 201, baru.text
+    assert baru.json()["id"] != d["id"] and baru.json()["disposition"] == "TERBUKA"
+    c = _tim(client_as, "pembaca")
+    assert c.get(URL, params={"narasi_id": nid, "disposition": "DITOLAK"}).json()["total"] == 1
 
 
 def test_jawaban_sebelum_disetujui_409_dan_ganda_409(client_as):

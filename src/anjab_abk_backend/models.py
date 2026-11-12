@@ -2063,7 +2063,8 @@ class NarasiKlarifikasiModel(Base):
 
     Proyeksi: `reviewer_approval`, `response_ref`, `jawaban_mentah`, `disposition` boleh
     berubah; riwayat aksi ada di `narasi_klarifikasi_event` (append-only). UNIQUE parsial
-    (`narasi_id`, `claim_id`) `WHERE disposition = 'TERBUKA'` menolak pertanyaan ganda.
+    (`narasi_id`, `claim_id`) `WHERE disposition = 'TERBUKA'` menolak pertanyaan ganda; UNIQUE
+    `ai_usulan_id` (NULL boleh berulang) menjamin satu usulan P04 menjadi paling banyak satu baris.
     """
 
     __tablename__ = "narasi_klarifikasi"
@@ -2078,6 +2079,7 @@ class NarasiKlarifikasiModel(Base):
             unique=True,
             postgresql_where=text("disposition = 'TERBUKA'"),
         ),
+        UniqueConstraint("ai_usulan_id", name="uq_narasi_klarifikasi_ai_usulan"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
