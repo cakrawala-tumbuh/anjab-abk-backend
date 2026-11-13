@@ -91,7 +91,15 @@ class SqlIdempotencyStore:
         self._s.flush()
 
     def release(self, key: str) -> None:
-        """Lepas reservasi (operasi gagal) agar key bisa di-retry."""
+        """Lepas reservasi (operasi gagal) agar key bisa di-retry.
+
+        Bila transaksi sesi sudah gagal (`Session.is_active` false, mis. `IntegrityError`
+        dari `flush()` tanpa SAVEPOINT), DB tidak disentuh: baris reservasi ikut dibuang
+        oleh rollback `session_scope` di akhir request, dan menyentuh sesi itu akan
+        melempar `PendingRollbackError` yang menutupi galat domain aslinya.
+        """
+        if not self._s.is_active:
+            return
         rec = self._s.get(IdempotencyRecord, _digest(key))
         if rec is not None:
             self._s.delete(rec)

@@ -7,6 +7,10 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diperbaiki
+
+- **Duplikat ber-`Idempotency-Key` membalas 409, bukan 500** (backlog #142): `SqlIdempotencyStore.release()` tidak lagi menyentuh DB bila transaksi sesi sudah gagal (sebelumnya `PendingRollbackError` menutupi `ConflictError`), dan `SqlVersiMetodeService._flush` memakai SAVEPOINT. Berlaku untuk semua rute `run_idempotent`; tanpa migrasi dan tanpa perubahan OpenAPI.
+
 ## [0.51.0] - 2026-11-13
 
 ### Ditambahkan

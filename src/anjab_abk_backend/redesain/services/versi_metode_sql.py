@@ -74,9 +74,21 @@ class SqlVersiMetodeService:
         self._s = session
         self._riwayat = riwayat
 
-    def _flush(self) -> None:
+    def _flush(self, baru: RedesainVersiMetodeModel | None = None) -> None:
+        """Flush dalam SAVEPOINT agar `IntegrityError` tidak meracuni transaksi request.
+
+        Args:
+            baru: Baris baru yang ditambahkan ke sesi DI DALAM SAVEPOINT, sehingga ikut
+                dibuang saat savepoint di-rollback (tidak tersisa sebagai pending).
+
+        Raises:
+            ConflictError: pasangan `versi`+`bagian` sudah ada.
+        """
         try:
-            self._s.flush()
+            with self._s.begin_nested():
+                if baru is not None:
+                    self._s.add(baru)
+                self._s.flush()
         except IntegrityError as exc:
             raise ConflictError("Catatan untuk pasangan versi dan bagian itu sudah ada.") from exc
 
@@ -87,8 +99,7 @@ class SqlVersiMetodeService:
             ConflictError: pasangan `versi`+`bagian` sudah ada.
         """
         rec = RedesainVersiMetodeModel(id=str(uuid.uuid4()), **data.model_dump())
-        self._s.add(rec)
-        self._flush()
+        self._flush(rec)
         self._s.refresh(rec)
         read = _to_read(rec)
         self._riwayat.catat(ENTITAS, read.id, "create", None, snapshot(read), pelaku_kode_orang)
