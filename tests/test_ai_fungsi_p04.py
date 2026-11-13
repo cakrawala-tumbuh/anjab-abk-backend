@@ -15,6 +15,7 @@ from anjab_abk_backend.ai.fungsi_p02 import aturan_p02
 from anjab_abk_backend.ai.fungsi_p03 import aturan_p03
 from anjab_abk_backend.ai.fungsi_p04 import (
     FUNGSI_P04,
+    INSTRUKSI_P04,
     SKEMA_ISI_P04,
     ParameterP04,
     aturan_p04,
@@ -114,7 +115,15 @@ def test_skema_rekursif_tanpa_kata_terlarang_dan_objek_tertutup():
             if node.get("type") == "object":
                 assert node["additionalProperties"] is False
                 assert set(node["required"]) == set(node["properties"])
-    assert FUNGSI_P04.kode == "P04" and FUNGSI_P04.prompt_version == "p04-1"
+    assert FUNGSI_P04.kode == "P04" and FUNGSI_P04.prompt_version == "p04-2"
+
+
+def test_instruksi_menetapkan_aturan_status_ai_draft_dan_batas_evidence_gap():
+    assert FUNGSI_P04.instruksi == INSTRUKSI_P04
+    aturan = INSTRUKSI_P04.split("8. Aturan status.", 1)[1]
+    assert "AI_DRAFT" in aturan and "EVIDENCE_GAP" in aturan
+    assert "material bernilai true" in aturan
+    assert "tidak ada satu pun span" in aturan
 
 
 def test_tujuh_field_wajib_dan_tanpa_nama_persetujuan_skor_atau_keputusan():

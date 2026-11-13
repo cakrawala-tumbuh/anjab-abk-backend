@@ -8,6 +8,11 @@ manusia yang memutuskan (R11-008).
 ``klaim`` dan ``keputusan_terkait`` adalah teks bebas dari klien, jadi keduanya dikirim sebagai
 sumber (``klaim:<uuid>`` dan ``keputusan:<uuid>``) agar melewati gerbang PII; penanda itu bukan
 baris ``narasi_sumber``.
+
+Status keluaran: kekurangan bukti atas klaim adalah objek penilaian P04, jadi ``AI_DRAFT``
+dipakai selama ada kutipan yang menopang penilaian (juga saat ``material`` true); ``EVIDENCE_GAP``
+hanya bila tidak ada span yang dapat dikutip. Aturan ini ada di ``INSTRUKSI_P04`` (``p04-2``)
+karena guardrail bersama memerintahkan ``EVIDENCE_GAP`` setiap kali rujukan pendukung tidak ada.
 """
 
 from __future__ import annotations
@@ -70,7 +75,12 @@ salah. Anda hanya mengusulkan; Anda tidak mengirim apa pun kepada siapa pun.
 selain bertanya (misalnya memeriksa dokumen lain) masuk alternatives; hal yang tidak dapat \
 Anda periksa masuk limitations.
 7. Kutip minimal satu span yang Anda periksa pada cited_spans, persis dari sumbernya. Tulis \
-seluruh keluaran dalam bahasa Indonesia.\
+seluruh keluaran dalam bahasa Indonesia.
+8. Aturan status. Kekurangan bukti atas klaim adalah objek penilaian fungsi ini, bukan celah \
+bukti keluaran. Isi status dengan AI_DRAFT bila penilaian materialitas Anda dapat ditopang \
+minimal satu kutipan dari sumber berpenanda "klaim:", sumber berpenanda "keputusan:", atau \
+materi bukti, termasuk saat material bernilai true. Isi status dengan EVIDENCE_GAP hanya bila \
+tidak ada satu pun span yang dapat Anda kutip dari sumber mana pun.\
 """
 
 _NULLABLE_STRING = {"anyOf": [{"type": "string"}, {"type": "null"}]}
@@ -102,7 +112,7 @@ persetujuan, skor, atau keputusan. Pertanyaan berupa string tunggal, bukan larik
 
 FUNGSI_P04 = FungsiAi(
     kode="P04",
-    prompt_version="p04-1",
+    prompt_version="p04-2",
     instruksi=INSTRUKSI_P04,
     skema_isi=SKEMA_ISI_P04,
 )
