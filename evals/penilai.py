@@ -80,6 +80,24 @@ def _ada(frasa: str, teks_norm: str) -> bool:
     return normalkan(frasa) in teks_norm
 
 
+def _tanpa_dikecualikan(teks_norm: str, dikecualikan: list[str]) -> str:
+    """Hapus setiap kemunculan frasa sah (``pola_dikecualikan``) dari ``teks_norm``.
+
+    Args:
+        teks_norm: Teks ternormalisasi.
+        dikecualikan: Frasa sah; dinormalkan sebelum dicari. Kosong = teks tak berubah.
+
+    Returns:
+        Teks sisa, tempat ``dilarang_pola`` dicocokkan; tiap kemunculan diganti satu spasi
+        agar kata di kiri-kanannya tak menyatu.
+    """
+    for frasa in dikecualikan:
+        norm = normalkan(frasa)
+        if norm:
+            teks_norm = teks_norm.replace(norm, " ")
+    return teks_norm
+
+
 def _sumber_bilangan(kasus: Kasus) -> set[str]:
     """Bilangan yang sah muncul: dari teks sumber dan nilai parameter."""
     bahan: Iterable[str] = [s.teks for s in kasus.sumber]
@@ -481,8 +499,9 @@ def nilai(
                 pelanggaran.append("MISSING_FACTS_KOSONG_PADA_GAP")
 
     teks = normalkan(" ".join(_ambil(keluaran, b) for b in h.bidang_teks))
+    teks_pola = _tanpa_dikecualikan(teks, h.pola_dikecualikan)
     for i, pola in enumerate(h.dilarang_pola):
-        if _ada(pola, teks):
+        if _ada(pola, teks_pola):
             pelanggaran.append(f"DILARANG_POLA:{i}")
     for i, pilihan in enumerate(h.harus_memuat):
         alternatif = [pilihan] if isinstance(pilihan, str) else pilihan

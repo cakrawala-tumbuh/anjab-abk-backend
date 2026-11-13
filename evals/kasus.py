@@ -45,6 +45,11 @@ _STATUS_MODEL = ("LOLOS", "EVIDENCE_GAP")
 _PREFIKS_JENIS_TERLARANG = ("WCP", "DCS", "KONSELING", "MURID")
 
 
+def _norm(teks: str) -> str:
+    """Normalkan seperti penilai: spasi beruntun menjadi satu, huruf kecil, tepi dipangkas."""
+    return " ".join(teks.split()).casefold()
+
+
 class KasusRusak(Exception):
     """Berkas kasus tidak sah (struktur, nilai, atau jenis sumber); evaluasi exit 2."""
 
@@ -152,6 +157,10 @@ class HarapanKasus(BaseModel):
         alasan_gerbang: Alasan penolakan gerbang yang diharapkan untuk ``TANPA_MODEL``.
         bidang_teks: Jalur titik pada keluaran yang diperiksa pola (``isi.draft_text``).
         dilarang_pola: Frasa yang tidak boleh muncul (spasi dan huruf dinormalkan).
+        pola_dikecualikan: Frasa sah yang memuat pola terlarang. Sebelum ``dilarang_pola``
+            diperiksa, setiap kemunculannya (dinormalkan) dihapus dari teks; ``harus_memuat``
+            dan ``angka_baru_dilarang`` tetap memakai teks utuh. Tiap entri wajib memuat
+            minimal satu entri ``dilarang_pola`` kasus yang sama sebagai potongan.
         harus_memuat: Frasa wajib; elemen berupa daftar berarti salah satu cukup.
         angka_baru_dilarang: Bilangan pada teks harus ada di sumber atau parameter.
         kontradiksi_wajib: ``contradictions`` pada keluaran harus terisi.
@@ -178,6 +187,7 @@ class HarapanKasus(BaseModel):
     alasan_gerbang: str | None = None
     bidang_teks: list[str] = Field(default_factory=lambda: ["isi.draft_text"])
     dilarang_pola: list[str] = Field(default_factory=list)
+    pola_dikecualikan: list[str] = Field(default_factory=list)
     harus_memuat: list[str | list[str]] = Field(default_factory=list)
     angka_baru_dilarang: bool = False
     kontradiksi_wajib: bool = False
@@ -204,6 +214,12 @@ class HarapanKasus(BaseModel):
             raise ValueError("bidang_teks tidak boleh kosong")
         if any(x not in SIFAT_FAKTA_P01 for x in self.hanya_sifat):
             raise ValueError("hanya_sifat harus berisi sifat fakta P01 yang sah")
+        terlarang = [_norm(x) for x in self.dilarang_pola]
+        for kecuali in self.pola_dikecualikan:
+            if not _norm(kecuali) or not any(t and t in _norm(kecuali) for t in terlarang):
+                raise ValueError(
+                    "pola_dikecualikan harus memuat minimal satu dilarang_pola sebagai potongan"
+                )
         return self
 
 

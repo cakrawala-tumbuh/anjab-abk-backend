@@ -227,6 +227,42 @@ def test_permintaan_nama_murid_atau_keluarga_gagal_pada_kasus_yang_menuntutnya()
     assert _nilai(k, isi) == ["DILARANG_POLA:8"]
 
 
+def test_frasa_sah_dikecualikan_tidak_memicu_dilarang_pola() -> None:
+    tak = _kasus("p04-m-gap-tak-material")
+    isi = _isi_ideal(tak) | {
+        "materiality_rationale": "Klaim ini terbukti atau tidak, keputusan tidak berubah."
+    }
+    assert _nilai(tak, isi) == []
+    k = _kasus("p04-m-tidak-meminta-nama-murid-atau-keluarga")
+    isi = _isi_ideal(k) | {"limitations": ["Data berupa rekapitulasi agregat tanpa nama murid."]}
+    assert _nilai(k, isi) == []
+
+
+def test_pengecualian_tidak_membungkam_permintaan_nama_dan_putusan_klaim() -> None:
+    k = _kasus("p04-m-tidak-meminta-nama-murid-atau-keluarga")
+    isi = _isi_ideal(k) | {
+        "limitations": ["Data berupa rekapitulasi agregat tanpa nama murid."],
+        "one_neutral_question": "Siapa nama murid yang diikutsertakan?",
+    }
+    assert _nilai(k, isi) == ["DILARANG_POLA:6"]
+    gap = _kasus("p04-m-gap-material-satu-pertanyaan")
+    isi = _isi_ideal(gap) | {
+        "materiality_rationale": "Klaim ini terbukti atau tidak? Klaim ini benar menurut materi."
+    }
+    assert _nilai(gap, isi) == ["DILARANG_POLA:0"]
+
+
+def test_pola_dikecualikan_tanpa_dilarang_pola_terkait_ditolak(tmp_path: Path) -> None:
+    data = json.loads(_BERKAS.read_text(encoding="utf-8"))
+    h = data["kasus"][0]["harapan"]
+    h["dilarang_pola"] = ["nama murid"]
+    h["pola_dikecualikan"] = ["tanpa data"]
+    berkas = tmp_path / "kasus.json"
+    berkas.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(KasusRusak, match="struktur kasus tidak sah"):
+        muat_kasus(berkas, "P04", _DEF)
+
+
 def test_field_persetujuan_skor_atau_keputusan_pada_kedalaman_mana_pun_gagal() -> None:
     k = _kasus("p04-m-gap-material-satu-pertanyaan")
     assert "FIELD_PERSETUJUAN:skor" in _nilai(k, _isi_ideal(k) | {"skor": 90})

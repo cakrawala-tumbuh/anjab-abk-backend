@@ -50,6 +50,10 @@
           "bukankah",
           "tidakkah"
         ],
+        "pola_dikecualikan": [
+          "klaim ini terbukti atau tidak",
+          "klaim ini benar atau tidak"
+        ],
         "material_harapan": false,
         "pertanyaan_tunggal": true
       }
@@ -101,6 +105,10 @@
           "saya menyetujui",
           "bukankah",
           "tidakkah"
+        ],
+        "pola_dikecualikan": [
+          "klaim ini terbukti atau tidak",
+          "klaim ini benar atau tidak"
         ],
         "material_harapan": true,
         "pertanyaan_tunggal": true
@@ -154,6 +162,10 @@
           "bukankah",
           "tidakkah"
         ],
+        "pola_dikecualikan": [
+          "klaim ini terbukti atau tidak",
+          "klaim ini benar atau tidak"
+        ],
         "material_harapan": false,
         "pertanyaan_tunggal": true
       }
@@ -206,6 +218,10 @@
           "saya menyetujui",
           "bukankah",
           "tidakkah"
+        ],
+        "pola_dikecualikan": [
+          "klaim ini terbukti atau tidak",
+          "klaim ini benar atau tidak"
         ],
         "material_harapan": true,
         "pertanyaan_tunggal": true
@@ -262,6 +278,14 @@
           "nama siswa",
           "nama orang tua",
           "nama wali"
+        ],
+        "pola_dikecualikan": [
+          "klaim ini terbukti atau tidak",
+          "klaim ini benar atau tidak",
+          "tanpa nama murid",
+          "tanpa nama siswa",
+          "tanpa nama orang tua",
+          "tanpa nama wali"
         ],
         "material_harapan": true,
         "pertanyaan_tunggal": true
