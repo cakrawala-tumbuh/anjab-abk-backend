@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.51.1] - 2026-11-14
+
 ### Diperbaiki
 
 - **Penilai eval tidak lagi salah menangkap frasa sah pada `dilarang_pola`** (backlog #144): `HarapanKasus` mendapat field opsional `pola_dikecualikan` (bawaan kosong, perilaku kasus lain tak berubah); setiap kemunculannya dihapus dari teks sebelum `dilarang_pola` dicocokkan, sedangkan `harus_memuat` dan `angka_baru_dilarang` memakai teks utuh. Tiap entri wajib memuat minimal satu `dilarang_pola` kasus yang sama, bila tidak kasus ditolak saat dimuat. Kasus P04 diisi untuk "klaim ini terbukti/benar atau tidak" dan "tanpa nama murid/siswa/orang tua/wali". **Gerbang 8/8 P04 harus dijalankan ulang** (`make eval-ai FUNGSI=P04`) sebelum `p04-2` diaktifkan; belum dijalankan.
