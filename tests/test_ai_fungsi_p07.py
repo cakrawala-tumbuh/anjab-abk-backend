@@ -236,4 +236,12 @@ def test_instruksi_p07_tanpa_asumsi_penerima_tunggal_dan_membaca_kesiapan():
     assert "persyaratan" in teks and "BELUM_DIPUTUS" in teks
     assert "PRIORITY dan CHANGE secara terpisah" in teks  # aturan 2 & 3 tak berubah
     assert "jangan memberi status VERIFIED, READY, atau APPROVE" in teks
-    assert FUNGSI_P07.prompt_version == "p07-2"
+    assert FUNGSI_P07.prompt_version == "p07-3"
+
+
+def test_instruksi_p07_aturan_status_ai_draft_dan_batas_evidence_gap():
+    teks = " ".join(FUNGSI_P07.instruksi.split())
+    aturan = teks.split("6. Aturan status.", 1)[1]
+    assert "AI_DRAFT" in aturan and "EVIDENCE_GAP" in aturan and "unknowns" in aturan
+    assert "tidak ada satu pun span" in aturan
+    assert "2. Jangan menulis status otorisasi." in teks

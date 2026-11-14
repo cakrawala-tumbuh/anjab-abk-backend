@@ -7,6 +7,10 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+### Diperbaiki
+
+- **P05 dan P07 tidak lagi memilih `EVIDENCE_GAP` hanya karena satu jenis sumber kosong** (backlog #145): `INSTRUKSI_P07` mendapat aturan 6 dan `INSTRUKSI_P05` aturan 8 yang menetapkan status `AI_DRAFT` bila isi dapat ditopang minimal satu kutipan, mencatat jenis sumber yang kosong pada `unknowns`/`batas_angka` (P07) atau `evidence_gaps` (P05), dan membatasi `EVIDENCE_GAP` pada ketiadaan span yang dapat dikutip. `prompt_version` naik `p07-2` ke `p07-3` dan `p05-1` ke `p05-2`; skema, guardrail, `aturan_p07`, dan penyerap tidak berubah, tanpa migrasi. **Eval nyata P05 dan P07 wajib dijalankan ulang** (`make eval-ai FUNGSI=P05`, `FUNGSI=P07`) sebelum versi baru diaktifkan di live; belum dijalankan.
+
 ## [0.51.1] - 2026-11-14
 
 ### Diperbaiki

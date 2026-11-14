@@ -171,6 +171,15 @@ def test_parameter_hanya_kode_tanpa_teks_bebas():
         ParameterP05(masalah_id="m1", periode="2026/27", catatan="bebas")
 
 
+def test_instruksi_p05_aturan_status_ai_draft_dan_batas_evidence_gap():
+    teks = " ".join(FUNGSI_P05.instruksi.split())
+    aturan = teks.split("8. Aturan status.", 1)[1]
+    assert "AI_DRAFT" in aturan and "EVIDENCE_GAP" in aturan and "evidence_gaps" in aturan
+    assert "tidak ada satu pun span" in aturan
+    assert "Setiap hipotesis berstatus HIPOTESIS" in teks
+    assert FUNGSI_P05.prompt_version == "p05-2"
+
+
 def test_katalog_memuat_p05_dan_saklar_bawaan_tidak_berubah():
     assert KATALOG_FUNGSI["P05"] is FUNGSI_P05
     assert ATURAN_ISI["P05"] is aturan_p05

@@ -9,6 +9,12 @@ terkirim (KAI:15).
 Hasilnya hanya usulan di ``ai_usulan`` untuk Tim Kajian: draf masalah bukan akar penyebab
 terbukti, dan tidak ada kolom hipotesis terstruktur di tabel redesain, jadi pemindahan ke form
 masalah/langkah tetap jalur manusia.
+
+Status keluaran: jenis sumber yang kosong (mis. tanpa ``bukti:``) dicatat pada ``evidence_gaps``,
+bukan alasan ``EVIDENCE_GAP``; ``AI_DRAFT`` dipakai selama ada kutipan yang menopang langkah atau
+hipotesis, ``EVIDENCE_GAP`` hanya bila tidak ada span yang dapat dikutip. Aturan ini ada di
+``INSTRUKSI_P05`` (``p05-2``) karena guardrail bersama memerintahkan ``EVIDENCE_GAP`` setiap kali
+rujukan pendukung tidak ada.
 """
 
 from __future__ import annotations
@@ -66,7 +72,11 @@ pelaksana berisi jabatan atau peran, bukan nama orang.
 6. Hal yang belum didukung sumber ditulis pada evidence_gaps, bukan ditebak.
 7. Gunakan hanya source_id yang ada pada sumber; jangan memakai pengetahuan lain. Parameter \
 masalah_id dan periode hanya kode konteks, bukan sumber fakta. Tulis seluruh keluaran dalam \
-bahasa Indonesia.\
+bahasa Indonesia.
+8. Aturan status. Isi status dengan AI_DRAFT bila minimal satu langkah draf atau hipotesis dapat \
+ditopang kutipan dari sumber. Jenis sumber yang tidak ada (mis. tidak ada sumber "bukti:") \
+ditulis pada evidence_gaps; itu bukan alasan memilih EVIDENCE_GAP. Isi status dengan \
+EVIDENCE_GAP hanya bila tidak ada satu pun span yang dapat dikutip dari sumber mana pun.\
 """
 
 SKEMA_ISI_P05: dict = {
@@ -130,7 +140,7 @@ SKEMA_ISI_P05: dict = {
 
 FUNGSI_P05 = FungsiAi(
     kode="P05",
-    prompt_version="p05-1",
+    prompt_version="p05-2",
     instruksi=INSTRUKSI_P05,
     skema_isi=SKEMA_ISI_P05,
 )

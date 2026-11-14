@@ -12,6 +12,12 @@ tidak boleh dibaca sebagai izin perubahan (KTK:139), jadi:
 
 Pengajuan hanya sah untuk masalah yang lolos gerbang F4 dan punya minimal satu alternatif
 (``periksa_syarat_p07``). Kartu hanya untuk Tim; rute Yayasan tidak membaca ``ai_usulan``.
+
+Status keluaran: jenis sumber yang kosong (mis. tanpa ``kesiapan:``) dicatat pada ``unknowns``
+dan ``batas_angka``, bukan alasan ``EVIDENCE_GAP``; ``AI_DRAFT`` dipakai selama ada kutipan yang
+menopang kartu, ``EVIDENCE_GAP`` hanya bila tidak ada span yang dapat dikutip. Aturan ini ada di
+``INSTRUKSI_P07`` (``p07-3``) karena guardrail bersama memerintahkan ``EVIDENCE_GAP`` setiap kali
+rujukan pendukung tidak ada.
 """
 
 from __future__ import annotations
@@ -89,7 +95,12 @@ diketahui; tulis pada unknowns, jangan ditebak. Keputusan perubahan pada "otoris
 dibaca dan terpisah dari prioritas final.
 5. Gunakan hanya source_id yang ada pada sumber; jangan memakai pengetahuan lain. Parameter \
 masalah_id, periode, versi_syarat_f4, dan usulan_p06_id hanya kode konteks, bukan sumber \
-fakta. Tulis seluruh keluaran dalam bahasa Indonesia.\
+fakta. Tulis seluruh keluaran dalam bahasa Indonesia.
+6. Aturan status. Isi status dengan AI_DRAFT bila decision_card dapat ditopang minimal satu \
+kutipan dari sumber mana pun. Jenis sumber yang tidak ada (mis. tidak ada sumber "kesiapan:" \
+atau "bukti:") ditulis pada unknowns dan, bila menyangkut angka, pada batas_angka; itu bukan \
+alasan memilih EVIDENCE_GAP. Isi status dengan EVIDENCE_GAP hanya bila tidak ada satu pun span \
+yang dapat dikutip dari sumber mana pun.\
 """
 
 
@@ -158,7 +169,7 @@ ditagih ``aturan_p07``, ``CHANGE`` pada ``required_signoffs`` juga."""
 
 FUNGSI_P07 = FungsiAi(
     kode="P07",
-    prompt_version="p07-2",
+    prompt_version="p07-3",
     instruksi=INSTRUKSI_P07,
     skema_isi=SKEMA_ISI_P07,
 )
