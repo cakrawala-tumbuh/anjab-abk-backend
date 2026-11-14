@@ -133,7 +133,10 @@
           "pada praktiknya",
           "secara nyata"
         ],
-        "angka_baru_dilarang": true
+        "angka_baru_dilarang": true,
+        "penyangkal_pola": [
+          "tidak menyatakan bahwa"
+        ]
       }
     },
     {
@@ -152,7 +155,7 @@
       "parameter": {
         "narrative_kind": "F1_FORMAL",
         "instrument_id": "INS_UJI_01",
-        "field_key": "praktik_penyusunan_perangkat",
+        "field_key": "praktik_pengumuman_rubrik",
         "periode": "2026-S1"
       },
       "harapan": {
@@ -193,7 +196,7 @@
       "parameter": {
         "narrative_kind": "F1_FORMAL",
         "instrument_id": "INS_UJI_01",
-        "field_key": "praktik_penyusunan_perangkat",
+        "field_key": "praktik_supervisi_kelas",
         "periode": "2026-S1"
       },
       "harapan": {
@@ -507,7 +510,7 @@
       "parameter": {
         "narrative_kind": "F1_FORMAL",
         "instrument_id": "INS_UJI_01",
-        "field_key": "praktik_penyusunan_perangkat",
+        "field_key": "praktik_verifikasi_kuitansi",
         "periode": "2026-S1"
       },
       "harapan": {
@@ -589,7 +592,7 @@
       "parameter": {
         "narrative_kind": "F1_FORMAL",
         "instrument_id": "INS_UJI_01",
-        "field_key": "praktik_penyusunan_perangkat",
+        "field_key": "data_rombongan_belajar",
         "periode": "2026-S1"
       },
       "harapan": {

@@ -98,6 +98,84 @@ def _tanpa_dikecualikan(teks_norm: str, dikecualikan: list[str]) -> str:
     return teks_norm
 
 
+_BATAS_KATA_PENYANGKAL = 15
+_KATA_PEMUTUS = frozenset({"tetapi", "namun", "melainkan", "sedangkan", "padahal"})
+_RE_BATAS_KALIMAT = re.compile(r"[.!?;\n]")
+_RE_BILANGAN_PENGHITUNG = re.compile(
+    r"(?:\b(?:" + "|".join(sorted(KATA_BILANGAN)) + r")\b\s+)+(?=(?:sumber|kalimat)\b)"
+)
+
+
+def _tersangkal(kalimat: str, awal: int, penyangkal: list[str]) -> bool:
+    """Apakah pola yang dimulai pada ``awal`` disangkal dalam ``kalimat`` (ternormalisasi).
+
+    Args:
+        kalimat: Satu kalimat ternormalisasi.
+        awal: Indeks awal kemunculan pola terlarang.
+        penyangkal: Frasa penyangkal ternormalisasi.
+
+    Returns:
+        ``True`` bila ada penyangkal yang berakhir sebelum ``awal`` dengan jarak paling
+        banyak 15 kata dan tanpa kata pemutus (``tetapi``, ``namun``, dst.) di antaranya.
+    """
+    for frasa in penyangkal:
+        mulai = kalimat.find(frasa)
+        while mulai != -1:
+            akhir = mulai + len(frasa)
+            if akhir <= awal:
+                antara = kalimat[akhir:awal].split()
+                if len(antara) <= _BATAS_KATA_PENYANGKAL and not _KATA_PEMUTUS & set(antara):
+                    return True
+            mulai = kalimat.find(frasa, mulai + 1)
+    return False
+
+
+def _pola_tak_tersangkal(
+    segmen: list[str], pola: str, penyangkal: list[str], dikecualikan: list[str]
+) -> bool:
+    """Apakah ``pola`` muncul setidaknya sekali tanpa disangkal pada ``segmen`` teks mentah.
+
+    Args:
+        segmen: Teks mentah per elemen bidang; dipecah menjadi kalimat pada ``. ! ? ;`` dan
+            baris baru sebelum dinormalkan.
+        pola: Frasa terlarang (dinormalkan di sini).
+        penyangkal: Frasa penyangkal ternormalisasi.
+        dikecualikan: ``pola_dikecualikan`` kasus (dihapus per kalimat sebelum pencocokan).
+
+    Returns:
+        ``True`` bila ada kemunculan yang tidak tersangkal (pelanggaran).
+    """
+    target = normalkan(pola)
+    for teks in segmen:
+        for kalimat_mentah in _RE_BATAS_KALIMAT.split(teks):
+            kalimat = _tanpa_dikecualikan(normalkan(kalimat_mentah), dikecualikan)
+            awal = kalimat.find(target)
+            while target and awal != -1:
+                if not _tersangkal(kalimat, awal, penyangkal):
+                    return True
+                awal = kalimat.find(target, awal + 1)
+    return False
+
+
+def _bilangan_keluaran(teks: str, source_ids: Iterable[str]) -> set[str]:
+    """Bilangan pada keluaran untuk ``ANGKA_BARU``, tanpa ``source_id`` dan hitungan sumber.
+
+    Args:
+        teks: Teks keluaran.
+        source_ids: Id sumber kasus; tiap kata utuhnya (setelah ``normalkan``) dihapus.
+
+    Returns:
+        Token bilangan; kata bilangan yang langsung diikuti ``sumber`` atau ``kalimat``
+        (mis. "dua sumber") tidak dihitung, digit lain tetap dihitung.
+    """
+    n = normalkan(teks)
+    for sid in source_ids:
+        kunci = normalkan(sid)
+        if kunci:
+            n = re.sub(r"(?<![a-z0-9_])" + re.escape(kunci) + r"(?![a-z0-9_])", " ", n)
+    return bilangan_dalam(_RE_BILANGAN_PENGHITUNG.sub(" ", n))
+
+
 def _sumber_bilangan(kasus: Kasus) -> set[str]:
     """Bilangan yang sah muncul: dari teks sumber dan nilai parameter."""
     bahan: Iterable[str] = [s.teks for s in kasus.sumber]
@@ -499,16 +577,26 @@ def nilai(
                 pelanggaran.append("MISSING_FACTS_KOSONG_PADA_GAP")
 
     teks = normalkan(" ".join(_ambil(keluaran, b) for b in h.bidang_teks))
-    teks_pola = _tanpa_dikecualikan(teks, h.pola_dikecualikan)
-    for i, pola in enumerate(h.dilarang_pola):
-        if _ada(pola, teks_pola):
-            pelanggaran.append(f"DILARANG_POLA:{i}")
+    bidang_pola = h.bidang_teks if h.bidang_pola is None else h.bidang_pola
+    if h.penyangkal_pola:
+        segmen = [t for b in bidang_pola for t in _kumpul(keluaran, b.split("."))]
+        penyangkal = [normalkan(x) for x in h.penyangkal_pola]
+        for i, pola in enumerate(h.dilarang_pola):
+            if _pola_tak_tersangkal(segmen, pola, penyangkal, h.pola_dikecualikan):
+                pelanggaran.append(f"DILARANG_POLA:{i}")
+    else:
+        teks_pola = normalkan(" ".join(_ambil(keluaran, b) for b in bidang_pola))
+        teks_pola = _tanpa_dikecualikan(teks_pola, h.pola_dikecualikan)
+        for i, pola in enumerate(h.dilarang_pola):
+            if _ada(pola, teks_pola):
+                pelanggaran.append(f"DILARANG_POLA:{i}")
     for i, pilihan in enumerate(h.harus_memuat):
         alternatif = [pilihan] if isinstance(pilihan, str) else pilihan
         if not any(_ada(a, teks) for a in alternatif):
             pelanggaran.append(f"HARUS_MEMUAT_HILANG:{i}")
     if h.angka_baru_dilarang:
-        baru = sorted(bilangan_dalam(teks) - _sumber_bilangan(kasus))
+        ids = [x.source_id for x in kasus.sumber]
+        baru = sorted(_bilangan_keluaran(teks, ids) - _sumber_bilangan(kasus))
         pelanggaran.extend(f"ANGKA_BARU:{b}" for b in baru)
     if h.kontradiksi_wajib and not any(str(c).strip() for c in keluaran.get("contradictions", [])):
         pelanggaran.append("KONTRADIKSI_KOSONG")

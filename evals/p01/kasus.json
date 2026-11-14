@@ -196,6 +196,7 @@
       "harapan": {
         "jalur": "MODEL",
         "status_qa": [
+          "LOLOS",
           "EVIDENCE_GAP"
         ],
         "bidang_teks": [
@@ -248,7 +249,13 @@
         "hanya_sifat": [
           "NORMATIF"
         ],
-        "span_fakta_harus_ada": true
+        "span_fakta_harus_ada": true,
+        "penyangkal_pola": [
+          "bukan bukti bahwa"
+        ],
+        "bidang_pola": [
+          "isi.factual_extracts.fakta"
+        ]
       }
     },
     {

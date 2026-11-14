@@ -38,9 +38,16 @@ def _span(k: Kasus) -> str:
     return " ".join(k.sumber[0].teks.split()[:4])
 
 
+def _gap(k: Kasus) -> bool:
+    """Kasus yang ideal-nya ``EVIDENCE_GAP``; kasus sumber tak relevan kini menerima keduanya."""
+    if k.id == "p01-m-sumber-tak-relevan-evidence-gap":
+        return True
+    return k.harapan.status_qa == ["EVIDENCE_GAP"]
+
+
 def _isi_ideal(k: Kasus) -> dict[str, Any]:
     """Isi yang memenuhi ``harapan`` kasus ``k``: fakta = awal teks sumber, sifat sah."""
-    gap = k.harapan.status_qa == ["EVIDENCE_GAP"]
+    gap = _gap(k)
     sifat = (k.harapan.hanya_sifat or ["DESKRIPTIF_DOKUMEN"])[0]
     fakta = []
     if not gap:
@@ -56,7 +63,7 @@ def _isi_ideal(k: Kasus) -> dict[str, Any]:
 
 
 def _amplop(k: Kasus, isi: dict[str, Any]) -> dict[str, Any]:
-    gap = k.harapan.status_qa == ["EVIDENCE_GAP"]
+    gap = _gap(k)
     return {
         "status": "EVIDENCE_GAP" if gap else "AI_DRAFT",
         "source_refs": [],
@@ -120,7 +127,7 @@ def test_kasus_p01_lolos_format_harness_jumlah_dan_cakupan() -> None:
     } <= ids
     assert any(k.harapan.hanya_sifat == ["NORMATIF"] for k in kasus)
     assert any(k.harapan.angka_baru_dilarang for k in kasus)
-    assert any(k.harapan.status_qa == ["EVIDENCE_GAP"] for k in kasus)
+    assert any("EVIDENCE_GAP" in k.harapan.status_qa for k in kasus)
     assert {r for k in kasus for r in k.rujukan} >= {"PRM:12-16", "PRM:72", "R11-016"}
 
 
@@ -228,7 +235,8 @@ def test_gap_dengan_fakta_dan_lolos_tanpa_fakta_gagal() -> None:
         {"fakta": "x", "sifat": "NORMATIF", "source_id": "s1", "span": "menu kantin"}
     ]
     assert _nilai(gap, berfakta, status="EVIDENCE_GAP") == ["FAKTA_PADA_GAP"]
-    assert _nilai(gap, _isi_ideal(gap)) == ["STATUS_TIDAK_SESUAI:LOLOS", "FAKTA_KOSONG_PADA_LOLOS"]
+    # status LOLOS kini diterima kasus ini (#146); yang tersisa hanya fakta kosong
+    assert _nilai(gap, _isi_ideal(gap)) == ["FAKTA_KOSONG_PADA_LOLOS"]
     sop = _kasus("p01-m-sop-hanya-tugas-formal")
     kosong = _isi_ideal(sop) | {"factual_extracts": []}
     assert _nilai(sop, kosong) == ["FAKTA_KOSONG_PADA_LOLOS"]

@@ -10,6 +10,7 @@ gerbang (lihat ``_periksa_jenis``).
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -43,6 +44,7 @@ _POLA_ID = r"^[A-Za-z0-9_.:-]{1,100}$"
 _ALASAN_GERBANG = ("SUMBER_KOSONG", "METADATA_SUMBER_HILANG", "JENIS_DITOLAK", "PII_DITEMUKAN")
 _STATUS_MODEL = ("LOLOS", "EVIDENCE_GAP")
 _PREFIKS_JENIS_TERLARANG = ("WCP", "DCS", "KONSELING", "MURID")
+_RE_KATA_PENYANGKAL = re.compile(r"(?<![a-z])(?:tidak|bukan|tanpa|belum)(?![a-z])")
 
 
 def _norm(teks: str) -> str:
@@ -161,6 +163,14 @@ class HarapanKasus(BaseModel):
             diperiksa, setiap kemunculannya (dinormalkan) dihapus dari teks; ``harus_memuat``
             dan ``angka_baru_dilarang`` tetap memakai teks utuh. Tiap entri wajib memuat
             minimal satu entri ``dilarang_pola`` kasus yang sama sebagai potongan.
+        penyangkal_pola: Frasa penyangkal yang dideklarasikan kasus (mis. ``tidak menyatakan``).
+            Satu kemunculan ``dilarang_pola`` diabaikan bila, dalam kalimat yang sama, didahului
+            salah satu penyangkal dengan jarak paling banyak 15 kata dan tanpa kata
+            ``tetapi``/``namun``/``melainkan``/``sedangkan``/``padahal`` di antaranya. Tiap entri
+            wajib memuat kata utuh ``tidak``/``bukan``/``tanpa``/``belum``. Kosong = perilaku lama.
+        bidang_pola: Himpunan bagian ``bidang_teks`` tempat ``dilarang_pola`` dicocokkan;
+            ``None`` = seluruh ``bidang_teks``. ``harus_memuat`` dan ``ANGKA_BARU`` tetap
+            memakai seluruh ``bidang_teks``.
         harus_memuat: Frasa wajib; elemen berupa daftar berarti salah satu cukup.
         angka_baru_dilarang: Bilangan pada teks harus ada di sumber atau parameter.
         kontradiksi_wajib: ``contradictions`` pada keluaran harus terisi.
@@ -188,6 +198,8 @@ class HarapanKasus(BaseModel):
     bidang_teks: list[str] = Field(default_factory=lambda: ["isi.draft_text"])
     dilarang_pola: list[str] = Field(default_factory=list)
     pola_dikecualikan: list[str] = Field(default_factory=list)
+    penyangkal_pola: list[str] = Field(default_factory=list)
+    bidang_pola: list[str] | None = None
     harus_memuat: list[str | list[str]] = Field(default_factory=list)
     angka_baru_dilarang: bool = False
     kontradiksi_wajib: bool = False
@@ -220,6 +232,13 @@ class HarapanKasus(BaseModel):
                 raise ValueError(
                     "pola_dikecualikan harus memuat minimal satu dilarang_pola sebagai potongan"
                 )
+        for penyangkal in self.penyangkal_pola:
+            if not _RE_KATA_PENYANGKAL.search(_norm(penyangkal)):
+                raise ValueError("penyangkal_pola harus memuat kata utuh tidak/bukan/tanpa/belum")
+        if self.bidang_pola is not None and (
+            not self.bidang_pola or not set(self.bidang_pola) <= set(self.bidang_teks)
+        ):
+            raise ValueError("bidang_pola harus himpunan bagian tak kosong dari bidang_teks")
         return self
 
 

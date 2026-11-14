@@ -64,6 +64,9 @@
           "boleh dijalankan",
           "formasi ditetapkan",
           "authorization_state"
+        ],
+        "penyangkal_pola": [
+          "tidak berarti"
         ]
       }
     },

@@ -59,6 +59,10 @@
           "siap dijalankan",
           "formasi ditetapkan",
           "slot kosong sehingga"
+        ],
+        "penyangkal_pola": [
+          "tidak menyatakan",
+          "tidak ada yang dinyatakan"
         ]
       }
     },
@@ -120,6 +124,10 @@
           "siap dijalankan",
           "formasi ditetapkan",
           "slot kosong sehingga"
+        ],
+        "penyangkal_pola": [
+          "tidak menyatakan",
+          "tidak ada yang dinyatakan"
         ]
       }
     },
