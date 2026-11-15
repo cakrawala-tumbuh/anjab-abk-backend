@@ -1,9 +1,18 @@
-"""Definisi fungsi AI P01: ekstraksi fakta dan metadata dari satu dokumen sumber.
+"""Definisi fungsi AI P01: ekstraksi fakta dari satu dokumen sumber.
 
 P01 mengambil fakta berkutipan dari satu baris ``narasi_sumber`` yang izin AI-nya tercatat.
 Hasilnya hanya usulan untuk Tim Kajian. Dokumen normatif (SOP, kebijakan, pedoman) menunjukkan
 yang seharusnya, bukan yang terlaksana, jadi fungsi ini dilarang menyimpulkan praktik aktual
 darinya. Fungsi ini tidak mengubah sumber dan tidak membuat narasi.
+
+Sejak ``prompt_version`` ``p01-2`` (#150) instruksi memuat dua aturan tambahan:
+
+- Aturan 9: identitas dokumen (judul, nomor, tanggal terbit, penerbit) bukan fakta dan tidak
+  masuk ``factual_extracts``; bila relevan cukup disebut di ``source_quality.alasan``. Skema
+  keluaran memang tidak punya tempat untuk metadata dokumen.
+- Aturan 10: larangan angka baru (aturan 3) berlaku di seluruh bidang keluaran, termasuk
+  ``uncertainties``, ``limitations``, dan ``unknowns``; kata bilangan ditulis seperti di sumber,
+  tidak diubah menjadi digit, dan tidak ditafsirkan menjadi rentang atau batas.
 """
 
 from __future__ import annotations
@@ -39,7 +48,7 @@ POLA_KODE_P01 = r"^[A-Za-z0-9_.:-]+$"
 """Pola nilai parameter: kode tanpa spasi, tanpa teks bebas."""
 
 INSTRUKSI_P01 = """\
-Fungsi: mengekstrak fakta dan metadata dari satu dokumen sumber untuk Tim Kajian. Hasilnya \
+Fungsi: mengekstrak fakta dari satu dokumen sumber untuk Tim Kajian. Hasilnya \
 hanya saran berkutipan; bukan narasi dan bukan keputusan.
 
 Aturan fungsi:
@@ -61,7 +70,13 @@ TIDAK_JELAS) beserta alasannya.
 factual_extracts dengan daftar kosong, dan isi unknowns dengan apa yang tidak ditemukan.
 8. Ketidakpastian masuk uncertainties; hal yang tidak dapat Anda periksa masuk limitations. \
 Parameter peran_ref dan periode hanya kode konteks, bukan sumber fakta. Tulis seluruh keluaran \
-dalam bahasa Indonesia.\
+dalam bahasa Indonesia.
+9. Identitas dokumen (judul, nomor, tanggal terbit, penerbit) bukan fakta dan tidak dimasukkan \
+ke factual_extracts. Bila relevan, identitas dokumen cukup disebut di source_quality.alasan.
+10. Larangan angka pada aturan 3 berlaku untuk seluruh bidang keluaran, termasuk uncertainties, \
+limitations, dan unknowns. Kata bilangan ditulis sama seperti di sumber, tidak diubah menjadi \
+digit, dan tidak ditafsirkan menjadi rentang atau batas (mis. "skala lima" tidak ditulis \
+"1–5").\
 """
 
 SKEMA_ISI_P01: dict = {
@@ -105,7 +120,7 @@ persetujuan, skor, atau keputusan. ``qa_flags`` milik server (``kode_qa``), buka
 
 FUNGSI_P01 = FungsiAi(
     kode="P01",
-    prompt_version="p01-1",
+    prompt_version="p01-2",
     instruksi=INSTRUKSI_P01,
     skema_isi=SKEMA_ISI_P01,
 )

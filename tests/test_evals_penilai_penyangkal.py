@@ -381,3 +381,51 @@ def test_penyangkal_pola_tambalan_149_persis_sesuai_keputusan_desain() -> None:
     }
     for (kode, id_kasus), daftar in harapan.items():
         assert _kasus_nyata(kode, id_kasus).harapan.penyangkal_pola == daftar
+
+
+# (kasus P10, bidang, kalimat sangkalan dari eval nyata d3d11f8, klaim terlarang) (#150)
+_KASUS_TAMBAL_150 = [
+    (
+        "p10-m-positif-pedoman-penilaian",
+        "isi.draft_text",
+        "Pedoman ini tidak membuktikan bahwa pengumuman rubrik sudah dilaksanakan oleh guru.",
+        "Pengumuman rubrik sudah dilaksanakan oleh guru.",
+    ),
+    (
+        "p10-m-prm91-3-dua-persetujuan-bukan-dua-bukti",
+        "isi.draft_text",
+        "Kedua catatan persetujuan itu tidak dihitung sebagai dua bukti terpisah.",
+        "Kedua catatan persetujuan itu merupakan dua bukti terpisah.",
+    ),
+    (
+        "p10-m-prm91-3-dua-persetujuan-bukan-dua-bukti",
+        "isi.recommended_review_scope",
+        "Kedua catatan persetujuan itu tidak dihitung sebagai dua bukti terpisah.",
+        "Kedua catatan persetujuan itu merupakan dua bukti terpisah.",
+    ),
+]
+
+
+@pytest.mark.parametrize(("id_kasus", "bidang", "sangkalan", "klaim"), _KASUS_TAMBAL_150)
+def test_tambalan_150_sangkalan_p10_lolos_klaim_positif_tetap_dilarang(
+    id_kasus: str, bidang: str, sangkalan: str, klaim: str
+) -> None:
+    """Dua sangkalan P10 eval nyata tak dihitung ``DILARANG_POLA``; klaim positif tetap gagal."""
+    assert _pola_nyata("P10", id_kasus, bidang, sangkalan) == []
+    assert _pola_nyata("P10", id_kasus, bidang, klaim) != []
+
+
+def test_penyangkal_pola_tambalan_150_persis_sesuai_keputusan_desain() -> None:
+    """Daftar ``penyangkal_pola`` kedua kasus P10 sama dengan tabel Keputusan Desain #150."""
+    harapan = {
+        "p10-m-positif-pedoman-penilaian": [
+            "tidak menyatakan bahwa",
+            "tidak memuat bukti bahwa",
+            "tidak membuktikan bahwa",
+        ],
+        "p10-m-prm91-3-dua-persetujuan-bukan-dua-bukti": ["tidak dihitung sebagai"],
+    }
+    for id_kasus, daftar in harapan.items():
+        k = _kasus_nyata("P10", id_kasus)
+        assert k.harapan.penyangkal_pola == daftar
+        assert k.harapan.bidang_pola is None

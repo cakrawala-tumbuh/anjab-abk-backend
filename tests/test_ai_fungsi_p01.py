@@ -100,7 +100,7 @@ def test_skema_rekursif_tanpa_kata_terlarang_dan_objek_tertutup():
     assert set(SKEMA_ISI_P01["required"]) == {
         "factual_extracts", "source_quality", "uncertainties", "limitations",
     }  # fmt: skip
-    assert FUNGSI_P01.kode == "P01" and FUNGSI_P01.prompt_version == "p01-1"
+    assert FUNGSI_P01.kode == "P01" and FUNGSI_P01.prompt_version == "p01-2"
 
 
 def test_nama_field_tanpa_persetujuan_skor_atau_keputusan_pada_semua_kedalaman():
@@ -234,6 +234,29 @@ def test_instruksi_memuat_setiap_larangan_body():
     assert "EVIDENCE_GAP" in ins and "unknowns" in ins
     assert "factual_extracts" in ins and "daftar kosong" in ins
     assert susun_instruksi(ins).endswith(ins)
+
+
+def test_instruksi_p01_2_identitas_dokumen_bukan_fakta_dan_angka_di_semua_bidang():
+    """Aturan 9 dan 10 (#150) ada, pembuka tanpa "metadata", aturan 2 dan 3 tetap ada."""
+    ins = FUNGSI_P01.instruksi
+    assert FUNGSI_P01.prompt_version == "p01-2"
+    pembuka = ins.splitlines()[0]
+    assert "metadata" not in pembuka
+    assert "mengekstrak fakta dari satu dokumen sumber" in pembuka
+    assert "metadata" not in ins
+    aturan_9 = ins.split("\n9. ", 1)[1].split("\n10. ", 1)[0]
+    assert "Identitas dokumen" in aturan_9
+    assert "judul, nomor, tanggal terbit, penerbit" in aturan_9
+    assert "bukan fakta" in aturan_9 and "factual_extracts" in aturan_9
+    assert "source_quality.alasan" in aturan_9
+    aturan_10 = ins.split("\n10. ", 1)[1]
+    assert "aturan 3" in aturan_10 and "seluruh bidang keluaran" in aturan_10
+    assert "uncertainties" in aturan_10 and "limitations" in aturan_10
+    assert "unknowns" in aturan_10
+    assert "Kata bilangan" in aturan_10 and "tidak diubah menjadi" in aturan_10
+    assert "rentang atau batas" in aturan_10 and '"skala lima"' in aturan_10
+    assert "\n2. Dokumen normatif" in ins
+    assert "\n3. Anda tidak mengarang angka" in ins
 
 
 def test_katalog_memuat_p01_dan_terdaftar_hanya_bila_disebut():

@@ -181,7 +181,8 @@
         "angka_baru_dilarang": true,
         "penyangkal_pola": [
           "tidak menyatakan bahwa",
-          "tidak memuat bukti bahwa"
+          "tidak memuat bukti bahwa",
+          "tidak membuktikan bahwa"
         ]
       }
     },
@@ -501,6 +502,9 @@
           "dua sumber independen",
           "bukti independen ganda",
           "dua bukti berbeda"
+        ],
+        "penyangkal_pola": [
+          "tidak dihitung sebagai"
         ]
       }
     },
