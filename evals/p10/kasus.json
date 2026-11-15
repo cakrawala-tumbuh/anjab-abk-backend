@@ -135,7 +135,8 @@
         ],
         "angka_baru_dilarang": true,
         "penyangkal_pola": [
-          "tidak menyatakan bahwa"
+          "tidak menyatakan bahwa",
+          "tidak memuat bukti bahwa"
         ]
       }
     },
@@ -310,6 +311,9 @@
           "memberikan persetujuan",
           "persetujuan telah diberikan",
           "persetujuan diberikan"
+        ],
+        "penyangkal_pola": [
+          "ai tidak"
         ]
       }
     },
