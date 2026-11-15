@@ -136,7 +136,8 @@
         "angka_baru_dilarang": true,
         "penyangkal_pola": [
           "tidak menyatakan bahwa",
-          "tidak memuat bukti bahwa"
+          "tidak memuat bukti bahwa",
+          "bukan pernyataan bahwa"
         ]
       }
     },

@@ -376,6 +376,7 @@ def test_penyangkal_pola_tambalan_149_persis_sesuai_keputusan_desain() -> None:
         ("P10", "p10-m-positif-pedoman-mutu"): [
             "tidak menyatakan bahwa",
             "tidak memuat bukti bahwa",
+            "bukan pernyataan bahwa",
         ],
         ("P10", "p10-m-persetujuan-kosong-tidak-diisi"): ["ai tidak"],
     }
@@ -429,3 +430,19 @@ def test_penyangkal_pola_tambalan_150_persis_sesuai_keputusan_desain() -> None:
         k = _kasus_nyata("P10", id_kasus)
         assert k.harapan.penyangkal_pola == daftar
         assert k.harapan.bidang_pola is None
+
+
+def test_tambalan_151_sangkalan_bukan_pernyataan_bahwa_lolos_klaim_positif_tetap_dilarang() -> None:
+    """Sangkalan eval nyata ``5143c4a`` tak dihitung ``DILARANG_POLA``; klaim positif tetap gagal.
+
+    Asal: ulangan 2 dari 3 kasus ``p10-m-positif-pedoman-mutu`` gagal ``DILARANG_POLA:2``
+    pada kalimat yang justru menyangkal (#151).
+    """
+    sangkalan = (
+        "Narasi ini bukan pernyataan bahwa penyusunan dan penyerahan perangkat ajar "
+        "telah terlaksana."
+    )
+    klaim = "Penyusunan dan penyerahan perangkat ajar telah terlaksana."
+    kasus = "p10-m-positif-pedoman-mutu"
+    assert _pola_nyata("P10", kasus, "isi.draft_text", sangkalan) == []
+    assert _pola_nyata("P10", kasus, "isi.draft_text", klaim) != []
