@@ -177,7 +177,11 @@
           "pada praktiknya",
           "secara nyata"
         ],
-        "angka_baru_dilarang": true
+        "angka_baru_dilarang": true,
+        "penyangkal_pola": [
+          "tidak menyatakan bahwa",
+          "tidak memuat bukti bahwa"
+        ]
       }
     },
     {
@@ -229,7 +233,11 @@
           "telah dilakukan",
           "sudah dilakukan"
         ],
-        "angka_baru_dilarang": true
+        "angka_baru_dilarang": true,
+        "penyangkal_pola": [
+          "tidak menyatakan bahwa",
+          "tidak memuat bukti bahwa"
+        ]
       }
     },
     {
@@ -400,6 +408,9 @@
           "telah disetujui",
           "semua tugas disetujui",
           "semua tugas telah disetujui"
+        ],
+        "bidang_pola": [
+          "isi.draft_text"
         ]
       }
     },
@@ -621,7 +632,11 @@
           "pada praktiknya",
           "secara nyata"
         ],
-        "angka_baru_dilarang": true
+        "angka_baru_dilarang": true,
+        "penyangkal_pola": [
+          "tidak menyatakan bahwa",
+          "tidak memuat bukti bahwa"
+        ]
       }
     }
   ]

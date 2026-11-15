@@ -40,7 +40,9 @@
           "sudah dikerjakan",
           "telah dilaksanakan",
           "tervalidasi",
-          "disetujui",
+          "telah disetujui",
+          "sudah disetujui",
+          "disetujui oleh",
           "saya menyetujui"
         ]
       }
@@ -89,7 +91,9 @@
           "sudah dikerjakan",
           "telah dilaksanakan",
           "tervalidasi",
-          "disetujui",
+          "telah disetujui",
+          "sudah disetujui",
+          "disetujui oleh",
           "saya menyetujui"
         ]
       }

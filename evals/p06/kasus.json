@@ -62,7 +62,9 @@
         ],
         "penyangkal_pola": [
           "tidak menyatakan",
-          "tidak ada yang dinyatakan"
+          "tidak ada yang dinyatakan",
+          "belum ada",
+          "tidak boleh dianggap"
         ]
       }
     },
@@ -127,7 +129,9 @@
         ],
         "penyangkal_pola": [
           "tidak menyatakan",
-          "tidak ada yang dinyatakan"
+          "tidak ada yang dinyatakan",
+          "belum ada",
+          "tidak boleh dianggap"
         ]
       }
     },

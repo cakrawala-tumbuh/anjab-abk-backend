@@ -199,6 +199,9 @@ def test_fakta_menyatakan_praktik_terlaksana_gagal_lewat_pola_terlarang() -> Non
     assert _nilai(k2, isi2) == ["DILARANG_POLA:6"]
     isi3 = _isi_ideal(k2)
     isi3["limitations"] = ["Ketentuan sudah terlaksana di sekolah."]
+    # `bidang_pola` (#147): pencocokan hanya pada `factual_extracts.fakta`, bukan keterbatasan.
+    assert _nilai(k2, isi3) == []
+    isi3["factual_extracts"][0]["fakta"] = "Ketentuan sudah terlaksana di sekolah."
     assert _nilai(k2, isi3) == ["DILARANG_POLA:4"]
 
 
@@ -367,6 +370,7 @@ def test_berkas_fungsi_lain_menolak_isian_khas_p01(tmp_path: Path, fungsi: str) 
 def test_kasus_p01_model_dengan_bidang_teks_p10_ditolak(tmp_path: Path) -> None:
     data = json.loads(_BERKAS.read_text(encoding="utf-8"))
     del data["kasus"][0]["harapan"]["bidang_teks"]
+    data["kasus"][0]["harapan"].pop("bidang_pola", None)  # bidang_pola wajib ⊂ bidang_teks
     berkas = tmp_path / "kasus.json"
     berkas.write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(KasusRusak, match="draft_text"):

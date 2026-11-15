@@ -295,7 +295,11 @@
           "bebas masalah"
         ],
         "span_temuan_harus_ada": true,
-        "tanpa_temuan_berat": true
+        "tanpa_temuan_berat": true,
+        "penyangkal_pola": [
+          "tidak menyatakan",
+          "tidak menilai"
+        ]
       }
     },
     {
@@ -401,7 +405,11 @@
             "SALAH_TAUTAN"
           ]
         ],
-        "angka_baru_dilarang": true
+        "angka_baru_dilarang": true,
+        "penyangkal_pola": [
+          "tidak menyatakan",
+          "tidak menilai"
+        ]
       }
     },
     {
