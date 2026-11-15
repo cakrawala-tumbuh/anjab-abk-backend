@@ -7,6 +7,12 @@ tidak pernah dihitung sebagai pemeriksaan kedua.
 
 Draf ikut dikirim sebagai sumber berpenanda ``versi:<id>`` agar melewati gerbang PII dan
 dapat dikutip (``cited_spans``); penanda itu bukan baris ``narasi_sumber``.
+
+Status keluaran: jenis sumber yang kosong dicatat sebagai ``unknowns`` (pada ``limitations``),
+bukan alasan ``EVIDENCE_GAP``; ``AI_DRAFT`` dipakai selama ada kutipan yang menopang isi,
+``EVIDENCE_GAP`` hanya bila tidak ada span yang dapat dikutip. Aturan ini ada di ``INSTRUKSI_P09``
+(``p09-2``) karena guardrail bersama memerintahkan ``EVIDENCE_GAP`` setiap kali rujukan pendukung
+tidak ada.
 """
 
 from __future__ import annotations
@@ -65,7 +71,11 @@ dari sumber itu. Usulan perbaikan masuk correction_proposals; hal yang tidak dap
 periksa masuk limitations.
 8. Tanpa temuan pun Anda wajib mengutip minimal satu span yang Anda periksa pada cited_spans, \
 dan blocking_findings serta major_findings boleh berupa daftar kosong.
-9. Isi peran dengan REVIEWER_OTOMATIS_PEMBANTU. Tulis seluruh keluaran dalam bahasa Indonesia.\
+9. Isi peran dengan REVIEWER_OTOMATIS_PEMBANTU. Tulis seluruh keluaran dalam bahasa Indonesia.
+10. Aturan status. Isi status dengan AI_DRAFT bila isi keluaran dapat ditopang minimal satu \
+kutipan dari sumber mana pun. Jenis sumber yang tidak ada (mis. tidak ada sumber "bukti:") \
+ditulis sebagai unknowns pada limitations; itu bukan alasan memilih EVIDENCE_GAP. Isi status \
+dengan EVIDENCE_GAP hanya bila tidak ada satu pun span yang dapat dikutip dari sumber mana pun.\
 """
 
 _TEMUAN = {
@@ -115,7 +125,7 @@ persetujuan, skor, atau keputusan."""
 
 FUNGSI_P09 = FungsiAi(
     kode="P09",
-    prompt_version="p09-1",
+    prompt_version="p09-2",
     instruksi=INSTRUKSI_P09,
     skema_isi=SKEMA_ISI_P09,
 )

@@ -11,6 +11,12 @@ Pengajuan hanya sah untuk protokol ``TERKUNCI`` yang punya minimal satu statisti
 ``RISET``); statistik ``DRAF`` tidak pernah dikirim. Fungsi ini nonaktif bawaan (Keputusan Tim
 4 November menahan AI F5, KTK:192, dan OD-09 belum terkunci); hasilnya hanya usulan di
 ``ai_usulan``.
+
+Status keluaran: jenis sumber yang kosong dicatat sebagai ``unknowns`` (pada ``limitations``),
+bukan alasan ``EVIDENCE_GAP``; ``AI_DRAFT`` dipakai selama ada kutipan yang menopang isi,
+``EVIDENCE_GAP`` hanya bila tidak ada span yang dapat dikutip. Aturan ini ada di ``INSTRUKSI_P08``
+(``p08-2``) karena guardrail bersama memerintahkan ``EVIDENCE_GAP`` setiap kali rujukan pendukung
+tidak ada.
 """
 
 from __future__ import annotations
@@ -87,7 +93,12 @@ limitations.
 bukan ke naskah. limitations wajib berisi minimal satu keterbatasan.
 7. Gunakan hanya source_id yang ada pada sumber; jangan memakai pengetahuan lain. Parameter \
 protokol_kode, protokol_versi, dan periode hanya kode konteks, bukan sumber fakta. Tulis \
-seluruh keluaran dalam bahasa Indonesia.\
+seluruh keluaran dalam bahasa Indonesia.
+8. Aturan status. Isi status dengan AI_DRAFT bila isi keluaran dapat ditopang minimal satu \
+kutipan dari sumber mana pun. Jenis sumber yang tidak ada (mis. tidak ada sumber "kasus- \
+negatif:") ditulis sebagai unknowns pada limitations; itu bukan alasan memilih EVIDENCE_GAP. Isi \
+status dengan EVIDENCE_GAP hanya bila tidak ada satu pun span yang dapat dikutip dari sumber \
+mana pun.\
 """
 
 SKEMA_ISI_P08: dict = {
@@ -148,7 +159,7 @@ Uji #126 menuntut skema menolak daftar kosong; minimal satu ``source_ids`` per b
 
 FUNGSI_P08 = FungsiAi(
     kode="P08",
-    prompt_version="p08-1",
+    prompt_version="p08-2",
     instruksi=INSTRUKSI_P08,
     skema_isi=SKEMA_ISI_P08,
 )

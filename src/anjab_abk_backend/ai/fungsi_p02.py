@@ -6,6 +6,12 @@ tindakan-objek-tujuan-cara-output beserta audit tingkat (duty/task/activity), du
 dan alasan pecah/gabung. Hasilnya hanya usulan untuk Tim Kajian: kandidat bukan pekerjaan aktual
 yang tervalidasi (MX:8), narasi asal tidak diubah, dan promosi kandidat ke katalog tetap jalur
 manusia. Fungsi ini tidak menulis katalog.
+
+Status keluaran: jenis sumber yang kosong dicatat sebagai ``unknowns`` (pada
+``reviewer_questions``), bukan alasan ``EVIDENCE_GAP``; ``AI_DRAFT`` dipakai selama ada kutipan
+yang menopang isi, ``EVIDENCE_GAP`` hanya bila tidak ada span yang dapat dikutip. Aturan ini ada
+di ``INSTRUKSI_P02`` (``p02-2``) karena guardrail bersama memerintahkan ``EVIDENCE_GAP`` setiap
+kali rujukan pendukung tidak ada.
 """
 
 from __future__ import annotations
@@ -97,7 +103,12 @@ source_id dan alasannya.
 atau keputusan.
 7. Gunakan hanya source_id yang ada pada sumber; jangan memakai pengetahuan lain dan jangan \
 mengarang angka. Parameter jabatan_kode, unit, dan periode hanya kode konteks, bukan sumber \
-fakta. Tulis seluruh keluaran dalam bahasa Indonesia.\
+fakta. Tulis seluruh keluaran dalam bahasa Indonesia.
+8. Aturan status. Isi status dengan AI_DRAFT bila isi keluaran dapat ditopang minimal satu \
+kutipan dari sumber mana pun. Jenis sumber yang tidak ada (mis. tidak ada sumber "kesiapan:") \
+ditulis sebagai unknowns pada reviewer_questions; itu bukan alasan memilih EVIDENCE_GAP. Isi \
+status dengan EVIDENCE_GAP hanya bila tidak ada satu pun span yang dapat dikutip dari sumber \
+mana pun.\
 """
 
 _SOURCE_IDS = {"type": "array", "items": {"type": "string"}}
@@ -167,7 +178,7 @@ persetujuan, skor, atau keputusan. Jumlah minimum ``source_ids`` ditagih ``atura
 
 FUNGSI_P02 = FungsiAi(
     kode="P02",
-    prompt_version="p02-1",
+    prompt_version="p02-2",
     instruksi=INSTRUKSI_P02,
     skema_isi=SKEMA_ISI_P02,
 )

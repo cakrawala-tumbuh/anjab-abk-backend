@@ -259,3 +259,13 @@ def test_sumber_riset_hanya_field_yang_diizinkan_dan_blok_apa_adanya():
     assert AWALAN_SUMBER_RISET == ("protokol:", "statistik:", "kasus-negatif:", "versi-metode:")
     assert "pemeriksa_pemutus" not in FIELD_SUMBER_RISET["versi-metode"]
     assert FIELD_SUMBER_RISET["protokol"] == ("kode", "versi", "isi_hash", "isi")
+
+
+def test_instruksi_p08_aturan_status_ai_draft_dan_batas_evidence_gap():
+    teks = " ".join(FUNGSI_P08.instruksi.split())
+    aturan = teks.split("8. Aturan status.", 1)[1]
+    assert "AI_DRAFT" in aturan and "EVIDENCE_GAP" in aturan and "unknowns" in aturan
+    assert "tidak ada satu pun span" in aturan
+    # aturan larangan lama tetap ada (regresi)
+    assert "1. Jangan mengarang statistik" in teks
+    assert FUNGSI_P08.prompt_version == "p08-2"

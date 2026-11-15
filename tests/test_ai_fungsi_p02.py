@@ -243,3 +243,13 @@ def test_katalog_memuat_p02_dan_bawaan_tidak_aktif():
     assert "P02" not in FUNGSI_TERDAFTAR
     daftarkan_fungsi(Settings(ai_fungsi_aktif=["P02"]))
     assert FUNGSI_TERDAFTAR == {"P02": FUNGSI_P02}
+
+
+def test_instruksi_p02_aturan_status_ai_draft_dan_batas_evidence_gap():
+    teks = " ".join(FUNGSI_P02.instruksi.split())
+    aturan = teks.split("8. Aturan status.", 1)[1]
+    assert "AI_DRAFT" in aturan and "EVIDENCE_GAP" in aturan and "unknowns" in aturan
+    assert "tidak ada satu pun span" in aturan
+    # aturan larangan lama tetap ada (regresi)
+    assert "1. Kandidat tugas bukan pekerjaan aktual yang tervalidasi" in teks
+    assert FUNGSI_P02.prompt_version == "p02-2"

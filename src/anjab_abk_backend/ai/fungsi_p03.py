@@ -13,6 +13,12 @@ berperiode. Sumber penugasan aktual belum ada di aplikasi, jadi versi ini sengaj
 
 Hasilnya hanya usulan untuk Tim Kajian; mandat formal bukan bukti tugas dikerjakan (KAI:13).
 Versi penuh menunggu model penugasan berperiode dan roster unit.
+
+Status keluaran: jenis sumber yang kosong dicatat sebagai ``unknowns`` (sudah wajib per aturan 5),
+bukan alasan ``EVIDENCE_GAP``; ``AI_DRAFT`` dipakai selama ada kutipan yang menopang isi,
+``EVIDENCE_GAP`` hanya bila tidak ada span yang dapat dikutip. Aturan ini ada di ``INSTRUKSI_P03``
+(``p03-terbatas-2``) karena guardrail bersama memerintahkan ``EVIDENCE_GAP`` setiap kali rujukan
+pendukung tidak ada.
 """
 
 from __future__ import annotations
@@ -100,7 +106,12 @@ jangan memilih diam-diam.
 yang belum diketahui.
 6. Gunakan hanya source_id yang ada pada sumber; jangan memakai pengetahuan lain. Parameter \
 jabatan_kode dan periode hanya kode konteks, bukan sumber fakta. Tulis seluruh keluaran \
-dalam bahasa Indonesia.\
+dalam bahasa Indonesia.
+7. Aturan status. Isi status dengan AI_DRAFT bila isi keluaran dapat ditopang minimal satu \
+kutipan dari sumber mana pun. Jenis sumber yang tidak ada (mis. tidak ada sumber penugasan \
+aktual) ditulis pada unknowns; itu bukan alasan memilih EVIDENCE_GAP. Ketiadaan sumber penugasan \
+aktual (sudah wajib di unknowns, aturan 5) bukan alasan EVIDENCE_GAP. Isi status dengan \
+EVIDENCE_GAP hanya bila tidak ada satu pun span yang dapat dikutip dari sumber mana pun.\
 """
 
 SKEMA_ISI_P03: dict = {
@@ -149,7 +160,7 @@ SKEMA_ISI_P03: dict = {
 
 FUNGSI_P03 = FungsiAi(
     kode="P03",
-    prompt_version="p03-terbatas-1",
+    prompt_version="p03-terbatas-2",
     instruksi=INSTRUKSI_P03,
     skema_isi=SKEMA_ISI_P03,
 )

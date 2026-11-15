@@ -259,6 +259,18 @@ def test_instruksi_p06_tanpa_asumsi_satu_penerima_dan_membaca_kesiapan():
     assert "satu jabatan penerima" not in teks and "Penerima selain satu jabatan" not in teks
     assert "kesiapan:" in teks and "BELUM_DINILAI" in teks and "HOLD" in teks
     assert "NOT_ESTIMABLE" in teks and "nol" in teks
-    assert "kesiapan:" in FUNGSI_P06.instruksi and FUNGSI_P06.prompt_version == "p06-2"
+    assert "kesiapan:" in FUNGSI_P06.instruksi and FUNGSI_P06.prompt_version == "p06-3"
     assert "kesiapan:" in AWALAN_SUMBER_REDESAIN
     assert "keputusan_perubahan" not in FIELD_SUMBER_REDESAIN["kesiapan"]
+
+
+def test_instruksi_p06_aturan_status_ai_draft_dan_batas_evidence_gap():
+    teks = " ".join(FUNGSI_P06.instruksi.split())
+    aturan = teks.split("9. Aturan status.", 1)[1]
+    assert "AI_DRAFT" in aturan and "EVIDENCE_GAP" in aturan and "unknowns" in aturan
+    assert "tidak ada satu pun span" in aturan
+    # aturan larangan lama tetap ada (regresi)
+    assert "3. Jangan memberi status VERIFIED, READY, atau APPROVE" in teks
+    assert '"kesiapan:"' in aturan
+    assert "dicatat sebagai risiko sesuai aturan 5" in aturan
+    assert FUNGSI_P06.prompt_version == "p06-3"

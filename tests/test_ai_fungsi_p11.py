@@ -245,3 +245,13 @@ def test_teks_konteks_field_tetap():
     )  # fmt: skip
     teks = teks_sumber_konteks("konteks", {"kode": "K-01", "tema": "Rapor", "aktif": True})
     assert teks == "kode: K-01\ntema: Rapor"
+
+
+def test_instruksi_p11_aturan_status_ai_draft_dan_batas_evidence_gap():
+    teks = " ".join(FUNGSI_P11.instruksi.split())
+    aturan = teks.split("9. Aturan status.", 1)[1]
+    assert "AI_DRAFT" in aturan and "EVIDENCE_GAP" in aturan and "unknowns" in aturan
+    assert "tidak ada satu pun span" in aturan
+    # aturan larangan lama tetap ada (regresi)
+    assert "1. Konteks adalah ruang dugaan" in teks
+    assert FUNGSI_P11.prompt_version == "p11-2"

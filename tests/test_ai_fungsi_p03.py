@@ -211,3 +211,16 @@ def test_katalog_memuat_p03_tetapi_bawaan_tidak_aktif():
     assert "P03" not in FUNGSI_TERDAFTAR
     daftarkan_fungsi(Settings(_env_file=None, ai_fungsi_aktif=["P03"]))
     assert FUNGSI_TERDAFTAR == {"P03": FUNGSI_P03}
+
+
+def test_instruksi_p03_aturan_status_ai_draft_dan_batas_evidence_gap():
+    teks = " ".join(FUNGSI_P03.instruksi.split())
+    aturan = teks.split("7. Aturan status.", 1)[1]
+    assert "AI_DRAFT" in aturan and "EVIDENCE_GAP" in aturan and "unknowns" in aturan
+    assert "tidak ada satu pun span" in aturan
+    # aturan larangan lama tetap ada (regresi)
+    assert "1. Mandat formal tidak sama dengan dilakukan" in teks
+    assert "5. unknowns wajib menyebut bahwa sumber penugasan aktual" in teks
+    assert "Ketiadaan sumber penugasan aktual" in aturan
+    assert "bukan alasan EVIDENCE_GAP" in aturan
+    assert FUNGSI_P03.prompt_version == "p03-terbatas-2"

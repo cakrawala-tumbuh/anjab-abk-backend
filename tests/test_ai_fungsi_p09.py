@@ -109,7 +109,7 @@ def test_skema_rekursif_tanpa_kata_terlarang_dan_objek_tertutup():
             if node.get("type") == "object":
                 assert node["additionalProperties"] is False
                 assert set(node["required"]) == set(node["properties"])
-    assert FUNGSI_P09.kode == "P09" and FUNGSI_P09.prompt_version == "p09-1"
+    assert FUNGSI_P09.kode == "P09" and FUNGSI_P09.prompt_version == "p09-2"
 
 
 def test_nama_field_tanpa_persetujuan_skor_atau_keputusan_pada_semua_kedalaman():
@@ -236,3 +236,13 @@ def test_draf_dengan_email_ditolak_gerbang():
     )
     h = gerbang_masukan(s, [], Settings(_env_file=None, ai_pii_mode="BLOKIR"))
     assert (h.lolos, h.alasan) == (False, "PII_DITEMUKAN")
+
+
+def test_instruksi_p09_aturan_status_ai_draft_dan_batas_evidence_gap():
+    teks = " ".join(FUNGSI_P09.instruksi.split())
+    aturan = teks.split("10. Aturan status.", 1)[1]
+    assert "AI_DRAFT" in aturan and "EVIDENCE_GAP" in aturan and "unknowns" in aturan
+    assert "tidak ada satu pun span" in aturan
+    # aturan larangan lama tetap ada (regresi)
+    assert "1. Jangan menyetujui draf" in teks
+    assert FUNGSI_P09.prompt_version == "p09-2"

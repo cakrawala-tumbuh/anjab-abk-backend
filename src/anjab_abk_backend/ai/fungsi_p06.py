@@ -12,6 +12,12 @@ terkirim) ditambah ``rakit_sumber_alternatif`` dan ``rakit_sumber_kesiapan`` (pe
 parameter); tidak ada kuantitas terverifikasi yang dikirim
 (``source_verified_quantities`` selalu kosong). Hasilnya hanya usulan di ``ai_usulan``; tab
 Alternatif tidak diisi otomatis.
+
+Status keluaran: jenis sumber yang kosong dicatat sebagai ``unknowns`` (pada
+``unknown_parameters``), bukan alasan ``EVIDENCE_GAP``; ``AI_DRAFT`` dipakai selama ada kutipan
+yang menopang isi, ``EVIDENCE_GAP`` hanya bila tidak ada span yang dapat dikutip. Aturan ini ada
+di ``INSTRUKSI_P06`` (``p06-3``) karena guardrail bersama memerintahkan ``EVIDENCE_GAP`` setiap
+kali rujukan pendukung tidak ada.
 """
 
 from __future__ import annotations
@@ -97,7 +103,12 @@ sumber ditulis sebagai asumsi (pada opsi atau scenario_assumptions), bukan sebag
 lewat opsi_ke (indeks berbasis nol pada options).
 8. Gunakan hanya source_id yang ada pada sumber; jangan memakai pengetahuan lain. Parameter \
 masalah_id, periode, dan versi_syarat_f4 hanya kode konteks, bukan sumber fakta. Tulis seluruh \
-keluaran dalam bahasa Indonesia.\
+keluaran dalam bahasa Indonesia.
+9. Aturan status. Isi status dengan AI_DRAFT bila isi keluaran dapat ditopang minimal satu \
+kutipan dari sumber mana pun. Jenis sumber yang tidak ada (mis. tidak ada sumber "kesiapan:") \
+ditulis sebagai unknowns pada unknown_parameters; itu bukan alasan memilih EVIDENCE_GAP. \
+Penerima tanpa sumber kesiapan tetap dicatat sebagai risiko sesuai aturan 5. Isi status dengan \
+EVIDENCE_GAP hanya bila tidak ada satu pun span yang dapat dikutip dari sumber mana pun.\
 """
 
 SKEMA_ISI_P06: dict = {
@@ -184,7 +195,7 @@ menuntut skema yang menolak daftar kosong; minimal satu ``source_ids`` per fakta
 
 FUNGSI_P06 = FungsiAi(
     kode="P06",
-    prompt_version="p06-2",
+    prompt_version="p06-3",
     instruksi=INSTRUKSI_P06,
     skema_isi=SKEMA_ISI_P06,
 )

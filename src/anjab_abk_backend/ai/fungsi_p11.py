@@ -10,6 +10,12 @@ Katalog konteks tidak punya objek tunggal, jadi usulan bersasaran ``REDESAIN_KON
 ``sasaran_id`` tetap ``SASARAN_KATALOG_KONTEKS``. Hasilnya hanya usulan di ``ai_usulan`` yang
 diputus Tim Kajian; menulis ke ``redesain_konteks`` adalah jalur terpisah. Fungsi ini nonaktif
 bawaan (``AI_FUNGSI_AKTIF``).
+
+Status keluaran: jenis sumber yang kosong dicatat sebagai ``unknowns`` (pada
+``batas_pemeriksaan``), bukan alasan ``EVIDENCE_GAP``; ``AI_DRAFT`` dipakai selama ada kutipan
+yang menopang isi, ``EVIDENCE_GAP`` hanya bila tidak ada span yang dapat dikutip. Aturan ini ada
+di ``INSTRUKSI_P11`` (``p11-2``) karena guardrail bersama memerintahkan ``EVIDENCE_GAP`` setiap
+kali rujukan pendukung tidak ada.
 """
 
 from __future__ import annotations
@@ -83,7 +89,12 @@ kode yang tercantum pada parameter kode_konteks_ada); bila tidak mirip, mirip_ko
 7. Pertanyaan yang perlu dijawab Tim sebelum menerima kandidat ditulis pada \
 reviewer_questions.
 8. Gunakan hanya source_id yang ada pada sumber; jangan memakai pengetahuan lain. Parameter \
-hanya kode, bukan sumber fakta. Tulis seluruh keluaran dalam bahasa Indonesia.\
+hanya kode, bukan sumber fakta. Tulis seluruh keluaran dalam bahasa Indonesia.
+9. Aturan status. Isi status dengan AI_DRAFT bila isi keluaran dapat ditopang minimal satu \
+kutipan dari sumber mana pun. Jenis sumber yang tidak ada (mis. tidak ada sumber "kesiapan:") \
+ditulis sebagai unknowns pada batas_pemeriksaan; itu bukan alasan memilih EVIDENCE_GAP. Isi \
+status dengan EVIDENCE_GAP hanya bila tidak ada satu pun span yang dapat dikutip dari sumber \
+mana pun.\
 """
 
 SKEMA_ISI_P11: dict = {
@@ -128,7 +139,7 @@ tidak didukung. ``gelombang_saran`` dikunci ke nilai ``Gelombang``."""
 
 FUNGSI_P11 = FungsiAi(
     kode="P11",
-    prompt_version="p11-1",
+    prompt_version="p11-2",
     instruksi=INSTRUKSI_P11,
     skema_isi=SKEMA_ISI_P11,
 )
