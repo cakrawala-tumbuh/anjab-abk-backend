@@ -7,6 +7,8 @@ dan proyek ini menganut [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Unreleased]
 
+## [0.51.2] - 2026-11-16
+
 ### Diperbaiki
 
 - **Kasus eval P10 `p10-m-positif-pedoman-mutu` tidak lagi salah menangkap kalimat sangkalan "bukan pernyataan bahwa"** (backlog #151): `penyangkal_pola` kasus itu ditambah `bukan pernyataan bahwa`; penilai, aturan lulus 3/3, dan kasus lain tidak berubah. **Eval nyata P10 wajib dijalankan ulang** (`make eval-ai FUNGSI=P10`); belum dijalankan.
